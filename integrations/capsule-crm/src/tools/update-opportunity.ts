@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,7 +23,10 @@ export let updateOpportunity = SlateTool.create(spec, {
       probability: z.number().optional().describe('Updated win probability (0-100)'),
       ownerId: z.number().optional().describe('New owner user ID'),
       teamId: z.number().optional().describe('New team ID'),
-      lostReason: z.string().optional().describe('Reason for losing the opportunity'),
+      lostReason: z
+        .string()
+        .optional()
+        .describe('Name of an existing lost reason configured in Capsule'),
       tags: z
         .array(
           z.object({
@@ -55,7 +58,14 @@ export let updateOpportunity = SlateTool.create(spec, {
     if (ctx.input.probability !== undefined) opportunity.probability = ctx.input.probability;
     if (ctx.input.ownerId) opportunity.owner = { id: ctx.input.ownerId };
     if (ctx.input.teamId) opportunity.team = { id: ctx.input.teamId };
-    if (ctx.input.lostReason !== undefined) opportunity.lostReason = ctx.input.lostReason;
+    if (ctx.input.lostReason !== undefined) {
+      let reasons = await client.listLostReasons();
+      let matches = reasons.filter(reason => reason.name === ctx.input.lostReason);
+      if (matches.length !== 1) {
+        throw createApiServiceError('Use the exact name of one existing Capsule lost reason.');
+      }
+      opportunity.lostReason = { id: matches[0]!.id };
+    }
 
     if (ctx.input.valueAmount !== undefined || ctx.input.valueCurrency) {
       opportunity.value = {};

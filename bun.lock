@@ -2292,7 +2292,7 @@
     },
     "integrations/capsule-crm": {
       "name": "@slates-integrations/capsule-crm",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",
@@ -7406,7 +7406,7 @@
     },
     "integrations/kommo": {
       "name": "@slates-integrations/kommo",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",
@@ -9077,7 +9077,7 @@
     },
     "integrations/nocrm-io": {
       "name": "@slates-integrations/nocrmio",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",
@@ -10074,7 +10074,7 @@
     },
     "integrations/pipeline-crm": {
       "name": "@slates-integrations/pipeline-crm",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",
@@ -11340,7 +11340,7 @@
     },
     "integrations/salesmate": {
       "name": "@slates-integrations/salesmate",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",

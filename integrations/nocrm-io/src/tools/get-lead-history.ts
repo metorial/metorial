@@ -37,10 +37,7 @@ export let getLeadHistory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let history = await client.getLeadActionHistory(ctx.input.leadId, {
       startDate: ctx.input.startDate,
@@ -51,10 +48,10 @@ export let getLeadHistory = SlateTool.create(spec, {
 
     let actions = history.map((entry: any) => ({
       actionId: entry.id,
-      actionType: entry.action_type || entry.type,
-      userId: entry.user_id,
+      actionType: entry.action_type ?? entry.type,
+      userId: entry.user?.id ?? entry.user_id ?? undefined,
       createdAt: entry.created_at,
-      content: entry.content || entry.description
+      content: entry.action_item ?? entry.content ?? entry.description ?? undefined
     }));
 
     return {

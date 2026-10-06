@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,11 +20,22 @@ export let createCalendarEntry = SlateTool.create(spec, {
         .enum(['CalendarEvent', 'CalendarTask'])
         .optional()
         .describe('Entry type: CalendarEvent or CalendarTask'),
-      startTime: z.string().optional().describe('Start time for events (ISO 8601)'),
-      endTime: z.string().optional().describe('End time for events (ISO 8601)'),
+      startTime: z
+        .string()
+        .optional()
+        .describe('Start time for events (YYYY-MM-DD HH:MM:SS in your time zone)'),
+      endTime: z
+        .string()
+        .optional()
+        .describe('End time for events (YYYY-MM-DD HH:MM:SS in your time zone)'),
       allDay: z.boolean().optional().describe('Whether this is an all-day event'),
       dueDate: z.string().optional().describe('Due date for tasks (YYYY-MM-DD)'),
-      categoryId: z.number().optional().describe('Event/task category ID'),
+      categoryId: z
+        .number()
+        .optional()
+        .describe(
+          'Required event/task category ID. Call list_event_categories to discover IDs.'
+        ),
       associationId: z
         .number()
         .optional()
@@ -47,6 +58,20 @@ export let createCalendarEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.categoryId === undefined) {
+      throw createApiServiceError(
+        'Provide categoryId. Call list_event_categories to find an event/task category.'
+      );
+    }
+    if (ctx.input.type === 'CalendarEvent' && (!ctx.input.startTime || !ctx.input.endTime)) {
+      throw createApiServiceError('Calendar events require both startTime and endTime.');
+    }
+    if (
+      (ctx.input.associationId === undefined) !==
+      (ctx.input.associationType === undefined)
+    ) {
+      throw createApiServiceError('Provide associationId and associationType together.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       appKey: ctx.auth.appKey

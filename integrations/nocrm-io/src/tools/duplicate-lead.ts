@@ -28,10 +28,7 @@ export let duplicateLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let lead = await client.duplicateLead(ctx.input.leadId, ctx.input.step);
 
@@ -40,7 +37,7 @@ export let duplicateLead = SlateTool.create(spec, {
         leadId: lead.id,
         title: lead.title,
         status: lead.status,
-        step: lead.step,
+        step: lead.step ?? undefined,
         createdAt: lead.created_at
       },
       message: `Duplicated lead ${ctx.input.leadId} → new lead **"${lead.title}"** (ID: ${lead.id}).`

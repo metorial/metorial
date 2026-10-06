@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,16 +56,13 @@ export let manageTeams = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let mapTeam = (t: any) => ({
       teamId: t.id,
       name: t.name,
-      members: t.users || t.members,
-      memberCount: t.users?.length || t.members?.length
+      members: t.users ?? t.members ?? undefined,
+      memberCount: t.users?.length ?? t.members?.length
     });
 
     if (ctx.input.action === 'list') {
@@ -75,7 +72,7 @@ export let manageTeams = SlateTool.create(spec, {
           teams: teams.map((t: any) => ({
             teamId: t.id,
             name: t.name,
-            memberCount: t.users?.length || t.members?.length
+            memberCount: t.users?.length ?? t.members?.length
           }))
         },
         message: `Found **${teams.length}** teams.`
@@ -83,7 +80,7 @@ export let manageTeams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for get action');
+      if (!ctx.input.teamId) throw createApiServiceError('teamId is required for get action');
       let team = await client.getTeam(ctx.input.teamId);
       return {
         output: { team: mapTeam(team) },
@@ -92,7 +89,7 @@ export let manageTeams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create action');
       let team = await client.createTeam(ctx.input.name);
       return {
         output: { team: mapTeam(team) },
@@ -101,8 +98,9 @@ export let manageTeams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for update action');
-      if (!ctx.input.name) throw new Error('name is required for update action');
+      if (!ctx.input.teamId)
+        throw createApiServiceError('teamId is required for update action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for update action');
       let team = await client.updateTeam(ctx.input.teamId, ctx.input.name);
       return {
         output: { team: mapTeam(team) },
@@ -111,7 +109,8 @@ export let manageTeams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for delete action');
+      if (!ctx.input.teamId)
+        throw createApiServiceError('teamId is required for delete action');
       await client.deleteTeam(ctx.input.teamId);
       return {
         output: { deleted: true },
@@ -120,8 +119,10 @@ export let manageTeams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'add_member') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for add_member action');
-      if (!ctx.input.userId) throw new Error('userId is required for add_member action');
+      if (!ctx.input.teamId)
+        throw createApiServiceError('teamId is required for add_member action');
+      if (!ctx.input.userId)
+        throw createApiServiceError('userId is required for add_member action');
       await client.addTeamMember(ctx.input.teamId, ctx.input.userId);
       return {
         output: { memberUpdated: true },
@@ -130,8 +131,10 @@ export let manageTeams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'remove_member') {
-      if (!ctx.input.teamId) throw new Error('teamId is required for remove_member action');
-      if (!ctx.input.userId) throw new Error('userId is required for remove_member action');
+      if (!ctx.input.teamId)
+        throw createApiServiceError('teamId is required for remove_member action');
+      if (!ctx.input.userId)
+        throw createApiServiceError('userId is required for remove_member action');
       await client.removeTeamMember(ctx.input.teamId, ctx.input.userId);
       return {
         output: { memberUpdated: true },
@@ -139,6 +142,6 @@ export let manageTeams = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

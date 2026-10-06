@@ -1,8 +1,8 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface KommoClientConfig {
   token: string;
-  subdomain: string;
+  subdomain?: string;
 }
 
 export interface CustomFieldValue {
@@ -52,15 +52,19 @@ export interface TaskFilters {
 }
 
 export class KommoClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: KommoClientConfig) {
-    this.http = createAxios({
+    if (!config.subdomain) {
+      throw createApiServiceError(
+        'Kommo account subdomain is missing. Reconnect your account.'
+      );
+    }
+    this.http = createAuthenticatedAxios({
       baseURL: `https://${config.subdomain}.kommo.com/api/v4`,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Kommo', reason: 'kommo_api_error' })
     });
   }
 
@@ -99,7 +103,7 @@ export class KommoClient {
 
   async updateLead(leadId: number, data: Record<string, any>) {
     let response = await this.http.patch(`/leads/${leadId}`, data);
-    return response.data?._embedded?.leads?.[0];
+    return response.data?._embedded?.leads?.[0] ?? response.data;
   }
 
   async createComplexLead(data: Record<string, any>) {
@@ -140,7 +144,7 @@ export class KommoClient {
 
   async updateContact(contactId: number, data: Record<string, any>) {
     let response = await this.http.patch(`/contacts/${contactId}`, data);
-    return response.data?._embedded?.contacts?.[0];
+    return response.data?._embedded?.contacts?.[0] ?? response.data;
   }
 
   // ── Companies ──
@@ -175,7 +179,7 @@ export class KommoClient {
 
   async updateCompany(companyId: number, data: Record<string, any>) {
     let response = await this.http.patch(`/companies/${companyId}`, data);
-    return response.data?._embedded?.companies?.[0];
+    return response.data?._embedded?.companies?.[0] ?? response.data;
   }
 
   // ── Tasks ──
@@ -205,6 +209,44 @@ export class KommoClient {
     return response.data;
   }
 
+  async listIncomingLeads(
+    filters: {
+      uids?: string[];
+      categories?: string[];
+      pipelineId?: number;
+      orderDir?: 'asc' | 'desc';
+    },
+    pagination: PaginationParams
+  ) {
+    let params: Record<string, string | number> = {};
+    if (pagination.page !== undefined) params.page = pagination.page;
+    if (pagination.limit !== undefined) params.limit = pagination.limit;
+    filters.uids?.forEach((uid, i) => (params[`filter[uid][${i}]`] = uid));
+    filters.categories?.forEach(
+      (category, i) => (params[`filter[category][${i}]`] = category)
+    );
+    if (filters.pipelineId !== undefined) params['filter[pipeline_id]'] = filters.pipelineId;
+    if (filters.orderDir) params['order[created_at]'] = filters.orderDir;
+    let response = await this.http.get('/leads/unsorted', { params });
+    return response.data?._embedded?.unsorted || [];
+  }
+
+  async acceptIncomingLead(uid: string, data: { user_id?: number; status_id?: number }) {
+    let response = await this.http.post(
+      `/leads/unsorted/${encodeURIComponent(uid)}/accept`,
+      data
+    );
+    return response.data;
+  }
+
+  async declineIncomingLead(uid: string, data: { user_id?: number }) {
+    let response = await this.http.delete(
+      `/leads/unsorted/${encodeURIComponent(uid)}/decline`,
+      { data }
+    );
+    return response.data;
+  }
+
   async createTask(task: Record<string, any>) {
     let response = await this.http.post('/tasks', [task]);
     return response.data?._embedded?.tasks?.[0];
@@ -212,7 +254,7 @@ export class KommoClient {
 
   async updateTask(taskId: number, data: Record<string, any>) {
     let response = await this.http.patch(`/tasks/${taskId}`, data);
-    return response.data?._embedded?.tasks?.[0];
+    return response.data?._embedded?.tasks?.[0] ?? response.data;
   }
 
   // ── Pipelines & Stages ──

@@ -19,7 +19,10 @@ export let listDeals = SlateTool.create(spec, {
       dealName: z.string().optional().describe('Filter by deal name (partial match)'),
       valueFrom: z.number().optional().describe('Minimum deal value filter'),
       valueTo: z.number().optional().describe('Maximum deal value filter'),
-      sort: z.string().optional().describe('Sort field (e.g., "name", "value", "created_at")')
+      sort: z
+        .string()
+        .optional()
+        .describe('Sort field (e.g., "deal_name", "-deal_value", "deal_created")')
     })
   )
   .output(
@@ -58,8 +61,9 @@ export let listDeals = SlateTool.create(spec, {
     let conditions: Record<string, any> = {};
     if (ctx.input.dealName) conditions.deal_name = ctx.input.dealName;
     if (ctx.input.valueFrom !== undefined)
-      conditions['deal_value[from]'] = ctx.input.valueFrom;
-    if (ctx.input.valueTo !== undefined) conditions['deal_value[to]'] = ctx.input.valueTo;
+      conditions.deal_value = { ...conditions.deal_value, from: ctx.input.valueFrom };
+    if (ctx.input.valueTo !== undefined)
+      conditions.deal_value = { ...conditions.deal_value, to: ctx.input.valueTo };
 
     let result = await client.listDeals({
       page: ctx.input.page,
@@ -71,7 +75,7 @@ export let listDeals = SlateTool.create(spec, {
     let deals = (result.entries ?? []).map((deal: any) => ({
       dealId: deal.id,
       name: deal.name,
-      value: deal.value ?? null,
+      value: deal.value == null ? null : Number(deal.value),
       dealStageId: deal.deal_stage_id ?? deal.stage_id ?? null,
       userId: deal.user_id ?? null,
       companyName: deal.company?.name ?? null,

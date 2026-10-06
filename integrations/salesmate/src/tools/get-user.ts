@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getUser = SlateTool.create(spec, {
   name: 'Get User',
   key: 'get_user',
-  description: `Retrieve a specific user by their ID from Salesmate. Returns user details including name, email, and role information.`,
+  description: `Retrieve a specific active user by their ID from Salesmate. Returns user details including name, email, and role information.`,
   tags: {
     readOnly: true
   }

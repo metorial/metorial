@@ -83,7 +83,7 @@ export let listOpportunities = SlateTool.create(spec, {
       party: o.party,
       owner: o.owner,
       team: o.team,
-      lostReason: o.lostReason,
+      lostReason: o.lostReason?.name ?? undefined,
       tags: o.tags,
       fields: o.fields
     }));

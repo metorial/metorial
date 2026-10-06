@@ -58,6 +58,7 @@ export let updateDeal = SlateTool.create(spec, {
       Object.assign(updateData, customFields);
     }
 
+    if (fields.followers) updateData.followers = fields.followers.map(userId => ({ userId }));
     await client.updateDeal(dealId, updateData);
 
     return {

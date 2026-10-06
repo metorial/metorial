@@ -1,20 +1,39 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface ClientConfig {
   subdomain: string;
   token: string;
+  tokenType?: 'api_key' | 'user_token';
 }
 
 export class Client {
-  private ax: ReturnType<typeof createAxios>;
+  private ax: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: ClientConfig) {
-    this.ax = createAxios({
+    this.ax = createAuthenticatedAxios({
       baseURL: `https://${config.subdomain}.nocrm.io/api/v2`,
-      headers: {
-        'X-API-KEY': config.token
-      }
+      authHeader: {
+        name: config.tokenType === 'user_token' ? 'X-USER-TOKEN' : 'X-API-KEY',
+        value: config.token
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'noCRM.io', reason: 'nocrm_api_error' })
     });
+  }
+
+  static fromContext(ctx: {
+    auth: { token: string; subdomain?: string; tokenType?: 'api_key' | 'user_token' };
+    config: unknown;
+  }) {
+    let legacySubdomain =
+      ctx.config && typeof ctx.config === 'object' && 'subdomain' in ctx.config
+        ? ctx.config.subdomain
+        : undefined;
+    let subdomain = ctx.auth.subdomain ?? legacySubdomain;
+    if (typeof subdomain !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(subdomain)) {
+      throw createApiServiceError('Reconnect with your noCRM.io account subdomain.');
+    }
+    return new Client({ subdomain, token: ctx.auth.token, tokenType: ctx.auth.tokenType });
   }
 
   // ── Leads ──
@@ -44,17 +63,29 @@ export class Client {
         step: params?.step,
         user_id: params?.userId,
         email: params?.email,
-        tags: params?.tags,
+        tags: params?.tags === undefined ? undefined : [params.tags],
         starred: params?.starred,
         field_key: params?.fieldKey,
         field_value: params?.fieldValue,
         updated_after: params?.updatedAfter,
         start_date: params?.startDate,
         end_date: params?.endDate,
-        date_range_type: params?.dateRangeType,
+        date_range_type:
+          params?.dateRangeType === 'created'
+            ? 'creation'
+            : params?.dateRangeType === 'updated'
+              ? 'update'
+              : params?.dateRangeType === 'remind'
+                ? 'next_action'
+                : params?.dateRangeType,
         limit: params?.limit,
         offset: params?.offset,
-        order: params?.order,
+        order:
+          params?.order === 'created_at'
+            ? 'creation_date'
+            : params?.order === 'updated_at'
+              ? 'last_update'
+              : params?.order,
         direction: params?.direction,
         include_unassigned: params?.includeUnassigned
       }
@@ -82,7 +113,7 @@ export class Client {
   }) {
     let response = await this.ax.post('/leads', {
       title: data.title,
-      description: data.description,
+      description: data.description ?? '',
       user_id: data.userId,
       tags: data.tags,
       step: data.step,
@@ -104,7 +135,7 @@ export class Client {
       step?: string;
       estimatedClosingDate?: string;
       tags?: string[];
-      clientFolderId?: number;
+      userId?: number;
     }
   ) {
     let response = await this.ax.put(`/leads/${leadId}`, {
@@ -118,7 +149,7 @@ export class Client {
       step: data.step,
       estimated_closing_date: data.estimatedClosingDate,
       tags: data.tags,
-      client_folder_id: data.clientFolderId
+      user_id: data.userId
     });
     return response.data;
   }
@@ -142,8 +173,15 @@ export class Client {
     return response.data;
   }
 
-  async listUnassignedLeads() {
-    let response = await this.ax.get('/leads/unassigned');
+  async addLeadToClient(leadId: number, clientId: number) {
+    let response = await this.ax.post(`/leads/${leadId}/add_to_client`, {
+      client_id: clientId
+    });
+    return response.data;
+  }
+
+  async listUnassignedLeads(limit?: number) {
+    let response = await this.ax.get('/leads/unassigned', { params: { limit } });
     return response.data as any[];
   }
 
@@ -163,10 +201,10 @@ export class Client {
   ) {
     let response = await this.ax.get(`/leads/${leadId}/action_histories`, {
       params: {
-        start_date: params?.startDate,
-        end_date: params?.endDate,
+        from: params?.startDate,
+        to: params?.endDate,
         action_type: params?.actionType,
-        user_id: params?.userId
+        user_ids: params?.userId
       }
     });
     return response.data as any[];
@@ -187,7 +225,7 @@ export class Client {
     }
   ) {
     let response = await this.ax.post(`/leads/${leadId}/comments`, {
-      comment: data.comment,
+      content: data.comment,
       activity_id: data.activityId
     });
     return response.data;
@@ -195,7 +233,7 @@ export class Client {
 
   async updateLeadComment(leadId: number, commentId: number, comment: string) {
     let response = await this.ax.put(`/leads/${leadId}/comments/${commentId}`, {
-      comment
+      content: comment
     });
     return response.data;
   }
@@ -218,12 +256,12 @@ export class Client {
     leadId: number,
     data: {
       templateId: number;
-      userId?: number;
+      userId: number;
     }
   ) {
-    let response = await this.ax.post(`/leads/${leadId}/send_email`, {
-      template_id: data.templateId,
-      user_id: data.userId
+    let response = await this.ax.post(`/leads/${leadId}/emails/send_email_from_template`, {
+      email_template_id: data.templateId,
+      from_user_id: data.userId
     });
     return response.data;
   }
@@ -233,13 +271,11 @@ export class Client {
     data: {
       subject: string;
       body: string;
-      userId?: number;
+      userId: number;
     }
   ) {
-    let response = await this.ax.post(`/leads/${leadId}/send_custom_email`, {
-      subject: data.subject,
-      body: data.body,
-      user_id: data.userId
+    let response = await this.ax.get(`../simple/leads/${leadId}/send_email`, {
+      params: { subject: data.subject, content: data.body, from_user_id: data.userId }
     });
     return response.data;
   }
@@ -315,7 +351,7 @@ export class Client {
   }
 
   async getUser(userIdOrEmail: string | number) {
-    let response = await this.ax.get(`/users/${userIdOrEmail}`);
+    let response = await this.ax.get(`/users/${encodeURIComponent(String(userIdOrEmail))}`);
     return response.data;
   }
 
@@ -445,66 +481,82 @@ export class Client {
   // ── Prospecting Lists ──
 
   async listProspectingLists() {
-    let response = await this.ax.get('/prospecting_lists');
+    let response = await this.ax.get('/spreadsheets');
     return response.data as any[];
   }
 
   async getProspectingList(listId: number) {
-    let response = await this.ax.get(`/prospecting_lists/${listId}`);
+    let response = await this.ax.get(`/spreadsheets/${listId}`);
     return response.data;
   }
 
-  async createProspectingList(data: { name: string; description?: string }) {
-    let response = await this.ax.post('/prospecting_lists', {
-      name: data.name,
+  async createProspectingList(data: {
+    name: string;
+    description?: string;
+    columns: string[];
+  }) {
+    let response = await this.ax.post('/spreadsheets', {
+      title: data.name,
+      content: JSON.stringify([data.columns]),
       description: data.description
     });
     return response.data;
   }
 
   async assignProspectingList(listId: number, userId: number) {
-    let response = await this.ax.post(`/prospecting_lists/${listId}/assign`, {
+    let response = await this.ax.post(`/spreadsheets/${listId}/assign`, {
       user_id: userId
     });
     return response.data;
   }
 
   async addProspects(listId: number, prospects: Record<string, any>[]) {
-    let response = await this.ax.post(`/prospecting_lists/${listId}/prospects`, {
-      prospects
+    let list = await this.getProspectingList(listId);
+    let columns: string[] = list.column_names;
+    if (!Array.isArray(columns) || columns.length === 0) {
+      throw createApiServiceError('The prospecting list has no column headers.');
+    }
+    for (let prospect of prospects) {
+      if (Object.keys(prospect).some(key => !columns.includes(key))) {
+        throw createApiServiceError(
+          'Prospect field names must match the prospecting list column headers.'
+        );
+      }
+    }
+    let rows = prospects.map(prospect => columns.map(column => prospect[column] ?? ''));
+    let response = await this.ax.post(`/spreadsheets/${listId}/rows`, {
+      content: JSON.stringify(rows)
     });
     return response.data;
   }
 
   async updateProspect(listId: number, prospectId: number, fields: Record<string, any>) {
-    let response = await this.ax.put(`/prospecting_lists/${listId}/prospects/${prospectId}`, {
-      fields
-    });
-    return response.data;
-  }
-
-  async deleteProspect(listId: number, prospectId: number) {
-    let response = await this.ax.delete(
-      `/prospecting_lists/${listId}/prospects/${prospectId}`
-    );
-    return response.data;
-  }
-
-  async convertProspectToLead(listId: number, prospectId: number, userId?: number) {
-    let response = await this.ax.post(
-      `/prospecting_lists/${listId}/prospects/${prospectId}/create_lead`,
+    let response = await this.ax.put(
+      `/spreadsheets/${listId}/rows/${prospectId}/update_fields`,
       {
-        user_id: userId
+        fields: JSON.stringify(fields)
       }
     );
     return response.data;
   }
 
+  async deleteProspect(listId: number, prospectId: number) {
+    let response = await this.ax.delete(`/spreadsheets/${listId}/rows/${prospectId}`);
+    return response.data;
+  }
+
+  async convertProspectToLead(listId: number, prospectId: number, userId?: number) {
+    let response = await this.ax.post(
+      `/spreadsheets/${listId}/rows/${prospectId}/create_lead`
+    );
+    return userId === undefined ? response.data : this.assignLead(response.data.id, userId);
+  }
+
   async findProspects(params: { email?: string; fieldName?: string; fieldValue?: string }) {
-    let response = await this.ax.get('/prospecting_lists/find_prospects', {
+    let response = await this.ax.get('/rows', {
       params: {
         email: params.email,
-        field_name: params.fieldName,
+        field_key: params.fieldName,
         field_value: params.fieldValue
       }
     });

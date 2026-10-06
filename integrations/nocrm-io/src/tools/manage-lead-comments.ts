@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -58,16 +58,13 @@ export let manageLeadComments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let mapComment = (c: any) => ({
       commentId: c.id,
-      content: c.comment || c.content || '',
-      activityId: c.activity_id,
-      userId: c.user_id,
+      content: c.content ?? c.comment ?? '',
+      activityId: c.activity_id ?? undefined,
+      userId: c.user?.id ?? c.user_id ?? undefined,
       createdAt: c.created_at
     });
 
@@ -81,7 +78,8 @@ export let manageLeadComments = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.comment) throw new Error('Comment text is required for create action');
+      if (!ctx.input.comment)
+        throw createApiServiceError('Comment text is required for create action');
       let result = await client.createLeadComment(ctx.input.leadId, {
         comment: ctx.input.comment,
         activityId: ctx.input.activityId
@@ -93,8 +91,10 @@ export let manageLeadComments = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.commentId) throw new Error('commentId is required for update action');
-      if (!ctx.input.comment) throw new Error('Comment text is required for update action');
+      if (!ctx.input.commentId)
+        throw createApiServiceError('commentId is required for update action');
+      if (!ctx.input.comment)
+        throw createApiServiceError('Comment text is required for update action');
       let result = await client.updateLeadComment(
         ctx.input.leadId,
         ctx.input.commentId,
@@ -107,7 +107,8 @@ export let manageLeadComments = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.commentId) throw new Error('commentId is required for delete action');
+      if (!ctx.input.commentId)
+        throw createApiServiceError('commentId is required for delete action');
       await client.deleteLeadComment(ctx.input.leadId, ctx.input.commentId);
       return {
         output: { deleted: true },
@@ -115,6 +116,6 @@ export let manageLeadComments = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

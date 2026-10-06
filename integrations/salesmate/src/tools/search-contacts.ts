@@ -10,6 +10,12 @@ let searchRuleSchema = z.object({
   condition: z
     .string()
     .describe('Filter condition (e.g., "EQUALS", "CONTAINS", "STARTS_WITH", "GREATER_THAN")'),
+  fieldType: z
+    .string()
+    .optional()
+    .describe(
+      'Provider field type, such as Text, DateTime, Boolean, or Lookup. Use the type configured for custom fields.'
+    ),
   value: z.string().describe('Value to match against')
 });
 
@@ -18,7 +24,7 @@ export let searchContacts = SlateTool.create(spec, {
   key: 'search_contacts',
   description: `Search and list contacts in Salesmate using filters. Supports pagination and sorting. Use filter rules to narrow results by any contact field.`,
   instructions: [
-    'Common filter conditions: EQUALS, NOT_EQUALS, CONTAINS, NOT_CONTAINS, STARTS_WITH, ENDS_WITH, IS_EMPTY, IS_NOT_EMPTY, GREATER_THAN, LESS_THAN.',
+    'Common filter conditions: EQUALS, NOT_EQUALS, CONTAINS, DOES_NOT_CONTAINS, STARTS_WITH, ENDS_WITH, EMPTY, NOT_EMPTY, GREATER_THAN, LESS_THAN.',
     'Common fields to filter: firstName, lastName, email, company, owner, source, tags, createdAt, modifiedAt.'
   ],
   tags: {
@@ -66,7 +72,7 @@ export let searchContacts = SlateTool.create(spec, {
               operator: filterOperator ?? ('AND' as const),
               rules: filters.map(f => ({
                 moduleName: 'Contact',
-                field: { fieldName: f.fieldName },
+                field: { fieldName: f.fieldName, type: f.fieldType },
                 condition: f.condition,
                 data: f.value
               }))
@@ -85,7 +91,7 @@ export let searchContacts = SlateTool.create(spec, {
 
     let data = result?.Data ?? {};
     let contacts = data.data ?? [];
-    let totalCount = data.totalCount ?? 0;
+    let totalCount = data.totalRows ?? data.totalCount ?? 0;
     let totalPages = data.totalPages ?? 0;
 
     return {

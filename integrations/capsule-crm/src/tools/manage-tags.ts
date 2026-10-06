@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -19,10 +19,7 @@ export let manageTags = SlateTool.create(spec, {
         .enum(['parties', 'opportunities', 'kases'])
         .describe('Entity type the tag applies to'),
       tagId: z.number().optional().describe('Tag ID (required for update and delete)'),
-      name: z
-        .string()
-        .optional()
-        .describe('Tag name (required for create, optional for update)'),
+      name: z.string().optional().describe('Tag name (required for create and update)'),
       dataTag: z.boolean().optional().describe('Whether this is a data tag (for create)')
     })
   )
@@ -49,6 +46,19 @@ export let manageTags = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (['create', 'update'].includes(ctx.input.action) && !ctx.input.name?.trim()) {
+      throw createApiServiceError('Provide a non-empty name when creating or renaming a tag.');
+    }
+    if (
+      ['update', 'delete'].includes(ctx.input.action) &&
+      (ctx.input.tagId === undefined ||
+        !Number.isInteger(ctx.input.tagId) ||
+        ctx.input.tagId <= 0)
+    ) {
+      throw createApiServiceError(
+        'Provide a positive integer tagId when updating or deleting a tag.'
+      );
+    }
     let client = new CapsuleClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {

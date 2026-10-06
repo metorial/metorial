@@ -1,10 +1,15 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class CapsuleClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Capsule CRM',
+          reason: 'capsule_api_error'
+        }),
       baseURL: 'https://api.capsulecrm.com/api/v2',
       headers: {
         Authorization: `Bearer ${config.token}`,
@@ -393,6 +398,11 @@ export class CapsuleClient {
   }
 
   // ── Pipelines & Milestones ──────────────────────────────
+
+  async listLostReasons() {
+    let response = await this.axios.get('/lostreasons');
+    return response.data.lostReasons as { id: number; name: string }[];
+  }
 
   async listPipelines() {
     let response = await this.axios.get('/pipelines');

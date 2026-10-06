@@ -38,10 +38,7 @@ export let createLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let lead = await client.createLead({
       title: ctx.input.title,
@@ -57,8 +54,8 @@ export let createLead = SlateTool.create(spec, {
         leadId: lead.id,
         title: lead.title,
         status: lead.status,
-        step: lead.step,
-        userId: lead.user_id,
+        step: lead.step ?? undefined,
+        userId: lead.user_id ?? undefined,
         createdAt: lead.created_at
       },
       message: `Created lead **"${lead.title}"** (ID: ${lead.id}) with status "${lead.status}"${lead.step ? ` in step "${lead.step}"` : ''}.`

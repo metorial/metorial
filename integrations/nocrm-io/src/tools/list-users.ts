@@ -35,18 +35,15 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let mapUser = (u: any) => ({
       userId: u.id,
       email: u.email,
-      firstname: u.firstname,
-      lastname: u.lastname,
-      isAdmin: u.is_admin,
-      isActive: u.is_active,
+      firstname: u.firstname ?? undefined,
+      lastname: u.lastname ?? undefined,
+      isAdmin: u.is_admin ?? undefined,
+      isActive: u.is_active ?? undefined,
       createdAt: u.created_at
     });
 

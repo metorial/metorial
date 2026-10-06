@@ -28,7 +28,7 @@ export let updateTaskTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KommoClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || (ctx.config as { subdomain?: string }).subdomain
     });
 
     let payload: Record<string, any> = {};

@@ -1,7 +1,18 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let capsuleAxios = createAxios({
+let capsuleAxios = createAuthenticatedAxios({
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Capsule CRM',
+      reason: 'capsule_auth_error'
+    }),
   baseURL: 'https://api.capsulecrm.com'
 });
 
@@ -65,19 +76,29 @@ export let auth = SlateAuth.create()
 
       let data = response.data;
 
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let tokens = normalizeOAuthTokenResponse(data, {
+        providerLabel: 'Capsule CRM',
+        required: true
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          ...tokens,
           subdomain: data.subdomain
         }
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; subdomain?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'Capsule CRM refresh token is missing. Reconnect your account.'
+        );
+      }
       let response = await capsuleAxios.post(
         '/oauth/token',
         {
@@ -95,13 +116,15 @@ export let auth = SlateAuth.create()
 
       let data = response.data;
 
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let tokens = normalizeOAuthTokenResponse(data, {
+        providerLabel: 'Capsule CRM',
+        required: true,
+        previousRefreshToken: ctx.output.refreshToken
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          ...tokens,
           subdomain: data.subdomain ?? ctx.output.subdomain
         }
       };

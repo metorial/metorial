@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -27,6 +27,15 @@ export let createEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let links = [ctx.input.partyId, ctx.input.opportunityId, ctx.input.projectId];
+    if (
+      links.filter(id => id !== undefined).length !== 1 ||
+      links.some(id => id !== undefined && (!Number.isInteger(id) || id <= 0))
+    ) {
+      throw createApiServiceError(
+        'Link the entry to exactly one valid partyId, opportunityId, or projectId.'
+      );
+    }
     let client = new CapsuleClient({ token: ctx.auth.token });
 
     let entry: Record<string, any> = {

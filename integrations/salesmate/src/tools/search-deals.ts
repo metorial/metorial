@@ -10,6 +10,12 @@ let searchRuleSchema = z.object({
   condition: z
     .string()
     .describe('Filter condition (e.g., "EQUALS", "CONTAINS", "GREATER_THAN")'),
+  fieldType: z
+    .string()
+    .optional()
+    .describe(
+      'Provider field type, such as Text, DateTime, Boolean, or Lookup. Use the type configured for custom fields.'
+    ),
   value: z.string().describe('Value to match against')
 });
 
@@ -62,7 +68,7 @@ export let searchDeals = SlateTool.create(spec, {
               operator: filterOperator ?? ('AND' as const),
               rules: filters.map(f => ({
                 moduleName: 'Deal',
-                field: { fieldName: f.fieldName },
+                field: { fieldName: f.fieldName, type: f.fieldType },
                 condition: f.condition,
                 data: f.value
               }))
@@ -81,7 +87,7 @@ export let searchDeals = SlateTool.create(spec, {
 
     let data = result?.Data ?? {};
     let deals = data.data ?? [];
-    let totalCount = data.totalCount ?? 0;
+    let totalCount = data.totalRows ?? data.totalCount ?? 0;
     let totalPages = data.totalPages ?? 0;
 
     return {

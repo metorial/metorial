@@ -54,7 +54,11 @@ export let createDeal = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
     let { customFields, ...fields } = ctx.input;
-    let data = { ...fields, ...customFields };
+    let data = {
+      ...fields,
+      ...customFields,
+      ...(fields.followers ? { followers: fields.followers.map(userId => ({ userId })) } : {})
+    };
     let result = await client.createDeal(data);
     let dealId = result?.Data?.id;
 

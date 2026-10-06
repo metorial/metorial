@@ -66,7 +66,7 @@ export let createDeal = SlateTool.create(spec, {
     if (ctx.input.companyName !== undefined) dealData.company_name = ctx.input.companyName;
     if (ctx.input.primaryContactId !== undefined)
       dealData.primary_contact_id = ctx.input.primaryContactId;
-    if (ctx.input.sourceId !== undefined) dealData.source_id = ctx.input.sourceId;
+    if (ctx.input.sourceId !== undefined) dealData.deal_source = ctx.input.sourceId;
     if (ctx.input.customFields !== undefined) dealData.custom_fields = ctx.input.customFields;
 
     let deal = await client.createDeal(dealData);
@@ -76,7 +76,7 @@ export let createDeal = SlateTool.create(spec, {
         dealId: deal.id,
         name: deal.name,
         summary: deal.summary ?? null,
-        value: deal.value ?? null,
+        value: deal.value == null ? null : Number(deal.value),
         createdAt: deal.created_at ?? null
       },
       message: `Created deal **${deal.name}**${deal.value ? ` with value ${deal.value}` : ''}`

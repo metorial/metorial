@@ -1,4 +1,4 @@
-# Slates Specification for Salesmate
+# Salesmate Integration Specification
 
 ## Overview
 
@@ -11,10 +11,12 @@ Salesmate uses **API key-based authentication**. To obtain your credentials, sig
 When making API requests, include the following headers:
 
 - `accessToken`: Your API access token/session key
-- `x-linkname`: Your Salesmate instance hostname (e.g., if your dashboard URL is `demo.salesmate.io`, the x-linkname is `demo`)
+- `x-linkname`: Your Salesmate instance hostname (e.g., if your dashboard URL is `demo.salesmate.io`, the x-linkname is `demo.salesmate.io`)
 - `Content-Type`: `application/json`
 
-The API base URL follows the pattern: `https://{domain}.salesmate.io/apis/core/v4/`, where `{domain}` is your Salesmate subdomain.
+The API base URL is `https://{domain}.salesmate.io/apis/`, where `{domain}` is the subdomain from the API key connection. Contacts, companies, deals, and activities use their singular resource names followed by `/v4`. Active users use `/core/v4/users?status=active`. The published product endpoints use `/v1/products` and `/v3/products/search`, with a `sessionToken` header and bare subdomain in `x-linkname`. Product sorting is sent as `sortBy` and `sortOrder` query parameters.
+
+The hostname is configured once in the API key connection. An existing stored domain is used only as a fallback when the connection has no hostname.
 
 API keys allow other apps to access your account without giving out your password. Each user in Salesmate has a different set of API keys.
 
@@ -50,11 +52,11 @@ Salesmate offers custom modules to meet specific business needs. These custom mo
 
 ### Notes
 
-Add notes to contacts, companies, deals, and activities to track additional context and information.
+Create, list, retrieve, update, and delete notes linked to CRM records. Notes require a module and record ID. Existing note tools accept optional `linkedModule`, `moduleId`, and `linkedRecordId` fields; provide the record scope when addressing a note. Use `get_module_id` to resolve a custom module API name. Note content is sent as `note`; creation returns `Data.noteId`. Note authorship comes from the API token: create_note validates owner against the current user, and update_note rejects owner reassignment.
 
 ### Users
 
-Manage users within the Salesmate account, including creating users and retrieving user information.
+List active users, retrieve an active user by ID, and identify the authenticated user from the `isCurrentUser` flag.
 
 ### Email & Communication
 
@@ -99,3 +101,9 @@ Webhooks are configured by creating automation rules (workflows/smart flows) tha
 
 - **Record Created**: Triggered when a new record is created in a custom module.
 - **Record Updated**: Triggered when a record is updated in a custom module.
+
+## API Reference and Verification Limits
+
+Verified against the [official Salesmate API reference](https://apidocs.salesmate.io/) and its published request/response examples. Search tools translate page numbers to `from` offsets, use `displayingFields`, `filterQuery`, and `sort`, and return the provider `totalRows` value as `totalCount`. Deal follower IDs are sent as `userId` objects. Provider failure envelopes are surfaced as errors even when HTTP status is 200.
+
+The current reference does not document standalone ticket CRUD routes; existing ticket tools remain unverified. Product retrieval is also not separately documented. The reference warns that v1/v3 were deprecated in 2023 while continuing to publish only those product routes, so current product API availability remains uncertain. The reference includes no module-ID response example, so discovery accepts a numeric ID or an `id`/`moduleId` field and reports unexpected responses. No authenticated provider calls or live tests were run during this refresh.

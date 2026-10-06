@@ -1,4 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -7,7 +13,8 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      subdomain: z.string().optional()
+      subdomain: z.string().optional(),
+      redirectUri: z.string().optional()
     })
   )
   .addOauth({
@@ -41,8 +48,10 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let http = createAxios({
-        baseURL: `https://${ctx.input.subdomain}.kommo.com`
+      let http = createAuthenticatedAxios({
+        baseURL: `https://${ctx.input.subdomain}.kommo.com`,
+        errorAdapter: error =>
+          buildApiServiceError(error, { providerLabel: 'Kommo', reason: 'kommo_api_error' })
       });
 
       let response = await http.post('/oauth2/access_token', {
@@ -53,23 +62,40 @@ export let auth = SlateAuth.create()
         redirect_uri: ctx.redirectUri
       });
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
-          subdomain: ctx.input.subdomain
+          ...normalizeOAuthTokenResponse(response.data, { providerLabel: 'Kommo' }),
+          subdomain: ctx.input.subdomain,
+          redirectUri: ctx.redirectUri
         }
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        subdomain?: string;
+        redirectUri?: string;
+      };
+      input: { subdomain: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError('Kommo refresh token is missing. Reconnect your account.');
+      }
+      if (!ctx.output.redirectUri) {
+        throw createApiServiceError(
+          'Kommo redirect URI is missing. Reconnect your account to enable token refresh.'
+        );
+      }
       let subdomain = ctx.output.subdomain || ctx.input.subdomain;
-      let http = createAxios({
-        baseURL: `https://${subdomain}.kommo.com`
+      let http = createAuthenticatedAxios({
+        baseURL: `https://${subdomain}.kommo.com`,
+        errorAdapter: error =>
+          buildApiServiceError(error, { providerLabel: 'Kommo', reason: 'kommo_api_error' })
       });
 
       let response = await http.post('/oauth2/access_token', {
@@ -77,18 +103,17 @@ export let auth = SlateAuth.create()
         client_secret: ctx.clientSecret,
         grant_type: 'refresh_token',
         refresh_token: ctx.output.refreshToken,
-        redirect_uri: ''
+        redirect_uri: ctx.output.redirectUri
       });
-
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
-          subdomain
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Kommo',
+            previousRefreshToken: ctx.output.refreshToken
+          }),
+          subdomain,
+          redirectUri: ctx.output.redirectUri
         }
       };
     },
@@ -99,9 +124,11 @@ export let auth = SlateAuth.create()
       scopes: string[];
     }) => {
       let subdomain = ctx.output.subdomain || ctx.input.subdomain;
-      let http = createAxios({
+      let http = createAuthenticatedAxios({
         baseURL: `https://${subdomain}.kommo.com/api/v4`,
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
+        authHeader: { value: `Bearer ${ctx.output.token}` },
+        errorAdapter: error =>
+          buildApiServiceError(error, { providerLabel: 'Kommo', reason: 'kommo_api_error' })
       });
 
       let accountRes = await http.get('/account');
@@ -145,9 +172,11 @@ export let auth = SlateAuth.create()
       output: { token: string; refreshToken?: string; expiresAt?: string; subdomain?: string };
       input: { token: string; subdomain: string };
     }) => {
-      let http = createAxios({
+      let http = createAuthenticatedAxios({
         baseURL: `https://${ctx.input.subdomain}.kommo.com/api/v4`,
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
+        authHeader: { value: `Bearer ${ctx.output.token}` },
+        errorAdapter: error =>
+          buildApiServiceError(error, { providerLabel: 'Kommo', reason: 'kommo_api_error' })
       });
 
       let accountRes = await http.get('/account');

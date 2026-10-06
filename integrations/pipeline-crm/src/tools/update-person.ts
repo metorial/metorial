@@ -54,14 +54,14 @@ export let updatePerson = SlateTool.create(spec, {
     if (ctx.input.lastName !== undefined) personData.last_name = ctx.input.lastName;
     if (ctx.input.email !== undefined) personData.email = ctx.input.email;
     if (ctx.input.phone !== undefined) personData.phone = ctx.input.phone;
-    if (ctx.input.title !== undefined) personData.title = ctx.input.title;
+    if (ctx.input.title !== undefined) personData.position = ctx.input.title;
     if (ctx.input.type !== undefined) personData.type = ctx.input.type;
     if (ctx.input.companyId !== undefined) personData.company_id = ctx.input.companyId;
     if (ctx.input.companyName !== undefined) personData.company_name = ctx.input.companyName;
     if (ctx.input.userId !== undefined) personData.user_id = ctx.input.userId;
-    if (ctx.input.sourceId !== undefined) personData.source_id = ctx.input.sourceId;
+    if (ctx.input.sourceId !== undefined) personData.lead_source_id = ctx.input.sourceId;
     if (ctx.input.summary !== undefined) personData.summary = ctx.input.summary;
-    if (ctx.input.address !== undefined) personData.address = ctx.input.address;
+    if (ctx.input.address !== undefined) personData.work_address_1 = ctx.input.address;
     if (ctx.input.customFields !== undefined)
       personData.custom_fields = ctx.input.customFields;
 

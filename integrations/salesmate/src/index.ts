@@ -19,11 +19,14 @@ import {
   getActivity,
   getCompany,
   getContact,
+  getCurrentUser,
   getDeal,
+  getModuleId,
   getNote,
   getProduct,
   getTicket,
   getUser,
+  listNotes,
   listUsers,
   searchActivities,
   searchCompanies,
@@ -78,7 +81,10 @@ export let provider = Slate.create({
     updateNote,
     deleteNote,
     listUsers,
-    getUser
+    getUser,
+    getCurrentUser,
+    getModuleId,
+    listNotes
   ],
   triggers: []
 });

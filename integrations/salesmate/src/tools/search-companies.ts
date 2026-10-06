@@ -8,6 +8,12 @@ let searchRuleSchema = z.object({
   condition: z
     .string()
     .describe('Filter condition (e.g., "EQUALS", "CONTAINS", "STARTS_WITH")'),
+  fieldType: z
+    .string()
+    .optional()
+    .describe(
+      'Provider field type, such as Text, DateTime, Boolean, or Lookup. Use the type configured for custom fields.'
+    ),
   value: z.string().describe('Value to match against')
 });
 
@@ -16,7 +22,7 @@ export let searchCompanies = SlateTool.create(spec, {
   key: 'search_companies',
   description: `Search and list companies in Salesmate using filters. Supports pagination and sorting.`,
   instructions: [
-    'Common filter conditions: EQUALS, NOT_EQUALS, CONTAINS, NOT_CONTAINS, STARTS_WITH, ENDS_WITH, IS_EMPTY, IS_NOT_EMPTY.',
+    'Common filter conditions: EQUALS, NOT_EQUALS, CONTAINS, DOES_NOT_CONTAINS, STARTS_WITH, ENDS_WITH, EMPTY, NOT_EMPTY.',
     'Common fields: name, website, phone, owner, tags, createdAt, modifiedAt.'
   ],
   tags: {
@@ -59,7 +65,7 @@ export let searchCompanies = SlateTool.create(spec, {
               operator: filterOperator ?? ('AND' as const),
               rules: filters.map(f => ({
                 moduleName: 'Company',
-                field: { fieldName: f.fieldName },
+                field: { fieldName: f.fieldName, type: f.fieldType },
                 condition: f.condition,
                 data: f.value
               }))
@@ -78,7 +84,7 @@ export let searchCompanies = SlateTool.create(spec, {
 
     let data = result?.Data ?? {};
     let companies = data.data ?? [];
-    let totalCount = data.totalCount ?? 0;
+    let totalCount = data.totalRows ?? data.totalCount ?? 0;
     let totalPages = data.totalPages ?? 0;
 
     return {

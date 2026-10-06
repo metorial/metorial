@@ -48,7 +48,7 @@ export let listCustomFieldsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KommoClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || (ctx.config as { subdomain?: string }).subdomain
     });
 
     let fields = await client.listCustomFields(ctx.input.entityType, {

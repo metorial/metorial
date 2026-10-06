@@ -76,7 +76,7 @@ export let searchTickets = SlateTool.create(spec, {
 
     let data = result?.Data ?? {};
     let tickets = data.data ?? [];
-    let totalCount = data.totalCount ?? 0;
+    let totalCount = data.totalRows ?? data.totalCount ?? 0;
     let totalPages = data.totalPages ?? 0;
 
     return {

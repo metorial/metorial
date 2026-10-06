@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -42,10 +42,20 @@ export let manageProspecting = SlateTool.create(spec, {
         .describe('Prospect ID (for update, delete, convert_to_lead)'),
       name: z.string().optional().describe('List name (for create_list)'),
       description: z.string().optional().describe('List description (for create_list)'),
+      columns: z
+        .array(z.string())
+        .min(1)
+        .max(26)
+        .optional()
+        .describe(
+          'Column headers for create_list. Defaults to Company, Firstname, Lastname, Email, Phone.'
+        ),
       prospectFields: z
         .array(z.record(z.string(), z.any()))
         .optional()
-        .describe('Array of prospect field objects to add (for add_prospects)'),
+        .describe(
+          '1 to 100 prospect field objects keyed by the exact column headers of the list (for add_prospects)'
+        ),
       fields: z
         .record(z.string(), z.any())
         .optional()
@@ -101,10 +111,7 @@ export let manageProspecting = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     if (ctx.input.action === 'list_lists') {
       let lists = await client.listProspectingLists();
@@ -112,8 +119,8 @@ export let manageProspecting = SlateTool.create(spec, {
         output: {
           prospectingLists: lists.map((l: any) => ({
             prospectingListId: l.id,
-            name: l.name,
-            description: l.description
+            name: l.title,
+            description: l.description ?? undefined
           }))
         },
         message: `Found **${lists.length}** prospecting lists.`
@@ -121,42 +128,49 @@ export let manageProspecting = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_list') {
-      if (!ctx.input.prospectingListId) throw new Error('prospectingListId is required');
+      if (!ctx.input.prospectingListId)
+        throw createApiServiceError('prospectingListId is required');
       let list = await client.getProspectingList(ctx.input.prospectingListId);
       return {
         output: {
           prospectingList: {
             prospectingListId: list.id,
-            name: list.name,
-            description: list.description
+            name: list.title,
+            description: list.description ?? undefined
           }
         },
-        message: `Retrieved prospecting list **"${list.name}"** (ID: ${list.id}).`
+        message: `Retrieved prospecting list **"${list.title}"** (ID: ${list.id}).`
       };
     }
 
     if (ctx.input.action === 'create_list') {
-      if (!ctx.input.name) throw new Error('name is required for create_list');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create_list');
       let list = await client.createProspectingList({
         name: ctx.input.name,
-        description: ctx.input.description
+        description: ctx.input.description,
+        columns: ctx.input.columns ?? ['Company', 'Firstname', 'Lastname', 'Email', 'Phone']
       });
       return {
         output: {
           prospectingList: {
             prospectingListId: list.id,
-            name: list.name,
-            description: list.description
+            name: list.title,
+            description: list.description ?? undefined
           }
         },
-        message: `Created prospecting list **"${list.name}"** (ID: ${list.id}).`
+        message: `Created prospecting list **"${list.title}"** (ID: ${list.id}).`
       };
     }
 
     if (ctx.input.action === 'add_prospects') {
-      if (!ctx.input.prospectingListId) throw new Error('prospectingListId is required');
-      if (!ctx.input.prospectFields || ctx.input.prospectFields.length === 0)
-        throw new Error('prospectFields is required');
+      if (!ctx.input.prospectingListId)
+        throw createApiServiceError('prospectingListId is required');
+      if (
+        !ctx.input.prospectFields ||
+        ctx.input.prospectFields.length === 0 ||
+        ctx.input.prospectFields.length > 100
+      )
+        throw createApiServiceError('Provide between 1 and 100 prospectFields records.');
       let result = await client.addProspects(
         ctx.input.prospectingListId,
         ctx.input.prospectFields
@@ -168,9 +182,10 @@ export let manageProspecting = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update_prospect') {
-      if (!ctx.input.prospectingListId) throw new Error('prospectingListId is required');
-      if (!ctx.input.prospectId) throw new Error('prospectId is required');
-      if (!ctx.input.fields) throw new Error('fields is required');
+      if (!ctx.input.prospectingListId)
+        throw createApiServiceError('prospectingListId is required');
+      if (!ctx.input.prospectId) throw createApiServiceError('prospectId is required');
+      if (!ctx.input.fields) throw createApiServiceError('fields is required');
       let result = await client.updateProspect(
         ctx.input.prospectingListId,
         ctx.input.prospectId,
@@ -183,8 +198,9 @@ export let manageProspecting = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete_prospect') {
-      if (!ctx.input.prospectingListId) throw new Error('prospectingListId is required');
-      if (!ctx.input.prospectId) throw new Error('prospectId is required');
+      if (!ctx.input.prospectingListId)
+        throw createApiServiceError('prospectingListId is required');
+      if (!ctx.input.prospectId) throw createApiServiceError('prospectId is required');
       await client.deleteProspect(ctx.input.prospectingListId, ctx.input.prospectId);
       return {
         output: { deleted: true },
@@ -193,6 +209,11 @@ export let manageProspecting = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'find_prospects') {
+      if (!ctx.input.email && !(ctx.input.fieldName && ctx.input.fieldValue)) {
+        throw createApiServiceError(
+          'Provide email or both fieldName and fieldValue to find prospects.'
+        );
+      }
       let results = await client.findProspects({
         email: ctx.input.email,
         fieldName: ctx.input.fieldName,
@@ -205,8 +226,9 @@ export let manageProspecting = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'convert_to_lead') {
-      if (!ctx.input.prospectingListId) throw new Error('prospectingListId is required');
-      if (!ctx.input.prospectId) throw new Error('prospectId is required');
+      if (!ctx.input.prospectingListId)
+        throw createApiServiceError('prospectingListId is required');
+      if (!ctx.input.prospectId) throw createApiServiceError('prospectId is required');
       let lead = await client.convertProspectToLead(
         ctx.input.prospectingListId,
         ctx.input.prospectId,
@@ -223,6 +245,6 @@ export let manageProspecting = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,4 +1,4 @@
-# Slates Specification for NoCRM.io
+# noCRM.io Integration Specification
 
 ## Overview
 
@@ -26,7 +26,7 @@ NoCRM.io supports two authentication methods, both requiring HTTPS:
 
 ### Account Subdomain
 
-All API requests are made to `https://YOUR_SUBDOMAIN.nocrm.io/api/v2/...`. The subdomain is the unique identifier for each noCRM account.
+All API requests are made to `https://YOUR_SUBDOMAIN.nocrm.io/api/v2/...`. The subdomain is stored with the selected authentication method. Existing API-key connections can continue using their previously stored configuration subdomain. Existing email/password connections must reconnect to store the user-token authentication type.
 
 ### Partner Key (for registered integrations only)
 

@@ -59,10 +59,7 @@ export let getLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let lead = await client.getLead(ctx.input.leadId);
 
@@ -70,36 +67,36 @@ export let getLead = SlateTool.create(spec, {
       output: {
         leadId: lead.id,
         title: lead.title,
-        description: lead.description,
-        htmlDescription: lead.html_description,
+        description: lead.description ?? undefined,
+        htmlDescription: lead.html_description ?? undefined,
         status: lead.status,
-        step: lead.step,
-        stepId: lead.step_id,
-        pipeline: lead.pipeline,
-        amount: lead.amount,
-        probability: lead.probability,
-        currency: lead.currency,
-        starred: lead.starred,
-        tags: lead.tags,
-        userId: lead.user_id,
-        teamId: lead.team_id,
-        clientFolderId: lead.client_folder_id,
-        clientFolderName: lead.client_folder_name,
-        remindDate: lead.remind_date,
-        remindTime: lead.remind_time,
-        estimatedClosingDate: lead.estimated_closing_date,
-        closedAt: lead.closed_at,
-        commentCount: lead.comment_count,
-        attachmentCount: lead.attachment_count,
+        step: lead.step ?? undefined,
+        stepId: lead.step_id ?? undefined,
+        pipeline: lead.pipeline ?? undefined,
+        amount: lead.amount ?? undefined,
+        probability: lead.probability ?? undefined,
+        currency: lead.currency ?? undefined,
+        starred: lead.starred ?? undefined,
+        tags: lead.tags ?? undefined,
+        userId: lead.user_id ?? undefined,
+        teamId: lead.team_id ?? undefined,
+        clientFolderId: lead.client_folder_id ?? undefined,
+        clientFolderName: lead.client_folder_name ?? undefined,
+        remindDate: lead.remind_date ?? undefined,
+        remindTime: lead.remind_time ?? undefined,
+        estimatedClosingDate: lead.estimated_closing_date ?? undefined,
+        closedAt: lead.closed_at ?? undefined,
+        commentCount: lead.comment_count ?? undefined,
+        attachmentCount: lead.attachment_count ?? undefined,
         createdAt: lead.created_at,
         updatedAt: lead.updated_at,
         extendedInfo: lead.extended_info
           ? {
-              firstContactEmail: lead.extended_info.first_contact_email,
-              allContactEmails: lead.extended_info.all_contact_emails,
-              permalink: lead.extended_info.permalink,
-              fields: lead.extended_info.fields,
-              fieldsByName: lead.extended_info.fields_by_name
+              firstContactEmail: lead.extended_info.first_contact_email ?? undefined,
+              allContactEmails: lead.extended_info.all_contact_emails ?? undefined,
+              permalink: lead.extended_info.permalink ?? undefined,
+              fields: lead.extended_info.fields ?? undefined,
+              fieldsByName: lead.extended_info.fields_by_name ?? undefined
             }
           : undefined
       },

@@ -26,6 +26,15 @@ export let createActivity = SlateTool.create(spec, {
         .describe('Whether the activity is already completed'),
       description: z.string().optional().describe('Activity description'),
       tags: z.string().optional().describe('Comma-separated tags'),
+      primaryContact: z
+        .number()
+        .optional()
+        .describe('Contact ID to associate with the activity'),
+      primaryCompany: z
+        .number()
+        .optional()
+        .describe('Company ID to associate with the activity'),
+      relatedTo: z.number().optional().describe('Deal ID to associate with the activity'),
       customFields: z
         .record(z.string(), z.unknown())
         .optional()

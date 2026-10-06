@@ -35,7 +35,7 @@ export let updateTask = SlateTool.create(spec, {
     if (ctx.input.detail !== undefined) task.detail = ctx.input.detail;
     if (ctx.input.dueOn !== undefined) task.dueOn = ctx.input.dueOn;
     if (ctx.input.dueTime !== undefined) task.dueTime = ctx.input.dueTime;
-    if (ctx.input.status !== undefined) task.status = ctx.input.status;
+    if (ctx.input.status !== undefined) task.status = ctx.input.status.toUpperCase();
     if (ctx.input.ownerId) task.owner = { id: ctx.input.ownerId };
 
     let result = await client.updateTask(ctx.input.taskId, task);

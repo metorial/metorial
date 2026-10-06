@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KommoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -42,12 +42,12 @@ export let manageTagsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KommoClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || (ctx.config as { subdomain?: string }).subdomain
     });
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.tags?.length) {
-        throw new Error('Tags array is required when action is "create"');
+        throw createApiServiceError('Tags array is required when action is "create"');
       }
       let created = await client.createTags(ctx.input.entityType, ctx.input.tags);
       let mapped = created.map((t: any) => ({

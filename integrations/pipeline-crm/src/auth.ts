@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -39,18 +40,7 @@ export let auth = SlateAuth.create()
       output: { token: string; appKey: string };
       input: { apiKey: string; appKey: string };
     }) => {
-      let axiosInstance = createAxios({
-        baseURL: 'https://api.pipelinecrm.com/api/v3'
-      });
-
-      let response = await axiosInstance.get('/profile.json', {
-        params: {
-          api_key: ctx.output.token,
-          app_key: ctx.output.appKey
-        }
-      });
-
-      let profile = response.data;
+      let profile = await new Client(ctx.output).getProfile();
 
       return {
         profile: {

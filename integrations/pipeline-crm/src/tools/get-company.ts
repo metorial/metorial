@@ -47,9 +47,9 @@ export let getCompany = SlateTool.create(spec, {
       output: {
         companyId: company.id,
         name: company.name,
-        address: company.address ?? null,
-        phone: company.phone ?? null,
-        website: company.website ?? null,
+        address: company.address_1 ?? company.address ?? null,
+        phone: company.phone1 ?? company.phone ?? null,
+        website: company.web ?? company.website ?? null,
         industry: company.industry ?? null,
         userId: company.user_id ?? company.owner_id ?? null,
         customFields: company.custom_fields ?? null,

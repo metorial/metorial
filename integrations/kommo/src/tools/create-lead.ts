@@ -12,7 +12,7 @@ import { spec } from '../spec';
 export let createLeadTool = SlateTool.create(spec, {
   name: 'Create Lead',
   key: 'create_lead',
-  description: `Create a new sales lead in Kommo. Optionally link it to a pipeline/stage, assign a responsible user, set a price, add tags, and set custom field values. Can also create associated contacts and companies in a single operation using the complex mode.`,
+  description: `Create a new sales lead in Kommo. Optionally link it to a pipeline/stage, assign a responsible user, set a price, add tags, and set custom field values. Can link an existing contact and company to the new lead.`,
   tags: { destructive: false }
 })
   .input(
@@ -42,7 +42,7 @@ export let createLeadTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KommoClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || (ctx.config as { subdomain?: string }).subdomain
     });
 
     let payload: Record<string, any> = {

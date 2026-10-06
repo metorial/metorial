@@ -70,7 +70,7 @@ export let listPeople = SlateTool.create(spec, {
       lastName: person.last_name ?? null,
       email: person.email ?? null,
       phone: person.phone ?? null,
-      title: person.title ?? null,
+      title: person.position ?? person.title ?? null,
       companyName: person.company?.name ?? null,
       userId: person.user_id ?? person.owner_id ?? null,
       createdAt: person.created_at ?? null,

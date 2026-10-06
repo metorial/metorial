@@ -33,7 +33,7 @@ export let listLeadsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KommoClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || (ctx.config as { subdomain?: string }).subdomain
     });
 
     let leads = await client.listLeads(

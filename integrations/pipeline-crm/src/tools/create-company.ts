@@ -44,11 +44,11 @@ export let createCompany = SlateTool.create(spec, {
       name: ctx.input.name
     };
 
-    if (ctx.input.address !== undefined) companyData.address = ctx.input.address;
-    if (ctx.input.phone !== undefined) companyData.phone = ctx.input.phone;
-    if (ctx.input.website !== undefined) companyData.website = ctx.input.website;
+    if (ctx.input.address !== undefined) companyData.address_1 = ctx.input.address;
+    if (ctx.input.phone !== undefined) companyData.phone1 = ctx.input.phone;
+    if (ctx.input.website !== undefined) companyData.web = ctx.input.website;
     if (ctx.input.industry !== undefined) companyData.industry = ctx.input.industry;
-    if (ctx.input.userId !== undefined) companyData.user_id = ctx.input.userId;
+    if (ctx.input.userId !== undefined) companyData.owner_id = ctx.input.userId;
     if (ctx.input.customFields !== undefined)
       companyData.custom_fields = ctx.input.customFields;
 
@@ -58,7 +58,7 @@ export let createCompany = SlateTool.create(spec, {
       output: {
         companyId: company.id,
         name: company.name,
-        website: company.website ?? null,
+        website: company.web ?? company.website ?? null,
         createdAt: company.created_at ?? null
       },
       message: `Created company **${company.name}**`

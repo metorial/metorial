@@ -39,13 +39,17 @@ export let listLeads = SlateTool.create(spec, {
       dateRangeType: z
         .string()
         .optional()
-        .describe('Date range type: created, updated, closed, remind'),
+        .describe(
+          'Date range type: creation, update, next_action, closed. Legacy created, updated, remind aliases are accepted.'
+        ),
       limit: z.number().optional().describe('Maximum number of leads to return (default 100)'),
       offset: z.number().optional().describe('Number of leads to skip for pagination'),
       order: z
         .string()
         .optional()
-        .describe('Sort field (e.g. created_at, updated_at, amount)'),
+        .describe(
+          'Sort field: id, creation_date, last_update, next_action, sale_step, amount, probability, probalized_amount, alphabetically. Legacy created_at and updated_at aliases are accepted.'
+        ),
       direction: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
       includeUnassigned: z.boolean().optional().describe('Include unassigned leads in results')
     })
@@ -70,10 +74,7 @@ export let listLeads = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listLeads({
       status: ctx.input.status,
@@ -99,11 +100,11 @@ export let listLeads = SlateTool.create(spec, {
       leadId: lead.id,
       title: lead.title,
       status: lead.status,
-      step: lead.step,
-      amount: lead.amount,
-      userId: lead.user_id,
-      tags: lead.tags,
-      starred: lead.starred,
+      step: lead.step ?? undefined,
+      amount: lead.amount ?? undefined,
+      userId: lead.user_id ?? undefined,
+      tags: lead.tags ?? undefined,
+      starred: lead.starred ?? undefined,
       createdAt: lead.created_at,
       updatedAt: lead.updated_at
     }));

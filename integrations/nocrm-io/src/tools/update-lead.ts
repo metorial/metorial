@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,11 +55,20 @@ export let updateLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
+    if (ctx.input.status === 'standby' && !ctx.input.remindDate) {
+      throw createApiServiceError('remindDate is required when setting status to standby.');
+    }
+    let assignAfterUpdate = false;
+    if (ctx.input.assignToUserId !== undefined) {
+      let currentLead = await client.getLead(ctx.input.leadId);
+      if (currentLead.user_id == null) {
+        await client.assignLead(ctx.input.leadId, ctx.input.assignToUserId);
+      } else {
+        assignAfterUpdate = true;
+      }
+    }
     let lead = await client.updateLead(ctx.input.leadId, {
       title: ctx.input.title,
       description: ctx.input.description,
@@ -70,11 +79,14 @@ export let updateLead = SlateTool.create(spec, {
       tags: ctx.input.tags,
       remindDate: ctx.input.remindDate,
       remindTime: ctx.input.remindTime,
-      estimatedClosingDate: ctx.input.estimatedClosingDate,
-      clientFolderId: ctx.input.clientFolderId
+      estimatedClosingDate: ctx.input.estimatedClosingDate
     });
 
-    if (ctx.input.assignToUserId) {
+    if (ctx.input.clientFolderId !== undefined) {
+      lead = await client.addLeadToClient(ctx.input.leadId, ctx.input.clientFolderId);
+    }
+
+    if (assignAfterUpdate && ctx.input.assignToUserId !== undefined) {
       lead = await client.assignLead(ctx.input.leadId, ctx.input.assignToUserId);
     }
 
@@ -83,9 +95,9 @@ export let updateLead = SlateTool.create(spec, {
         leadId: lead.id,
         title: lead.title,
         status: lead.status,
-        step: lead.step,
-        amount: lead.amount,
-        userId: lead.user_id,
+        step: lead.step ?? undefined,
+        amount: lead.amount ?? undefined,
+        userId: lead.user_id ?? undefined,
         updatedAt: lead.updated_at
       },
       message: `Updated lead **"${lead.title}"** (ID: ${lead.id}) — status: ${lead.status}${lead.step ? `, step: ${lead.step}` : ''}.`

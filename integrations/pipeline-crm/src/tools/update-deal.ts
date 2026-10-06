@@ -70,16 +70,16 @@ export let updateDeal = SlateTool.create(spec, {
     if (ctx.input.expectedCloseDate !== undefined)
       dealData.expected_close_date = ctx.input.expectedCloseDate;
     if (ctx.input.actualCloseDate !== undefined)
-      dealData.actual_close_date = ctx.input.actualCloseDate;
+      dealData.closed_time = ctx.input.actualCloseDate;
     if (ctx.input.userId !== undefined) dealData.user_id = ctx.input.userId;
     if (ctx.input.companyId !== undefined) dealData.company_id = ctx.input.companyId;
     if (ctx.input.companyName !== undefined) dealData.company_name = ctx.input.companyName;
     if (ctx.input.primaryContactId !== undefined)
       dealData.primary_contact_id = ctx.input.primaryContactId;
-    if (ctx.input.sourceId !== undefined) dealData.source_id = ctx.input.sourceId;
+    if (ctx.input.sourceId !== undefined) dealData.deal_source = ctx.input.sourceId;
     if (ctx.input.lossReason !== undefined) dealData.loss_reason = ctx.input.lossReason;
     if (ctx.input.lossReasonNotes !== undefined)
-      dealData.loss_reason_notes = ctx.input.lossReasonNotes;
+      dealData.deal_loss_reason_notes = ctx.input.lossReasonNotes;
     if (ctx.input.customFields !== undefined) dealData.custom_fields = ctx.input.customFields;
 
     let deal = await client.updateDeal(ctx.input.dealId, dealData);
@@ -88,7 +88,7 @@ export let updateDeal = SlateTool.create(spec, {
       output: {
         dealId: deal.id,
         name: deal.name,
-        value: deal.value ?? null,
+        value: deal.value == null ? null : Number(deal.value),
         updatedAt: deal.updated_at ?? null
       },
       message: `Updated deal **${deal.name}**`

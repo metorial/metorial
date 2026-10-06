@@ -1,6 +1,4 @@
-Now let me fetch the API reference page for more details on features:Now I have comprehensive information. Let me compile the specification.
-
-# Slates Specification for Capsule CRM
+# Capsule CRM API Specification
 
 ## Overview
 
@@ -142,3 +140,14 @@ Triggered when a task is created, updated, or completed.
 Triggered when a user is created, updated, or deleted.
 
 - Events: `user/created`, `user/updated`, `user/deleted`
+
+
+## Available Read Tools
+
+- `get_current_user`: GET `/users/current`, returning the connected user identity and preferences.
+- `get_opportunity`: GET `/opportunities/{id}`, with optional related data.
+- `get_project`: GET `/kases/{id}`, with optional related data.
+
+Task updates preserve lowercase tool input statuses and send Capsule's uppercase model values. Creating tasks requires `dueOn` and allows at most one related record. Notes require exactly one related record. Lost reason names resolve to existing account definitions before opportunity updates.
+
+Official references: [User](https://developer.capsulecrm.com/v2/operations/User), [Opportunity](https://developer.capsulecrm.com/v2/operations/Opportunity), [Project](https://developer.capsulecrm.com/v2/operations/Project), [Task model](https://developer.capsulecrm.com/v2/models/task), [Entry](https://developer.capsulecrm.com/v2/operations/Entry), [Lost Reason](https://developer.capsulecrm.com/v2/operations/Lost_Reason), and [Authentication](https://developer.capsulecrm.com/v2/overview/authentication).

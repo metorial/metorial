@@ -10,16 +10,19 @@ import {
   getCompanyTool,
   getContactTool,
   getLeadTool,
+  getTaskTool,
   listCompaniesTool,
   listContactsTool,
   listCustomFieldsTool,
   listEventsTool,
+  listIncomingLeadsTool,
   listLeadsTool,
   listNotesTool,
   listPipelinesTool,
   listTasksTool,
   listUsersTool,
   manageEntityLinksTool,
+  manageIncomingLeadTool,
   manageTagsTool,
   updateCompanyTool,
   updateContactTool,
@@ -42,6 +45,7 @@ export let provider = Slate.create({
     createCompanyTool,
     updateCompanyTool,
     listTasksTool,
+    getTaskTool,
     createTaskTool,
     updateTaskTool,
     listPipelinesTool,
@@ -52,7 +56,9 @@ export let provider = Slate.create({
     listCustomFieldsTool,
     manageEntityLinksTool,
     getAccountTool,
-    listEventsTool
+    listEventsTool,
+    listIncomingLeadsTool,
+    manageIncomingLeadTool
   ],
   triggers: []
 });

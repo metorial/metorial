@@ -60,8 +60,8 @@ export let listCompanies = SlateTool.create(spec, {
     let companies = (result.entries ?? []).map((company: any) => ({
       companyId: company.id,
       name: company.name,
-      phone: company.phone ?? null,
-      website: company.website ?? null,
+      phone: company.phone1 ?? company.phone ?? null,
+      website: company.web ?? company.website ?? null,
       industry: company.industry ?? null,
       userId: company.user_id ?? company.owner_id ?? null,
       createdAt: company.created_at ?? null,

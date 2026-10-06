@@ -37,7 +37,7 @@ export let listNotesTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KommoClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || (ctx.config as { subdomain?: string }).subdomain
     });
 
     let notes = await client.listNotes(ctx.input.entityType, ctx.input.entityId, {

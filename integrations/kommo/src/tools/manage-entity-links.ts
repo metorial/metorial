@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KommoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -43,12 +43,12 @@ export let manageEntityLinksTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new KommoClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || (ctx.config as { subdomain?: string }).subdomain
     });
 
     if (ctx.input.action === 'link') {
       if (!ctx.input.links?.length) {
-        throw new Error('Links array is required when action is "link"');
+        throw createApiServiceError('Links array is required when action is "link"');
       }
       let apiLinks = ctx.input.links.map(l => ({
         to_entity_id: l.toEntityId,
@@ -73,7 +73,7 @@ export let manageEntityLinksTool = SlateTool.create(spec, {
 
     if (ctx.input.action === 'unlink') {
       if (!ctx.input.links?.length) {
-        throw new Error('Links array is required when action is "unlink"');
+        throw createApiServiceError('Links array is required when action is "unlink"');
       }
       let apiLinks = ctx.input.links.map(l => ({
         to_entity_id: l.toEntityId,

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -97,10 +97,7 @@ export let listPipelinesSteps = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     if (ctx.input.resource === 'pipelines') {
       let pipelines = await client.listPipelines();
@@ -109,7 +106,7 @@ export let listPipelinesSteps = SlateTool.create(spec, {
           pipelines: pipelines.map((p: any) => ({
             pipelineId: p.id,
             name: p.name,
-            isDefault: p.is_default
+            isDefault: p.is_default ?? undefined
           }))
         },
         message: `Found **${pipelines.length}** pipelines.`
@@ -123,8 +120,8 @@ export let listPipelinesSteps = SlateTool.create(spec, {
           steps: steps.map((s: any) => ({
             stepId: s.id,
             name: s.name,
-            pipelineId: s.pipeline_id,
-            position: s.position
+            pipelineId: s.pipeline_id ?? undefined,
+            position: s.position ?? undefined
           }))
         },
         message: `Found **${steps.length}** pipeline steps.`
@@ -138,8 +135,8 @@ export let listPipelinesSteps = SlateTool.create(spec, {
           activities: activities.map((a: any) => ({
             activityId: a.id,
             name: a.name,
-            icon: a.icon,
-            isDisabled: a.is_disabled
+            icon: a.icon ?? undefined,
+            isDisabled: a.is_disabled ?? undefined
           }))
         },
         message: `Found **${activities.length}** activities.`
@@ -153,7 +150,7 @@ export let listPipelinesSteps = SlateTool.create(spec, {
           categories: categories.map((c: any) => ({
             categoryId: c.id,
             name: c.name,
-            tags: c.tags
+            tags: c.tags ?? undefined
           }))
         },
         message: `Found **${categories.length}** categories.`
@@ -167,7 +164,7 @@ export let listPipelinesSteps = SlateTool.create(spec, {
           predefinedTags: tags.map((t: any) => ({
             tagId: t.id,
             name: t.name,
-            categoryId: t.category_id
+            categoryId: t.category_id ?? undefined
           }))
         },
         message: `Found **${tags.length}** predefined tags.`
@@ -181,15 +178,15 @@ export let listPipelinesSteps = SlateTool.create(spec, {
           fields: fields.map((f: any) => ({
             fieldId: f.id,
             name: f.name,
-            fieldType: f.type,
-            parentType: f.parent_type,
-            isKey: f.is_key
+            fieldType: f.type ?? undefined,
+            parentType: f.parent_type ?? undefined,
+            isKey: f.is_key ?? undefined
           }))
         },
         message: `Found **${fields.length}** fields.`
       };
     }
 
-    throw new Error(`Unknown resource: ${ctx.input.resource}`);
+    throw createApiServiceError(`Unknown resource: ${ctx.input.resource}`);
   })
   .build();

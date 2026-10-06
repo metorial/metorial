@@ -10,6 +10,7 @@ import {
   deleteDeal,
   deletePerson,
   getCompany,
+  getCurrentUser,
   getDeal,
   getPerson,
   listCalendarEntries,
@@ -17,9 +18,11 @@ import {
   listCustomFieldLabels,
   listDealStages,
   listDeals,
+  listEventCategories,
   listNotes,
   listPeople,
   listUsers,
+  updateCalendarEntry,
   updateCompany,
   updateDeal,
   updatePerson
@@ -39,7 +42,9 @@ export let provider = Slate.create({
     deletePerson,
     createCompany,
     getCompany,
+    getCurrentUser,
     listCompanies,
+    updateCalendarEntry,
     updateCompany,
     deleteCompany,
     createNote,
@@ -48,6 +53,7 @@ export let provider = Slate.create({
     listCalendarEntries,
     listUsers,
     listDealStages,
+    listEventCategories,
     listCustomFieldLabels
   ],
   triggers: []

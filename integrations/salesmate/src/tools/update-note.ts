@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireNoteRecordId, resolveNoteModuleId } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let updateNote = SlateTool.create(spec, {
@@ -14,9 +14,34 @@ export let updateNote = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      linkedModule: z
+        .string()
+        .optional()
+        .describe(
+          'Module containing the note: Contact, Company, Deal, Task, or Product. Required unless moduleId is provided.'
+        ),
+      moduleId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Module ID. Call get_module_id for custom modules. Required unless linkedModule is provided.'
+        ),
+      linkedRecordId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('ID of the record containing the note; required to address a note.'),
       noteId: z.string().describe('ID of the note to update'),
       description: z.string().optional().describe('Updated note content/text'),
-      owner: z.number().optional().describe('User ID of the note owner'),
+      owner: z
+        .number()
+        .optional()
+        .describe(
+          'Note author reassignment is not supported by Salesmate; omit this field when updating note content'
+        ),
       customFields: z
         .record(z.string(), z.unknown())
         .optional()
@@ -29,20 +54,27 @@ export let updateNote = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.owner !== undefined) {
+      throw createApiServiceError(
+        'Salesmate does not support changing a note author. Omit owner and update the note content.',
+        {
+          reason: 'salesmate_unsupported_note_owner'
+        }
+      );
+    }
     let client = createClient(ctx);
-    let { noteId, customFields, ...fields } = ctx.input;
-
-    let updateData: Record<string, unknown> = {};
-    for (let [key, value] of Object.entries(fields)) {
-      if (value !== undefined) {
-        updateData[key] = value;
-      }
-    }
-    if (customFields) {
-      Object.assign(updateData, customFields);
-    }
-
-    await client.updateNote(noteId, updateData);
+    let { noteId, description, customFields } = ctx.input;
+    let updateData = {
+      ...customFields,
+      ...(description !== undefined ? { note: description } : {}),
+      type: 'Note'
+    };
+    await client.updateNote(
+      noteId,
+      resolveNoteModuleId(ctx.input),
+      requireNoteRecordId(ctx.input.linkedRecordId),
+      updateData
+    );
 
     return {
       output: { noteId },

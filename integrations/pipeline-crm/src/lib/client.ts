@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginatedResponse<T> {
   entries: T[];
@@ -13,16 +13,21 @@ export interface PaginatedResponse<T> {
 export class Client {
   private axios;
 
-  constructor(private credentials: { token: string; appKey: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.pipelinecrm.com/api/v3'
+  constructor(credentials: { token: string; appKey: string }) {
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.pipelinecrm.com/api/v3',
+      authHeader: { value: `Bearer ${credentials.token}` },
+      headers: { 'app-key': credentials.appKey },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Pipeline CRM',
+          reason: 'pipeline_crm_api_error'
+        })
     });
   }
 
   private params(extra: Record<string, any> = {}): Record<string, any> {
     return {
-      api_key: this.credentials.token,
-      app_key: this.credentials.appKey,
       ...extra
     };
   }
@@ -215,6 +220,12 @@ export class Client {
       companyId?: number;
     } = {}
   ): Promise<PaginatedResponse<any>> {
+    if (
+      [options.dealId, options.personId, options.companyId].filter(id => id !== undefined)
+        .length > 1
+    ) {
+      throw createApiServiceError('Choose only one deal, person, or company to filter notes.');
+    }
     let basePath: string;
     if (options.dealId) {
       basePath = `/deals/${options.dealId}/notes.json`;
@@ -329,43 +340,49 @@ export class Client {
     });
   }
 
+  private async listMetadata(path: string): Promise<any[]> {
+    let entries: any[] = [];
+    let page = 1;
+    while (true) {
+      let response = await this.axios.get(path, { params: { page, per_page: 200 } });
+      if (Array.isArray(response.data)) return response.data;
+      let pageEntries = response.data.entries ?? [];
+      entries.push(...pageEntries);
+      let pagination = response.data.pagination;
+      let totalPages =
+        pagination?.pages ??
+        Math.ceil((pagination?.total ?? entries.length) / (pagination?.per_page ?? 200));
+      if (pageEntries.length === 0 || page >= totalPages) return entries;
+      page++;
+    }
+  }
+
   // ── Users ──
 
   async listUsers(): Promise<any[]> {
-    let response = await this.axios.get('/admin/users.json', {
-      params: this.params()
-    });
-    return response.data;
+    return this.listMetadata('/admin/users.json');
   }
 
   // ── Admin / Metadata ──
 
   async listDealStages(): Promise<any[]> {
-    let response = await this.axios.get('/admin/deal_stages.json', {
-      params: this.params()
-    });
-    return response.data;
+    return this.listMetadata('/admin/deal_stages.json');
   }
 
   async listNoteCategories(): Promise<any[]> {
-    let response = await this.axios.get('/admin/note_categories.json', {
-      params: this.params()
-    });
-    return response.data;
+    return this.listMetadata('/admin/note_categories.json');
   }
 
   async listLeadSources(): Promise<any[]> {
-    let response = await this.axios.get('/admin/lead_sources.json', {
-      params: this.params()
-    });
-    return response.data;
+    return this.listMetadata('/admin/lead_sources.json');
   }
 
   async listCustomFieldLabels(resourceType: 'deal' | 'person' | 'company'): Promise<any[]> {
-    let response = await this.axios.get(`/admin/${resourceType}_custom_field_labels.json`, {
-      params: this.params()
-    });
-    return response.data;
+    return this.listMetadata(`/admin/${resourceType}_custom_field_labels.json`);
+  }
+
+  async listEventCategories(): Promise<any[]> {
+    return this.listMetadata('/admin/event_categories.json');
   }
 
   // ── Profile ──

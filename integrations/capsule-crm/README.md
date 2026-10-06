@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Capsule Crm
 
-Manage contacts, sales pipelines, projects, and tasks in Capsule CRM. Create, update, delete, and search people and organisations with addresses, phone numbers, emails, and custom fields. Track sales opportunities through configurable pipelines with milestones, expected close dates, and deal values. Manage projects with boards and stages. Create and assign tasks with due dates and recurrence. Log activity history and communication notes against contacts, opportunities, and projects, including file attachments. Define tags and custom fields to categorise records. Set up automated workflow tracks with sequential tasks. Manage users, teams, goals, filters, and lost reasons.
+Manage contacts, sales opportunities, projects, and tasks in Capsule CRM. List, search, create, update, and delete people and organisations. Read individual opportunities and projects, track deals through pipeline milestones, assign tasks with due dates, log notes, and manage tag definitions. List users and pipelines, or inspect the user associated with your connection.
 
 ## License
 

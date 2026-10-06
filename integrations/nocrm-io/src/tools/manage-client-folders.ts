@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -57,15 +57,12 @@ export let manageClientFolders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      subdomain: ctx.config.subdomain,
-      token: ctx.auth.token
-    });
+    let client = Client.fromContext(ctx);
 
     let mapFolder = (f: any) => ({
       clientFolderId: f.id,
       name: f.name,
-      description: f.description,
+      description: f.description ?? undefined,
       createdAt: f.created_at,
       updatedAt: f.updated_at
     });
@@ -80,7 +77,7 @@ export let manageClientFolders = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.clientFolderId)
-        throw new Error('clientFolderId is required for get action');
+        throw createApiServiceError('clientFolderId is required for get action');
       let folder = await client.getClientFolder(ctx.input.clientFolderId);
       return {
         output: { clientFolder: mapFolder(folder) },
@@ -89,7 +86,7 @@ export let manageClientFolders = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create action');
       let folder = await client.createClientFolder({
         name: ctx.input.name,
         description: ctx.input.description,
@@ -103,7 +100,7 @@ export let manageClientFolders = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.clientFolderId)
-        throw new Error('clientFolderId is required for update action');
+        throw createApiServiceError('clientFolderId is required for update action');
       let folder = await client.updateClientFolder(ctx.input.clientFolderId, {
         name: ctx.input.name,
         description: ctx.input.description,
@@ -117,7 +114,7 @@ export let manageClientFolders = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.clientFolderId)
-        throw new Error('clientFolderId is required for delete action');
+        throw createApiServiceError('clientFolderId is required for delete action');
       await client.deleteClientFolder(ctx.input.clientFolderId);
       return {
         output: { deleted: true },
@@ -125,6 +122,6 @@ export let manageClientFolders = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

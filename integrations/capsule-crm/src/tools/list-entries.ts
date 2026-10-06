@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -49,6 +49,27 @@ export let listEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.entityType === undefined) !== (ctx.input.entityId === undefined)) {
+      throw createApiServiceError(
+        'Provide entityType and entityId together, or omit both to list all entries.'
+      );
+    }
+    if (
+      ctx.input.entityId !== undefined &&
+      (!Number.isInteger(ctx.input.entityId) || ctx.input.entityId <= 0)
+    ) {
+      throw createApiServiceError('Provide a positive integer entityId.');
+    }
+    if (
+      ctx.input.perPage !== undefined &&
+      (!Number.isInteger(ctx.input.perPage) ||
+        ctx.input.perPage < 1 ||
+        ctx.input.perPage > (ctx.input.entityType ? 50 : 100))
+    ) {
+      throw createApiServiceError(
+        'perPage must be 1-50 for entity entries, or 1-100 for all entries.'
+      );
+    }
     let client = new CapsuleClient({ token: ctx.auth.token });
 
     let result: any;
@@ -72,7 +93,7 @@ export let listEntries = SlateTool.create(spec, {
       content: e.content,
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
-      entryDate: e.entryDate,
+      entryDate: e.entryAt,
       creator: e.creator,
       party: e.party,
       opportunity: e.opportunity,

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `List all users in the Salesmate account. Returns user details including names, emails, and roles. Useful for finding owner IDs when creating or assigning records.`,
+  description: `List active users in the Salesmate account. Returns user details including names, emails, and roles. Useful for finding owner IDs when creating or assigning records.`,
   tags: {
     readOnly: true
   }

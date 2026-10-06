@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let createTask = SlateTool.create(spec, {
   key: 'create_task',
   description: `Create a new task in Capsule CRM. Tasks can be linked to a party, opportunity, or project, and can have a due date and time.`,
   instructions: [
-    'A description is required when creating a task.',
+    'A description and dueOn date are required when creating a task.',
     'Optionally link the task to a party, opportunity, or project.'
   ]
 })
@@ -16,7 +16,10 @@ export let createTask = SlateTool.create(spec, {
     z.object({
       description: z.string().describe('Task description/title'),
       detail: z.string().optional().describe('Additional details or notes'),
-      dueOn: z.string().optional().describe('Due date (YYYY-MM-DD)'),
+      dueOn: z
+        .string()
+        .optional()
+        .describe('Due date (YYYY-MM-DD), required when creating a task'),
       dueTime: z.string().optional().describe('Due time (HH:MM:SS)'),
       partyId: z.number().optional().describe('Link to a party by ID'),
       opportunityId: z.number().optional().describe('Link to an opportunity by ID'),
@@ -33,6 +36,18 @@ export let createTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let links = [ctx.input.partyId, ctx.input.opportunityId, ctx.input.projectId];
+    if (
+      links.filter(id => id !== undefined).length > 1 ||
+      links.some(id => id !== undefined && (!Number.isInteger(id) || id <= 0))
+    ) {
+      throw createApiServiceError(
+        'Link the task to at most one valid partyId, opportunityId, or projectId.'
+      );
+    }
+    if (!ctx.input.dueOn) {
+      throw createApiServiceError('Provide dueOn (YYYY-MM-DD) when creating a task.');
+    }
     let client = new CapsuleClient({ token: ctx.auth.token });
 
     let task: Record<string, any> = {
