@@ -41,6 +41,12 @@ export let searchPeople = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Filter by company domains, e.g. ["apollo.io", "google.com"]'),
+      organizationIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Filter by one or more Apollo organization IDs (employers). Use search_organizations to discover organization IDs.'
+        ),
       companyLocations: z.array(z.string()).optional().describe('Filter by company locations'),
       companyEmployeeRanges: z
         .array(z.string())
@@ -84,6 +90,7 @@ export let searchPeople = SlateTool.create(spec, {
       personLocations: ctx.input.locations,
       personSeniorities: ctx.input.seniorities,
       organizationDomains: ctx.input.companyDomains,
+      organizationIds: ctx.input.organizationIds,
       organizationLocations: ctx.input.companyLocations,
       organizationNumEmployeesRanges: ctx.input.companyEmployeeRanges,
       page: ctx.input.page,

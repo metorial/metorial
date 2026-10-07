@@ -179,6 +179,7 @@ export class Client {
           person_locations: filters.personLocations,
           person_seniorities: filters.personSeniorities,
           q_organization_domains_list: filters.organizationDomains,
+          organization_ids: filters.organizationIds,
           organization_locations: filters.organizationLocations,
           organization_num_employees_ranges: filters.organizationNumEmployeesRanges,
           organization_industry_tag_ids: filters.organizationIndustryTagIds,

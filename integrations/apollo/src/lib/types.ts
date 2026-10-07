@@ -183,6 +183,7 @@ export interface PeopleSearchFilters {
   personLocations?: string[];
   personSeniorities?: string[];
   organizationDomains?: string[];
+  organizationIds?: string[];
   organizationLocations?: string[];
   organizationNumEmployeesRanges?: string[];
   organizationIndustryTagIds?: string[];
