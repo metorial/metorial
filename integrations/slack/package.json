@@ -9,16 +9,16 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/adapter-chat": "1.0.0-rc.11",
-    "@slates/slack-tools": "1.0.0-rc.16",
+    "@slates/adapter-chat": "1.0.0-rc.12",
+    "@slates/slack-tools": "1.0.0-rc.17",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.25",
+    "slates": "1.0.0-rc.26",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.23",
+    "@slates/test": "1.0.0-rc.24",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.3.15"
+  "version": "0.3.16"
 }

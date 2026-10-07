@@ -262,6 +262,7 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Slack OAuth (Bot)',
     key: 'oauth',
+    syncTokensAcrossConnections: true,
     adapters: ['chat'],
     docs: [
       {
@@ -330,6 +331,7 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Slack OAuth (User)',
     key: 'user_oauth',
+    syncTokensAcrossConnections: true,
     adapters: [],
     docs: [
       {
