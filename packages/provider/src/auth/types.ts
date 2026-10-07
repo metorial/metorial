@@ -24,6 +24,10 @@ export type SlateAuthWithOauth<
 
   adapters?: string[];
 
+  // Set when the provider issues the same rotating token pair to every
+  // connection of one installation, so a refresh must update all of them.
+  syncTokensAcrossConnections?: boolean;
+
   docs?: SlateAuthDocsReference[];
 
   inputSchema?: z.ZodType<InputType>;

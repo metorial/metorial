@@ -49,6 +49,10 @@ export let mapAuthMethod = <ConfigType extends {}, AuthType extends {}>(
 
   adapters: 'adapters' in m ? m.adapters : undefined,
 
+  ...('syncTokensAcrossConnections' in m && m.syncTokensAcrossConnections
+    ? { syncTokensAcrossConnections: true }
+    : {}),
+
   inputSchema: toJsonSchema(m.inputSchema ?? z.object({})),
   outputSchema: toJsonSchema(slate.spec.auth.outputSchema),
 

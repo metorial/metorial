@@ -9,7 +9,8 @@ import {
   getTriggersForGroup,
   isMappableTrigger,
   mapAction,
-  mapAdapter
+  mapAdapter,
+  mapAuthMethod
 } from './spec';
 
 let baseAction = {
@@ -143,5 +144,27 @@ describe('adapter exposure', () => {
       name: 'Chat',
       capabilities: []
     });
+  });
+});
+
+describe('mapAuthMethod', () => {
+  let slate: any = { spec: { auth: { outputSchema: z.object({ token: z.string() }) } } };
+  let oauthMethod: any = {
+    type: 'auth.oauth',
+    key: 'oauth',
+    name: 'OAuth',
+    scopes: [],
+    getAuthorizationUrl: async () => ({ url: '' }),
+    handleCallback: async () => ({ output: { token: '' } })
+  };
+
+  it('emits syncTokensAcrossConnections only when the method opts in', () => {
+    expect(
+      mapAuthMethod(slate, { ...oauthMethod, syncTokensAcrossConnections: true })
+    ).toMatchObject({ syncTokensAcrossConnections: true });
+
+    for (let method of [oauthMethod, { ...oauthMethod, syncTokensAcrossConnections: false }]) {
+      expect(mapAuthMethod(slate, method)).not.toHaveProperty('syncTokensAcrossConnections');
+    }
   });
 });

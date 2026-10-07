@@ -23,6 +23,8 @@ export let slatesAuthenticationMethod = z.object({
 
   adapters: z.array(z.string()).optional(),
 
+  syncTokensAcrossConnections: z.boolean().optional(),
+
   inputSchema: z.record(z.string(), z.any()),
   outputSchema: z.record(z.string(), z.any()),
 
