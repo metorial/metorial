@@ -30,7 +30,8 @@ let projectIdSchema = z
   );
 
 // Google-managed per-project service agent; nobody else can mint ID tokens for it.
-let ADD_ON_SERVICE_ACCOUNT_PATTERN = /^service-(\d+)@gcp-sa-gsuiteaddons\.iam\.gserviceaccount\.com$/;
+let ADD_ON_SERVICE_ACCOUNT_PATTERN =
+  /^service-(\d+)@gcp-sa-gsuiteaddons\.iam\.gserviceaccount\.com$/;
 
 let userConfigSchema = z.object({
   authenticationAudience: authenticationAudienceSchema,
@@ -38,8 +39,7 @@ let userConfigSchema = z.object({
   projectId: projectIdSchema,
   addOnServiceAccountEmail: z
     .preprocess(
-      value =>
-        typeof value === 'string' ? value.trim().toLowerCase() || undefined : value,
+      value => (typeof value === 'string' ? value.trim().toLowerCase() || undefined : value),
       z
         .string()
         .regex(ADD_ON_SERVICE_ACCOUNT_PATTERN, 'Use the add-on service account email')
@@ -114,7 +114,12 @@ export let normalizeGoogleChatAddOnEvent = (body: unknown): unknown => {
   );
   if (!kind) {
     let unknownKind = Object.keys(payloads).find(key => key.endsWith('Payload'));
-    return { type: unknownKind ? `ADD_ON_${unknownKind}` : 'APP_HOME', eventTime, user, space };
+    return {
+      type: unknownKind ? `ADD_ON_${unknownKind}` : 'APP_HOME',
+      eventTime,
+      user,
+      space
+    };
   }
 
   let payload = payloads[kind] as Record<string, any>;
