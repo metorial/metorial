@@ -1,5 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { ZOOM_USER_AUTH_METHODS } from '../lib/authMethods';
 import { ZoomClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -43,6 +44,7 @@ export let getWebinar = SlateTool.create(spec, {
       settings: z.any().optional().describe('Full webinar settings')
     })
   )
+  .authMethods(ZOOM_USER_AUTH_METHODS)
   .handleInvocation(async ctx => {
     let client = new ZoomClient(ctx.auth.token);
     let webinar = await client.getWebinar(ctx.input.webinarId, {

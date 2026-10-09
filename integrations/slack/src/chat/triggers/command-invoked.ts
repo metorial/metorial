@@ -12,10 +12,12 @@ import {
 
 export let chatCommandInvoked = contract
   .implement(spec, slackEventsTriggerGroup)
-  .scopes(slackActionScopes.chatWrite)
+  .scopes(slackActionScopes.commands)
   .matches(payload => typeof (payload as { command?: unknown }).command === 'string')
   .map(async ctx => {
     let payload = ctx.input as Record<string, any>;
+    // response_url is a short-lived response credential; it only travels as responseToken.
+    let { response_url: _responseUrl, ...raw } = payload;
     let client = new SlackClient(ctx.auth.token);
 
     let [identity, user, rawChannel] = await Promise.all([
@@ -40,7 +42,7 @@ export let chatCommandInvoked = contract
             identity.team_id ?? payload.team_id
           )
         : undefined,
-      raw: payload
+      raw
     };
 
     let id = getEventId(payload, `${input.channelId}:${input.triggerId ?? input.name}`);

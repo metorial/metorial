@@ -118,3 +118,22 @@ The following event categories can be received:
 
 - **chat_boost** — A chat boost was added or changed. The bot must be an administrator in the chat to receive these updates.
 - **removed_chat_boost** — A boost was removed from a chat. The bot must be an administrator in the chat to receive these updates.
+
+## Implemented event delivery
+
+Events are enabled automatically: the integration calls `setWebhook` with a generated
+`secret_token` and the update types `message`, `edited_message`, `channel_post`,
+`edited_channel_post`, `message_reaction`, `chat_member`, and `my_chat_member`, then reads
+the configuration back with `getWebhookInfo`. A bot has one webhook, so enabling events
+replaces any webhook already set and stops `getUpdates` polling. Every delivery must carry
+the `X-Telegram-Bot-Api-Secret-Token` header for the saved registration; others are
+rejected. Deduplication uses `update_id` (reaction updates are split into one event per
+added or removed reaction). Telegram has no message deletion updates.
+
+Normalized events: `message.received` (`message`, `channel_post`), `message.updated`
+(`edited_message`, `edited_channel_post`), `mention.received` (a `mention` of the bot's
+username or a `text_mention` of the bot), `command.invoked` (a leading `bot_command`
+entity addressed to this bot), `reaction.added` / `reaction.removed` (from the
+`old_reaction` / `new_reaction` delta), and `member.joined` / `member.left` (membership
+transitions in `chat_member` and `my_chat_member`). Album items share `groupId`
+(`media_group_id`). Reference: https://core.telegram.org/bots/api#getting-updates

@@ -18,6 +18,8 @@ import {
   type SlatesMessageConfigDefaultGetResponse,
   type SlatesMessageConfigSchemaGetResponse,
   type SlatesMessageProviderIdentifyResponse,
+  type SlatesMessageTriggerGroupGatewayConnectResponse,
+  type SlatesMessageTriggerGroupGatewayReceiveResponse,
   type SlatesMessageTriggerGroupGetResponse,
   type SlatesMessageTriggerGroupPollingPollResponse,
   type SlatesMessageTriggerGroupRoutingMatchersGetResponse,
@@ -464,6 +466,32 @@ export class SlatesProtocolClient {
     return this.request('slates/trigger_group.polling.poll', {
       triggerGroupId: d.triggerGroupId,
       state: d.state ?? null
+    });
+  }
+
+  async connectTriggerGroupGateway(d: {
+    triggerGroupId: string;
+    state?: any;
+  }): Promise<SlatesMessageTriggerGroupGatewayConnectResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/trigger_group.gateway.connect', {
+      triggerGroupId: d.triggerGroupId,
+      state: d.state ?? null
+    });
+  }
+
+  async receiveTriggerGroupGatewayFrames(d: {
+    triggerGroupId: string;
+    state?: any;
+    frames: string[];
+    closed?: { code: number; reason: string } | null;
+  }): Promise<SlatesMessageTriggerGroupGatewayReceiveResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/trigger_group.gateway.receive', {
+      triggerGroupId: d.triggerGroupId,
+      state: d.state ?? null,
+      frames: d.frames,
+      closed: d.closed ?? null
     });
   }
 

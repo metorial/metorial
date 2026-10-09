@@ -2,7 +2,7 @@
 
 ## Overview
 
-Google Chat is Google Workspace's team messaging service. This integration exposes 25 tools for messages, spaces, memberships, reactions, direct messages, attachments, space events, the signed-in user's read state, space notification settings, sidebar sections, custom emoji, and organization-wide admin space search. It has no triggers.
+Google Chat is Google Workspace's team messaging service. This integration exposes 25 tools for messages, spaces, memberships, reactions, direct messages, attachments, space events, the signed-in user's read state, space notification settings, sidebar sections, custom emoji, and organization-wide admin space search. It also implements the normalized chat adapter for the Google Chat app and one manual webhook trigger group for Chat app interaction events (see the README's Chat app adapter section).
 
 ## Tool surface
 
@@ -56,7 +56,7 @@ Connections request every scope declared on the OAuth method. Consolidated tools
 
 ### Chat app service account
 
-App authentication accepts the JSON key for the service account configured as the Google Chat app, exchanges a signed JWT for an access token, and refreshes by signing a new assertion. It requests only the app-only `chat.bot` scope; `chat.bot` is not presented on the user OAuth consent screen.
+App authentication accepts the JSON key for the service account configured as the Google Chat app and an optional numeric `projectNumber`, exchanges a signed JWT for an access token, and refreshes by signing a new assertion. It requests only the app-only `chat.bot` scope; `chat.bot` is not presented on the user OAuth consent screen.
 
 The Google Cloud project must have a configured Chat app, and that app must be installed in each space it accesses. App authentication does not substitute for user authentication on user-only endpoints. Attachment metadata (`get_attachment`) is app-only, and attachment upload (`upload_attachment`) supports app authentication in addition to user OAuth, matching `media.upload`. Mixed-auth tools still follow Google restrictions; in particular, a Chat app can update or delete only its own messages.
 
@@ -84,3 +84,9 @@ Google Drive download flow.
 ## Live verification boundary
 
 The private E2E suite defines scenarios for all 25 tools. A real run requires both a fully consented user OAuth profile and a Chat app service-account profile, a Workspace tenant where the app can be installed, a disposable member fixture, existing OAuth/app direct-message fixtures, and stable user/app attachment fixtures. Where the search API is available the suite exercises the primary `messages.search` path; otherwise `search_messages` exercises its `spaces.messages.list` fallback instead. The read state, notification setting, section, and custom emoji scenarios need their user scopes, and `search_spaces_admin` runs only for a Workspace administrator profile. Scenarios whose profile, scope, or fixture is missing skip individually rather than claiming live provider coverage.
+
+## Chat app adapter and events
+
+The `service_account` method is the only chat-adapter-eligible method (`adapters: ['chat']`); user OAuth declares `adapters: []`. Its auth output persists the non-secret app identity (`clientEmail`, `clientId`, `projectId`, `projectNumber`). Chat actions model the app as one workspace, `projects/{projectId}`, and stamp it on every channel. Each implemented action was checked against its Google Chat API reference page for `chat.bot` app authentication without administrator approval; the README lists the supported matrix and exclusions.
+
+The `chat_app_events` trigger group uses manual registration. Its saved registration holds the endpoint URL, the Authentication Audience (`project_number`, recommended, or `endpoint_url`), the project number, and the project ID. `process` verifies the bearer token as described in [Verify requests from Google Chat](https://developers.google.com/workspace/chat/verify-requests-from-chat): RS256 signatures against `https://www.googleapis.com/oauth2/v3/certs` (ID tokens, issuer `accounts.google.com`, email `chat@system.gserviceaccount.com`) or `https://www.googleapis.com/service_accounts/v1/jwk/chat@system.gserviceaccount.com` (self-signed JWTs, issuer `chat@system.gserviceaccount.com`), audience, and expiry with five minutes of clock skew. Routing matchers are `{ installType: 'chat_app', projectNumber, projectId }` on both sides; the connection's project ID comes from its service account email, which the token exchange proves, so a connection cannot claim another project's events by entering its project number. In `endpoint_url` mode the token does not identify the project, so the endpoint URL must stay private. Chat apps built as Google Workspace add-ons save an optional `addOnServiceAccountEmail`, which must be the project's Google-managed add-on service agent (`service-{projectNumber}@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`) and requires `endpoint_url`; such registrations accept only ID tokens issued to that account, binding requests to the project. Add-on bodies (`chat.<kind>Payload`) are converted to the Chat event shape before selection, and `authorizationEventObject` and `commonEventObject` are never forwarded. `MESSAGE` and `APP_COMMAND` events are forwarded with idempotency keys `message:{name}` and `command:{name}`; other event types are acknowledged and skipped.

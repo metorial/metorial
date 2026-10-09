@@ -1,5 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { ZOOM_USER_AUTH_METHODS } from '../lib/authMethods';
 import { ZoomClient } from '../lib/client';
 import { zoomServiceError } from '../lib/errors';
 import { spec } from '../spec';
@@ -141,6 +142,7 @@ export let manageMeetingPolls = SlateTool.create(spec, {
         .describe('Poll returned by create, get, or update')
     })
   )
+  .authMethods(ZOOM_USER_AUTH_METHODS)
   .handleInvocation(async ctx => {
     let client = new ZoomClient(ctx.auth.token);
 

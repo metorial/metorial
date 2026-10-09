@@ -35,7 +35,11 @@ const expectedToolIds = [
 
 describe('Google Chat MCP schema inventory', () => {
   it('checks one top-level object schema for every registered tool, in order', () => {
-    let cases = getMcpCompatibleToolSchemaCases(provider.actions);
+    // Chat adapter actions keep the shared contract schemas; they are still
+    // schema-checked below and inventoried in tests/integrations/google-chat/chat.test.ts.
+    let cases = getMcpCompatibleToolSchemaCases(
+      provider.actions.filter(action => !action.adapter)
+    );
     let toolIds = cases.map(([toolId]) => toolId);
 
     expect(toolIds).toEqual(expectedToolIds);

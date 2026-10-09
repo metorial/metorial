@@ -142,3 +142,32 @@ Webhook setup requires providing a **Callback URL** (HTTPS endpoint) and a **Ver
 ### Reactions
 
 - **`message_reactions`** — Triggered when a user reacts to a message with an emoji reaction (e.g., love, wow, angry).
+
+### Message Edits
+
+- **`message_edits`** — Triggered when a user edits a previously sent message. The payload carries the message id, the new text, and the edit count (`num_edit`).
+
+### Implemented Event Delivery
+
+This integration receives events through one manually configured webhook for the Meta app (`page` object). Setup stores the App Secret (used to verify `X-Hub-Signature-256` over the raw request body) and the Verify Token (used to answer Meta's `hub.challenge` GET handshake). Each `entry[].messaging[]` item becomes one event routed by Page id (`entry[].id`):
+
+- `messages` → message received (id `message:<mid>`)
+- `message_edits` → message updated (id `message_edit:<mid>:<num_edit>`)
+- `message_reactions` → reaction added (`react`) or removed (`unreact`) (id `reaction:<mid>:<psid>:<action>:<emoji>:<timestamp>`)
+
+Message echoes (`is_echo`), deliveries, reads, and postbacks are acknowledged without events. Example message received output:
+
+```json
+{
+  "type": "chat.message.received",
+  "id": "message:m_abc",
+  "message": {
+    "id": "m_abc",
+    "channelId": "<PSID>",
+    "author": { "userId": "<PSID>", "fullName": "Peter Chang", "type": "user", "isMe": false },
+    "body": { "parts": [{ "type": "text", "content": "hello" }] },
+    "metadata": { "sentAt": "2016-03-23T00:25:52.478Z", "edited": false }
+  },
+  "channel": { "id": "<PSID>", "workspaceId": "<PAGE_ID>", "type": "dm" }
+}
+```

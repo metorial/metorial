@@ -1,5 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { ZOOM_USER_AUTH_METHODS } from '../lib/authMethods';
 import { ZoomClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -36,6 +37,7 @@ export let getMeetingReport = SlateTool.create(spec, {
       source: z.string().optional().describe('Meeting source')
     })
   )
+  .authMethods(ZOOM_USER_AUTH_METHODS)
   .handleInvocation(async ctx => {
     let client = new ZoomClient(ctx.auth.token);
     let report = await client.getMeetingReport(ctx.input.meetingId);

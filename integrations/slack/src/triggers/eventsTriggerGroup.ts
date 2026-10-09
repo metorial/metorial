@@ -95,7 +95,7 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
           `\`\`\`\n${ctx.input.webhookUrl}\n\`\`\``,
           '',
           `> NOTE: Slack will not be able to complete the URL verification until you finish this setup. Once you enter the Signing Secret and App-Level Token below and save the configuration, the URL verification will succeed.`,
-          '2. Subscribe to the bot/user events this integration needs.',
+          '2. Subscribe to the bot/user events this integration needs. Set each **Slash Command** Request URL, and the **Interactivity** Request URL, to the same URL.',
           '3. Open **Basic Information**, copy the **Signing Secret**, and enter it here.',
           '4. Under **App-Level Tokens**, generate a token with the `authorizations:read` scope and enter it here.'
         ].join('\n'),
@@ -148,6 +148,44 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
           'slack_webhook_signature_invalid',
           jsonResponse(401, { error: 'invalid signature' })
         );
+      }
+
+      // Slash commands are form-encoded rather than Events API JSON, and only reach bot installs.
+      // https://docs.slack.dev/interactivity/implementing-slash-commands
+      if (request.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) {
+        // `token` is the app's long-lived legacy verification token; it is never stored.
+        let { token: _verificationToken, ...form } = Object.fromEntries(
+          new URLSearchParams(rawBody)
+        );
+        if (!form.command || !form.team_id) {
+          ctx.info({
+            message: 'Ignored Slack form payload: not a slash command',
+            hasInteractionPayload: !!form.payload,
+            sslCheck: !!form.ssl_check
+          });
+          return skipWebhook(
+            'slack_webhook_ignored_form_payload',
+            jsonResponse(200, { ok: true, reason: 'ignored_form_payload' })
+          );
+        }
+
+        return {
+          events: [
+            {
+              matchers: [
+                buildSlackBotRoutingMatcher({
+                  enterpriseId: form.enterprise_id,
+                  teamId: form.team_id
+                })
+              ],
+              // The group's events carry a type; Slack's command payload has none.
+              payload: { ...form, type: 'slash_command' },
+              idempotencyKey: form.trigger_id
+            }
+          ],
+          // An empty acknowledgement shows nothing; the reply goes to the command's response_url.
+          response: { status: 200, body: '' }
+        };
       }
 
       let parsed: unknown;

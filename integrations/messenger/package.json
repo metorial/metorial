@@ -8,12 +8,13 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/provider": "1.0.0-rc.18",
+    "@slates/adapter-chat": "1.0.0-rc.12",
+    "@slates/provider": "1.0.0-rc.27",
     "@types/node": "^20",
     "zod": "^4.2"
   },
   "devDependencies": {
     "typescript": "^5"
   },
-  "version": "0.2.0"
+  "version": "0.3.0"
 }

@@ -14,10 +14,17 @@ export type GoogleChatRequestOptions = {
 };
 
 let absoluteUrlPattern = /^[A-Za-z][A-Za-z\d+.-]*:/;
+let customMethodPathPattern = /^[A-Za-z]+:[A-Za-z]+$/;
 
 export let resolveGoogleChatRequestUrl = (url: string) => {
   let resolved = url.trim();
   if (!resolved) throw googleChatValidationError('Google Chat request URL is required.');
+
+  // Collection custom methods such as `spaces:findDirectMessage` look like a URL
+  // scheme; address them through the API base URL so they stay same-origin.
+  if (customMethodPathPattern.test(resolved)) {
+    resolved = `${GOOGLE_CHAT_API_BASE_URL}${resolved}`;
+  }
 
   let isAbsolute = absoluteUrlPattern.test(resolved) || resolved.startsWith('//');
   let parsed: URL;

@@ -139,3 +139,7 @@ Subscribe to call started/ended and call roster updates for Microsoft Teams onli
 ### Call Recordings and Transcripts
 
 Subscribe to new recordings and transcripts for online meetings at the tenant level or for meetings where a specific Teams app is installed. The notification for a transcript is sent only if the subscription happens before the transcription starts.
+
+## Teams Bot Chat Events
+
+Bot activities (messages, edits, soft deletes, reactions to bot messages, and membership changes) arrive at the Azure Bot messaging endpoint configured during event setup. Requests are verified against the Bot Connector OpenID signing keys for the configured Microsoft App ID. Event ids are stable per activity: message events use `<conversation>:<activity id>`, edits add the edit timestamp, and reaction and membership events add the reaction type or member id. See the README section "Teams Bot Chat" for the supported events and limitations.

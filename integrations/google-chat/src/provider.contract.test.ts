@@ -200,7 +200,10 @@ describe('google-chat provider contract', () => {
     expect(contract.actions).toHaveLength(25);
     expect(tools.map(tool => tool.key)).toEqual(toolIds);
     expect(new Set(tools.map(tool => tool.key)).size).toBe(25);
-    expect(provider.actions.map(action => action.key)).toEqual(toolIds);
+    // Chat adapter actions are covered by tests/integrations/google-chat/chat.test.ts.
+    expect(
+      provider.actions.filter(action => !action.adapter).map(action => action.key)
+    ).toEqual(toolIds);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['defaultSpace']);
     expect(contract.configSchema.required ?? []).toEqual([]);
     expect(contract.configSchema.properties?.defaultSpace).toMatchObject({

@@ -8,14 +8,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@lowerdeck/error": "^1.1.0",
+    "@slates/adapter-chat": "1.0.0-rc.12",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.17",
+    "slates": "1.0.0-rc.26",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.14",
+    "@slates/test": "1.0.0-rc.24",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.0"
+  "version": "0.3.0"
 }

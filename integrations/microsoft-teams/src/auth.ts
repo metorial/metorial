@@ -1,7 +1,22 @@
 import { createMicrosoftGraphOauth } from '@slates/oauth-microsoft';
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import {
+  BOT_FRAMEWORK_AUTH_METHOD_KEY,
+  type BotFrameworkAuthInput,
+  requestBotFrameworkToken,
+  TEAMS_GLOBAL_SERVICE_URL
+} from './lib/botFramework';
 import { microsoftTeamsScopes } from './scopes';
+
+// Delegated Microsoft Graph connections act as the signed-in user. They cannot
+// act as a Teams bot, so they are excluded from the normalized chat adapter;
+// only the Bot Framework (Azure Bot) method below is chat-eligible.
+export let graphAuthMethodKeys = [
+  'oauth_common',
+  'oauth_organizations',
+  'oauth_organizations_full'
+];
 
 // Every scope declared on an auth method is requested in production, so
 // scope tiers are separate auth methods:
@@ -132,36 +147,98 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      // Bot Framework connections only.
+      appId: z.string().optional(),
+      tenantId: z.string().optional(),
+      serviceUrl: z.string().optional(),
+      botName: z.string().optional()
     })
   )
-  .addOauth(
-    createMicrosoftGraphOauth({
+  .addOauth({
+    ...createMicrosoftGraphOauth({
       name: 'Work & Personal',
       key: 'oauth_common',
       tenant: 'common',
       scopes: baseScopes,
       docs,
       missingRefreshTokenMessage: 'No refresh token available'
-    })
-  )
-  .addOauth(
-    createMicrosoftGraphOauth({
+    }),
+    adapters: []
+  })
+  .addOauth({
+    ...createMicrosoftGraphOauth({
       name: 'Work Only',
       key: 'oauth_organizations',
       tenant: 'organizations',
       scopes: baseScopes,
       docs,
       missingRefreshTokenMessage: 'No refresh token available'
-    })
-  )
-  .addOauth(
-    createMicrosoftGraphOauth({
+    }),
+    adapters: []
+  })
+  .addOauth({
+    ...createMicrosoftGraphOauth({
       name: 'Work Only (Full Access)',
       key: 'oauth_organizations_full',
       tenant: 'organizations',
       scopes: [...baseScopes, ...adminConsentScopes],
       docs,
       missingRefreshTokenMessage: 'No refresh token available'
+    }),
+    adapters: []
+  })
+  .addCustomAuth({
+    type: 'auth.custom',
+    name: 'Teams Bot (Azure Bot)',
+    key: BOT_FRAMEWORK_AUTH_METHOD_KEY,
+    adapters: ['chat'],
+    docs: [
+      {
+        type: 'docs.auth.service_account',
+        name: 'Bot Connector authentication',
+        url: 'https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-authentication?view=azure-bot-service-4.0'
+      }
+    ],
+    inputSchema: z.object({
+      appId: z
+        .string()
+        .describe('Microsoft App ID from the Azure Bot resource Configuration page'),
+      clientSecret: z
+        .string()
+        .describe(
+          'Client secret value created for the Microsoft App ID in Microsoft Entra ID'
+        ),
+      tenantId: z
+        .string()
+        .optional()
+        .describe(
+          'Directory (tenant) ID. Required for single-tenant bots and for opening direct messages; leave empty for multi-tenant bots.'
+        ),
+      serviceUrl: z
+        .string()
+        .optional()
+        .describe(
+          `Teams Bot Connector service URL used for outgoing messages. Defaults to ${TEAMS_GLOBAL_SERVICE_URL}`
+        ),
+      botName: z
+        .string()
+        .optional()
+        .describe('Display name of the bot, used to label the bot and its workspace')
+    }),
+
+    getOutput: async (ctx: { input: BotFrameworkAuthInput }) => ({
+      output: await requestBotFrameworkToken(ctx.input, 'bot token request')
+    }),
+
+    handleTokenRefresh: async (ctx: { input: BotFrameworkAuthInput }) => ({
+      output: await requestBotFrameworkToken(ctx.input, 'bot token refresh')
+    }),
+
+    getProfile: async (ctx: { output: { appId?: string; botName?: string } }) => ({
+      profile: {
+        id: ctx.output.appId,
+        name: ctx.output.botName ?? ctx.output.appId
+      }
     })
-  );
+  });

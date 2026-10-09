@@ -121,8 +121,44 @@ let createServiceAccountAssertion = async (clientEmail: string, privateKey: stri
   return `${signingInput}.${bytesToBase64Url(new Uint8Array(signature))}`;
 };
 
-let exchangeServiceAccountToken = async (serviceAccountJson: string, operation: string) => {
-  let { clientEmail, privateKey } = parseServiceAccountJson(serviceAccountJson);
+let projectIdFromClientEmail = (clientEmail: string) =>
+  /@([a-z0-9-]+)\.iam\.gserviceaccount\.com$/i.exec(clientEmail)?.[1];
+
+let normalizeProjectNumber = (value: string | undefined) => {
+  let resolved = value?.trim();
+  if (!resolved) return undefined;
+  if (!/^\d+$/.test(resolved)) {
+    throw createApiServiceError(
+      'projectNumber must be the numeric Google Cloud project number of the Chat app.',
+      { reason: 'google_chat_service_account_auth_error' }
+    );
+  }
+  return resolved;
+};
+
+/**
+ * Non-secret Chat app identity persisted in the auth output so chat actions and
+ * inbound event routing can derive the same app/workspace identity without the key.
+ */
+let getServiceAccountIdentity = (input: ServiceAccountAuthInput) => {
+  let { clientEmail, clientId, projectId } = parseServiceAccountJson(input.serviceAccountJson);
+  return {
+    clientEmail,
+    clientId,
+    // The email's project is proven by the token exchange; the JSON project_id is not.
+    projectId: projectIdFromClientEmail(clientEmail) ?? projectId,
+    projectNumber: normalizeProjectNumber(input.projectNumber)
+  };
+};
+
+type ServiceAccountAuthInput = { serviceAccountJson: string; projectNumber?: string };
+
+let exchangeServiceAccountToken = async (
+  input: ServiceAccountAuthInput,
+  operation: string
+) => {
+  let identity = getServiceAccountIdentity(input);
+  let { clientEmail, privateKey } = parseServiceAccountJson(input.serviceAccountJson);
   let assertion = await createServiceAccountAssertion(clientEmail, privateKey);
   let response = await googleOAuthAxios.post(
     '/token',
@@ -142,7 +178,8 @@ let exchangeServiceAccountToken = async (serviceAccountJson: string, operation: 
   return {
     output: {
       token: token.token,
-      expiresAt: token.expiresAt
+      expiresAt: token.expiresAt,
+      ...identity
     },
     scopes: [googleChatScopes.bot]
   };
@@ -153,13 +190,20 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      // Chat app (service account) identity; absent for user OAuth connections.
+      clientEmail: z.string().optional(),
+      clientId: z.string().optional(),
+      projectId: z.string().optional(),
+      projectNumber: z.string().optional()
     })
   )
   .addOauth({
     type: 'auth.oauth',
     name: 'Google OAuth',
     key: 'oauth',
+    // User OAuth acts as a person, not as the Chat app, so it is not chat-adapter eligible.
+    adapters: [],
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -366,6 +410,7 @@ export let auth = SlateAuth.create()
     type: 'auth.custom',
     name: 'Google Chat App Service Account',
     key: 'service_account',
+    adapters: ['chat'],
     docs: [
       {
         type: 'docs.auth.service_account',
@@ -378,24 +423,29 @@ export let auth = SlateAuth.create()
         .string()
         .describe(
           'Contents of the JSON key for the service account configured as this Google Chat app'
+        ),
+      projectNumber: z
+        .string()
+        .trim()
+        .regex(/^\d+$/, 'Use the numeric Google Cloud project number')
+        .optional()
+        .describe(
+          'Numeric Google Cloud project number of the Chat app (Google Cloud console > Dashboard). Required to route Chat app events to this connection.'
         )
     }),
 
     getOutput: async ctx => {
       try {
-        return await exchangeServiceAccountToken(
-          ctx.input.serviceAccountJson,
-          'service account token exchange'
-        );
+        return await exchangeServiceAccountToken(ctx.input, 'service account token exchange');
       } catch (error) {
         throw googleChatOAuthError('service account token exchange', error);
       }
     },
 
-    handleTokenRefresh: async (ctx: { input: { serviceAccountJson: string } }) => {
+    handleTokenRefresh: async (ctx: { input: ServiceAccountAuthInput }) => {
       try {
         let result = await exchangeServiceAccountToken(
-          ctx.input.serviceAccountJson,
+          ctx.input,
           'service account token refresh'
         );
         return { output: result.output };
@@ -404,7 +454,7 @@ export let auth = SlateAuth.create()
       }
     },
 
-    getProfile: async (ctx: { input: { serviceAccountJson: string } }) => {
+    getProfile: async (ctx: { input: ServiceAccountAuthInput }) => {
       let serviceAccount = parseServiceAccountJson(ctx.input.serviceAccountJson);
       return {
         profile: {

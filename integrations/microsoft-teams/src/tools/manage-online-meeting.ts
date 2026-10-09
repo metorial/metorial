@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
 import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
@@ -15,6 +16,7 @@ export let manageOnlineMeeting = SlateTool.create(spec, {
   ]
 })
   .scopes(microsoftTeamsActionScopes.manageOnlineMeeting)
+  .authMethods(graphAuthMethodKeys)
   .input(
     z.object({
       action: z

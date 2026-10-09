@@ -25,11 +25,23 @@ export class AuthConfigSecretRedactor {
     });
   }
 
-  public redactEmbedded<T>(value: T): T {
-    if (this.secretToPlaceholder.size === 0) return value;
+  /**
+   * `embeddable(secret, path)` limits which secrets are also replaced inside longer strings;
+   * every secret is still replaced as a whole value.
+   */
+  public redactEmbedded<T>(
+    value: T,
+    embeddable: (secret: string, path: string) => boolean = () => true
+  ): T {
+    let secrets = [...this.secretToPlaceholder.entries()]
+      .filter(([secret, placeholder]) =>
+        embeddable(secret, placeholder.slice(AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX.length))
+      )
+      .map(([secret]) => secret);
+    if (secrets.length === 0) return this.redact(value);
 
     let pattern = new RegExp(
-      [...this.secretToPlaceholder.keys()]
+      secrets
         .sort((a, b) => b.length - a.length)
         // Escape regex metacharacters so values match literally; $& inserts the matched character.
         .map(secret => secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))

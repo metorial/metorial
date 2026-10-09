@@ -332,6 +332,77 @@ export type SlatesMessageTriggerGroupPollingPollResponse = z.infer<
   typeof slatesMessageTriggerGroupPollingPollResponse
 >;
 
+/**
+ * Gateway connect
+ */
+export let slatesMessageTriggerGroupGatewayConnectRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/trigger_group.gateway.connect'),
+  id: z.string(),
+  params: z.object({
+    triggerGroupId: z.string(),
+    state: z.any().nullable()
+  })
+});
+
+export type SlatesMessageTriggerGroupGatewayConnectRequest = z.infer<
+  typeof slatesMessageTriggerGroupGatewayConnectRequest
+>;
+
+export let slatesMessageTriggerGroupGatewayConnectResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces({
+    url: z.string(),
+    state: z.any().nullable().optional()
+  })
+});
+
+export type SlatesMessageTriggerGroupGatewayConnectResponse = z.infer<
+  typeof slatesMessageTriggerGroupGatewayConnectResponse
+>;
+
+/**
+ * Gateway receive
+ */
+export let slatesMessageTriggerGroupGatewayReceiveRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/trigger_group.gateway.receive'),
+  id: z.string(),
+  params: z.object({
+    triggerGroupId: z.string(),
+    state: z.any().nullable(),
+    frames: z.array(z.string()),
+    closed: z.object({ code: z.number(), reason: z.string() }).nullable().optional()
+  })
+});
+
+export type SlatesMessageTriggerGroupGatewayReceiveRequest = z.infer<
+  typeof slatesMessageTriggerGroupGatewayReceiveRequest
+>;
+
+export let slatesMessageTriggerGroupGatewayReceiveResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces({
+    state: z.any().nullable().optional(),
+    send: z.array(z.string()),
+    events: z.array(slatesTriggerGroupPollEvent),
+    heartbeat: z
+      .object({ intervalMs: z.number().int().positive(), frame: z.string() })
+      .nullable()
+      .optional(),
+    close: z
+      .object({ reconnect: z.boolean(), reason: z.string().optional() })
+      .nullable()
+      .optional()
+  })
+});
+
+export type SlatesMessageTriggerGroupGatewayReceiveResponse = z.infer<
+  typeof slatesMessageTriggerGroupGatewayReceiveResponse
+>;
+
 export type SlatesTriggerGroupRequests =
   | SlatesMessageTriggerGroupsListRequest
   | SlatesMessageTriggerGroupGetRequest
@@ -342,7 +413,9 @@ export type SlatesTriggerGroupRequests =
   | SlatesMessageTriggerGroupWebhookManualFinishRequest
   | SlatesMessageTriggerGroupWebhookProcessRequest
   | SlatesMessageTriggerGroupRoutingMatchersGetRequest
-  | SlatesMessageTriggerGroupPollingPollRequest;
+  | SlatesMessageTriggerGroupPollingPollRequest
+  | SlatesMessageTriggerGroupGatewayConnectRequest
+  | SlatesMessageTriggerGroupGatewayReceiveRequest;
 
 export type SlatesTriggerGroupResponses =
   | SlatesMessageTriggerGroupsListResponse
@@ -354,7 +427,9 @@ export type SlatesTriggerGroupResponses =
   | SlatesMessageTriggerGroupWebhookManualFinishResponse
   | SlatesMessageTriggerGroupWebhookProcessResponse
   | SlatesMessageTriggerGroupRoutingMatchersGetResponse
-  | SlatesMessageTriggerGroupPollingPollResponse;
+  | SlatesMessageTriggerGroupPollingPollResponse
+  | SlatesMessageTriggerGroupGatewayConnectResponse
+  | SlatesMessageTriggerGroupGatewayReceiveResponse;
 
 export let slatesTriggerGroupResponsesByMethod = {
   'slates/trigger_groups.list': slatesMessageTriggerGroupsListResponse,
@@ -371,7 +446,9 @@ export let slatesTriggerGroupResponsesByMethod = {
   'slates/trigger_group.webhook.process': slatesMessageTriggerGroupWebhookProcessResponse,
   'slates/trigger_group.routing_matchers.get':
     slatesMessageTriggerGroupRoutingMatchersGetResponse,
-  'slates/trigger_group.polling.poll': slatesMessageTriggerGroupPollingPollResponse
+  'slates/trigger_group.polling.poll': slatesMessageTriggerGroupPollingPollResponse,
+  'slates/trigger_group.gateway.connect': slatesMessageTriggerGroupGatewayConnectResponse,
+  'slates/trigger_group.gateway.receive': slatesMessageTriggerGroupGatewayReceiveResponse
 };
 
 export let slatesTriggerGroupRequestsByMethod = {
@@ -388,5 +465,7 @@ export let slatesTriggerGroupRequestsByMethod = {
   'slates/trigger_group.webhook.process': slatesMessageTriggerGroupWebhookProcessRequest,
   'slates/trigger_group.routing_matchers.get':
     slatesMessageTriggerGroupRoutingMatchersGetRequest,
-  'slates/trigger_group.polling.poll': slatesMessageTriggerGroupPollingPollRequest
+  'slates/trigger_group.polling.poll': slatesMessageTriggerGroupPollingPollRequest,
+  'slates/trigger_group.gateway.connect': slatesMessageTriggerGroupGatewayConnectRequest,
+  'slates/trigger_group.gateway.receive': slatesMessageTriggerGroupGatewayReceiveRequest
 };
