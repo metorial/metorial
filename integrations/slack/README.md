@@ -16,6 +16,8 @@ Canvas and Slack List availability depends on the workspace plan and Slack permi
 
 The New Message (Events API) trigger works with a customer-owned Slack app. Set the app's Events Request URL to the callback instance's `webhookUrl` and configure the app's Signing Secret to verify requests. Slack supports one Events Request URL per app, so each callback instance needs its own Slack app. URL verification challenges are answered synchronously; message events continue through the normal callback delivery flow.
 
+Slash commands use the same URL and Signing Secret: set each slash command's Request URL to the same `webhookUrl`. Commands are acknowledged with an empty response, and the reply is sent afterwards through the command's response handle. Slash commands need the `commands` scope, which comes from your own Slack app's configuration: connect that app with its Bot Token. The OAuth connection does not request `commands`, so command events are not available on OAuth connections.
+
 ## Tools
 
 ### Get Conversation History

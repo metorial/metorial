@@ -71,7 +71,7 @@ export interface ExpectedSlateTriggerGroup {
   id: string;
   name?: string;
   description?: string;
-  invocationType?: 'polling' | 'webhook';
+  invocationType?: 'polling' | 'webhook' | 'gateway';
 }
 
 export let getVitestExpect = () => {
@@ -375,6 +375,34 @@ export let pollSlateTriggerGroupEvents = async (d: {
   return d.client.pollTriggerGroup({
     triggerGroupId: d.triggerGroupId,
     state: d.state ?? null
+  });
+};
+
+export let connectSlateTriggerGroupGateway = async (d: {
+  client: SlatesTestClient;
+  triggerGroupId: string;
+  state?: any;
+}) => {
+  d.client.ensureSession();
+  return d.client.connectTriggerGroupGateway({
+    triggerGroupId: d.triggerGroupId,
+    state: d.state ?? null
+  });
+};
+
+export let receiveSlateTriggerGroupGatewayFrames = async (d: {
+  client: SlatesTestClient;
+  triggerGroupId: string;
+  state?: any;
+  frames?: string[];
+  closed?: { code: number; reason: string } | null;
+}) => {
+  d.client.ensureSession();
+  return d.client.receiveTriggerGroupGatewayFrames({
+    triggerGroupId: d.triggerGroupId,
+    state: d.state ?? null,
+    frames: d.frames ?? [],
+    closed: d.closed ?? null
   });
 };
 

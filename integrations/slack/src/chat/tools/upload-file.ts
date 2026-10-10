@@ -1,5 +1,4 @@
-import { Buffer } from 'node:buffer';
-import { ChatErrors, uploadFile as contract } from '@slates/adapter-chat';
+import { uploadFile as contract, fetchAttachmentSource } from '@slates/adapter-chat';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';
@@ -9,6 +8,9 @@ import {
   mapSlackFile,
   mapSlackThread
 } from '../lib/mappers';
+
+// https://docs.slack.dev/reference/methods/files.getUploadURLExternal/
+let SLACK_MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
 
 export let chatUploadFile = contract
   .implement(spec)
@@ -22,28 +24,15 @@ export let chatUploadFile = contract
       }
     });
 
-    let response: Response;
-    try {
-      response = await fetch(ctx.input.fileUrl);
-    } catch {
-      throw ChatErrors.attachmentDownloadFailed({
-        action: contract.key,
-        message: 'Could not fetch the file from its signed upload URL.'
-      });
-    }
-
-    if (!response.ok) {
-      throw ChatErrors.attachmentDownloadFailed({
-        action: contract.key,
-        message: `Could not fetch the file from its signed upload URL: HTTP ${response.status}.`
-      });
-    }
-
-    let content = Buffer.from(await response.arrayBuffer());
+    let source = await fetchAttachmentSource(ctx.input.fileUrl, {
+      action: contract.key,
+      attachmentId: ctx.input.clientReferenceId,
+      maxBytes: SLACK_MAX_UPLOAD_BYTES
+    });
     let raw = await client.uploadBinaryFile({
-      content,
+      content: source.bytes,
       filename: ctx.input.filename,
-      contentType: ctx.input.mimeType,
+      contentType: ctx.input.mimeType ?? source.contentType,
       channelId: ctx.input.channelId,
       threadTs: ctx.input.threadId
     });

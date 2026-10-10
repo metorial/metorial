@@ -10,6 +10,7 @@ import {
   type SlatesParticipant
 } from '@slates/proto';
 import {
+  AuthConfigSecretRedactor,
   redactUrlAttachmentSecrets,
   runWithContext,
   type Slate,
@@ -1440,6 +1441,100 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       return withRequestTraces(context, {
         updatedState: res.updatedState,
         events: res.events.map(event => ({
+          payload: event.payload,
+          idempotencyKey: event.idempotencyKey,
+          triggerIds: evaluateTriggerMatches(slate, group.key, event.payload)
+        }))
+      });
+    });
+
+    let getGatewayTriggerGroup = (triggerGroupId: string) => {
+      let group = getTriggerGroup(slate, triggerGroupId);
+      if (group.source !== 'gateway' || !group.gateway) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Trigger group does not support gateway connections: ${triggerGroupId}`
+          })
+        );
+      }
+      return { group, gateway: group.gateway };
+    };
+
+    manager.onRequest('slates/trigger_group.gateway.connect', async ({ params }) => {
+      let ctx = getContextFull();
+      let { group, gateway } = getGatewayTriggerGroup(params.triggerGroupId);
+
+      let context = new SlateContext(
+        ctx.config,
+        { state: params.state },
+        ctx.auth?.output!,
+        slate.spec,
+        logger
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'gatewayConnect',
+          message: `Preparing gateway connection for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: () =>
+            `Prepared gateway connection for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while preparing a gateway connection`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name,
+            hasPreviousState: params.state !== null
+          }
+        },
+        () => runWithContext(context, () => gateway.connect(context))
+      );
+
+      return withRequestTraces(context, { url: res.url, state: res.state });
+    });
+
+    manager.onRequest('slates/trigger_group.gateway.receive', async ({ params }) => {
+      let ctx = getContextFull();
+      let { group, gateway } = getGatewayTriggerGroup(params.triggerGroupId);
+
+      let context = new SlateContext(
+        ctx.config,
+        { state: params.state, frames: params.frames, closed: params.closed ?? null },
+        ctx.auth?.output!,
+        slate.spec,
+        logger
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'gatewayReceive',
+          message: `Handling ${params.frames.length} gateway frame(s) for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: result =>
+            `Handled gateway frames for trigger group ${formatEntityLabel(group.name, group.key)} (${result.events?.length ?? 0} event(s))`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while handling gateway frames`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name,
+            frameCount: params.frames.length,
+            closed: params.closed ?? null
+          },
+          onSuccess: result => ({
+            eventCount: result.events?.length ?? 0,
+            sendCount: result.send?.length ?? 0,
+            close: result.close ?? null
+          })
+        },
+        () => runWithContext(context, () => gateway.receive(context))
+      );
+
+      return withRequestTraces(context, {
+        state: res.state,
+        // Outbound frames (e.g. IDENTIFY) embed credentials; the hub restores them at the socket.
+        send: new AuthConfigSecretRedactor(
+          context._getAuthConfigForRedaction()
+        ).redactEmbedded(res.send ?? []),
+        heartbeat: res.heartbeat ?? null,
+        heartbeatAcked: res.heartbeatAcked,
+        close: res.close ?? null,
+        events: (res.events ?? []).map(event => ({
           payload: event.payload,
           idempotencyKey: event.idempotencyKey,
           triggerIds: evaluateTriggerMatches(slate, group.key, event.payload)

@@ -1,4 +1,4 @@
-import { decodeCursor, encodeCursor, type PageDirection } from '@slates/adapter-chat';
+import { decodeChatCursor, encodeCursor, type PageDirection } from '@slates/adapter-chat';
 import { z } from 'zod';
 
 export let slackCursorDataSchema = z
@@ -13,10 +13,11 @@ export type SlackCursorData = z.infer<typeof slackCursorDataSchema>;
 
 export let decodeSlackCursor = (
   cursor: string | undefined,
-  direction: PageDirection = 'backward'
+  direction: PageDirection,
+  action: string
 ) => {
   if (!cursor) return { direction, data: {} as SlackCursorData };
-  let decoded = decodeCursor('slack', cursor, slackCursorDataSchema);
+  let decoded = decodeChatCursor('slack', cursor, slackCursorDataSchema, { action });
   return { direction: decoded.direction, data: decoded.data };
 };
 

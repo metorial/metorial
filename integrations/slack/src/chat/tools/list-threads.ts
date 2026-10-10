@@ -10,7 +10,11 @@ export let chatListThreads = contract
   .scopes(slackActionScopes.conversationHistory)
   .handleInvocation(async ctx => {
     let client = createSlackChatClient(ctx, { action: contract.key });
-    let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'backward');
+    let cursor = decodeSlackCursor(
+      ctx.input.cursor,
+      ctx.input.direction ?? 'backward',
+      contract.key
+    );
     let [history, identity, rawChannel] = await Promise.all([
       client.getConversationHistory({
         channel: ctx.input.channelId,

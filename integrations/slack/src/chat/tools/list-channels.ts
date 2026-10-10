@@ -19,7 +19,11 @@ export let chatListChannels = contract
   .scopes(slackActionScopes.conversationRead)
   .handleInvocation(async ctx => {
     let client = createSlackChatClient(ctx, { action: contract.key });
-    let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'forward');
+    let cursor = decodeSlackCursor(
+      ctx.input.cursor,
+      ctx.input.direction ?? 'forward',
+      contract.key
+    );
     let [result, identity] = await Promise.all([
       client.listConversations({
         types: channelTypes(ctx.input.type),

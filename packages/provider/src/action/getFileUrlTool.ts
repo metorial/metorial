@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AuthConfigSecretRedactor } from '../auth/redact';
+import { AuthConfigSecretRedactor, isUrlEmbeddedCredential } from '../auth/redact';
 import type { SlateContext } from '../context/context';
 import type { SlateSpecification } from '../specification/specification';
 import { tool } from './tool';
@@ -42,6 +42,7 @@ export let getFileUrlTool = <ConfigType extends {}, AuthType extends {}>(
       return {
         output: {
           ...output,
+          url: redactor.redactEmbedded(output.url, isUrlEmbeddedCredential),
           ...(output.headers ? { headers: redactor.redactEmbedded(output.headers) } : {}),
           ...(output.query ? { query: redactor.redactEmbedded(output.query) } : {})
         },

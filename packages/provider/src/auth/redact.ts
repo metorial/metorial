@@ -25,11 +25,20 @@ export class AuthConfigSecretRedactor {
     });
   }
 
-  public redactEmbedded<T>(value: T): T {
-    if (this.secretToPlaceholder.size === 0) return value;
+  /** `embeddable` limits which secrets are also replaced inside longer strings. */
+  public redactEmbedded<T>(
+    value: T,
+    embeddable: (secret: string, path: string) => boolean = () => true
+  ): T {
+    let secrets = [...this.secretToPlaceholder.entries()]
+      .filter(([secret, placeholder]) =>
+        embeddable(secret, placeholder.slice(AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX.length))
+      )
+      .map(([secret]) => secret);
+    if (secrets.length === 0) return this.redact(value);
 
     let pattern = new RegExp(
-      [...this.secretToPlaceholder.keys()]
+      secrets
         .sort((a, b) => b.length - a.length)
         // Escape regex metacharacters so values match literally; $& inserts the matched character.
         .map(secret => secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
@@ -102,10 +111,17 @@ export class AuthConfigSecretRedactor {
   }
 }
 
+// Credentials replaced inside URLs (e.g. Telegram's `/file/bot<token>/` path). Kept narrow:
+// a placeholder in a URL makes the hub proxy the download instead of handing out the link.
+let URL_CREDENTIAL_KEY = /^(?:.*[-_])?(?:token|secret|password|api[-_]?key)$/i;
+
+export let isUrlEmbeddedCredential = (secret: string, path: string) =>
+  secret.length >= 8 && URL_CREDENTIAL_KEY.test(path.split('.').pop() ?? '');
+
 /**
  * Applied to every finalized attachment list right before it's sent over
  * `slates/action.tool.invoke` (see @slates/provider-handler). Only `type: 'url'` attachments
- * carry headers/query -- content/upload_reference attachments pass through untouched.
+ * carry credentials -- content/upload_reference attachments pass through untouched.
  */
 export let redactUrlAttachmentSecrets = (
   attachments: SlateAttachment[] | undefined,
@@ -117,18 +133,15 @@ export let redactUrlAttachmentSecrets = (
 
   return attachments.map(attachment => {
     if (attachment.content.type !== 'url') return attachment;
-    if (!attachment.content.headers && !attachment.content.query) return attachment;
 
+    let { url, headers, query } = attachment.content;
     return {
       ...attachment,
       content: {
         ...attachment.content,
-        headers: attachment.content.headers
-          ? redactor.redactEmbedded(attachment.content.headers)
-          : undefined,
-        query: attachment.content.query
-          ? redactor.redactEmbedded(attachment.content.query)
-          : undefined
+        url: redactor.redactEmbedded(url, isUrlEmbeddedCredential),
+        ...(headers ? { headers: redactor.redactEmbedded(headers) } : {}),
+        ...(query ? { query: redactor.redactEmbedded(query) } : {})
       }
     };
   });

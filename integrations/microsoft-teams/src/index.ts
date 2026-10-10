@@ -1,4 +1,5 @@
 import { Slate } from 'slates';
+import { teamsChatAdapter } from './chat';
 import { spec } from './spec';
 import {
   createTeam,
@@ -19,6 +20,8 @@ import {
   sendChatMessage,
   updateTeam
 } from './tools';
+import { teamsBotTriggerGroup } from './triggers/botFrameworkTriggerGroup';
+
 export let provider = Slate.create({
   spec,
   tools: [
@@ -40,5 +43,7 @@ export let provider = Slate.create({
     manageTags,
     manageShifts
   ],
+  adapters: [teamsChatAdapter],
+  triggerGroups: [teamsBotTriggerGroup],
   triggers: []
 });

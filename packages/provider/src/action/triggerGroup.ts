@@ -31,6 +31,39 @@ export type SlateTriggerGroupPollHandler<ConfigType extends {}, AuthType extends
   updatedState?: any;
 }>;
 
+export interface SlateGatewayEvent {
+  payload: any;
+  idempotencyKey?: string;
+}
+
+export type SlateTriggerGroupGatewayConnectHandler<
+  ConfigType extends {},
+  AuthType extends {}
+> = (
+  context: SlateContext<ConfigType, AuthType, { state: any | null }>
+) => Promise<{ url: string; state?: any }>;
+
+/** `closed` is set, with no frames, when the socket closed unexpectedly. */
+export type SlateTriggerGroupGatewayReceiveHandler<
+  ConfigType extends {},
+  AuthType extends {}
+> = (
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    { state: any | null; frames: string[]; closed?: { code: number; reason: string } | null }
+  >
+) => Promise<{
+  state?: any;
+  send?: string[];
+  events?: SlateGatewayEvent[];
+  /** With `expectsAck`, the hub reconnects when no `heartbeatAcked` arrives before the next beat. */
+  heartbeat?: { intervalMs: number; frame: string; expectsAck?: boolean } | null;
+  /** Set when `frames` included the provider's heartbeat acknowledgement. */
+  heartbeatAcked?: boolean;
+  close?: { reconnect: boolean; reason?: string } | null;
+}>;
+
 export type SlateWebhookTargetListHandler<ConfigType extends {}, AuthType extends {}> = (
   context: SlateContext<ConfigType, AuthType, { pageToken: any | null }>
 ) => Promise<{
@@ -121,6 +154,14 @@ export interface SlateTriggerGroupPollingParameters<
   pollEvents: SlateTriggerGroupPollHandler<ConfigType, AuthType>;
 }
 
+export interface SlateTriggerGroupGatewayParameters<
+  ConfigType extends {},
+  AuthType extends {}
+> {
+  connect: SlateTriggerGroupGatewayConnectHandler<ConfigType, AuthType>;
+  receive: SlateTriggerGroupGatewayReceiveHandler<ConfigType, AuthType>;
+}
+
 export interface SlateTriggerGroupWebhookAutoRegistrationParameters<
   ConfigType extends {},
   AuthType extends {}
@@ -164,9 +205,10 @@ export interface SlateTriggerGroupParameters<
   AuthType extends {},
   InputType extends {} = Record<string, unknown>
 > extends SlateTriggerGroupCreateParameters<InputType> {
-  source: 'polling' | 'webhook';
+  source: 'polling' | 'webhook' | 'gateway';
   polling?: SlateTriggerGroupPollingParameters<ConfigType, AuthType>;
   webhook?: SlateTriggerGroupWebhookParameters<ConfigType, AuthType>;
+  gateway?: SlateTriggerGroupGatewayParameters<ConfigType, AuthType>;
   routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType>;
 }
 
@@ -227,6 +269,10 @@ export class SlateTriggerGroup<
     return this._params.webhook;
   }
 
+  get gateway() {
+    return this._params.gateway;
+  }
+
   get routingMatchers() {
     return this._params.routingMatchers;
   }
@@ -237,9 +283,10 @@ export class SlateTriggerGroupBuilder<
   AuthType extends {},
   InputType extends {} = Record<string, unknown>
 > {
-  #source: 'polling' | 'webhook' | null = null;
+  #source: 'polling' | 'webhook' | 'gateway' | null = null;
   #polling: SlateTriggerGroupPollingParameters<ConfigType, AuthType> | null = null;
   #webhook: SlateTriggerGroupWebhookParameters<ConfigType, AuthType> | null = null;
+  #gateway: SlateTriggerGroupGatewayParameters<ConfigType, AuthType> | null = null;
   #routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType> | null =
     null;
 
@@ -302,6 +349,20 @@ export class SlateTriggerGroupBuilder<
     return this;
   }
 
+  /** Receive events over a platform-managed persistent connection (e.g. a WebSocket gateway). */
+  gateway(
+    props: SlateTriggerGroupGatewayParameters<ConfigType, AuthType>
+  ): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
+    if (this.#source) {
+      throw new SlateDeclarationError('Trigger group invocation is already defined');
+    }
+
+    this.#source = 'gateway';
+    this.#gateway = { connect: props.connect, receive: props.receive };
+
+    return this;
+  }
+
   routingMatchers(
     handler: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType>
   ): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
@@ -312,7 +373,7 @@ export class SlateTriggerGroupBuilder<
   build(): SlateTriggerGroup<ConfigType, AuthType, InputType> {
     if (!this.#source) {
       throw new SlateDeclarationError(
-        'Trigger group invocation (polling or webhook) is not defined'
+        'Trigger group invocation (polling, webhook, or gateway) is not defined'
       );
     }
     if (!this.#routingMatchers) {
@@ -324,6 +385,7 @@ export class SlateTriggerGroupBuilder<
       source: this.#source,
       polling: this.#polling ?? undefined,
       webhook: this.#webhook ?? undefined,
+      gateway: this.#gateway ?? undefined,
       routingMatchers: this.#routingMatchers
     });
   }

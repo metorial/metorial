@@ -1,16 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TelegramClient } from '../lib/client';
+import { telegramFileAttachment } from '../lib/files';
 import { spec } from '../spec';
 
 export let getFileTool = SlateTool.create(spec, {
   name: 'Get File',
   key: 'get_file',
-  description: `Retrieve file information and a download URL for a file shared in Telegram. Use the file_id from a received message to get the download link.`,
-  constraints: [
-    'Files are available for download for at least 1 hour after the bot receives the file.',
-    'Maximum file size for download is 20 MB.'
-  ],
+  description: `Retrieve file information for a file shared in Telegram and provide it as a downloadable file. Use the file_id from a received message.`,
+  constraints: ['Maximum file size for download is 20 MB.'],
   tags: {
     destructive: false,
     readOnly: true
@@ -30,27 +28,24 @@ export let getFileTool = SlateTool.create(spec, {
         .string()
         .describe('Unique file identifier that stays the same over time'),
       fileSize: z.number().optional().describe('File size in bytes'),
-      filePath: z.string().optional().describe('File path on Telegram servers'),
-      downloadUrl: z.string().optional().describe('Direct URL to download the file')
+      filePath: z.string().optional().describe('File path on Telegram servers')
     })
   )
   .handleInvocation(async ctx => {
     let client = new TelegramClient(ctx.auth.token);
 
     let file = await client.getFile(ctx.input.fileId);
-    let downloadUrl = file.file_path
-      ? client.getFileDownloadUrl(ctx.auth.token, file.file_path)
-      : undefined;
+
+    if (file.file_path) await ctx.addAttachment(telegramFileAttachment(client, file));
 
     return {
       output: {
         fileId: file.file_id,
         fileUniqueId: file.file_unique_id,
         fileSize: file.file_size,
-        filePath: file.file_path,
-        downloadUrl
+        filePath: file.file_path
       },
-      message: `File info retrieved.${downloadUrl ? ` Download: ${downloadUrl}` : ''} (${file.file_size ? `${Math.round(file.file_size / 1024)} KB` : 'unknown size'})`
+      message: `File info retrieved${file.file_path ? ' and prepared for download' : ''}. (${file.file_size ? `${Math.round(file.file_size / 1024)} KB` : 'unknown size'})`
     };
   })
   .build();

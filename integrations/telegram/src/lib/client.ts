@@ -1,11 +1,25 @@
 import { createAxios } from 'slates';
 
+let TELEGRAM_API_ORIGIN = 'https://api.telegram.org';
+
+// The bot token is in the URL path; mask it in error data.
+let redactBotToken = (value: string | undefined, token: string) =>
+  value && token ? value.split(token).join('<bot-token>') : value;
+
 export class TelegramClient {
   private axios: ReturnType<typeof createAxios>;
 
-  constructor(token: string) {
+  constructor(private readonly token: string) {
     this.axios = createAxios({
-      baseURL: `https://api.telegram.org/bot${token}`
+      baseURL: `${TELEGRAM_API_ORIGIN}/bot${token}`,
+      errorMapping: {
+        mapAxiosError: (_error, inferred) => ({
+          upstream: {
+            ...inferred.upstream,
+            url: redactBotToken(inferred.upstream?.url, token)
+          }
+        })
+      }
     });
   }
 
@@ -238,8 +252,8 @@ export class TelegramClient {
     return response.data.result;
   }
 
-  getFileDownloadUrl(token: string, filePath: string): string {
-    return `https://api.telegram.org/file/bot${token}/${filePath}`;
+  getFileDownloadUrl(filePath: string): string {
+    return `${TELEGRAM_API_ORIGIN}/file/bot${this.token}/${filePath}`;
   }
 
   // ---- Chat ----
@@ -460,6 +474,74 @@ export class TelegramClient {
     return response.data.result;
   }
 
+  // ---- Reactions & chat actions ----
+
+  async setMessageReaction(params: {
+    chatId: string | number;
+    messageId: number;
+    reaction: Array<
+      { type: 'emoji'; emoji: string } | { type: 'custom_emoji'; custom_emoji_id: string }
+    >;
+  }): Promise<boolean> {
+    let response = await this.axios.post('/setMessageReaction', {
+      chat_id: params.chatId,
+      message_id: params.messageId,
+      reaction: params.reaction
+    });
+    return response.data.result;
+  }
+
+  async sendChatAction(params: {
+    chatId: string | number;
+    action: string;
+    messageThreadId?: number;
+  }): Promise<boolean> {
+    let response = await this.axios.post('/sendChatAction', {
+      chat_id: params.chatId,
+      action: params.action,
+      message_thread_id: params.messageThreadId
+    });
+    return response.data.result;
+  }
+
+  async editMessageCaption(params: {
+    chatId: string | number;
+    messageId: number;
+    caption: string;
+    parseMode?: string;
+  }): Promise<any> {
+    let response = await this.axios.post('/editMessageCaption', {
+      chat_id: params.chatId,
+      message_id: params.messageId,
+      caption: params.caption,
+      parse_mode: params.parseMode
+    });
+    return response.data.result;
+  }
+
+  async getMyCommands(): Promise<Array<{ command: string; description: string }>> {
+    let response = await this.axios.post('/getMyCommands', {});
+    return response.data.result;
+  }
+
+  async uploadFile(params: {
+    method: 'sendDocument' | 'sendPhoto' | 'sendVideo' | 'sendAudio';
+    field: 'document' | 'photo' | 'video' | 'audio';
+    chatId: string | number;
+    file: Blob;
+    filename: string;
+    messageThreadId?: number;
+  }): Promise<any> {
+    let form = new FormData();
+    form.append('chat_id', String(params.chatId));
+    if (params.messageThreadId !== undefined) {
+      form.append('message_thread_id', String(params.messageThreadId));
+    }
+    form.append(params.field, params.file, params.filename);
+    let response = await this.axios.post(`/${params.method}`, form);
+    return response.data.result;
+  }
+
   // ---- Webhook ----
 
   async setWebhook(params: {
@@ -474,6 +556,19 @@ export class TelegramClient {
       secret_token: params.secretToken,
       max_connections: params.maxConnections
     });
+    return response.data.result;
+  }
+
+  async getWebhookInfo(): Promise<{
+    url: string;
+    has_custom_certificate?: boolean;
+    pending_update_count?: number;
+    allowed_updates?: string[];
+    last_error_date?: number;
+    last_error_message?: string;
+    max_connections?: number;
+  }> {
+    let response = await this.axios.get('/getWebhookInfo');
     return response.data.result;
   }
 

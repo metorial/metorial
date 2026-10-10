@@ -13,7 +13,11 @@ export let chatSearchMessages = contract
   .authMethods(slackUserAuthMethods)
   .handleInvocation(async ctx => {
     let client = createSlackChatClient(ctx, { action: contract.key });
-    let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'backward');
+    let cursor = decodeSlackCursor(
+      ctx.input.cursor,
+      ctx.input.direction ?? 'backward',
+      contract.key
+    );
 
     let query = ctx.input.channelId
       ? `${ctx.input.query} in:${ctx.input.channelId}`

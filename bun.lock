@@ -16,10 +16,10 @@
     },
     "adapters/chat": {
       "name": "@slates/adapter-chat",
-      "version": "1.0.0-rc.12",
+      "version": "1.0.0-rc.13",
       "dependencies": {
         "@slates/adapter": "1.0.0-rc.11",
-        "@slates/provider": "1.0.0-rc.27",
+        "@slates/provider": "1.0.0-rc.28",
         "mdast-util-to-string": "^4.0.0",
         "remark-gfm": "^4.0.0",
         "remark-parse": "^11.0.0",
@@ -28,6 +28,7 @@
         "zod": "^4.2.1",
       },
       "devDependencies": {
+        "@lowerdeck/error": "^1.1.0",
         "@slates/tsconfig": "1.0.0-rc.1",
         "@types/mdast": "^4.0.4",
         "typescript": "5.8.2",
@@ -3742,11 +3743,13 @@
     },
     "integrations/discord": {
       "name": "@slates-integrations/discord",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/provider": "1.0.0-rc.18",
+        "@slates/adapter-chat": "1.0.0-rc.13",
+        "@slates/provider": "1.0.0-rc.28",
         "@types/node": "^20",
+        "axios": "^1.13.2",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -5798,15 +5801,16 @@
     },
     "integrations/google-chat": {
       "name": "@slates-integrations/google-chat",
-      "version": "0.1.5",
+      "version": "0.2.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
+        "@slates/adapter-chat": "1.0.0-rc.13",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.25",
+        "slates": "1.0.0-rc.26",
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.23",
+        "@slates/test": "1.0.0-rc.24",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -8325,10 +8329,11 @@
     },
     "integrations/messenger": {
       "name": "@slates-integrations/facebook-messenger",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/provider": "1.0.0-rc.18",
+        "@slates/adapter-chat": "1.0.0-rc.13",
+        "@slates/provider": "1.0.0-rc.28",
         "@types/node": "^20",
         "zod": "^4.2",
       },
@@ -8435,15 +8440,17 @@
     },
     "integrations/microsoft-teams": {
       "name": "@slates-integrations/microsoft-teams",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
-        "@slates/oauth-microsoft": "1.0.0-rc.6",
+        "@lowerdeck/error": "^1.1.0",
+        "@slates/adapter-chat": "1.0.0-rc.13",
+        "@slates/oauth-microsoft": "1.0.0-rc.12",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.17",
+        "slates": "1.0.0-rc.26",
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.14",
+        "@slates/test": "1.0.0-rc.24",
         "@vercel/ncc": "^0.38.4",
         "typescript": "^5",
         "vitest": "^3.1.2",
@@ -12175,10 +12182,10 @@
     },
     "integrations/slack": {
       "name": "@slates-integrations/slack",
-      "version": "0.3.16",
+      "version": "0.3.17",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/adapter-chat": "1.0.0-rc.12",
+        "@slates/adapter-chat": "1.0.0-rc.13",
         "@slates/slack-tools": "1.0.0-rc.17",
         "@types/node": "^20",
         "slates": "1.0.0-rc.26",
@@ -13231,10 +13238,12 @@
     },
     "integrations/telegram": {
       "name": "@slates-integrations/telegram",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@slates/adapter-chat": "1.0.0-rc.13",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.17",
+        "slates": "1.0.0-rc.26",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14351,14 +14360,16 @@
     },
     "integrations/whatsapp": {
       "name": "@slates-integrations/whatsapp-business",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@slates/adapter-chat": "1.0.0-rc.13",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.17",
+        "slates": "1.0.0-rc.26",
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.14",
+        "@slates/test": "1.0.0-rc.24",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -14952,15 +14963,16 @@
     },
     "integrations/zoom": {
       "name": "@slates-integrations/zoom",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/provider": "1.0.0-rc.18",
+        "@slates/adapter-chat": "1.0.0-rc.13",
+        "@slates/provider": "1.0.0-rc.28",
         "@types/node": "^20",
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.14",
+        "@slates/test": "1.0.0-rc.24",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -15017,9 +15029,9 @@
     },
     "packages/adapter": {
       "name": "@slates/adapter",
-      "version": "1.0.0-rc.11",
+      "version": "1.0.0-rc.12",
       "dependencies": {
-        "@slates/provider": "1.0.0-rc.27",
+        "@slates/provider": "1.0.0-rc.28",
         "zod": "^4.2.1",
       },
       "devDependencies": {
@@ -15064,11 +15076,11 @@
     },
     "packages/client": {
       "name": "@slates/client",
-      "version": "1.0.0-rc.27",
+      "version": "1.0.0-rc.28",
       "dependencies": {
-        "@slates/proto": "1.0.0-rc.23",
-        "@slates/provider": "1.0.0-rc.27",
-        "@slates/provider-handler": "1.0.0-rc.37",
+        "@slates/proto": "1.0.0-rc.24",
+        "@slates/provider": "1.0.0-rc.28",
+        "@slates/provider-handler": "1.0.0-rc.38",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -15192,13 +15204,13 @@
     },
     "packages/profiles": {
       "name": "@slates/profiles",
-      "version": "1.0.0-rc.25",
+      "version": "1.0.0-rc.26",
       "dependencies": {
-        "@slates/client": "1.0.0-rc.27",
-        "@slates/proto": "1.0.0-rc.23",
+        "@slates/client": "1.0.0-rc.28",
+        "@slates/proto": "1.0.0-rc.24",
       },
       "devDependencies": {
-        "@slates/provider": "1.0.0-rc.27",
+        "@slates/provider": "1.0.0-rc.28",
         "@slates/tsconfig": "1.0.0-rc.1",
         "typescript": "5.8.2",
         "vitest": "^3.1.2",
@@ -15207,7 +15219,7 @@
     },
     "packages/proto": {
       "name": "@slates/proto",
-      "version": "1.0.0-rc.23",
+      "version": "1.0.0-rc.24",
       "dependencies": {
         "@lowerdeck/emitter": "^1.0.4",
         "@lowerdeck/error": "^1.1.0",
@@ -15224,7 +15236,7 @@
     },
     "packages/provider": {
       "name": "@slates/provider",
-      "version": "1.0.0-rc.27",
+      "version": "1.0.0-rc.28",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@toon-format/toon": "^2.1.0",
@@ -15241,11 +15253,11 @@
     },
     "packages/provider-handler": {
       "name": "@slates/provider-handler",
-      "version": "1.0.0-rc.37",
+      "version": "1.0.0-rc.38",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/proto": "1.0.0-rc.23",
-        "@slates/provider": "1.0.0-rc.27",
+        "@slates/proto": "1.0.0-rc.24",
+        "@slates/provider": "1.0.0-rc.28",
         "p-queue": "^6.6.2",
         "zod": "^4.2.1",
       },
@@ -15272,9 +15284,9 @@
     },
     "packages/slates": {
       "name": "slates",
-      "version": "1.0.0-rc.26",
+      "version": "1.0.0-rc.27",
       "dependencies": {
-        "@slates/provider": "1.0.0-rc.27",
+        "@slates/provider": "1.0.0-rc.28",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -15299,14 +15311,14 @@
     },
     "packages/test": {
       "name": "@slates/test",
-      "version": "1.0.0-rc.24",
+      "version": "1.0.0-rc.25",
       "dependencies": {
         "@lowerdeck/testing-tools": "latest",
-        "@slates/client": "1.0.0-rc.27",
-        "@slates/profiles": "1.0.0-rc.25",
+        "@slates/client": "1.0.0-rc.28",
+        "@slates/profiles": "1.0.0-rc.26",
       },
       "devDependencies": {
-        "@slates/provider": "1.0.0-rc.27",
+        "@slates/provider": "1.0.0-rc.28",
         "@slates/tsconfig": "1.0.0-rc.1",
         "typescript": "5.8.2",
         "vitest": "^3.1.2",
@@ -20207,8 +20219,6 @@
 
     "@slates-integrations/digital-ocean/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
-    "@slates-integrations/discord/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
-
     "@slates-integrations/dnsfilter/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
     "@slates-integrations/dock-labs-truvera/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
@@ -20404,8 +20414,6 @@
     "@slates-integrations/facebook/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
     "@slates-integrations/facebook/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
-
-    "@slates-integrations/facebook-messenger/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
     "@slates-integrations/faceup/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
@@ -20631,9 +20639,7 @@
 
     "@slates-integrations/google-calendar/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
-    "@slates-integrations/google-chat/@slates/test": ["@slates/test@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.26", "@slates/profiles": "1.0.0-rc.24" } }, "sha512-2Z+2tomwvD2+8W/q2DrRO6On1F3aoxkwUlFoIVb5f9NG+vSqVR0BUBCl2qMc4dan+pyAKCQexUOfHRgSnWyhGg=="],
-
-    "@slates-integrations/google-chat/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
+    "@slates-integrations/google-chat/@slates/test": ["@slates/test@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.27", "@slates/profiles": "1.0.0-rc.25" } }, "sha512-Yl6mi1VyX0llAtyHDvcYlUWnwKOwpCgQ9zqBllBAkP5Q1nm6BF8wmtWqjhl06nAEOiY/LQEHzGhC5hy6+7Fl5w=="],
 
     "@slates-integrations/google-classroom/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
 
@@ -21181,11 +21187,7 @@
 
     "@slates-integrations/microsoft-outlook/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
-    "@slates-integrations/microsoft-teams/@slates/oauth-microsoft": ["@slates/oauth-microsoft@1.0.0-rc.6", "", { "dependencies": { "slates": "1.0.0-rc.17" } }, "sha512-dJD5OPtEamUB5943amNvZxhUE0l6h3S3NVB/JTgyrk9RmzH3hAUTSGWlEjziHfaGVivhn/GlYwNEZ9fX0mp1sQ=="],
-
-    "@slates-integrations/microsoft-teams/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
-
-    "@slates-integrations/microsoft-teams/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
+    "@slates-integrations/microsoft-teams/@slates/test": ["@slates/test@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.27", "@slates/profiles": "1.0.0-rc.25" } }, "sha512-Yl6mi1VyX0llAtyHDvcYlUWnwKOwpCgQ9zqBllBAkP5Q1nm6BF8wmtWqjhl06nAEOiY/LQEHzGhC5hy6+7Fl5w=="],
 
     "@slates-integrations/midjourney/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
 
@@ -21947,6 +21949,8 @@
 
     "@slates-integrations/skyfire/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
+    "@slates-integrations/slack/@slates/test": ["@slates/test@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.27", "@slates/profiles": "1.0.0-rc.25" } }, "sha512-Yl6mi1VyX0llAtyHDvcYlUWnwKOwpCgQ9zqBllBAkP5Q1nm6BF8wmtWqjhl06nAEOiY/LQEHzGhC5hy6+7Fl5w=="],
+
     "@slates-integrations/slite/@slates/test": ["@slates/test@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.26", "@slates/profiles": "1.0.0-rc.24" } }, "sha512-2Z+2tomwvD2+8W/q2DrRO6On1F3aoxkwUlFoIVb5f9NG+vSqVR0BUBCl2qMc4dan+pyAKCQexUOfHRgSnWyhGg=="],
 
     "@slates-integrations/slite/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
@@ -22087,6 +22091,8 @@
 
     "@slates-integrations/supadata/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
+    "@slates-integrations/super-booble-1/@slates-integrations/google-chat": ["@slates-integrations/google-chat@0.1.5", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@types/node": "^20", "slates": "1.0.0-rc.25", "zod": "^4.2" } }, "sha512-b5adiFBZaMTI1hmeXL5o2fgTYh+o3R99zoIATR0Fv/CLcQ4E3044/RZ6OH4R35n4yiXJlyw0rTgYOrf2y7tXqA=="],
+
     "@slates-integrations/super-booble-1/@slates/test": ["@slates/test@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.26", "@slates/profiles": "1.0.0-rc.24" } }, "sha512-2Z+2tomwvD2+8W/q2DrRO6On1F3aoxkwUlFoIVb5f9NG+vSqVR0BUBCl2qMc4dan+pyAKCQexUOfHRgSnWyhGg=="],
 
     "@slates-integrations/super-booble-1/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
@@ -22202,8 +22208,6 @@
     "@slates-integrations/teamcamp/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
     "@slates-integrations/teamwork/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
-
-    "@slates-integrations/telegram/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
     "@slates-integrations/telnyx/@slates/test": ["@slates/test@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.26", "@slates/profiles": "1.0.0-rc.24" } }, "sha512-2Z+2tomwvD2+8W/q2DrRO6On1F3aoxkwUlFoIVb5f9NG+vSqVR0BUBCl2qMc4dan+pyAKCQexUOfHRgSnWyhGg=="],
 
@@ -22439,9 +22443,7 @@
 
     "@slates-integrations/webvizio/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
-    "@slates-integrations/whatsapp-business/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
-
-    "@slates-integrations/whatsapp-business/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
+    "@slates-integrations/whatsapp-business/@slates/test": ["@slates/test@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.27", "@slates/profiles": "1.0.0-rc.25" } }, "sha512-Yl6mi1VyX0llAtyHDvcYlUWnwKOwpCgQ9zqBllBAkP5Q1nm6BF8wmtWqjhl06nAEOiY/LQEHzGhC5hy6+7Fl5w=="],
 
     "@slates-integrations/whautomate/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
@@ -22577,9 +22579,7 @@
 
     "@slates-integrations/zoho-mail/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
-    "@slates-integrations/zoom/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
-
-    "@slates-integrations/zoom/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
+    "@slates-integrations/zoom/@slates/test": ["@slates/test@1.0.0-rc.24", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.27", "@slates/profiles": "1.0.0-rc.25" } }, "sha512-Yl6mi1VyX0llAtyHDvcYlUWnwKOwpCgQ9zqBllBAkP5Q1nm6BF8wmtWqjhl06nAEOiY/LQEHzGhC5hy6+7Fl5w=="],
 
     "@slates-integrations/zoominfo/@slates/test": ["@slates/test@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.26", "@slates/profiles": "1.0.0-rc.24" } }, "sha512-2Z+2tomwvD2+8W/q2DrRO6On1F3aoxkwUlFoIVb5f9NG+vSqVR0BUBCl2qMc4dan+pyAKCQexUOfHRgSnWyhGg=="],
 
@@ -22592,6 +22592,10 @@
     "@slates-integrations/zyte-api/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
     "@slates/aws-sdk-http-handler/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
+
+    "@slates/cli/@slates/client": ["@slates/client@1.0.0-rc.27", "", { "dependencies": { "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "@slates/provider-handler": "1.0.0-rc.37" } }, "sha512-XU8sTzxMWyeEpOvZIxR2T6kONSHsAQPzHHIfciwcmydAjhPJ53seF+uqi+izlGGpISD4yl36KWvy3egZiQq79w=="],
+
+    "@slates/cli/@slates/profiles": ["@slates/profiles@1.0.0-rc.25", "", { "dependencies": { "@slates/client": "1.0.0-rc.27", "@slates/proto": "1.0.0-rc.23" } }, "sha512-c/sMyYDlYH+wCIl2HkLR9OBc1V++fyUxMsEyWjGikYuaT1H4dtkjLyt0Tp0m9kwDNqPkiKCfqANUzmSsGfeSWw=="],
 
     "@slates/dynamics-commerce-recipes/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
 
@@ -22610,6 +22614,8 @@
     "@slates/oauth-microsoft/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
 
     "@slates/oauth-zoho/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
+
+    "@slates/slack-tools/slates": ["slates@1.0.0-rc.26", "", { "dependencies": { "@slates/provider": "1.0.0-rc.27" } }, "sha512-iQYMPSzrezor9cDDTR2PGSJ/g5I3G3R9NykxA4378h7RAdA7TS+Ex0MIUrGbfTCASema7tU1K7TclJCDF36Sfg=="],
 
     "@slates/super-google-tools/slates": ["slates@1.0.0-rc.25", "", { "dependencies": { "@slates/provider": "1.0.0-rc.26" } }, "sha512-Y91wuR2eCHSIU3aAnpyVW/YHeSNjPpnvFtDyWnaKIcEHuOzj3wQmaJNBwGX7zXS273XgLbTVj1ruVNDyIOlmPQ=="],
 
@@ -23817,7 +23823,7 @@
 
     "@slates-integrations/google-calendar/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
-    "@slates-integrations/google-chat/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
+    "@slates-integrations/google-chat/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.27", "", { "dependencies": { "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "@slates/provider-handler": "1.0.0-rc.37" } }, "sha512-XU8sTzxMWyeEpOvZIxR2T6kONSHsAQPzHHIfciwcmydAjhPJ53seF+uqi+izlGGpISD4yl36KWvy3egZiQq79w=="],
 
     "@slates-integrations/google-classroom/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
 
@@ -24353,11 +24359,7 @@
 
     "@slates-integrations/microsoft-outlook/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
-    "@slates-integrations/microsoft-teams/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
-
-    "@slates-integrations/microsoft-teams/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.15", "", { "dependencies": { "@slates/client": "1.0.0-rc.17", "@slates/proto": "1.0.0-rc.15" } }, "sha512-54Da7oeshZssih0vTZaLoKtMRvSoROgsFd9VFEHrtIX7rrsizPpnPFNp8CMb8FCb1dM2tuUiI/rECKE9Bw1mfA=="],
-
-    "@slates-integrations/microsoft-teams/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
+    "@slates-integrations/microsoft-teams/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.27", "", { "dependencies": { "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "@slates/provider-handler": "1.0.0-rc.37" } }, "sha512-XU8sTzxMWyeEpOvZIxR2T6kONSHsAQPzHHIfciwcmydAjhPJ53seF+uqi+izlGGpISD4yl36KWvy3egZiQq79w=="],
 
     "@slates-integrations/midjourney/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
 
@@ -25079,6 +25081,8 @@
 
     "@slates-integrations/skyfire/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
+    "@slates-integrations/slack/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.27", "", { "dependencies": { "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "@slates/provider-handler": "1.0.0-rc.37" } }, "sha512-XU8sTzxMWyeEpOvZIxR2T6kONSHsAQPzHHIfciwcmydAjhPJ53seF+uqi+izlGGpISD4yl36KWvy3egZiQq79w=="],
+
     "@slates-integrations/slite/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 
     "@slates-integrations/smartsheet/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
@@ -25278,8 +25282,6 @@
     "@slates-integrations/teamcamp/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
     "@slates-integrations/teamwork/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
-
-    "@slates-integrations/telegram/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
     "@slates-integrations/telnyx/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 
@@ -25485,11 +25487,7 @@
 
     "@slates-integrations/webvizio/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
-    "@slates-integrations/whatsapp-business/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
-
-    "@slates-integrations/whatsapp-business/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.15", "", { "dependencies": { "@slates/client": "1.0.0-rc.17", "@slates/proto": "1.0.0-rc.15" } }, "sha512-54Da7oeshZssih0vTZaLoKtMRvSoROgsFd9VFEHrtIX7rrsizPpnPFNp8CMb8FCb1dM2tuUiI/rECKE9Bw1mfA=="],
-
-    "@slates-integrations/whatsapp-business/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
+    "@slates-integrations/whatsapp-business/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.27", "", { "dependencies": { "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "@slates/provider-handler": "1.0.0-rc.37" } }, "sha512-XU8sTzxMWyeEpOvZIxR2T6kONSHsAQPzHHIfciwcmydAjhPJ53seF+uqi+izlGGpISD4yl36KWvy3egZiQq79w=="],
 
     "@slates-integrations/whautomate/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
@@ -25603,9 +25601,7 @@
 
     "@slates-integrations/zoho/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 
-    "@slates-integrations/zoom/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
-
-    "@slates-integrations/zoom/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.15", "", { "dependencies": { "@slates/client": "1.0.0-rc.17", "@slates/proto": "1.0.0-rc.15" } }, "sha512-54Da7oeshZssih0vTZaLoKtMRvSoROgsFd9VFEHrtIX7rrsizPpnPFNp8CMb8FCb1dM2tuUiI/rECKE9Bw1mfA=="],
+    "@slates-integrations/zoom/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.27", "", { "dependencies": { "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "@slates/provider-handler": "1.0.0-rc.37" } }, "sha512-XU8sTzxMWyeEpOvZIxR2T6kONSHsAQPzHHIfciwcmydAjhPJ53seF+uqi+izlGGpISD4yl36KWvy3egZiQq79w=="],
 
     "@slates-integrations/zoominfo/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 
@@ -25616,6 +25612,14 @@
     "@slates-integrations/zyte-api/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
     "@slates/aws-sdk-http-handler/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
+
+    "@slates/cli/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-iqSzn1Z04aLOWIKPXeZBc/m+nw2x8KFJcVHF5dgAyPYtKxCxyhXrXybzI33BVS3vmm1jjPilarOeuliA9QsetA=="],
+
+    "@slates/cli/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-yp7BqmrLfb/n5lBBHiFIJe6oiicCpjlS3XKAY184tMMJ5zENFuSialoGmqcpKAlzhD8uwcb1q03p8vlURiukCw=="],
+
+    "@slates/cli/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.37", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-MLs7nMkwpk/LjUmo5ZJ+8WiaOgVvbGAFFanyq6+Khgkvnuc3oNjSsKwE4HDmsXLMtJ/Ws5S0y/F84UFtwZjSuQ=="],
+
+    "@slates/cli/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-iqSzn1Z04aLOWIKPXeZBc/m+nw2x8KFJcVHF5dgAyPYtKxCxyhXrXybzI33BVS3vmm1jjPilarOeuliA9QsetA=="],
 
     "@slates/dynamics-commerce-recipes/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 
@@ -25636,6 +25640,8 @@
     "@slates/oauth-microsoft/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 
     "@slates/oauth-zoho/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
+
+    "@slates/slack-tools/slates/@slates/provider": ["@slates/provider@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-yp7BqmrLfb/n5lBBHiFIJe6oiicCpjlS3XKAY184tMMJ5zENFuSialoGmqcpKAlzhD8uwcb1q03p8vlURiukCw=="],
 
     "@slates/super-google-tools/slates/@slates/provider": ["@slates/provider@1.0.0-rc.26", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-wKxTr2fn7VVICfW6HghlLvnIvNqipMl8nHEZMnn0aox2EH+z6ipzzsEf7BNf3cEIhZM4KvDkX0JsgOmjImkwOA=="],
 
@@ -26189,6 +26195,12 @@
 
     "@slates-integrations/google-calendar/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
+    "@slates-integrations/google-chat/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-iqSzn1Z04aLOWIKPXeZBc/m+nw2x8KFJcVHF5dgAyPYtKxCxyhXrXybzI33BVS3vmm1jjPilarOeuliA9QsetA=="],
+
+    "@slates-integrations/google-chat/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-yp7BqmrLfb/n5lBBHiFIJe6oiicCpjlS3XKAY184tMMJ5zENFuSialoGmqcpKAlzhD8uwcb1q03p8vlURiukCw=="],
+
+    "@slates-integrations/google-chat/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.37", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-MLs7nMkwpk/LjUmo5ZJ+8WiaOgVvbGAFFanyq6+Khgkvnuc3oNjSsKwE4HDmsXLMtJ/Ws5S0y/F84UFtwZjSuQ=="],
+
     "@slates-integrations/google-classroom/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
     "@slates-integrations/google-classroom/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
@@ -26479,13 +26491,11 @@
 
     "@slates-integrations/microsoft-outlook/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
-    "@slates-integrations/microsoft-teams/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
+    "@slates-integrations/microsoft-teams/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-iqSzn1Z04aLOWIKPXeZBc/m+nw2x8KFJcVHF5dgAyPYtKxCxyhXrXybzI33BVS3vmm1jjPilarOeuliA9QsetA=="],
 
-    "@slates-integrations/microsoft-teams/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
+    "@slates-integrations/microsoft-teams/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-yp7BqmrLfb/n5lBBHiFIJe6oiicCpjlS3XKAY184tMMJ5zENFuSialoGmqcpKAlzhD8uwcb1q03p8vlURiukCw=="],
 
-    "@slates-integrations/microsoft-teams/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.22", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "zod": "^4.2.1" } }, "sha512-obqnJjvKmyrzCKkWLfUYXTx/fEQ6pOAWnxkpYfn+WVrKFG1ObHVWAJ4WimG/IyQlG5eA8bF5HFWnDCiL3K96PA=="],
-
-    "@slates-integrations/microsoft-teams/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
+    "@slates-integrations/microsoft-teams/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.37", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-MLs7nMkwpk/LjUmo5ZJ+8WiaOgVvbGAFFanyq6+Khgkvnuc3oNjSsKwE4HDmsXLMtJ/Ws5S0y/F84UFtwZjSuQ=="],
 
     "@slates-integrations/midjourney/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
@@ -26813,6 +26823,12 @@
 
     "@slates-integrations/sharepoint/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
+    "@slates-integrations/slack/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-iqSzn1Z04aLOWIKPXeZBc/m+nw2x8KFJcVHF5dgAyPYtKxCxyhXrXybzI33BVS3vmm1jjPilarOeuliA9QsetA=="],
+
+    "@slates-integrations/slack/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-yp7BqmrLfb/n5lBBHiFIJe6oiicCpjlS3XKAY184tMMJ5zENFuSialoGmqcpKAlzhD8uwcb1q03p8vlURiukCw=="],
+
+    "@slates-integrations/slack/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.37", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-MLs7nMkwpk/LjUmo5ZJ+8WiaOgVvbGAFFanyq6+Khgkvnuc3oNjSsKwE4HDmsXLMtJ/Ws5S0y/F84UFtwZjSuQ=="],
+
     "@slates-integrations/smartsheet/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
     "@slates-integrations/smartsheet/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
@@ -26989,13 +27005,11 @@
 
     "@slates-integrations/webflow/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
-    "@slates-integrations/whatsapp-business/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
+    "@slates-integrations/whatsapp-business/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-iqSzn1Z04aLOWIKPXeZBc/m+nw2x8KFJcVHF5dgAyPYtKxCxyhXrXybzI33BVS3vmm1jjPilarOeuliA9QsetA=="],
 
-    "@slates-integrations/whatsapp-business/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
+    "@slates-integrations/whatsapp-business/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-yp7BqmrLfb/n5lBBHiFIJe6oiicCpjlS3XKAY184tMMJ5zENFuSialoGmqcpKAlzhD8uwcb1q03p8vlURiukCw=="],
 
-    "@slates-integrations/whatsapp-business/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.22", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "zod": "^4.2.1" } }, "sha512-obqnJjvKmyrzCKkWLfUYXTx/fEQ6pOAWnxkpYfn+WVrKFG1ObHVWAJ4WimG/IyQlG5eA8bF5HFWnDCiL3K96PA=="],
-
-    "@slates-integrations/whatsapp-business/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
+    "@slates-integrations/whatsapp-business/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.37", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-MLs7nMkwpk/LjUmo5ZJ+8WiaOgVvbGAFFanyq6+Khgkvnuc3oNjSsKwE4HDmsXLMtJ/Ws5S0y/F84UFtwZjSuQ=="],
 
     "@slates-integrations/wix/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
@@ -27059,11 +27073,11 @@
 
     "@slates-integrations/zoho-crm/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 
-    "@slates-integrations/zoom/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
+    "@slates-integrations/zoom/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.23", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-iqSzn1Z04aLOWIKPXeZBc/m+nw2x8KFJcVHF5dgAyPYtKxCxyhXrXybzI33BVS3vmm1jjPilarOeuliA9QsetA=="],
 
-    "@slates-integrations/zoom/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.22", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "zod": "^4.2.1" } }, "sha512-obqnJjvKmyrzCKkWLfUYXTx/fEQ6pOAWnxkpYfn+WVrKFG1ObHVWAJ4WimG/IyQlG5eA8bF5HFWnDCiL3K96PA=="],
+    "@slates-integrations/zoom/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.27", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-yp7BqmrLfb/n5lBBHiFIJe6oiicCpjlS3XKAY184tMMJ5zENFuSialoGmqcpKAlzhD8uwcb1q03p8vlURiukCw=="],
 
-    "@slates-integrations/zoom/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
+    "@slates-integrations/zoom/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.37", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.23", "@slates/provider": "1.0.0-rc.27", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-MLs7nMkwpk/LjUmo5ZJ+8WiaOgVvbGAFFanyq6+Khgkvnuc3oNjSsKwE4HDmsXLMtJ/Ws5S0y/F84UFtwZjSuQ=="],
 
     "@slates/google-identity-recipes/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-BYOQJi1PJRvdND87dzoeooYqaGl4B7swMW2S1BvgocryOwwDAEmdom8qd7XV675jVMxpd3CcgaHgOI+Wx7JP7w=="],
 

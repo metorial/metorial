@@ -1,5 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { ZOOM_USER_AUTH_METHODS } from '../lib/authMethods';
 import { ZoomClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -27,6 +28,7 @@ export let getUserSettings = SlateTool.create(spec, {
       settings: z.any().describe('Full Zoom settings response for the user')
     })
   )
+  .authMethods(ZOOM_USER_AUTH_METHODS)
   .handleInvocation(async ctx => {
     let client = new ZoomClient(ctx.auth.token);
     let settings = await client.getUserSettings(ctx.input.userId);

@@ -1,4 +1,5 @@
 import { Slate } from '@slates/provider';
+import { zoomChatAdapter } from './chat';
 import { spec } from './spec';
 import {
   createMeeting,
@@ -26,8 +27,12 @@ import {
   updateMeeting,
   updateWebinar
 } from './tools';
+import { zoomChatbotTriggerGroup } from './triggers';
+
 export let provider = Slate.create({
   spec,
+  adapters: [zoomChatAdapter],
+  triggerGroups: [zoomChatbotTriggerGroup],
   tools: [
     createMeeting,
     getMeeting,
