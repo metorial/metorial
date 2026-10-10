@@ -1,10 +1,6 @@
 import { z } from 'zod';
 
-/**
- * Messenger Platform webhook shapes. Reference:
- * https://developers.facebook.com/docs/messenger-platform/webhooks
- * https://developers.facebook.com/docs/messenger-platform/reference/webhook-events
- */
+// https://developers.facebook.com/docs/messenger-platform/reference/webhook-events
 
 let participant = z.object({ id: z.string() }).loose();
 
@@ -70,13 +66,24 @@ export let messengerWebhookEnvelopeSchema = z
   })
   .loose();
 
+// Shared by the idempotency key and the event id so redeliveries collapse.
+export let getMessengerEditEventId = (event: MessengerMessagingEvent) =>
+  `message_edit:${event.message_edit?.mid}:${event.message_edit?.num_edit ?? event.timestamp}`;
+
+export let getMessengerReactionEventId = (event: MessengerMessagingEvent) =>
+  [
+    'reaction',
+    event.reaction?.mid,
+    event.sender.id,
+    event.reaction?.action,
+    event.reaction?.emoji ?? event.reaction?.reaction ?? '',
+    event.timestamp
+  ].join(':');
+
 export let messengerEventTypes = ['message', 'message_edit', 'reaction'] as const;
 export type MessengerEventType = (typeof messengerEventTypes)[number];
 
-/**
- * One emitted event per supported `entry[].messaging[]` item. `pageId` is the
- * signed delivery's `entry[].id`; `messaging` is the provider event unchanged.
- */
+// `pageId` is the signed delivery's `entry[].id`.
 export let messengerEventSchema = z.object({
   type: z.enum(messengerEventTypes),
   pageId: z.string(),

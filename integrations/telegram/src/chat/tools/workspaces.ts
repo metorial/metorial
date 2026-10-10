@@ -2,7 +2,8 @@ import {
   ChatErrors,
   getAuthenticatedUser,
   getWorkspace,
-  listWorkspaces
+  listWorkspaces,
+  matchesChatQuery
 } from '@slates/adapter-chat';
 import { TelegramClient } from '../../lib/client';
 import { spec } from '../../spec';
@@ -23,12 +24,11 @@ export let chatListWorkspaces = listWorkspaces
     return withTelegramChatErrors({ action }, async () => {
       let bot = await resolveTelegramBot(new TelegramClient(ctx.auth.token), ctx.auth);
       let workspace = buildTelegramWorkspace(bot);
-      let query = ctx.input.query?.trim().toLowerCase();
-      let matches =
-        !query ||
-        [workspace.name, bot.username, workspace.id].some(value =>
-          value?.toLowerCase().includes(query)
-        );
+      let matches = matchesChatQuery(ctx.input.query, [
+        workspace.name,
+        bot.username,
+        workspace.id
+      ]);
       return {
         output: { workspaces: matches ? [workspace] : [], raw: { botId: bot.id } },
         message: matches

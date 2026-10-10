@@ -15,7 +15,6 @@ import {
 let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** Pure, non-throwing read of an event's message for trigger selection. */
 export let peekEventMessage = (
   payload: unknown,
   kinds: readonly string[]

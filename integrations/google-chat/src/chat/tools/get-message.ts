@@ -7,10 +7,6 @@ import { resolveMessageName } from '../lib/resources';
 import { buildGoogleChatMessageResult } from '../lib/results';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/**
- * spaces.messages.get with chat.bot returns messages the Chat app has access
- * to, such as its own messages, direct messages, and messages that invoked it.
- */
 export let chatGetMessage = contract
   .implement(spec)
   .scopes(googleChatAppScopes)

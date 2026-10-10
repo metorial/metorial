@@ -4,18 +4,18 @@ import { DiscordChatClient } from '../lib/client';
 import { withDiscordChatErrors } from '../lib/errors';
 import { parseDiscordFileReference, resolveDiscordAttachment } from '../lib/files';
 
+let ACTION = 'metorial$getFileUrl';
 let FALLBACK_TTL_MS = 60 * 60 * 1000;
 
-/** Renews an expired Discord attachment download URL from its durable reference. */
 export let discordGetFileUrl = getFileUrlTool(spec, async ctx =>
   withDiscordChatErrors(
-    { action: 'metorial$getFileUrl', notFound: 'chat.attachment.not_found' },
+    { action: ACTION, notFound: 'chat.attachment.not_found' },
     async () => {
-      let reference = parseDiscordFileReference(ctx.input.reference, 'metorial$getFileUrl');
+      let reference = parseDiscordFileReference(ctx.input.reference, ACTION);
       let resolved = await resolveDiscordAttachment(
         new DiscordChatClient(ctx.auth),
         reference,
-        'metorial$getFileUrl'
+        ACTION
       );
       return {
         url: resolved.url,

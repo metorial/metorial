@@ -43,10 +43,7 @@ export type SlateTriggerGroupGatewayConnectHandler<
   context: SlateContext<ConfigType, AuthType, { state: any | null }>
 ) => Promise<{ url: string; state?: any }>;
 
-/**
- * Handles frames received on a gateway connection the platform keeps open.
- * `closed` is set (with no frames) when the socket closed without being asked to.
- */
+/** `closed` is set, with no frames, when the socket closed unexpectedly. */
 export type SlateTriggerGroupGatewayReceiveHandler<
   ConfigType extends {},
   AuthType extends {}
@@ -349,10 +346,7 @@ export class SlateTriggerGroupBuilder<
     return this;
   }
 
-  /**
-   * Receive events over a persistent connection (for example a WebSocket gateway)
-   * that the platform opens with the connection's credentials and keeps alive.
-   */
+  /** Receive events over a platform-managed persistent connection (e.g. a WebSocket gateway). */
   gateway(
     props: SlateTriggerGroupGatewayParameters<ConfigType, AuthType>
   ): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {

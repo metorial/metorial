@@ -1,15 +1,17 @@
-import { ChatErrors, uploadFile as contract } from '@slates/adapter-chat';
+import {
+  ChatErrors,
+  uploadFile as contract,
+  fetchAttachmentSource
+} from '@slates/adapter-chat';
 import { TelegramClient } from '../../lib/client';
 import { spec } from '../../spec';
 import { getTelegramErrorDescription, withTelegramChatErrors } from '../lib/errors';
 import { parseOptionalTelegramInteger } from '../lib/ids';
 import { mapTelegramMessage, resolveTelegramBot } from '../lib/mappers';
 
-// Multipart upload limits: 10 MB for photos, 50 MB for other files.
 // https://core.telegram.org/bots/api#sending-files
 let MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 let MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-let SOURCE_TIMEOUT_MS = 120_000;
 
 type UploadMethod = {
   method: 'sendDocument' | 'sendPhoto' | 'sendVideo' | 'sendAudio';
@@ -31,10 +33,7 @@ let resolveMimeType = (filename: string, mimeType?: string) =>
     .trim()
     .toLowerCase();
 
-/**
- * Photos, MP4 video, and MP3/M4A audio display inline in Telegram clients; every
- * other file is sent as a document, which keeps the original bytes and filename.
- */
+// Only these types display inline; anything else is sent as a document.
 let chooseMethod = (mimeType: string, size: number): UploadMethod => {
   if ((mimeType === 'image/jpeg' || mimeType === 'image/png') && size <= MAX_PHOTO_BYTES) {
     return { method: 'sendPhoto', field: 'photo' };
@@ -46,52 +45,26 @@ let chooseMethod = (mimeType: string, size: number): UploadMethod => {
   return { method: 'sendDocument', field: 'document' };
 };
 
+let TOO_LARGE_MESSAGE = 'Telegram bots can upload files up to 50 MB.';
+
 let tooLarge = (action: string, actual: number, filename: string) =>
   ChatErrors.attachmentTooLarge({
     action,
     id: filename,
     max: MAX_UPLOAD_BYTES,
     actual,
-    message: 'Telegram bots can upload files up to 50 MB.'
+    message: TOO_LARGE_MESSAGE
   });
 
 let fetchSource = async (fileUrl: string, filename: string, action: string) => {
-  let url = new URL(fileUrl);
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-    throw ChatErrors.inputInvalid({
-      action,
-      message: 'fileUrl must be an HTTP(S) URL.',
-      issues: [{ path: ['fileUrl'], code: 'invalid_url', message: 'Expected http or https' }]
-    });
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(url, { signal: AbortSignal.timeout(SOURCE_TIMEOUT_MS) });
-  } catch (error) {
-    throw ChatErrors.attachmentUploadFailed({
-      action,
-      attachmentId: filename,
-      message: 'The file could not be fetched from its source URL.',
-      cause: error
-    });
-  }
-  if (!response.ok) {
-    throw ChatErrors.attachmentUploadFailed({
-      action,
-      attachmentId: filename,
-      message: `The file source URL responded with HTTP ${response.status}.`
-    });
-  }
-
-  let declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES) {
-    throw tooLarge(action, declared, filename);
-  }
-
-  let blob = await response.blob();
-  if (blob.size > MAX_UPLOAD_BYTES) throw tooLarge(action, blob.size, filename);
-  return { blob, contentType: response.headers.get('content-type') ?? undefined };
+  let source = await fetchAttachmentSource(fileUrl, {
+    action,
+    attachmentId: filename,
+    maxBytes: MAX_UPLOAD_BYTES,
+    tooLargeMessage: TOO_LARGE_MESSAGE
+  });
+  let blob = new Blob([source.bytes], { type: source.contentType ?? '' });
+  return { blob, contentType: source.contentType };
 };
 
 export let chatUploadFile = contract
@@ -125,7 +98,7 @@ export let chatUploadFile = contract
         try {
           sent = await upload(method);
         } catch (error) {
-          // Photos with unsupported dimensions or ratios are still deliverable as documents.
+          // Photos with unsupported dimensions still send as documents.
           let description = getTelegramErrorDescription(error) ?? '';
           if (
             method.method !== 'sendPhoto' ||
@@ -136,8 +109,7 @@ export let chatUploadFile = contract
           sent = await upload({ method: 'sendDocument', field: 'document' });
         }
 
-        // Sending a file creates a new message, so both the stored file and that
-        // message are returned.
+        // The upload creates a message, so it is returned with the file.
         let mapped = mapTelegramMessage(sent, bot, {
           clientReferenceIds: [clientReferenceId]
         });

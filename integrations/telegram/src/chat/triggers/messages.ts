@@ -14,7 +14,7 @@ import {
   readEventMessage,
   safely
 } from '../lib/events';
-import { mapTelegramMessage, mapTelegramSenderChat, mapTelegramUser } from '../lib/mappers';
+import { mapTelegramMessage } from '../lib/mappers';
 
 // A bot command is delivered only as command.invoked, so a consumer answers it once.
 export let chatMessageReceived = messageReceived
@@ -73,9 +73,8 @@ export let chatCommandInvoked = commandInvoked
   .matches(payload => !!eventCommand(payload))
   .map(async ctx => {
     let event = ctx.input;
-    let message = readEventMessage(event, commandInvoked.key);
+    let mapped = mapTelegramMessage(readEventMessage(event, commandInvoked.key), event.bot);
     let command = eventCommand(event);
-    let mapped = mapTelegramMessage(message, event.bot);
     let id = eventId(event, 'command');
     return {
       type: 'chat.command.invoked',
@@ -85,11 +84,7 @@ export let chatCommandInvoked = commandInvoked
         id,
         name: command?.name ?? '',
         text: command?.text,
-        author: message.from
-          ? mapTelegramUser(message.from, event.bot.id)
-          : message.sender_chat
-            ? mapTelegramSenderChat(message.sender_chat)
-            : mapped.message.author,
+        author: mapped.message.author,
         channelId: mapped.channel.id,
         threadId: mapped.thread?.id,
         message: mapped.message,

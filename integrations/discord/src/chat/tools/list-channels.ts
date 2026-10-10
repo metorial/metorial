@@ -5,12 +5,7 @@ import { decodeDiscordCursor, encodeDiscordCursor, offsetCursorSchema } from '..
 import { mapChannel, NON_MESSAGE_CHANNEL_TYPES } from '../lib/mappers';
 import type { DiscordApiChannel } from '../lib/types';
 
-/**
- * Lists the message-capable channels of one server. Discord returns a server's channels
- * in one response, so pages are offsets into that list. Without `workspaceId` the bot's
- * only server is used; with several servers `workspaceId` is required.
- * https://docs.discord.com/developers/resources/guild#get-guild-channels
- */
+// Discord returns all of a server's channels at once, so pages are offsets into that list.
 export let chatListChannels = contract
   .implement(spec)
   .authMethods(['bot_token'])

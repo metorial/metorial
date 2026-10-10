@@ -16,7 +16,11 @@ export let chatListMessages = contract
   .scopes(slackActionScopes.conversationHistory)
   .handleInvocation(async ctx => {
     let client = createSlackChatClient(ctx, { action: contract.key });
-    let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'backward');
+    let cursor = decodeSlackCursor(
+      ctx.input.cursor,
+      ctx.input.direction ?? 'backward',
+      contract.key
+    );
     let limit = ctx.input.limit ?? 100;
     let [identity, rawChannel] = await Promise.all([
       getSlackIdentity(client),

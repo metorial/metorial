@@ -7,15 +7,9 @@ export type GoogleChatAppRequestOptions = {
   method?: 'delete' | 'get' | 'patch' | 'post';
   params?: Record<string, unknown>;
   data?: unknown;
-  /** Per-request error context merged over the client's default context. */
   context?: GoogleChatChatErrorContext;
 };
 
-/**
- * Google Chat API client for chat adapter actions. It authenticates as the Chat
- * app and converts every failure into a serialized `ChatError` at the adapter
- * boundary. Ordinary tools keep using `GoogleChatClient` and `ServiceError`.
- */
 export class GoogleChatAppClient {
   private http: ReturnType<typeof createAxios>;
 

@@ -1,10 +1,9 @@
-import { type AttachmentRef, ChatErrors } from '@slates/adapter-chat';
+import { type AttachmentRef, ChatErrors, fetchAttachmentSource } from '@slates/adapter-chat';
 import type { DiscordUploadFile } from './client';
-import type { DiscordFileReference } from './mappers';
+import type { DiscordFileReference } from './files';
 import type { DiscordApiMessage } from './types';
 
 // Discord caps a whole request at 25 MiB.
-// https://docs.discord.com/developers/reference#uploading-files
 export let DISCORD_MAX_REQUEST_BYTES = 25 * 1024 * 1024;
 
 export interface PreparedAttachments {
@@ -32,37 +31,19 @@ let fetchPendingFile = async (
     });
   }
 
-  let response: Response;
-  try {
-    response = await fetch(source);
-  } catch (error) {
-    throw ChatErrors.attachmentDownloadFailed({
-      action,
-      cause: error,
-      message: 'Could not fetch the file from its signed upload URL.'
-    });
-  }
-
-  if (!response.ok) {
-    throw ChatErrors.attachmentDownloadFailed({
-      action,
-      message: `Could not fetch the file from its signed upload URL: HTTP ${response.status}.`
-    });
-  }
-
-  let bytes = new Uint8Array(await response.arrayBuffer());
+  let fetched = await fetchAttachmentSource(source, {
+    action,
+    maxBytes: DISCORD_MAX_REQUEST_BYTES,
+    field: 'sourceUrl'
+  });
   return {
     filename: attachment.name ?? 'file',
-    contentType: attachment.mimeType ?? response.headers.get('content-type') ?? undefined,
-    bytes
+    contentType: attachment.mimeType ?? fetched.contentType,
+    bytes: fetched.bytes
   };
 };
 
-/**
- * Shape B uploads: pending attachments are fetched here and sent as multipart parts of
- * the same message create/edit call. Completed Discord attachments can only be kept on
- * the message that already owns them (edits); Discord cannot re-attach a file by id.
- */
+// Discord can't re-attach a file by id; completed files are only kept on their own message.
 export let prepareAttachments = async (
   attachments: AttachmentRef[] | undefined,
   options: { action: string; messageId?: string }
@@ -107,10 +88,7 @@ export let prepareAttachments = async (
   return prepared;
 };
 
-/**
- * Correlates new attachments with the caller's `clientReferenceId`: attachments that were
- * not kept are the new uploads, matched by filename first and then by request order.
- */
+// Matches new uploads to `clientReferenceId` by filename, then by request order.
 export let clientReferencesFor = (
   raw: DiscordApiMessage,
   prepared: PreparedAttachments

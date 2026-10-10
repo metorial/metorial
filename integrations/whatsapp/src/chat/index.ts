@@ -14,12 +14,7 @@ import {
 } from './tools';
 import { chatMessageReceived, chatReactionAdded, chatReactionRemoved } from './triggers';
 
-/**
- * Omitted actions (see README): message edit/delete (the Cloud API cannot edit
- * or delete business messages), typing (needs an inbound message id, which the
- * contract does not carry), ephemeral messages, threads, message history/search,
- * channel/user listing, DMs, and commands (no provider equivalent).
- */
+// Omitted actions have no Cloud API equivalent; see README.
 export let whatsappChatTools = [
   chatSendMessage,
   chatMarkMessageRead,
@@ -44,10 +39,8 @@ export let whatsappChatAdapter = ChatAdapter.register({
   tools: whatsappChatTools,
   triggers: whatsappChatTriggers,
   capabilities: {
-    // Contextual replies quote the replied-to message.
     message_reply: true,
     message_quote: true,
-    // Markdown is rendered to WhatsApp formatting; other structures use text fallbacks.
     content_markdown: true,
     content_images: false,
     content_rich_links: false,
@@ -75,8 +68,7 @@ export let whatsappChatAdapter = ChatAdapter.register({
     command_freeform: false,
     command_structured_options: false,
     command_subcommands: false,
-    // Customer ids are usually phone numbers, but Meta may supply a
-    // business-scoped user id instead, so this is not guaranteed.
+    // Customer ids may be business-scoped user ids rather than phone numbers.
     user_id_is_email: false,
     user_id_is_phone_number: false
   }

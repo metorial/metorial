@@ -4,13 +4,7 @@ import { spec } from '../../spec';
 import { zoomChatbotTriggerGroup } from '../../triggers/chatbotTriggerGroup';
 import { isZoomSlashCommandNotification, mapZoomBotNotification } from '../lib/events';
 
-/**
- * Zoom documents `bot_notification` as the slash command delivery, with `cmd`
- * holding the text after the command:
- * https://developers.zoom.us/docs/chat/capabilities/#slash-commands
- * A chatbot has exactly one slash command, saved with the endpoint registration.
- * Only channel notifications are commands; direct chats with the bot are messages.
- */
+// A chatbot has one slash command (saved with the registration); `cmd` is the text after it.
 export let chatCommandInvoked = contract
   .implement(spec, zoomChatbotTriggerGroup)
   .authMethods([ZOOM_CHATBOT_AUTH_METHOD])

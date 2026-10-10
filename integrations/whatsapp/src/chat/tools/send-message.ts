@@ -28,8 +28,7 @@ export let chatSendMessage = contract
     assertNoWhatsAppThread(ctx.input.threadId, action);
     assertWhatsAppChannelId(channelId, action);
 
-    // Files are sent as their own WhatsApp messages through file upload; a text
-    // message cannot carry attachments.
+    // A text message cannot carry files; they are sent through file upload.
     if (ctx.input.attachments && ctx.input.attachments.length > 0) {
       throw ChatErrors.inputInvalid({
         action,

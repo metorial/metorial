@@ -1,18 +1,12 @@
 import { ServiceError } from '@lowerdeck/error';
 import {
-  ChatError,
   type ChatErrorCode,
-  type ChatErrorDetailsInput,
   type ChatErrorTargetType,
-  getChatErrorTargetType,
-  wrapChatError
+  createChatErrorMapper
 } from '@slates/adapter-chat';
 import { SlateError } from 'slates';
 
-/**
- * WhatsApp Cloud API error codes mapped to chat error codes.
- * https://developers.facebook.com/documentation/business-messaging/whatsapp/support/error-codes
- */
+// https://developers.facebook.com/documentation/business-messaging/whatsapp/support/error-codes
 let WHATSAPP_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
   // Authorization
   '0': 'chat.auth.invalid',
@@ -68,18 +62,6 @@ let WHATSAPP_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
   '2494100': 'chat.provider.unavailable'
 };
 
-let SLATE_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
-  'upstream.rate_limited': 'chat.rate_limit.exceeded',
-  'upstream.timeout': 'chat.provider.timeout',
-  'upstream.network_error': 'chat.provider.network_error',
-  'upstream.unavailable': 'chat.provider.unavailable',
-  'auth.invalid': 'chat.auth.invalid',
-  'auth.expired': 'chat.auth.expired',
-  'auth.required': 'chat.auth.invalid',
-  'permission.denied': 'chat.access.forbidden'
-};
-
-/** Friendlier messages for the conditions agents most need to act on. */
 let WHATSAPP_CHAT_ERROR_MESSAGES: Record<string, string> = {
   '131047':
     'The 24-hour customer service window with this WhatsApp user is closed. Free-form messages can only be sent within 24 hours of the user’s last message; send an approved template message instead.',
@@ -100,14 +82,13 @@ export interface WhatsAppChatErrorContext {
   workspaceId?: string;
   attachmentId?: string;
   emoji?: string;
-  /** Per-operation overrides for codes whose meaning depends on the target. */
   ambiguous?: Record<string, ChatErrorCode>;
 }
 
 let TARGET_FIELDS: Partial<Record<ChatErrorTargetType, keyof WhatsAppChatErrorContext>> = {
   workspace: 'workspaceId',
   channel: 'channelId',
-  // A WhatsApp customer conversation is identified by the customer's id.
+  // The customer id is the conversation id.
   user: 'channelId',
   message: 'messageId',
   attachment: 'attachmentId',
@@ -129,76 +110,37 @@ export let getWhatsAppUpstreamCode = (error: unknown): string | undefined => {
 };
 
 let resolveChatCode = (
-  error: unknown,
   upstreamCode: string | undefined,
   context: WhatsAppChatErrorContext
-): ChatErrorCode => {
-  if (upstreamCode) {
-    let ambiguous = context.ambiguous?.[upstreamCode];
-    if (ambiguous) return ambiguous;
+): ChatErrorCode | undefined => {
+  if (!upstreamCode) return undefined;
 
-    let mapped = WHATSAPP_CHAT_ERROR_CODES[upstreamCode];
-    if (mapped) return mapped;
+  let ambiguous = context.ambiguous?.[upstreamCode];
+  if (ambiguous) return ambiguous;
 
-    let numeric = Number(upstreamCode);
-    if (Number.isInteger(numeric) && numeric >= 200 && numeric <= 299) {
-      return 'chat.auth.missing_scope';
-    }
+  let mapped = WHATSAPP_CHAT_ERROR_CODES[upstreamCode];
+  if (mapped) return mapped;
+
+  let numeric = Number(upstreamCode);
+  if (Number.isInteger(numeric) && numeric >= 200 && numeric <= 299) {
+    return 'chat.auth.missing_scope';
   }
-
-  if (SlateError.is(error)) {
-    let mapped = SLATE_CHAT_ERROR_CODES[error.code];
-    if (mapped) return mapped;
-  }
-
-  return 'chat.provider.error';
-};
-
-let resolveTarget = (code: ChatErrorCode, context: WhatsAppChatErrorContext) => {
-  let entity = getChatErrorTargetType(code);
-  if (!entity) return undefined;
-
-  let field = TARGET_FIELDS[entity];
-  let id = field ? context[field] : undefined;
-  return typeof id === 'string' ? id : undefined;
-};
-
-let getUpstreamMessage = (error: unknown) => {
-  if (SlateError.is(error)) return error.message;
-  if (error instanceof Error) return error.message;
   return undefined;
 };
 
-export let mapWhatsAppChatError = (error: unknown, context: WhatsAppChatErrorContext = {}) => {
-  if (ChatError.is(error)) return error;
-
-  let upstreamCode = getWhatsAppUpstreamCode(error);
-  let code = resolveChatCode(error, upstreamCode, context);
-  let upstreamMessage = getUpstreamMessage(error);
-
-  let details: ChatErrorDetailsInput = {
-    action: context.action,
-    target: resolveTarget(code, context),
-    provider: upstreamCode ? { code: upstreamCode, message: upstreamMessage } : undefined
-  };
-
-  let friendly = upstreamCode ? WHATSAPP_CHAT_ERROR_MESSAGES[upstreamCode] : undefined;
-  if (friendly) details.message = friendly;
-
-  if (code === 'chat.auth.missing_scope') {
-    details.scopes = ['whatsapp_business_messaging'];
+let whatsappChatErrors = createChatErrorMapper<WhatsAppChatErrorContext>({
+  targetFields: TARGET_FIELDS,
+  classify: (error, context, upstream) => {
+    let upstreamCode = getWhatsAppUpstreamCode(error);
+    let code = resolveChatCode(upstreamCode, context);
+    return {
+      code,
+      provider: upstreamCode ? { code: upstreamCode, message: upstream.message } : undefined,
+      message: upstreamCode ? WHATSAPP_CHAT_ERROR_MESSAGES[upstreamCode] : undefined,
+      scopes: code === 'chat.auth.missing_scope' ? ['whatsapp_business_messaging'] : undefined
+    };
   }
+});
 
-  return wrapChatError(code, error, details);
-};
-
-export let withWhatsAppChatErrors = async <T>(
-  context: WhatsAppChatErrorContext,
-  run: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw mapWhatsAppChatError(error, context);
-  }
-};
+export let mapWhatsAppChatError = whatsappChatErrors.map;
+export let withWhatsAppChatErrors = whatsappChatErrors.withErrors;

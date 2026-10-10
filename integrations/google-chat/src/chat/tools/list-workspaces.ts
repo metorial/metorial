@@ -3,7 +3,6 @@ import { spec } from '../../spec';
 import { getGoogleChatAppIdentity, mapGoogleChatWorkspace } from '../lib/identity';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/** Returns the single synthetic workspace representing the connected Chat app. */
 export let chatListWorkspaces = contract
   .implement(spec)
   .scopes(googleChatAppScopes)

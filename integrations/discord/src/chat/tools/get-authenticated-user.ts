@@ -3,10 +3,7 @@ import { spec } from '../../spec';
 import { runDiscordChatAction } from '../lib/context';
 import { mapAuthor } from '../lib/mappers';
 
-/**
- * The bot user. A bot can belong to many servers, so no single workspace is returned;
- * servers are discovered with workspace.list.
- */
+// A bot can belong to many servers, so no single workspace is returned.
 export let chatGetAuthenticatedUser = contract
   .implement(spec)
   .authMethods(['bot_token'])

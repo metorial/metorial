@@ -1,4 +1,4 @@
-import { ChatErrors, decodeCursor, encodeCursor } from '@slates/adapter-chat';
+import { ChatErrors, decodeChatCursor, encodeCursor } from '@slates/adapter-chat';
 import { z } from 'zod';
 import {
   resolveGoogleChatMessageName,
@@ -12,7 +12,6 @@ export let GOOGLE_CHAT_CURSOR_PROVIDER = 'google-chat';
 let validationMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Invalid Google Chat resource name.';
 
-/** Runs a shared resource-name resolver and reports its failures as chat input errors. */
 let resolve = <T>(action: string, field: string, run: () => T): T => {
   try {
     return run();
@@ -64,13 +63,8 @@ export let encodePageCursor = (pageToken: string | undefined) =>
 
 export let decodePageCursor = (action: string, cursor: string | undefined) => {
   if (!cursor) return undefined;
-  try {
-    return decodeCursor(GOOGLE_CHAT_CURSOR_PROVIDER, cursor, pageCursorSchema).data.pageToken;
-  } catch (error) {
-    throw ChatErrors.cursorInvalid({
-      action,
-      message: 'The cursor is not a Google Chat page cursor from a previous call.',
-      cause: error
-    });
-  }
+  return decodeChatCursor(GOOGLE_CHAT_CURSOR_PROVIDER, cursor, pageCursorSchema, {
+    action,
+    message: 'The cursor is not a Google Chat page cursor from a previous call.'
+  }).data.pageToken;
 };

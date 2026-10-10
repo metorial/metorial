@@ -1,4 +1,4 @@
-# Slates Specification for Google Chat
+# Google Chat integration specification
 
 ## Overview
 

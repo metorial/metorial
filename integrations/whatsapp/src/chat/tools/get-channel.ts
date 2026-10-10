@@ -3,11 +3,7 @@ import { spec } from '../../spec';
 import { mapWhatsAppChannel } from '../lib/mappers';
 import { assertWhatsAppChannelId } from '../lib/outgoing';
 
-/**
- * Documented fallback: the Cloud API has no conversation or contact lookup, so a
- * channel is derived from the customer id alone. Names are only available on
- * inbound messages and are not invented here.
- */
+// No contact lookup API, so the channel comes from the customer id alone.
 export let chatGetChannel = contract
   .implement(spec)
   .handleInvocation(async ctx => {

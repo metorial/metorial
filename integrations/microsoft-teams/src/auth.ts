@@ -9,9 +9,7 @@ import {
 } from './lib/botFramework';
 import { microsoftTeamsScopes } from './scopes';
 
-// Delegated Microsoft Graph connections act as the signed-in user. They cannot
-// act as a Teams bot, so they are excluded from the normalized chat adapter;
-// only the Bot Framework (Azure Bot) method below is chat-eligible.
+// Graph connections act as a user, not a bot, so they are not chat-eligible.
 export let graphAuthMethodKeys = [
   'oauth_common',
   'oauth_organizations',

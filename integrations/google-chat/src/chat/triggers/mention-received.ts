@@ -8,12 +8,7 @@ import { isGoogleChatMentionEvent, mapGoogleChatEventMessage } from '../lib/even
 import { getGoogleChatAppIdentity } from '../lib/identity';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/**
- * MESSAGE events whose annotations include a USER_MENTION of a Chat app. Chat
- * only delivers space messages to an app when they mention it, so the bot user
- * mentioned there is this app. Direct messages without a mention fire only
- * chat.message.received.
- */
+// Chat only delivers space messages that mention the app, so the mentioned bot is this app.
 export let chatMentionReceived = contract
   .implement(spec, googleChatInteractionEvents)
   .scopes(googleChatAppScopes)

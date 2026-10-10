@@ -4,8 +4,6 @@ import { spec } from '../../spec';
 import { createTeamsBotClient } from '../lib/client';
 import { classifyConversation, parseConversationId, threadConversationId } from '../lib/ids';
 
-// A `typing` activity sent to the conversation:
-// https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-api-reference?view=azure-bot-service-4.0#activity-object
 export let chatStartTyping = contract
   .implement(spec)
   .authMethods([BOT_FRAMEWORK_AUTH_METHOD_KEY])

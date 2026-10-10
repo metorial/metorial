@@ -7,11 +7,7 @@ import {
 } from '../lib/identity';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/**
- * The connected identity is the Chat app itself. Google exposes no "who am I"
- * endpoint for app authentication, so the identity comes from the service
- * account recorded at connection time.
- */
+// No app-auth "who am I" endpoint; identity comes from the stored service account.
 export let chatGetAuthenticatedUser = contract
   .implement(spec)
   .scopes(googleChatAppScopes)

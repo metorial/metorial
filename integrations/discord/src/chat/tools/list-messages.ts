@@ -8,12 +8,7 @@ import {
 } from '../lib/cursors';
 import { compareSnowflakes, mapChannel, mapEventChannel, mapMessage } from '../lib/mappers';
 
-/**
- * Discord pages by message id (`before`/`after`, max 100) and returns newest first; each
- * page is re-sorted oldest first. Backward pages continue before the oldest message,
- * forward pages after the newest.
- * https://docs.discord.com/developers/resources/message#get-channel-messages
- */
+// Discord returns newest first; each page is re-sorted oldest first.
 export let chatListMessages = contract
   .implement(spec)
   .authMethods(['bot_token'])

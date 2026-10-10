@@ -10,14 +10,13 @@ import {
 } from '../../triggers/botFrameworkTriggerGroup';
 import { asTeamsEvent, isTeamsEventKind, resolveEventAppId } from '../lib/events';
 import {
+  mapActivityAuthor,
   mapActivityChannel,
   mapActivityThread,
-  mapTeamsAuthor,
   mapTeamsReaction
 } from '../lib/mappers';
 
-// `messageReaction` activity; Teams sends it only for reactions to messages
-// the bot sent, with `replyToId` naming that message:
+// Sent only for reactions to the bot's own messages (`replyToId`).
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/subscribe-to-conversation-events#message-reaction-events
 let mapReaction = (event: TeamsActivityEvent, auth: { appId?: string }) => {
   let { activity } = event;
@@ -29,15 +28,7 @@ let mapReaction = (event: TeamsActivityEvent, auth: { appId?: string }) => {
     messageId: typeof activity.replyToId === 'string' ? activity.replyToId : '',
     channelId: channel.id,
     emoji: mapTeamsReaction(reactionType),
-    author: activity.from
-      ? mapTeamsAuthor(activity.from as any, appId)
-      : {
-          userId: 'unknown',
-          userName: 'unknown',
-          fullName: 'unknown',
-          type: 'unknown' as const,
-          isMe: false
-        },
+    author: mapActivityAuthor(activity, appId),
     channel,
     ...(thread ? { thread } : {}),
     raw: activity,

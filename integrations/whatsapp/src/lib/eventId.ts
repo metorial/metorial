@@ -1,13 +1,4 @@
-/**
- * Stable per-event identity for inbound WhatsApp messages, used both as the
- * webhook idempotency key and as the normalized trigger event id.
- *
- * Ordinary inbound messages use the provider message id (`wamid`). Reaction
- * deliveries add the emoji and timestamp: Meta's documented add/remove reaction
- * samples reuse the same `wamid`, so the message id alone could drop a removal
- * as a duplicate of the earlier add.
- * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/reaction
- */
+// Reactions add emoji and timestamp because Meta reuses the wamid for add and remove.
 export let getWhatsAppEventId = (message: {
   id: string;
   type?: string | null;

@@ -6,11 +6,7 @@ import { type GoogleChatSpaceResource, mapGoogleChatChannel } from '../lib/mappe
 import { resolveUserName } from '../lib/resources';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/**
- * spaces.findDirectMessage with app authentication returns the existing direct
- * message between the user and the Chat app. Creating a new direct message as
- * the app needs an administrator-approved scope, so a missing DM is reported.
- */
+// Creating a DM as the app needs an admin-approved scope, so a missing DM is reported.
 export let chatOpenSingleDm = contract
   .implement(spec)
   .scopes(googleChatAppScopes)

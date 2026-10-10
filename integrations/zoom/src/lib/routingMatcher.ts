@@ -1,9 +1,4 @@
-/**
- * One helper for both sides of chatbot webhook routing: the connection's
- * `.routingMatchers` (from chatbot auth) and the matchers `process` derives
- * from a verified delivery (`robotJid` + `accountId`). JIDs are compared
- * case-insensitively.
- */
+// Shared by `.routingMatchers` and `process` so both sides normalize identically.
 export interface ZoomChatbotMatcherInput {
   botJid: string;
   accountId: string;

@@ -5,9 +5,7 @@ import { DISCORD_API_BASE_URL } from '../chat/lib/client';
 import { InteractionCallbackType } from '../chat/lib/interaction';
 import { spec } from '../spec';
 
-// Gateway v10 protocol, implemented as a platform-held WebSocket.
-// https://docs.discord.com/developers/events/gateway
-// https://docs.discord.com/developers/topics/opcodes-and-status-codes
+// Gateway v10 on a platform-held WebSocket: https://docs.discord.com/developers/events/gateway
 
 export let DISCORD_GATEWAY_VERSION = '10';
 
@@ -29,7 +27,7 @@ export let GatewayIntents = {
   GUILD_MESSAGE_REACTIONS: 1 << 10,
   DIRECT_MESSAGES: 1 << 12,
   DIRECT_MESSAGE_REACTIONS: 1 << 13,
-  /** Privileged: must be enabled for the bot in the Developer Portal. */
+  // Privileged: enable it for the bot in the Developer Portal.
   MESSAGE_CONTENT: 1 << 15
 } as const;
 
@@ -51,7 +49,6 @@ export let FATAL_CLOSE_CODES: Record<number, string> = {
 /** Reconnectable close codes after which the old session cannot be resumed. */
 let SESSION_RESET_CLOSE_CODES = new Set([4007, 4009]);
 
-/** Dispatch types forwarded to triggers. Everything else only updates session state. */
 export let FORWARDED_DISPATCH_TYPES = new Set([
   'MESSAGE_CREATE',
   'MESSAGE_UPDATE',
@@ -73,7 +70,6 @@ let gatewayStateSchema = z.object({
   botUserId: z.string().nullable().default(null),
   applicationId: z.string().nullable().default(null),
   heartbeatIntervalMs: z.number().int().positive().nullable().default(null),
-  /** True when the current socket was opened to resume `sessionId`. */
   resuming: z.boolean().default(false),
   ready: z.boolean().default(false)
 });
@@ -101,7 +97,6 @@ export interface DiscordGatewayEventPayload {
   sequence: number | null;
   botUserId: string | null;
   applicationId: string | null;
-  /** Set on INTERACTION_CREATE: how the gateway acknowledged the interaction. */
   interaction?: {
     deferred: boolean;
     ephemeral: boolean;
@@ -169,7 +164,6 @@ let gatewayHttpError = async (response: Response, operation: string) => {
   return error;
 };
 
-// https://docs.discord.com/developers/events/gateway#get-gateway-bot
 let getGatewayBot = async (token: string) => {
   let response = await fetch(`${DISCORD_API_BASE_URL}/gateway/bot`, {
     headers: { Authorization: `Bot ${token}` }
@@ -182,11 +176,7 @@ let getGatewayBot = async (token: string) => {
   };
 };
 
-/**
- * Acknowledges an application command within Discord's 3-second window with a deferred
- * response ("thinking..."). `command.respond` later edits that original response.
- * https://docs.discord.com/developers/interactions/receiving-and-responding#responding-to-an-interaction
- */
+// Deferred ack within Discord's 3-second window; command.respond edits it later.
 let deferInteraction = async (interaction: { id: string; token: string }) => {
   let response = await fetch(
     `${DISCORD_API_BASE_URL}/interactions/${encodeURIComponent(interaction.id)}/${encodeURIComponent(interaction.token)}/callback`,
@@ -440,7 +430,6 @@ export let discordGatewayTriggerGroup = triggerGroup(spec, {
       };
     }
   })
-  // Gateway events are delivered to the registration instance that owns the socket, so
-  // routing matchers are not consulted; the builder still requires a handler.
+  // Gateway events go to the socket's own registration; matchers are unused but required.
   .routingMatchers(async () => [])
   .build();

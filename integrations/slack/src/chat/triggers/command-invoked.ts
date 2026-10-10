@@ -16,7 +16,7 @@ export let chatCommandInvoked = contract
   .matches(payload => typeof (payload as { command?: unknown }).command === 'string')
   .map(async ctx => {
     let payload = ctx.input as Record<string, any>;
-    // response_url is a short-lived response credential; it only travels as responseToken.
+    // response_url is a credential; it travels only as responseToken.
     let { response_url: _responseUrl, ...raw } = payload;
     let client = new SlackClient(ctx.auth.token);
 

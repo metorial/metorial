@@ -136,20 +136,16 @@ let normalizeProjectNumber = (value: string | undefined) => {
   return resolved;
 };
 
-/**
- * Non-secret Chat app identity persisted in the auth output so chat actions and
- * inbound event routing can derive the same app/workspace identity without the key.
- */
-let getServiceAccountIdentity = (input: ServiceAccountAuthInput) => {
-  let { clientEmail, clientId, projectId } = parseServiceAccountJson(input.serviceAccountJson);
-  return {
-    clientEmail,
-    clientId,
-    // The email's project is proven by the token exchange; the JSON project_id is not.
-    projectId: projectIdFromClientEmail(clientEmail) ?? projectId,
-    projectNumber: normalizeProjectNumber(input.projectNumber)
-  };
-};
+let getServiceAccountIdentity = (
+  serviceAccount: ReturnType<typeof parseServiceAccountJson>,
+  projectNumber: string | undefined
+) => ({
+  clientEmail: serviceAccount.clientEmail,
+  clientId: serviceAccount.clientId,
+  // The email's project is proven by the token exchange; the JSON project_id is not.
+  projectId: projectIdFromClientEmail(serviceAccount.clientEmail) ?? serviceAccount.projectId,
+  projectNumber: normalizeProjectNumber(projectNumber)
+});
 
 type ServiceAccountAuthInput = { serviceAccountJson: string; projectNumber?: string };
 
@@ -157,8 +153,9 @@ let exchangeServiceAccountToken = async (
   input: ServiceAccountAuthInput,
   operation: string
 ) => {
-  let identity = getServiceAccountIdentity(input);
-  let { clientEmail, privateKey } = parseServiceAccountJson(input.serviceAccountJson);
+  let serviceAccount = parseServiceAccountJson(input.serviceAccountJson);
+  let identity = getServiceAccountIdentity(serviceAccount, input.projectNumber);
+  let { clientEmail, privateKey } = serviceAccount;
   let assertion = await createServiceAccountAssertion(clientEmail, privateKey);
   let response = await googleOAuthAxios.post(
     '/token',
@@ -191,7 +188,7 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      // Chat app (service account) identity; absent for user OAuth connections.
+      // Absent for user OAuth connections.
       clientEmail: z.string().optional(),
       clientId: z.string().optional(),
       projectId: z.string().optional(),
@@ -202,7 +199,7 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Google OAuth',
     key: 'oauth',
-    // User OAuth acts as a person, not as the Chat app, so it is not chat-adapter eligible.
+    // User OAuth acts as a person, not as the Chat app.
     adapters: [],
     docs: [
       {

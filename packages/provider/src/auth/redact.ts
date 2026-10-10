@@ -25,10 +25,7 @@ export class AuthConfigSecretRedactor {
     });
   }
 
-  /**
-   * `embeddable(secret, path)` limits which secrets are also replaced inside longer strings;
-   * every secret is still replaced as a whole value.
-   */
+  /** `embeddable` limits which secrets are also replaced inside longer strings. */
   public redactEmbedded<T>(
     value: T,
     embeddable: (secret: string, path: string) => boolean = () => true

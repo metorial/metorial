@@ -66,11 +66,7 @@ export let chatReactionAdded = addedContract
   })
   .build();
 
-/**
- * WhatsApp reports a removed reaction by omitting `emoji`; it does not say which
- * emoji was removed. The normalized emoji is therefore an empty Unicode value,
- * and the provider payload is preserved in `raw`.
- */
+// Removals omit `emoji`, so the normalized emoji is empty; see raw.
 export let chatReactionRemoved = removedContract
   .implement(spec, whatsappWebhookTriggerGroup)
   .matches(payload => {

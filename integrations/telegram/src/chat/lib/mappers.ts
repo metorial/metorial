@@ -26,10 +26,7 @@ export interface TelegramBotIdentity {
   name?: string;
 }
 
-/**
- * Telegram has no workspace concept. Each bot is modelled as one stable synthetic
- * workspace so every channel the bot can reach routes to the same chat installation.
- */
+// Telegram has no workspaces; each bot is one synthetic workspace.
 export let telegramWorkspaceId = (botId: string) => `telegram-bot-${botId}`;
 
 export let buildTelegramWorkspace = (bot: TelegramBotIdentity): Workspace => ({
@@ -39,7 +36,7 @@ export let buildTelegramWorkspace = (bot: TelegramBotIdentity): Workspace => ({
   raw: { botId: bot.id, botUsername: bot.username }
 });
 
-/** Bot identity from the saved connection, or from getMe for older connections. */
+// Falls back to getMe for older connections.
 export let resolveTelegramBot = async (
   client: TelegramClient,
   auth: { botId?: string; botUsername?: string; botName?: string }
@@ -65,7 +62,6 @@ export let mapTelegramUser = (user: TelegramUser, botId: string): Author => ({
   raw: user
 });
 
-/** Author for content sent on behalf of a chat (channel posts, anonymous admins). */
 export let mapTelegramSenderChat = (chat: TelegramChat): Author => ({
   userId: String(chat.id),
   userName: chat.username ?? String(chat.id),
@@ -176,7 +172,7 @@ let fileAttachment = (
 export let mapTelegramAttachments = (message: TelegramMessage): AttachmentRef[] => {
   let attachments: AttachmentRef[] = [];
   if (message.photo?.length) {
-    // The photo array holds the same image at several sizes; the last is the largest.
+    // The last photo size is the largest.
     let largest = message.photo[message.photo.length - 1]!;
     attachments.push(fileAttachment('image', largest, 'photo'));
   }
@@ -216,12 +212,11 @@ let CONTENT_KEYS = [
   'checklist'
 ];
 
-/** False for service messages (members joined, title changed, pins, ...). */
 export let isTelegramContentMessage = (message: Record<string, unknown>) =>
   CONTENT_KEYS.some(key => message[key] !== undefined);
 
 let entityText = (text: string, entity: TelegramEntity) =>
-  // Entity offsets and lengths are UTF-16 code units, which match JS string indices.
+  // Entity offsets are UTF-16 units, matching JS string indices.
   text.slice(entity.offset, entity.offset + entity.length);
 
 let messageEntities = (message: TelegramMessage) => {
@@ -251,11 +246,7 @@ export interface TelegramCommand {
   text?: string;
 }
 
-/**
- * A command is a bot_command entity at the start of a message, such as
- * `/start` or `/start@my_bot args`. Commands addressed to another bot are ignored.
- * https://core.telegram.org/bots/features#commands
- */
+// Commands addressed to another bot (/cmd@other_bot) are ignored.
 export let parseTelegramCommand = (
   message: TelegramMessage,
   bot: { username?: string }
@@ -308,7 +299,7 @@ export let mapTelegramMessage = (
     return clientReferenceId ? { ...attachment, clientReferenceId } : attachment;
   });
 
-  // In forum topics a message without an explicit reply points at the topic root.
+  // In forum topics a non-reply points at the topic root.
   let replyTo = message.reply_to_message;
   let isTopicRootReply =
     message.is_topic_message && replyTo?.message_id === message.message_thread_id;
@@ -319,7 +310,7 @@ export let mapTelegramMessage = (
       channelId: String(message.chat.id),
       threadId: thread?.id,
       author,
-      // The shared body schema requires one part; file-only messages carry an empty text part.
+      // File-only messages need an empty text part to satisfy the body schema.
       body: {
         parts: [{ type: 'text', content: text }],
         attachments: attachments.length ? attachments : undefined

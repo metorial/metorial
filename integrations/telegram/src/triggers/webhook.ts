@@ -14,7 +14,6 @@ import {
 
 export let TELEGRAM_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 
-// setWebhook secret_token: 1-256 characters of A-Z, a-z, 0-9, _ and -.
 // https://core.telegram.org/bots/api#setwebhook
 export let telegramSecretTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{1,256}$/);
 
@@ -27,8 +26,6 @@ export let telegramRegistrationSchema = telegramTargetSchema.extend({
   webhookUrl: z.string().url(),
   secretToken: telegramSecretTokenSchema
 });
-
-export type TelegramRegistration = z.infer<typeof telegramRegistrationSchema>;
 
 export let telegramTargetIdentifier = (target: { botId: string }) =>
   `telegram-bot:${target.botId}`;
@@ -52,7 +49,7 @@ let reactionKey = (reaction: TelegramReactionType) =>
       ? `custom:${reaction.custom_emoji_id}`
       : 'paid';
 
-/** Per-reaction delta between old and new reaction lists, excluding paid reactions. */
+// Excludes paid reactions.
 export let telegramReactionDelta = (
   oldReactions: TelegramReactionType[],
   newReactions: TelegramReactionType[]
@@ -95,8 +92,7 @@ export let processTelegramWebhook = async (input: {
     return skipWebhook('telegram_webhook_secret_invalid', { status: 401, body: '' });
   }
 
-  // The request is authenticated from here on. Telegram retries every non-2xx response, so
-  // updates this handler cannot use are acknowledged and skipped instead of piling up.
+  // Telegram retries non-2xx responses, so unusable updates are acked and skipped.
   let ok = { status: 200, body: '' };
 
   let body: unknown;
@@ -112,12 +108,11 @@ export let processTelegramWebhook = async (input: {
   }
   let update = envelope.data as Record<string, unknown> & { update_id: number };
 
-  // An update carries at most one of its optional payload fields.
   let kind = telegramAllowedUpdates.find(key => update[key] !== undefined) as
     | TelegramUpdateKind
     | undefined;
   if (!kind) {
-    return skipWebhook('telegram_webhook_update_unsupported', { status: 200, body: '' });
+    return skipWebhook('telegram_webhook_update_unsupported', ok);
   }
 
   let bot = { id: registration.data.botId, username: registration.data.botUsername };

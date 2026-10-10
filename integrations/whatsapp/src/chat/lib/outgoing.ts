@@ -6,7 +6,6 @@ import type {
 } from './client';
 import { isWhatsAppChannelId, mapWhatsAppBusinessAuthor, mapWhatsAppChannel } from './mappers';
 
-/** Validates a customer conversation id before contacting the provider. */
 export let assertWhatsAppChannelId = (channelId: string, action: string) => {
   if (!isWhatsAppChannelId(channelId)) {
     throw ChatErrors.inputInvalid({
@@ -24,7 +23,7 @@ export let assertWhatsAppChannelId = (channelId: string, action: string) => {
   }
 };
 
-/** WhatsApp conversations have no threads; replies use `reply.id` (contextual reply). */
+// No threads; replies use reply.id.
 export let assertNoWhatsAppThread = (threadId: string | undefined, action: string) => {
   if (threadId) {
     throw ChatErrors.inputInvalid({
@@ -38,7 +37,7 @@ export let assertNoWhatsAppThread = (threadId: string | undefined, action: strin
   }
 };
 
-/** Best-effort business identity; display metadata must not fail a completed send. */
+// Best-effort; display metadata must not fail a completed send.
 export let getWhatsAppBusinessInfo = async (
   client: WhatsAppChatClient
 ): Promise<WhatsAppPhoneNumberInfo | undefined> => {

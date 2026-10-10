@@ -4,11 +4,7 @@ import { spec } from '../../spec';
 import { ZoomChatbotClient } from '../lib/client';
 import { getZoomJidKind, mapZoomChannel } from '../lib/mappers';
 
-/**
- * Documented fallback: the chatbot API has no channel lookup, so the channel is
- * described from its JID (`...@conference.xmpp.zoom.us` = channel, otherwise a
- * user JID for a direct chat). No name is invented.
- */
+// No channel lookup exists, so the channel is described from its JID.
 export let chatGetChannel = contract
   .implement(spec)
   .authMethods([ZOOM_CHATBOT_AUTH_METHOD])

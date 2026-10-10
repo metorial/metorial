@@ -6,8 +6,7 @@ import {
 } from '../../triggers/gateway';
 import { mapMessageEvent } from '../lib/events';
 
-// MESSAGE_UPDATE also fires when Discord resolves link embeds; only real edits carry
-// `edited_timestamp`. https://docs.discord.com/developers/events/gateway-events#message-update
+// Embed resolution also fires MESSAGE_UPDATE; only real edits carry `edited_timestamp`.
 export let chatMessageUpdated = contract
   .implement(spec, discordGatewayTriggerGroup)
   .authMethods(['bot_token'])

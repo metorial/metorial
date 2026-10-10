@@ -1,6 +1,6 @@
 {
   "name": "@slates/adapter-chat",
-  "version": "1.0.0-rc.12",
+  "version": "1.0.0-rc.13",
   "publishConfig": {
     "access": "public"
   },
@@ -41,6 +41,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@lowerdeck/error": "^1.1.0",
     "@slates/tsconfig": "1.0.0-rc.1",
     "@types/mdast": "^4.0.4",
     "typescript": "5.8.2",

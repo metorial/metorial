@@ -1,9 +1,8 @@
 import { createAxios } from 'slates';
 
-export let TELEGRAM_API_ORIGIN = 'https://api.telegram.org';
+let TELEGRAM_API_ORIGIN = 'https://api.telegram.org';
 
-// The Bot API carries the bot token in the URL path. Keep it out of error data that
-// leaves the integration (upstream.url) by replacing it with a fixed marker.
+// The bot token is in the URL path; mask it in error data.
 let redactBotToken = (value: string | undefined, token: string) =>
   value && token ? value.split(token).join('<bot-token>') : value;
 
@@ -254,7 +253,7 @@ export class TelegramClient {
   }
 
   private getFileDownloadUrl(filePath: string): string {
-    return `https://api.telegram.org/file/bot${this.token}/${filePath}`;
+    return `${TELEGRAM_API_ORIGIN}/file/bot${this.token}/${filePath}`;
   }
 
   // ---- Chat ----
@@ -525,10 +524,6 @@ export class TelegramClient {
     return response.data.result;
   }
 
-  /**
-   * Upload file bytes with multipart/form-data. Uploads (unlike URL sends) keep the
-   * original filename and allow up to 50 MB (10 MB for photos).
-   */
   async uploadFile(params: {
     method: 'sendDocument' | 'sendPhoto' | 'sendVideo' | 'sendAudio';
     field: 'document' | 'photo' | 'video' | 'audio';
@@ -547,7 +542,6 @@ export class TelegramClient {
     return response.data.result;
   }
 
-  /** Fetch file bytes from the Bot API file endpoint. The URL embeds the bot token. */
   async downloadFile(filePath: string): Promise<Response> {
     return fetch(this.getFileDownloadUrl(filePath));
   }

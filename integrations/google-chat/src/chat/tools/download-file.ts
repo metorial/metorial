@@ -19,13 +19,7 @@ let providerFileReferenceSchema = z.object({
 let invalidReference = (message: string, cause?: unknown) =>
   ChatErrors.inputInvalid({ action: contract.key, message, cause });
 
-/**
- * Downloads Google Chat-hosted attachment bytes from media.download
- * (`GET /v1/media/{resourceName}?alt=media`, chat.bot accepted). When only the
- * attachment resource name is known, spaces.messages.attachments.get (Chat app
- * authentication) resolves its attachmentDataRef first. Google Drive
- * attachments are not Chat-hosted and are reported as unsupported.
- */
+// Drive attachments are not Chat-hosted and are reported as unsupported.
 export let chatDownloadFile = contract
   .implement(spec)
   .scopes(googleChatAppScopes)

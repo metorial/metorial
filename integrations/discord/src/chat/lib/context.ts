@@ -30,10 +30,6 @@ let contextFromInput = (input: unknown): DiscordChatErrorContext => {
   };
 };
 
-/**
- * Runs a chat action with a bot client, translating every failure (including local
- * validation and Discord API errors) into the chat error envelope.
- */
 export let runDiscordChatAction = <T>(
   ctx: ChatActionContext,
   options: Omit<DiscordChatErrorContext, 'action'> & { action: string },
@@ -43,7 +39,6 @@ export let runDiscordChatAction = <T>(
     run(new DiscordChatClient(ctx.auth))
   );
 
-/** The bot user id, from the connection when available, else `GET /users/@me`. */
 export let resolveDiscordIdentity = async (
   client: DiscordChatClient,
   auth: DiscordAuthOutput
@@ -83,10 +78,7 @@ export let loadChannelSafe = (client: DiscordChatClient, channelId: string) =>
     DiscordApiChannel | undefined
   >;
 
-/**
- * Normalized message result. The channel is enriched from REST on a best-effort basis so
- * a completed mutation is never failed for display metadata.
- */
+// Channel enrichment is best-effort; a completed mutation never fails over it.
 export let buildMessageResult = (
   raw: DiscordApiMessage,
   rawChannel: DiscordApiChannel | undefined,

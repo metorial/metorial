@@ -20,8 +20,7 @@ export let resolveGoogleChatRequestUrl = (url: string) => {
   let resolved = url.trim();
   if (!resolved) throw googleChatValidationError('Google Chat request URL is required.');
 
-  // Collection custom methods such as `spaces:findDirectMessage` look like a URL
-  // scheme; address them through the API base URL so they stay same-origin.
+  // Custom methods like `spaces:findDirectMessage` parse as a URL scheme; keep them on the base URL.
   if (customMethodPathPattern.test(resolved)) {
     resolved = `${GOOGLE_CHAT_API_BASE_URL}${resolved}`;
   }

@@ -16,13 +16,7 @@ import { clientReferencesFor, prepareAttachments } from '../lib/outgoing';
 import { renderDiscordBody } from '../lib/render';
 import type { DiscordApiMessage } from '../lib/types';
 
-/**
- * Replies to a slash command. The gateway already deferred the interaction publicly, so
- * the reply edits that original response. Discord keeps the visibility chosen at
- * deferral (a follow-up right after a deferral edits the same message), so an ephemeral
- * reply is only possible when the interaction was not deferred.
- * https://docs.discord.com/developers/interactions/receiving-and-responding#edit-original-interaction-response
- */
+// Edits the deferred original response; visibility is fixed at deferral, so ephemeral needs no defer.
 export let chatRespondToCommand = contract
   .implement(spec)
   .authMethods(['bot_token'])

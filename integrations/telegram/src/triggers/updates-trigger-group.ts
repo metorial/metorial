@@ -28,11 +28,7 @@ let sameUpdates = (actual: string[] | undefined) => {
   return actual.length === expected.size && actual.every(update => expected.has(update));
 };
 
-/**
- * One webhook per bot: Telegram keeps a single webhook URL per bot token, so the bot
- * is the only target and registration replaces any webhook set elsewhere.
- * https://core.telegram.org/bots/api#setwebhook
- */
+// Telegram keeps one webhook per bot token, so registering replaces any other.
 export let telegramUpdatesTriggerGroup = triggerGroup(spec, {
   key: 'updates',
   name: 'Bot Updates',
@@ -130,8 +126,7 @@ export let telegramUpdatesTriggerGroup = triggerGroup(spec, {
         }
 
         let info = await client.getWebhookInfo();
-        // A different or empty URL proves this registration is no longer active;
-        // never remove a webhook that another registration owns.
+        // Only remove the webhook while it still points at this registration.
         if (info?.url !== saved.data.webhookUrl) return;
 
         await client.deleteWebhook();

@@ -5,7 +5,6 @@ import { teamsBotTriggerGroup } from '../../triggers/botFrameworkTriggerGroup';
 import { asTeamsEvent, isTeamsEventKind, resolveEventAppId } from '../lib/events';
 import { mapActivityChannel, mapActivityThread } from '../lib/mappers';
 
-// `messageDelete` activity (channelData.eventType `softDeleteMessage`):
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/build-conversational-capability#receive-soft-delete-message-activity
 export let chatMessageDeleted = contract
   .implement(spec, teamsBotTriggerGroup)

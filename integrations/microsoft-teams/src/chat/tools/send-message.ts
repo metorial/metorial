@@ -11,7 +11,6 @@ import {
 import { mapSentMessage } from '../lib/mappers';
 import { renderTeamsMarkdown } from '../lib/render';
 
-// Send to conversation / reply to activity:
 // https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-api-reference?view=azure-bot-service-4.0#send-to-conversation
 export let chatSendMessage = contract
   .implement(spec)

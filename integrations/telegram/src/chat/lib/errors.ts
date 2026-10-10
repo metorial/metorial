@@ -1,19 +1,12 @@
 import { ServiceError } from '@lowerdeck/error';
 import {
-  ChatError,
   type ChatErrorCode,
-  type ChatErrorDetailsInput,
   type ChatErrorTargetType,
-  getChatErrorTargetType,
-  wrapChatError
+  createChatErrorMapper
 } from '@slates/adapter-chat';
 import { SlateError } from 'slates';
 
-/**
- * Bot API failures carry no stable string code: `error_code` is the HTTP status and
- * `description` is the human-readable reason. Classify by description fragment,
- * most specific first. https://core.telegram.org/bots/api#making-requests
- */
+// No stable error codes, so classify by description: https://core.telegram.org/bots/api#making-requests
 let DESCRIPTION_CODES: [RegExp, ChatErrorCode][] = [
   [/message thread not found/i, 'chat.thread.not_found'],
   [
@@ -59,17 +52,6 @@ let DESCRIPTION_CODES: [RegExp, ChatErrorCode][] = [
   [/too many requests|flood/i, 'chat.rate_limit.exceeded']
 ];
 
-let SLATE_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
-  'upstream.rate_limited': 'chat.rate_limit.exceeded',
-  'upstream.timeout': 'chat.provider.timeout',
-  'upstream.network_error': 'chat.provider.network_error',
-  'upstream.unavailable': 'chat.provider.unavailable',
-  'auth.invalid': 'chat.auth.invalid',
-  'auth.expired': 'chat.auth.expired',
-  'auth.required': 'chat.auth.invalid',
-  'permission.denied': 'chat.access.forbidden'
-};
-
 export interface TelegramChatErrorContext {
   action?: string;
   channelId?: string;
@@ -81,16 +63,14 @@ export interface TelegramChatErrorContext {
   emoji?: string;
 }
 
-let TARGET_FIELDS: Record<ChatErrorTargetType, keyof TelegramChatErrorContext | undefined> = {
+let TARGET_FIELDS: Partial<Record<ChatErrorTargetType, keyof TelegramChatErrorContext>> = {
   workspace: 'workspaceId',
   channel: 'channelId',
   thread: 'threadId',
   message: 'messageId',
   user: 'userId',
   attachment: 'attachmentId',
-  reaction: 'messageId',
-  modal: undefined,
-  command: undefined
+  reaction: 'messageId'
 };
 
 type TelegramFailure = {
@@ -121,7 +101,7 @@ let readFailure = (error: unknown): TelegramFailure => {
   return {};
 };
 
-let resolveCode = (error: unknown, failure: TelegramFailure): ChatErrorCode => {
+let resolveCode = (failure: TelegramFailure): ChatErrorCode | undefined => {
   if (failure.status === 401) return 'chat.auth.invalid';
   if (failure.status === 429) return 'chat.rate_limit.exceeded';
 
@@ -130,55 +110,28 @@ let resolveCode = (error: unknown, failure: TelegramFailure): ChatErrorCode => {
       if (pattern.test(failure.description)) return code;
     }
   }
-
-  if (SlateError.is(error)) {
-    let mapped = SLATE_CHAT_ERROR_CODES[error.code];
-    if (mapped) return mapped;
-  }
-
-  return 'chat.provider.error';
+  return undefined;
 };
 
-export let mapTelegramChatError = (
-  error: unknown,
-  context: TelegramChatErrorContext = {}
-): ChatError => {
-  if (ChatError.is(error)) return error;
-
-  let failure = readFailure(error);
-  let code = resolveCode(error, failure);
-  let entity = getChatErrorTargetType(code);
-  let field = entity ? TARGET_FIELDS[entity] : undefined;
-  let target = field ? context[field] : undefined;
-
-  let details: ChatErrorDetailsInput = {
-    action: context.action,
-    target: typeof target === 'string' ? target : undefined,
-    provider: failure.description
-      ? {
-          code: failure.status === undefined ? undefined : String(failure.status),
-          message: failure.description
-        }
-      : undefined
-  };
-
-  if (code === 'chat.rate_limit.exceeded' && failure.retryAfterSeconds !== undefined) {
-    details.retryAfterMs = failure.retryAfterSeconds * 1000;
+let telegramChatErrors = createChatErrorMapper<TelegramChatErrorContext>({
+  targetFields: TARGET_FIELDS,
+  classify: error => {
+    let failure = readFailure(error);
+    return {
+      code: resolveCode(failure),
+      provider: failure.description
+        ? {
+            code: failure.status === undefined ? undefined : String(failure.status),
+            message: failure.description
+          }
+        : undefined,
+      retryAfterMs:
+        failure.retryAfterSeconds === undefined ? undefined : failure.retryAfterSeconds * 1000
+    };
   }
+});
 
-  return wrapChatError(code, error, details);
-};
+export let mapTelegramChatError = telegramChatErrors.map;
+export let withTelegramChatErrors = telegramChatErrors.withErrors;
 
-export let withTelegramChatErrors = async <T>(
-  context: TelegramChatErrorContext,
-  run: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw mapTelegramChatError(error, context);
-  }
-};
-
-/** Description of a Bot API failure, for handlers that branch on a specific reason. */
 export let getTelegramErrorDescription = (error: unknown) => readFailure(error).description;

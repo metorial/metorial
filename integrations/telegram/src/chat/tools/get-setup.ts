@@ -1,9 +1,7 @@
 import { getSetup as contract } from '@slates/adapter-chat';
 import { spec } from '../../spec';
 
-// BotFather command lists use `command - description`, one per line, with
-// lowercase command names of up to 32 letters, digits, and underscores.
-// https://core.telegram.org/bots/features#commands
+// BotFather format: https://core.telegram.org/bots/features#commands
 let commandName = (name: string) =>
   name
     .replace(/^\//, '')

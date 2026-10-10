@@ -15,10 +15,7 @@ export let isTeamsEventKind = (payload: unknown, kind: TeamsActivityEventKind) =
   );
 };
 
-/**
- * The bot's Microsoft App ID for mapping. Connections are routed by App ID, so
- * the connection's id and the activity recipient (`28:<appId>`) agree.
- */
+// Routing is by App ID, so the recipient (`28:<appId>`) matches the connection.
 export let resolveEventAppId = (auth: { appId?: string }, activity: TeamsActivity) => {
   if (auth.appId) return auth.appId;
   let recipient = activity.recipient?.id ?? '';

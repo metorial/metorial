@@ -3,10 +3,7 @@ import { normalizeAppId } from '../../lib/botFramework';
 
 export let TEAMS_CHAT_PROVIDER = 'microsoft-teams';
 
-/**
- * Teams bots have no workspace object. Every conversation the bot can reach
- * belongs to one synthetic workspace per Microsoft App ID.
- */
+// Teams has no workspace object; each Microsoft App ID gets one synthetic workspace.
 export let teamsBotWorkspaceId = (appId: string) => `msteams-bot:${normalizeAppId(appId)}`;
 
 export let teamsBotUserId = (appId: string) => `28:${normalizeAppId(appId)}`;
@@ -14,14 +11,11 @@ export let teamsBotUserId = (appId: string) => `28:${normalizeAppId(appId)}`;
 export interface TeamsConversationRef {
   /** Conversation id without the thread suffix. */
   baseId: string;
-  /** Root message id for channel thread conversations (`;messageid=`). */
+  /** Channel thread root message id (`;messageid=`). */
   threadRootId?: string;
 }
 
-/**
- * Channel thread conversations are addressed as
- * `19:...@thread.tacv2;messageid=<root message id>`.
- */
+// Channel threads are `19:...@thread.tacv2;messageid=<root message id>`.
 export let parseConversationId = (conversationId: string): TeamsConversationRef => {
   let [baseId, ...suffixes] = conversationId.split(';');
   let threadRootId = suffixes
@@ -40,12 +34,7 @@ export interface TeamsConversationKind {
   providerType: string;
 }
 
-/**
- * Derives the conversation kind from Teams' documented `conversationType`
- * values (`personal`, `groupChat`, `channel`) or, when absent, from the id
- * shape. Channel visibility (standard/private/shared) is not exposed to bots,
- * so channels are reported as `unknown` with providerType `channel`.
- */
+// Bots can't see channel visibility, so channels are typed `unknown`.
 export let classifyConversation = (
   conversationId: string,
   conversationType?: string | null

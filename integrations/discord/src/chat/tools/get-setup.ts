@@ -1,5 +1,6 @@
 import { getSetup as contract } from '@slates/adapter-chat';
 import { spec } from '../../spec';
+import { DISCORD_COMMAND_OPTION_TYPES } from '../lib/interaction';
 
 // https://docs.discord.com/developers/topics/permissions#permissions-bitwise-permission-flags
 let BOT_PERMISSIONS = {
@@ -18,19 +19,9 @@ export let DISCORD_BOT_PERMISSIONS = Object.values(BOT_PERMISSIONS)
 
 let PORTAL = 'https://discord.com/developers/applications';
 
-let OPTION_TYPE_IDS: Record<string, number> = {
-  subcommand: 1,
-  subcommand_group: 2,
-  string: 3,
-  integer: 4,
-  boolean: 5,
-  user: 6,
-  channel: 7,
-  role: 8,
-  mentionable: 9,
-  number: 10,
-  attachment: 11
-};
+let OPTION_TYPE_IDS: Record<string, number> = Object.fromEntries(
+  Object.entries(DISCORD_COMMAND_OPTION_TYPES).map(([id, type]) => [type, Number(id)])
+);
 
 type SetupCommandOption = {
   name: string;

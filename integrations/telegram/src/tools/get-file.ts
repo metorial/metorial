@@ -38,8 +38,7 @@ export let getFileTool = SlateTool.create(spec, {
 
     let file = await client.getFile(ctx.input.fileId);
 
-    // Telegram's file URL embeds the bot token, so the bytes are fetched here instead of
-    // returning the link. https://core.telegram.org/bots/api#getfile
+    // The file URL embeds the bot token, so the bytes are returned instead of the link.
     if (file.file_path) {
       let response = await client.downloadFile(file.file_path);
       if (!response.ok) {

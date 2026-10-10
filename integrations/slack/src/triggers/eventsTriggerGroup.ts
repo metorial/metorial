@@ -150,10 +150,9 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
         );
       }
 
-      // Slash commands are form-encoded rather than Events API JSON, and only reach bot installs.
-      // https://docs.slack.dev/interactivity/implementing-slash-commands
+      // Slash commands are form-encoded: https://docs.slack.dev/interactivity/implementing-slash-commands
       if (request.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) {
-        // `token` is the app's long-lived legacy verification token; it is never stored.
+        // Drop the legacy verification token so it is never stored.
         let { token: _verificationToken, ...form } = Object.fromEntries(
           new URLSearchParams(rawBody)
         );
@@ -178,12 +177,12 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
                   teamId: form.team_id
                 })
               ],
-              // The group's events carry a type; Slack's command payload has none.
+              // Command payloads have no type; the group's events need one.
               payload: { ...form, type: 'slash_command' },
               idempotencyKey: form.trigger_id
             }
           ],
-          // An empty acknowledgement shows nothing; the reply goes to the command's response_url.
+          // Empty ack; the reply goes through response_url.
           response: { status: 200, body: '' }
         };
       }

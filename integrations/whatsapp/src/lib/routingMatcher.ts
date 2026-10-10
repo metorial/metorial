@@ -1,9 +1,4 @@
-/**
- * Routing identity shared by the webhook trigger group's `process` (built from the
- * verified delivery's `metadata.phone_number_id`) and `routingMatchers` (built from
- * the connection's configured business phone number). Both sides must use this
- * helper so field names and value normalization stay identical.
- */
+// Shared by process and routingMatchers so both sides normalize identically.
 export interface WhatsAppPhoneNumberMatcher {
   phoneNumberId: string;
 }

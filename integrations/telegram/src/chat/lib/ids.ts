@@ -1,6 +1,6 @@
 import { ChatErrors } from '@slates/adapter-chat';
 
-/** Telegram message and topic IDs are integers; chat IDs may also be an @username. */
+// Chat IDs may also be an @username.
 export let parseTelegramInteger = (value: string, field: string, action: string): number => {
   let trimmed = value.trim();
   let parsed = Number(trimmed);

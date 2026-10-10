@@ -3,7 +3,6 @@ import { spec } from '../../spec';
 import { runDiscordChatAction } from '../lib/context';
 
 // The indicator lasts about 10 seconds or until the bot sends a message.
-// https://docs.discord.com/developers/resources/channel#trigger-typing-indicator
 export let chatStartTyping = contract
   .implement(spec)
   .authMethods(['bot_token'])

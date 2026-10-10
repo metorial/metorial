@@ -1,18 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { createAxios } from 'slates';
 
-/**
- * Verification for requests Google Chat sends to an HTTP endpoint, following
- * https://developers.google.com/workspace/chat/verify-requests-from-chat
- *
- * - "Project Number" audience: a self-signed JWT issued and signed by
- *   chat@system.gserviceaccount.com whose `aud` is the Cloud project number.
- * - "HTTP endpoint URL" audience: a Google-signed OIDC ID token whose `aud` is
- *   the endpoint URL and whose `email` is chat@system.gserviceaccount.com.
- * - Chat apps built as Google Workspace add-ons: a Google-signed ID token whose
- *   `aud` is the endpoint URL and whose `email` is the add-on's per-project
- *   service account (https://developers.google.com/workspace/add-ons/chat/convert).
- */
+// https://developers.google.com/workspace/chat/verify-requests-from-chat
 
 export let GOOGLE_CHAT_ISSUER = 'chat@system.gserviceaccount.com';
 export let GOOGLE_CHAT_JWKS_URL =
@@ -37,7 +26,7 @@ export interface GoogleChatJwk {
 
 export interface GoogleChatJwks {
   keys: GoogleChatJwk[];
-  /** Milliseconds the key set may be cached for, from Cache-Control max-age. */
+  // From Cache-Control max-age.
   maxAgeMs?: number;
 }
 
@@ -49,10 +38,7 @@ let parseMaxAge = (cacheControl: unknown) => {
 
 let certificateHttp = createAxios({ timeout: 10_000 });
 
-/**
- * Public certificate access. Exposed as an object so contract tests can stub
- * the network fetch; the process-local cache is only a performance cache.
- */
+// An object so contract tests can stub the fetch; the cache is only for performance.
 export let googleChatCertificates = {
   fetchJwks: async (url: string): Promise<GoogleChatJwks> => {
     let response = await certificateHttp.get(url);
@@ -65,8 +51,7 @@ export let googleChatCertificates = {
   }
 };
 
-// Unknown key IDs refresh the key set at most this often, so forged tokens with
-// random `kid` values cannot force a certificate fetch per request.
+// Caps refreshes so random `kid` values cannot force a fetch per request.
 let MIN_UNKNOWN_KID_REFRESH_MS = 60 * 1000;
 
 let getKey = async (url: string, kid: string) => {
@@ -82,8 +67,7 @@ let getKey = async (url: string, kid: string) => {
   try {
     fresh = await googleChatCertificates.fetchJwks(url);
   } catch (error) {
-    // Google publishes keys well before use and keeps them after rotation, so a
-    // cached key with this kid stays usable while a refresh fails.
+    // Keys outlive rotation, so a cached key stays usable while a refresh fails.
     let stale = cached?.keys.find(entry => entry.kid === kid);
     if (stale) return stale;
     throw error;

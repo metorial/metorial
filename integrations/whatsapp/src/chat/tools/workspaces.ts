@@ -2,17 +2,15 @@ import {
   ChatErrors,
   getAuthenticatedUser as getAuthenticatedUserContract,
   getWorkspace as getWorkspaceContract,
-  listWorkspaces as listWorkspacesContract
+  listWorkspaces as listWorkspacesContract,
+  matchesChatQuery
 } from '@slates/adapter-chat';
 import { spec } from '../../spec';
 import { createWhatsAppChatClient } from '../lib/client';
 import { withWhatsAppChatErrors } from '../lib/errors';
 import { mapWhatsAppBusinessAuthor, mapWhatsAppWorkspace } from '../lib/mappers';
 
-/**
- * A connection represents one business phone number, exposed as a single
- * workspace whose id is the phone number ID.
- */
+// One workspace per connection: the business phone number.
 export let chatListWorkspaces = listWorkspacesContract
   .implement(spec)
   .handleInvocation(async ctx => {
@@ -22,13 +20,13 @@ export let chatListWorkspaces = listWorkspacesContract
       client.getPhoneNumber()
     );
     let workspace = mapWhatsAppWorkspace(client.phoneNumberId, raw);
-    let query = ctx.input.query?.trim().toLowerCase();
-    let matches =
-      !query ||
-      [workspace.name, raw.display_phone_number, workspace.id].some(value =>
-        value?.toLowerCase().includes(query)
-      );
-    let workspaces = matches ? [workspace] : [];
+    let workspaces = matchesChatQuery(ctx.input.query, [
+      workspace.name,
+      raw.display_phone_number,
+      workspace.id
+    ])
+      ? [workspace]
+      : [];
 
     return {
       output: { workspaces, raw },

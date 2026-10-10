@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ChatErrors } from '../../errors/factories';
 
 export let pageDirectionSchema = z.enum(['backward', 'forward']);
 
@@ -47,6 +48,24 @@ export let decodeCursor = <Data = unknown>(
     direction: value.direction,
     data: dataSchema ? dataSchema.parse(value.data) : (value.data as Data)
   };
+};
+
+/** `decodeCursor` that reports a malformed or foreign cursor as `chat.input.cursor_invalid`. */
+export let decodeChatCursor = <Data = unknown>(
+  provider: string,
+  cursor: string,
+  dataSchema: z.ZodType<Data>,
+  options: { action: string; message?: string }
+): ChatCursor<Data> => {
+  try {
+    return decodeCursor(provider, cursor, dataSchema);
+  } catch (error) {
+    throw ChatErrors.cursorInvalid({
+      action: options.action,
+      message: options.message,
+      cause: error
+    });
+  }
 };
 
 export let cursorPageSchema = z.object({

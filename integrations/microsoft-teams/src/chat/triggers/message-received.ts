@@ -5,7 +5,6 @@ import { teamsBotTriggerGroup } from '../../triggers/botFrameworkTriggerGroup';
 import { asTeamsEvent, isTeamsEventKind, resolveEventAppId } from '../lib/events';
 import { mapActivityMessage, stripMessageRelations } from '../lib/mappers';
 
-// `message` activity:
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/build-conversational-capability#receive-a-message-activity
 export let chatMessageReceived = contract
   .implement(spec, teamsBotTriggerGroup)

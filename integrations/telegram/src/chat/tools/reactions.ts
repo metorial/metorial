@@ -24,8 +24,7 @@ let toTelegramReaction = (input: EmojiInput, action: string) => {
 let emojiLabel = (input: EmojiInput) =>
   typeof input === 'string' ? input : input.type === 'unicode' ? input.value : input.name;
 
-// Bots can hold at most one reaction per message, so setting a reaction replaces
-// the bot's previous one. https://core.telegram.org/bots/api#setmessagereaction
+// Bots hold one reaction per message, so this replaces the previous one.
 export let chatAddReaction = addReaction
   .implement(spec)
   .handleInvocation(async ctx => {
@@ -57,8 +56,7 @@ export let chatAddReaction = addReaction
   })
   .build();
 
-// The Bot API can only replace the bot's reactions as a whole, and bots hold one
-// reaction per message, so removal clears the bot's reaction on the message.
+// Bots hold one reaction per message, so removal clears it.
 export let chatRemoveReaction = removeReaction
   .implement(spec)
   .handleInvocation(async ctx => {

@@ -8,11 +8,7 @@ import {
   mapZoomBotNotification
 } from '../lib/events';
 
-/**
- * A `bot_notification` from a direct chat with the bot becomes a message; channel
- * notifications are slash commands and become command.invoked instead.
- * https://developers.zoom.us/docs/api/chatbot/events/#tag/bot_notification
- */
+// Only direct-chat notifications; channel ones are slash commands (command.invoked).
 export let chatMessageReceived = contract
   .implement(spec, zoomChatbotTriggerGroup)
   .authMethods([ZOOM_CHATBOT_AUTH_METHOD])

@@ -6,9 +6,7 @@ import {
 } from '../../triggers/gateway';
 import { mapCommandEvent } from '../lib/events';
 
-// Application commands arrive as INTERACTION_CREATE when the app has no Interactions
-// Endpoint URL. The gateway group has already sent a deferred acknowledgement.
-// https://docs.discord.com/developers/interactions/receiving-and-responding#receiving-an-interaction
+// INTERACTION_CREATE (no Interactions Endpoint URL); the gateway group already deferred it.
 export let chatCommandInvoked = contract
   .implement(spec, discordGatewayTriggerGroup)
   .authMethods(['bot_token'])

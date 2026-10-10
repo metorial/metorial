@@ -1,6 +1,6 @@
 import { messageUpdated as contract } from '@slates/adapter-chat';
 import { spec } from '../../spec';
-import { isMessengerEventOfType } from '../../triggers/event-schemas';
+import { getMessengerEditEventId, isMessengerEventOfType } from '../../triggers/event-schemas';
 import { messengerEventsTriggerGroup } from '../../triggers/events-trigger-group';
 import { resolveMessengerEventParticipants } from '../lib/events';
 import { mapEditedMessage } from '../lib/mappers';
@@ -16,8 +16,7 @@ export let chatMessageUpdated = contract
       contract.key
     );
     let message = mapEditedMessage({ event: event.messaging, author, channel });
-    let edit = event.messaging.message_edit;
-    let id = `message_edit:${message.id}:${edit?.num_edit ?? event.messaging.timestamp}`;
+    let id = getMessengerEditEventId(event.messaging);
     return {
       type: 'chat.message.updated',
       id,

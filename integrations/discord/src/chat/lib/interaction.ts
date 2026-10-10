@@ -1,12 +1,8 @@
 import { Buffer } from 'node:buffer';
+import type { CommandOptionType } from '@slates/adapter-chat';
 import { z } from 'zod';
 
-/**
- * Opaque `responseToken` for `command.respond`. It holds the interaction id, the
- * interaction token (valid for 15 minutes), the application id, and how the gateway
- * acknowledged the interaction. It never contains the bot token.
- * https://docs.discord.com/developers/interactions/receiving-and-responding#responding-to-an-interaction
- */
+// Opaque command.respond token; carries the interaction token, never the bot token.
 export let discordResponseTokenSchema = z.object({
   v: z.literal(1),
   interactionId: z.string(),
@@ -14,7 +10,6 @@ export let discordResponseTokenSchema = z.object({
   token: z.string(),
   deferred: z.boolean(),
   ephemeral: z.boolean(),
-  /** Epoch milliseconds when the interaction was received. */
   receivedAt: z.number()
 });
 
@@ -38,7 +33,6 @@ export let decodeDiscordResponseToken = (value: string): DiscordResponseToken | 
   }
 };
 
-/** Interaction tokens stay valid for 15 minutes after the interaction is received. */
 export let DISCORD_INTERACTION_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 // https://docs.discord.com/developers/interactions/receiving-and-responding#interaction-response-object-interaction-callback-type
@@ -48,3 +42,18 @@ export let InteractionCallbackType = {
 } as const;
 
 export let EPHEMERAL_FLAG = 1 << 6;
+
+// https://docs.discord.com/developers/interactions/application-commands#application-command-object-application-command-option-type
+export let DISCORD_COMMAND_OPTION_TYPES: Record<number, CommandOptionType> = {
+  1: 'subcommand',
+  2: 'subcommand_group',
+  3: 'string',
+  4: 'integer',
+  5: 'boolean',
+  6: 'user',
+  7: 'channel',
+  8: 'role',
+  9: 'mentionable',
+  10: 'number',
+  11: 'attachment'
+};

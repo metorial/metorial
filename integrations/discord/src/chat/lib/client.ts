@@ -1,4 +1,4 @@
-import { ChatErrors } from '@slates/adapter-chat';
+import { ChatErrors, parseRetryAfterMs } from '@slates/adapter-chat';
 import { createAxios } from '@slates/provider';
 import axios, { type AxiosAdapter, getAdapter, isAxiosError } from 'axios';
 import type { DiscordApiMessage, DiscordAuthOutput } from './types';
@@ -11,13 +11,9 @@ let readRetryAfterMs = (error: {
   let data = error.response?.data as { retry_after?: unknown } | undefined;
   if (typeof data?.retry_after === 'number') return Math.ceil(data.retry_after * 1000);
 
-  let header = (error.response?.headers as Record<string, unknown> | undefined)?.[
-    'retry-after'
-  ];
-  let seconds = typeof header === 'string' ? Number(header) : undefined;
-  return seconds !== undefined && Number.isFinite(seconds)
-    ? Math.ceil(seconds * 1000)
-    : undefined;
+  return parseRetryAfterMs(
+    (error.response?.headers as Record<string, unknown> | undefined)?.['retry-after']
+  );
 };
 
 let parseRetryBody = (data: unknown) => {
@@ -29,9 +25,7 @@ let parseRetryBody = (data: unknown) => {
   }
 };
 
-// Short rate limits (Discord often answers bursts with a sub-second `retry_after`) are
-// waited out here; longer ones surface as `chat.rate_limit.exceeded` with the delay.
-// https://docs.discord.com/developers/topics/rate-limits
+// Sub-second `retry_after` waits happen here; longer limits surface with the delay.
 let MAX_RATE_LIMIT_RETRIES = 2;
 let MAX_RATE_LIMIT_WAIT_MS = 5_000;
 
@@ -62,11 +56,7 @@ let rateLimitRetryAdapter = (): AxiosAdapter => {
   };
 };
 
-/**
- * Discord returns numeric JSON error codes (for example `10008` Unknown Message), which
- * the generic axios mapping does not read. Keep them as the upstream code so the chat
- * error mapper can classify by operation.
- */
+// Keep Discord's numeric JSON error code (e.g. 10008) as the upstream code.
 export let createDiscordAxios = (headers: Record<string, string> = {}) =>
   createAxios({
     baseURL: DISCORD_API_BASE_URL,
@@ -118,11 +108,7 @@ export interface DiscordMessagePayload {
   flags?: number;
 }
 
-/**
- * Builds a Discord multipart body: `payload_json` plus `files[n]`, with each new
- * attachment's `id` matching its `n`.
- * https://docs.discord.com/developers/reference#uploading-files
- */
+// `payload_json` plus `files[n]`; each new attachment's `id` must equal its `n`.
 export let buildDiscordMultipart = (
   payload: DiscordMessagePayload,
   files: DiscordUploadFile[],
@@ -284,11 +270,7 @@ export class DiscordChatClient {
   }
 }
 
-/**
- * Interaction webhooks are authorized by the interaction token in the path, so these
- * calls carry no bot credential (matching the official client libraries).
- * https://docs.discord.com/developers/interactions/receiving-and-responding#followup-messages
- */
+// Interaction webhooks are authorized by the token in the path; no bot credential.
 export class DiscordInteractionClient {
   private api = createDiscordAxios();
 

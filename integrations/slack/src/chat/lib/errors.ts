@@ -1,13 +1,8 @@
-import { ServiceError } from '@lowerdeck/error';
 import {
-  ChatError,
   type ChatErrorCode,
-  type ChatErrorDetailsInput,
   type ChatErrorTargetType,
-  getChatErrorTargetType,
-  wrapChatError
+  createChatErrorMapper
 } from '@slates/adapter-chat';
-import { SlateError } from 'slates';
 import { getSlackNeededScopes } from '../../lib/errors';
 
 let SLACK_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
@@ -80,17 +75,6 @@ let SLACK_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
   invalid_cursor: 'chat.input.cursor_invalid'
 };
 
-let SLATE_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
-  'upstream.rate_limited': 'chat.rate_limit.exceeded',
-  'upstream.timeout': 'chat.provider.timeout',
-  'upstream.network_error': 'chat.provider.network_error',
-  'upstream.unavailable': 'chat.provider.unavailable',
-  'auth.invalid': 'chat.auth.invalid',
-  'auth.expired': 'chat.auth.expired',
-  'auth.required': 'chat.auth.invalid',
-  'permission.denied': 'chat.access.forbidden'
-};
-
 export interface SlackChatErrorContext {
   action?: string;
   channelId?: string;
@@ -117,76 +101,19 @@ let TARGET_FIELDS: Record<ChatErrorTargetType, keyof SlackChatErrorContext> = {
   command: 'messageId'
 };
 
-let getSlackCode = (error: unknown): string | undefined => {
-  if (error instanceof ServiceError) {
-    let code = error.data.upstreamCode;
-    if (typeof code === 'string' && code) return code;
+let slackChatErrors = createChatErrorMapper<SlackChatErrorContext>({
+  targetFields: TARGET_FIELDS,
+  classify: (error, context, { code: slackCode }) => {
+    let code = slackCode
+      ? (context.ambiguous?.[slackCode] ?? SLACK_CHAT_ERROR_CODES[slackCode])
+      : undefined;
+    let provider = slackCode ? { code: slackCode } : undefined;
+    if (code !== 'chat.auth.missing_scope') return { code, provider };
+
+    let needed = getSlackNeededScopes(error);
+    return { code, provider, scopes: needed.length > 0 ? needed : context.scopes };
   }
+});
 
-  if (SlateError.is(error)) {
-    let code = error.data.upstream?.code;
-    if (typeof code === 'string' && code) return code;
-  }
-
-  return undefined;
-};
-
-let resolveChatCode = (
-  error: unknown,
-  slackCode: string | undefined,
-  context: SlackChatErrorContext
-): ChatErrorCode => {
-  if (slackCode) {
-    let ambiguous = context.ambiguous?.[slackCode];
-    if (ambiguous) return ambiguous;
-
-    let mapped = SLACK_CHAT_ERROR_CODES[slackCode];
-    if (mapped) return mapped;
-  }
-
-  if (SlateError.is(error)) {
-    let mapped = SLATE_CHAT_ERROR_CODES[error.code];
-    if (mapped) return mapped;
-  }
-
-  return 'chat.provider.error';
-};
-
-let resolveTarget = (code: ChatErrorCode, context: SlackChatErrorContext) => {
-  let entity = getChatErrorTargetType(code);
-  if (!entity) return undefined;
-
-  let id = context[TARGET_FIELDS[entity]];
-  return typeof id === 'string' ? id : undefined;
-};
-
-export let mapSlackChatError = (error: unknown, context: SlackChatErrorContext = {}) => {
-  if (ChatError.is(error)) return error;
-
-  let slackCode = getSlackCode(error);
-  let code = resolveChatCode(error, slackCode, context);
-
-  let details: ChatErrorDetailsInput = {
-    action: context.action,
-    target: resolveTarget(code, context),
-    provider: slackCode ? { code: slackCode } : undefined
-  };
-
-  if (code === 'chat.auth.missing_scope') {
-    let scopes = getSlackNeededScopes(error);
-    details.scopes = scopes.length > 0 ? scopes : context.scopes;
-  }
-
-  return wrapChatError(code, error, details);
-};
-
-export let withSlackChatErrors = async <T>(
-  context: SlackChatErrorContext,
-  run: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw mapSlackChatError(error, context);
-  }
-};
+export let mapSlackChatError = slackChatErrors.map;
+export let withSlackChatErrors = slackChatErrors.withErrors;

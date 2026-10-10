@@ -5,8 +5,7 @@ import { teamsBotTriggerGroup } from '../../triggers/botFrameworkTriggerGroup';
 import { asTeamsEvent, isTeamsEventKind, resolveEventAppId } from '../lib/events';
 import { mapActivityMessage, stripMessageRelations } from '../lib/mappers';
 
-// `messageUpdate` activity (channelData.eventType `editMessage`, or
-// `undeleteMessage` when a deleted message is restored):
+// Also sent as `undeleteMessage` when a deleted message is restored.
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/build-conversational-capability#receive-edit-message-activity
 export let chatMessageUpdated = contract
   .implement(spec, teamsBotTriggerGroup)
@@ -17,8 +16,7 @@ export let chatMessageUpdated = contract
     let mapped = mapActivityMessage(activity, resolveEventAppId(ctx.auth, activity), {
       edited: activity.channelData?.eventType !== 'undeleteMessage'
     });
-    // The update reuses the message id, so the edit timestamp keeps
-    // successive edits distinct.
+    // Edits reuse the message id; the timestamp keeps them distinct.
     let id = `${mapped.channelId}:${mapped.id}:updated:${activity.timestamp ?? ''}`;
     return {
       type: 'chat.message.updated',

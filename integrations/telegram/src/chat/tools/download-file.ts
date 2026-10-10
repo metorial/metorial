@@ -24,9 +24,7 @@ let typeFor = (mimeType: string | undefined, filePath: string) => {
   return 'file' as const;
 };
 
-// Bot downloads are limited to 20 MB, and the file URL embeds the bot token, so the
-// bytes are fetched here and delivered as a downloadable file instead of as a link.
-// https://core.telegram.org/bots/api#getfile
+// The file URL embeds the bot token, so the bytes are delivered instead of the link.
 export let chatDownloadFile = contract
   .implement(spec)
   .handleInvocation(async ctx => {

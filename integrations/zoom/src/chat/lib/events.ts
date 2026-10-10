@@ -5,11 +5,7 @@ import {
 } from '../../triggers/chatbotTriggerGroup';
 import { epochToIso, mapZoomChannel, mapZoomUserAuthor, normalizeJid } from './mappers';
 
-/**
- * `bot_notification` carries no Zoom message ID, so inbound messages get a
- * synthetic, stable ID with this prefix. It is not a valid `reply_to` target.
- * Payload reference: https://developers.zoom.us/docs/chat/capabilities/#slash-commands
- */
+// bot_notification has no message ID; this synthetic ID is not a valid `reply_to` target.
 export let ZOOM_NOTIFICATION_MESSAGE_PREFIX = 'bot_notification:';
 
 export let isZoomNotificationMessageId = (id: string | undefined) =>
@@ -32,11 +28,7 @@ export let isZoomBotNotification = (event: unknown): event is ZoomChatbotEvent =
   );
 };
 
-/**
- * Outside a direct chat with the bot, Zoom only notifies the chatbot through its slash
- * command, so a channel notification is a command invocation and a direct one is a message.
- * https://developers.zoom.us/docs/chat/capabilities/#slash-commands
- */
+// In channels Zoom only notifies the bot via its slash command; direct chats are messages.
 export let isZoomSlashCommandNotification = (event: unknown): event is ZoomChatbotEvent =>
   isZoomBotNotification(event) &&
   normalizeJid(String(event.payload.toJid)) !== normalizeJid(String(event.payload.userJid));
@@ -70,7 +62,6 @@ export let mapZoomBotNotification = (event: ZoomChatbotEvent): MappedZoomNotific
     recipient: isDirect ? author : undefined
   });
 
-  // Zoom documents `timestamp` on every bot_notification; fall back to receipt time.
   let sentAt =
     epochToIso(payload.timestamp) ?? epochToIso(event.event_ts) ?? new Date().toISOString();
 

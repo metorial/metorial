@@ -1,9 +1,8 @@
-import { ChatErrors } from '@slates/adapter-chat';
+import { ChatErrors, parseRetryAfterMs } from '@slates/adapter-chat';
 import { createAxios } from 'slates';
 import { normalizeServiceUrl } from '../../lib/botFramework';
 import { type TeamsChatErrorContext, withTeamsChatErrors } from './errors';
 
-// Bot Connector REST operations:
 // https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-api-reference?view=azure-bot-service-4.0#conversation-operations
 
 export interface TeamsBotAuth {
@@ -75,27 +74,19 @@ export let requireTeamsBotIdentity = (
   };
 };
 
-/**
- * Creates the Bot Connector HTTP client. Exposed as an object so root contract
- * tests can stub provider HTTP at the client boundary.
- */
+/** An object so root contract tests can stub provider HTTP. */
 export let teamsBotHttp = {
   create: (serviceUrl: string) =>
     createAxios({
       baseURL: serviceUrl,
       errorMapping: {
-        // The Bot Connector throttles with 429 and a Retry-After header in seconds.
-        // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/rate-limit
+        // Retry-After is in seconds: https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/rate-limit
         mapAxiosError: (error, inferred) => {
-          let header = (error.response?.headers as Record<string, unknown> | undefined)?.[
-            'retry-after'
-          ];
-          let seconds = typeof header === 'string' ? Number(header) : Number.NaN;
-          if (!Number.isFinite(seconds)) return inferred;
-          return {
-            ...inferred,
-            baggage: { ...inferred.baggage, retryAfterMs: Math.ceil(seconds * 1000) }
-          };
+          let retryAfterMs = parseRetryAfterMs(
+            (error.response?.headers as Record<string, unknown> | undefined)?.['retry-after']
+          );
+          if (retryAfterMs === undefined) return inferred;
+          return { ...inferred, baggage: { ...inferred.baggage, retryAfterMs } };
         }
       }
     })

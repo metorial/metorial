@@ -15,8 +15,7 @@ export let chatGetUser = contract
       };
     }
 
-    // The User Profile API returns an empty object when the person has not
-    // granted profile access; the author then falls back to the PSID.
+    // Without profile access Graph returns an empty object; the author falls back to the PSID.
     let profile = await client.getUserProfile(ctx.input.userId);
     let author = mapMessengerUserAuthor(
       ctx.input.userId,

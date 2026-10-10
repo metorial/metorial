@@ -8,8 +8,7 @@ export let chatRemoveReaction = contract
   .handleInvocation(async ctx => {
     let client = createMessengerChatClient(ctx, contract.key);
     assertMessengerPsid(client, ctx.input.channelId, contract.key);
-    // `unreact` removes the Page's single reaction on the message, whichever
-    // emoji it was.
+    // `unreact` removes the Page's single reaction, whichever emoji it was.
     let raw = await client.senderAction({
       recipientId: ctx.input.channelId,
       action: 'unreact',

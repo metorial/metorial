@@ -1,7 +1,6 @@
 import {
-  ChatErrors,
   listChannelMembers as contract,
-  decodeCursor,
+  decodeChatCursor,
   encodeCursor
 } from '@slates/adapter-chat';
 import { z } from 'zod';
@@ -11,16 +10,15 @@ import { createTeamsBotClient } from '../lib/client';
 import { buildTeamsChannel, parseConversationId, TEAMS_CHAT_PROVIDER } from '../lib/ids';
 import { mapTeamsAuthor } from '../lib/mappers';
 
-// Paged members: Teams accepts page sizes from 50 to 500; chats return the
-// full roster in one page.
+// Page size is 50-500; chats return the full roster in one page.
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/get-teams-context#fetch-the-roster-or-user-profile
 let TEAMS_MIN_PAGE_SIZE = 50;
 let DEFAULT_LIMIT = 100;
 
 let cursorDataSchema = z.object({
-  // Continuation token of the provider page being read (absent for page one).
+  // Provider page token; absent for page one.
   token: z.string().optional(),
-  // Members of that provider page already returned.
+  // Members of that page already returned.
   offset: z.number().int().nonnegative()
 });
 
@@ -34,16 +32,13 @@ export let chatListChannelMembers = contract
 
     let position: z.infer<typeof cursorDataSchema> = { offset: 0 };
     if (ctx.input.cursor) {
-      try {
-        position = decodeCursor(TEAMS_CHAT_PROVIDER, ctx.input.cursor, cursorDataSchema).data;
-      } catch (error) {
-        throw ChatErrors.cursorInvalid({ action, cause: error });
-      }
+      position = decodeChatCursor(TEAMS_CHAT_PROVIDER, ctx.input.cursor, cursorDataSchema, {
+        action
+      }).data;
     }
 
     let client = createTeamsBotClient(ctx.auth, action, { channelId: baseId });
-    // Request at least the provider minimum; smaller limits are served by
-    // slicing the page and resuming from the stored offset.
+    // Smaller limits slice the provider page and resume from the offset.
     let pageSize = Math.max(TEAMS_MIN_PAGE_SIZE, limit);
     let page = await client.getPagedMembers(baseId, pageSize, position.token);
     let members = Array.isArray(page?.members) ? page.members : [];

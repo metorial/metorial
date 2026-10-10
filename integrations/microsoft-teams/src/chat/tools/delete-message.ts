@@ -3,7 +3,7 @@ import { BOT_FRAMEWORK_AUTH_METHOD_KEY } from '../../lib/botFramework';
 import { spec } from '../../spec';
 import { createTeamsBotClient } from '../lib/client';
 
-// Delete activity (bots can delete only their own messages):
+// Bots can delete only their own messages.
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/build-conversational-capability#delete-messages
 export let chatDeleteMessage = contract
   .implement(spec)

@@ -3,12 +3,7 @@ import { spec } from '../../spec';
 
 let PLACEHOLDER_ENDPOINT = 'https://YOUR_HOST/google-chat/events';
 
-/**
- * Public setup instructions for a Google Chat app configured in the Google
- * Chat API Configuration page. Google has no importable app manifest, so the
- * steps describe the console fields directly.
- * https://developers.google.com/workspace/chat/configure-chat-api
- */
+// No importable manifest: https://developers.google.com/workspace/chat/configure-chat-api
 export let chatGetSetup = contract
   .implement(spec)
   .handleInvocation(async ctx => {
@@ -30,16 +25,14 @@ export let chatGetSetup = contract
     );
     let nextId = 1;
     let commandLines = (ctx.input.commands ?? []).map(command => {
+      let name = command.name.replace(/^\//, '');
       let id = Number(command.commandId);
       if (!Number.isInteger(id) || id < 1 || id > 1000) {
         while (usedIds.has(nextId)) nextId += 1;
         id = nextId;
         usedIds.add(id);
-        warnings.push(
-          `Command /${command.name.replace(/^\//, '')} had no numeric command ID; use ${id}.`
-        );
+        warnings.push(`Command /${name} had no numeric command ID; use ${id}.`);
       }
-      let name = command.name.replace(/^\//, '');
       return `   - **Slash command** \`/${name}\` with Command ID **${id}**${
         command.description ? ` and description "${command.description}"` : ''
       }`;

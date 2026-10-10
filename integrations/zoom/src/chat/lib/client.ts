@@ -1,4 +1,4 @@
-import { ChatErrors } from '@slates/adapter-chat';
+import { ChatErrors, parseRetryAfterMs } from '@slates/adapter-chat';
 import { createAxios } from '@slates/provider';
 import { ZOOM_DEFAULT_API_URL } from '../../lib/chatbotAuth';
 import type { ZoomChatbotContent } from './render';
@@ -20,10 +20,7 @@ export interface ZoomChatbotMessageResponse {
   [key: string]: unknown;
 }
 
-/**
- * Zoom error bodies carry numeric codes (`{"code": 8001, "message": "..."}`);
- * stringify them so the shared error normalizer keeps the code for chat mapping.
- */
+// Stringify Zoom's numeric error code so the shared normalizer keeps it.
 export let normalizeZoomErrorBody = (response: { data?: unknown }) => {
   let data = response.data;
   if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -33,11 +30,7 @@ export let normalizeZoomErrorBody = (response: { data?: unknown }) => {
   return data;
 };
 
-/**
- * Client for the chatbot message endpoints
- * (https://developers.zoom.us/docs/api/chatbot/), authorized with the
- * client-credentials chatbot token.
- */
+// https://developers.zoom.us/docs/api/chatbot/
 export class ZoomChatbotClient {
   readonly botJid: string;
   readonly accountId: string;
@@ -59,7 +52,17 @@ export class ZoomChatbotClient {
     this.userJid = auth.chatbotUserJid || undefined;
     this.api = createAxios({
       baseURL: `${auth.apiUrl ?? ZOOM_DEFAULT_API_URL}/v2`,
-      errorMapping: { extractResponseData: normalizeZoomErrorBody }
+      errorMapping: {
+        extractResponseData: normalizeZoomErrorBody,
+        // Retry-After is seconds or a reset time: https://developers.zoom.us/docs/api/rate-limits/
+        mapAxiosError: (error, inferred) => {
+          let retryAfterMs = parseRetryAfterMs(
+            (error.response?.headers as Record<string, unknown> | undefined)?.['retry-after']
+          );
+          if (retryAfterMs === undefined) return inferred;
+          return { ...inferred, baggage: { ...inferred.baggage, retryAfterMs } };
+        }
+      }
     });
     this.headers = { Authorization: `Bearer ${auth.token}` };
   }

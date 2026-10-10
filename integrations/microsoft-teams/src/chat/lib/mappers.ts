@@ -8,6 +8,8 @@ import type {
   Thread,
   Workspace
 } from '@slates/adapter-chat';
+import { attachmentTypeForMime } from '@slates/adapter-chat';
+import { z } from 'zod';
 import { normalizeAppId } from '../../lib/botFramework';
 import type { TeamsActivity } from '../../triggers/botFrameworkTriggerGroup';
 import {
@@ -51,22 +53,37 @@ export let mapTeamsAuthor = (account: Account, appId: string): Author => {
       : userRole === 'user'
         ? { role: 'member' as const }
         : {}),
-    ...(isApp ? { providerType: 'bot' } : { providerType: 'user' }),
+    providerType: isApp ? 'bot' : 'user',
     isMe: account.id.toLowerCase() === teamsBotUserId(appId),
     ...(email ? { email } : {}),
     raw: account
   };
 };
 
-export let mapTeamsBotAuthor = (appId: string, botName?: string): Author => ({
-  userId: teamsBotUserId(appId),
-  userName: botName ?? normalizeAppId(appId),
-  fullName: botName ?? normalizeAppId(appId),
-  type: 'app',
-  providerType: 'bot',
-  isMe: true,
-  raw: { id: teamsBotUserId(appId), appId: normalizeAppId(appId) }
-});
+export let mapTeamsBotAuthor = (appId: string, botName?: string): Author => {
+  let normalized = normalizeAppId(appId);
+  let userId = teamsBotUserId(appId);
+  return {
+    userId,
+    userName: botName ?? normalized,
+    fullName: botName ?? normalized,
+    type: 'app',
+    providerType: 'bot',
+    isMe: true,
+    raw: { id: userId, appId: normalized }
+  };
+};
+
+export let mapActivityAuthor = (activity: TeamsActivity, appId: string): Author =>
+  activity.from
+    ? mapTeamsAuthor(activity.from as Account, appId)
+    : {
+        userId: 'unknown',
+        userName: 'unknown',
+        fullName: 'unknown',
+        type: 'unknown',
+        isMe: false
+      };
 
 export let mapTeamsWorkspace = (appId: string, botName?: string): Workspace => ({
   id: teamsBotWorkspaceId(appId),
@@ -74,10 +91,7 @@ export let mapTeamsWorkspace = (appId: string, botName?: string): Workspace => (
   raw: { appId: normalizeAppId(appId), kind: 'teams_bot' }
 });
 
-/**
- * Teams wraps mentions in `<at>Name</at>` inside message text:
- * https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/channel-and-group-conversations#retrieve-mentions
- */
+// Mentions arrive as `<at>Name</at>`: https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/channel-and-group-conversations#retrieve-mentions
 export let cleanTeamsText = (text: string) =>
   text.replace(/<at[^>]*>(.*?)<\/at>/gi, '@$1').trim();
 
@@ -91,11 +105,7 @@ let REACTION_EMOJI: Record<string, string> = {
   plusone: '👍'
 };
 
-/**
- * Documented reaction types are angry, heart, laugh, like, sad, surprised:
- * https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/subscribe-to-conversation-events#message-reaction-events
- * Anything else is preserved as a named custom reaction.
- */
+// Undocumented reaction types stay named custom reactions: https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/subscribe-to-conversation-events#message-reaction-events
 export let mapTeamsReaction = (type: string): Emoji => {
   let unicode = REACTION_EMOJI[type.toLowerCase()];
   return unicode ? { type: 'unicode', value: unicode } : { type: 'custom', name: type };
@@ -114,25 +124,18 @@ export let isBotMentioned = (activity: TeamsActivity) => {
   );
 };
 
-// File messages in personal chats carry a OneDrive download link:
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/bots-filesv4#receive-files-in-personal-chat
 export let TEAMS_FILE_DOWNLOAD_INFO = 'application/vnd.microsoft.teams.file.download.info';
 
-export interface TeamsFileReference {
-  kind: 'download_info' | 'content_url';
-  url: string;
-  name?: string;
-  contentType?: string;
-  uniqueId?: string;
-}
+export let teamsFileReferenceSchema = z.object({
+  kind: z.enum(['download_info', 'content_url']),
+  url: z.string(),
+  name: z.string().optional(),
+  contentType: z.string().optional(),
+  uniqueId: z.string().optional()
+});
 
-let attachmentTypeFor = (mimeType: string | undefined): AttachmentRef['type'] => {
-  if (!mimeType) return 'file';
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  return 'file';
-};
+export type TeamsFileReference = z.infer<typeof teamsFileReferenceSchema>;
 
 export let mapTeamsAttachments = (activity: TeamsActivity): AttachmentRef[] => {
   if (!Array.isArray(activity.attachments)) return [];
@@ -165,8 +168,7 @@ export let mapTeamsAttachments = (activity: TeamsActivity): AttachmentRef[] => {
       continue;
     }
 
-    // Inline media sent to the bot (for example pasted images) carries a
-    // media type and a contentUrl hosted by the Bot Connector.
+    // Inline media (e.g. pasted images) has a Bot Connector contentUrl.
     if (
       typeof attachment?.contentUrl === 'string' &&
       /^(image|video|audio)\//.test(contentType)
@@ -178,7 +180,7 @@ export let mapTeamsAttachments = (activity: TeamsActivity): AttachmentRef[] => {
         contentType
       };
       result.push({
-        type: attachmentTypeFor(contentType),
+        type: attachmentTypeForMime(contentType),
         name,
         mimeType: contentType,
         providerFileReference: reference,
@@ -227,8 +229,7 @@ export let mapActivityBody = (activity: TeamsActivity): ChatBody => {
   let text = typeof activity.text === 'string' ? cleanTeamsText(activity.text) : '';
   let attachments = mapTeamsAttachments(activity);
   return {
-    // The shared body schema requires one part; file-only messages keep an
-    // empty text part instead of invented text.
+    // The body needs one part; file-only messages get an empty text part.
     parts: [text ? { type: 'markdown', markdown: text } : { type: 'text', content: '' }],
     ...(text ? { altText: text } : {}),
     ...(attachments.length > 0 ? { attachments } : {})
@@ -245,21 +246,12 @@ export let mapActivityMessage = (
   let channel = mapActivityChannel(activity, appId);
   let thread = mapActivityThread(activity, channel);
   let timestamp = activity.timestamp ?? new Date(0).toISOString();
-  let author = activity.from
-    ? mapTeamsAuthor(activity.from as Account, appId)
-    : {
-        userId: 'unknown',
-        userName: 'unknown',
-        fullName: 'unknown',
-        type: 'unknown' as const,
-        isMe: false
-      };
 
   return {
     id: activity.id ?? '',
     channelId: channel.id,
     ...(thread ? { threadId: thread.id } : {}),
-    author,
+    author: mapActivityAuthor(activity, appId),
     body: mapActivityBody(activity),
     isMention: isBotMentioned(activity),
     providerType: activity.type,

@@ -1527,8 +1527,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       return withRequestTraces(context, {
         state: res.state,
-        // Frames such as a gateway IDENTIFY embed credentials; the hub restores them only at
-        // the socket, so stored invocation results never contain them.
+        // Outbound frames (e.g. IDENTIFY) embed credentials; the hub restores them at the socket.
         send: new AuthConfigSecretRedactor(
           context._getAuthConfigForRedaction()
         ).redactEmbedded(res.send ?? []),

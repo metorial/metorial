@@ -26,10 +26,7 @@ import {
   chatReactionRemoved
 } from './triggers';
 
-// Omitted (no Bot API support for a bot credential): message get/list/search,
-// ephemeral messages, read receipts, reaction listing, channel/thread listing,
-// channel members listing, DM opening, user lookup/search, and command responses.
-// Telegram has no deletion updates, so message.deleted is omitted too.
+// Omitted: actions the Bot API lacks for bots, and message.deleted (no deletion updates).
 export let telegramChatTools = [
   chatSendMessage,
   chatEditMessage,

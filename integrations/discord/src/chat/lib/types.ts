@@ -98,7 +98,6 @@ export interface DiscordApiChannel {
   [key: string]: unknown;
 }
 
-/** Bot identity used to compute `isMe` and mentions without extra calls. */
 export interface DiscordIdentity {
   botUserId?: string;
   applicationId?: string;

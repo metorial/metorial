@@ -1,6 +1,11 @@
-import { ChatErrors, uploadFile as contract } from '@slates/adapter-chat';
+import {
+  attachmentTypeForMime,
+  ChatErrors,
+  uploadFile as contract,
+  fetchAttachmentSource
+} from '@slates/adapter-chat';
 import { spec } from '../../spec';
-import { createMessengerChatClient, type MessengerUploadType } from '../lib/client';
+import { createMessengerChatClient } from '../lib/client';
 import {
   type MessengerFileReference,
   mapMessengerPageAuthor,
@@ -9,21 +14,10 @@ import {
 } from '../lib/mappers';
 import { assertMessengerPsid } from '../lib/validation';
 
-/** Messenger accepts uploaded assets up to 25 MB (Attachment Upload API). */
+// Attachment Upload API limit.
 let MESSENGER_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
-let uploadTypeFor = (mimeType: string): MessengerUploadType => {
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  return 'file';
-};
-
-/**
- * Upload shape C: Messenger has no way to attach a file to a separate text
- * message, so sending the file creates its own message, returned alongside the
- * attachment.
- */
+// Messenger cannot attach a file to a text message, so the file is sent as its own message.
 export let chatUploadFile = contract
   .implement(spec)
   .handleInvocation(async ctx => {
@@ -48,46 +42,17 @@ export let chatUploadFile = contract
     let client = createMessengerChatClient(ctx, action);
     assertMessengerPsid(client, input.channelId, action);
 
-    let response: Response;
-    try {
-      response = await fetch(input.fileUrl);
-    } catch (error) {
-      throw ChatErrors.attachmentDownloadFailed({
-        action,
-        cause: error,
-        message: 'Could not fetch the file from its signed upload URL.'
-      });
-    }
-    if (!response.ok) {
-      throw ChatErrors.attachmentDownloadFailed({
-        action,
-        message: `Could not fetch the file from its signed upload URL: HTTP ${response.status}.`
-      });
-    }
-
-    let declaredLength = Number(response.headers.get('content-length'));
-    if (Number.isFinite(declaredLength) && declaredLength > MESSENGER_MAX_UPLOAD_BYTES) {
-      throw ChatErrors.attachmentTooLarge({
-        action,
-        max: MESSENGER_MAX_UPLOAD_BYTES,
-        actual: declaredLength
-      });
-    }
-
-    let content = await response.arrayBuffer();
-    if (content.byteLength > MESSENGER_MAX_UPLOAD_BYTES) {
-      throw ChatErrors.attachmentTooLarge({
-        action,
-        max: MESSENGER_MAX_UPLOAD_BYTES,
-        actual: content.byteLength
-      });
-    }
+    let source = await fetchAttachmentSource(input.fileUrl, {
+      action,
+      maxBytes: MESSENGER_MAX_UPLOAD_BYTES
+    });
+    let content = source.bytes;
 
     let mimeType =
       input.mimeType ||
-      response.headers.get('content-type')?.split(';')[0]?.trim() ||
+      source.contentType?.split(';')[0]?.trim() ||
       'application/octet-stream';
-    let type = uploadTypeFor(mimeType);
+    let type = attachmentTypeForMime(mimeType);
 
     let sent = await client.sendFile({
       recipientId: input.channelId,

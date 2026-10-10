@@ -1,23 +1,15 @@
 import { ServiceError } from '@lowerdeck/error';
 import {
-  ChatError,
   type ChatErrorCode,
-  type ChatErrorDetailsInput,
   type ChatErrorTargetType,
-  getChatErrorTargetType,
-  wrapChatError
+  createChatErrorMapper
 } from '@slates/adapter-chat';
 import { SlateError } from 'slates';
 
-/**
- * Google API errors carry an HTTP status and a canonical `error.status`
- * (https://cloud.google.com/apis/design/errors#handling_errors). The meaning of
- * 403/404 depends on the action, so callers pass `ambiguous` overrides.
- */
+// 403/404 depend on the action, so callers pass `ambiguous` overrides.
 let GOOGLE_STATUS_CHAT_CODES: Record<string, ChatErrorCode> = {
   UNAUTHENTICATED: 'chat.auth.invalid',
   PERMISSION_DENIED: 'chat.access.forbidden',
-  NOT_FOUND: 'chat.provider.error',
   ALREADY_EXISTS: 'chat.message.duplicate',
   INVALID_ARGUMENT: 'chat.input.invalid',
   FAILED_PRECONDITION: 'chat.input.invalid',
@@ -40,17 +32,6 @@ let HTTP_STATUS_GOOGLE_STATUS: Record<number, string> = {
   504: 'DEADLINE_EXCEEDED'
 };
 
-let SLATE_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
-  'upstream.rate_limited': 'chat.rate_limit.exceeded',
-  'upstream.timeout': 'chat.provider.timeout',
-  'upstream.network_error': 'chat.provider.network_error',
-  'upstream.unavailable': 'chat.provider.unavailable',
-  'auth.invalid': 'chat.auth.invalid',
-  'auth.expired': 'chat.auth.expired',
-  'auth.required': 'chat.auth.invalid',
-  'permission.denied': 'chat.access.forbidden'
-};
-
 export interface GoogleChatChatErrorContext {
   action?: string;
   channelId?: string;
@@ -59,7 +40,6 @@ export interface GoogleChatChatErrorContext {
   userId?: string;
   workspaceId?: string;
   attachmentId?: string;
-  /** Google canonical status (NOT_FOUND, PERMISSION_DENIED, ...) to chat code. */
   ambiguous?: Record<string, ChatErrorCode>;
 }
 
@@ -75,7 +55,6 @@ let TARGET_FIELDS: Record<ChatErrorTargetType, keyof GoogleChatChatErrorContext>
   command: 'messageId'
 };
 
-/** Reads `{ error: { status } }` from the upstream response, else derives it from HTTP status. */
 export let getGoogleStatus = (error: unknown): string | undefined => {
   let upstreamCode: unknown;
   let upstreamStatus: unknown;
@@ -92,53 +71,17 @@ export let getGoogleStatus = (error: unknown): string | undefined => {
   return typeof status === 'number' ? HTTP_STATUS_GOOGLE_STATUS[status] : undefined;
 };
 
-let resolveCode = (
-  error: unknown,
-  googleStatus: string | undefined,
-  context: GoogleChatChatErrorContext
-): ChatErrorCode => {
-  if (googleStatus) {
-    let ambiguous = context.ambiguous?.[googleStatus];
-    if (ambiguous) return ambiguous;
-    let mapped = GOOGLE_STATUS_CHAT_CODES[googleStatus];
-    if (mapped && mapped !== 'chat.provider.error') return mapped;
+let googleChatErrors = createChatErrorMapper<GoogleChatChatErrorContext>({
+  targetFields: TARGET_FIELDS,
+  classify: (error, context) => {
+    let googleStatus = getGoogleStatus(error);
+    return {
+      code: googleStatus
+        ? (context.ambiguous?.[googleStatus] ?? GOOGLE_STATUS_CHAT_CODES[googleStatus])
+        : undefined,
+      provider: googleStatus ? { code: googleStatus } : undefined
+    };
   }
+});
 
-  if (SlateError.is(error)) {
-    let mapped = SLATE_CHAT_ERROR_CODES[error.code];
-    if (mapped) return mapped;
-  }
-
-  return 'chat.provider.error';
-};
-
-export let mapGoogleChatChatError = (
-  error: unknown,
-  context: GoogleChatChatErrorContext = {}
-) => {
-  if (ChatError.is(error)) return error;
-
-  let googleStatus = getGoogleStatus(error);
-  let code = resolveCode(error, googleStatus, context);
-  let entity = getChatErrorTargetType(code);
-  let targetId = entity ? context[TARGET_FIELDS[entity]] : undefined;
-
-  let details: ChatErrorDetailsInput = {
-    action: context.action,
-    target: typeof targetId === 'string' ? targetId : undefined,
-    provider: googleStatus ? { code: googleStatus } : undefined
-  };
-
-  return wrapChatError(code, error, details);
-};
-
-export let withGoogleChatChatErrors = async <T>(
-  context: GoogleChatChatErrorContext,
-  run: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw mapGoogleChatChatError(error, context);
-  }
-};
+export let mapGoogleChatChatError = googleChatErrors.map;

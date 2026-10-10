@@ -1,5 +1,10 @@
 import { Buffer } from 'node:buffer';
-import { type AttachmentRef, ChatErrors, uploadFile as contract } from '@slates/adapter-chat';
+import {
+  type AttachmentRef,
+  ChatErrors,
+  uploadFile as contract,
+  fetchAttachmentSource
+} from '@slates/adapter-chat';
 import { SlateError } from 'slates';
 import { spec } from '../../spec';
 import { createWhatsAppChatClient } from '../lib/client';
@@ -17,8 +22,7 @@ type MediaKind = 'image' | 'video' | 'audio' | 'document';
 
 let MB = 1024 * 1024;
 
-// Supported media types and limits. WebP goes out as a document: Meta only accepts it as a
-// 512x512 sticker, which ordinary images are not.
+// WebP is sent as a document; Meta accepts it only as a 512x512 sticker.
 // https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media#supported-media-types
 let MEDIA_KINDS: Record<string, { kind: MediaKind; maxBytes: number }> = {
   'image/jpeg': { kind: 'image', maxBytes: 5 * MB },
@@ -43,11 +47,7 @@ let ATTACHMENT_TYPES: Record<MediaKind, AttachmentRef['type']> = {
 let baseMimeType = (value: string | null | undefined) =>
   value?.split(';')[0]?.trim().toLowerCase() || undefined;
 
-/**
- * Shape C upload: WhatsApp has no way to attach a file to a separate text
- * message, so uploading stores the media and immediately sends it to the
- * conversation as its own media message.
- */
+// Upload sends the media at once as its own message (shape C).
 export let chatUploadFile = contract
   .implement(spec)
   .handleInvocation(async ctx => {
@@ -68,48 +68,19 @@ export let chatUploadFile = contract
       }
     }
 
-    let response: Response;
-    try {
-      response = await fetch(ctx.input.fileUrl);
-    } catch (error) {
-      throw ChatErrors.attachmentDownloadFailed({
-        action,
-        message: 'Could not fetch the file from its signed upload URL.',
-        cause: error
-      });
-    }
-    if (!response.ok) {
-      throw ChatErrors.attachmentDownloadFailed({
-        action,
-        message: `Could not fetch the file from its signed upload URL: HTTP ${response.status}.`
-      });
-    }
-
-    let declaredLength = Number(response.headers.get('content-length'));
-    let { maxBytes: sourceLimit } =
-      MEDIA_KINDS[declaredMime ?? baseMimeType(response.headers.get('content-type')) ?? ''] ??
-      DOCUMENT;
-    if (Number.isFinite(declaredLength) && declaredLength > sourceLimit) {
-      throw ChatErrors.attachmentTooLarge({
-        action,
-        max: sourceLimit,
-        actual: declaredLength
-      });
-    }
-
-    let content = Buffer.from(await response.arrayBuffer());
-    let mimeType =
-      declaredMime ??
-      baseMimeType(response.headers.get('content-type')) ??
-      'application/octet-stream';
-    let { kind, maxBytes } = MEDIA_KINDS[mimeType] ?? DOCUMENT;
-    if (content.byteLength > maxBytes) {
-      throw ChatErrors.attachmentTooLarge({
-        action,
-        max: maxBytes,
-        actual: content.byteLength
-      });
-    }
+    let resolveMime = (contentType: string | undefined) =>
+      declaredMime ?? baseMimeType(contentType) ?? 'application/octet-stream';
+    let source = await fetchAttachmentSource(ctx.input.fileUrl, {
+      action,
+      maxBytes: contentType => (MEDIA_KINDS[resolveMime(contentType)] ?? DOCUMENT).maxBytes
+    });
+    let mimeType = resolveMime(source.contentType);
+    let { kind } = MEDIA_KINDS[mimeType] ?? DOCUMENT;
+    let content = Buffer.from(
+      source.bytes.buffer,
+      source.bytes.byteOffset,
+      source.bytes.byteLength
+    );
 
     let client = createWhatsAppChatClient(ctx);
     let uploaded = await withWhatsAppChatErrors(
@@ -138,10 +109,7 @@ export let chatUploadFile = contract
         [kind]: kind === 'document' ? { id: mediaId, filename } : { id: mediaId }
       });
     } catch (error) {
-      // When WhatsApp rejected the send, nothing references the stored media; remove
-      // it so a retry does not leave orphaned uploads (media IDs otherwise last 30
-      // days). After a timeout or network failure the message may still have been
-      // delivered, so the media is kept.
+      // Remove media only if the send was rejected; after a timeout it may have been delivered.
       let outcomeUnknown =
         SlateError.is(error) &&
         (error.code === 'upstream.timeout' || error.code === 'upstream.network_error');

@@ -1,9 +1,6 @@
 import { z } from 'zod';
 
-/**
- * WhatsApp Cloud API `messages` webhook envelope.
- * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages
- */
+// https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages
 
 let nullishString = () => z.string().nullish();
 
@@ -64,11 +61,7 @@ export let whatsappWebhookEnvelopeSchema = z.looseObject({
   )
 });
 
-/**
- * One emitted event per inbound customer message. The trigger group flattens the
- * envelope so each event carries the business phone number identity plus the
- * matching sender contact.
- */
+// One event per inbound message, flattened with the phone number and sender contact.
 export let whatsappMessageEventSchema = z.object({
   kind: z.literal('message'),
   wabaId: z.string().optional(),
@@ -82,7 +75,6 @@ export type WhatsAppMessageEvent = z.infer<typeof whatsappMessageEventSchema> & 
   message: WhatsAppInboundMessage;
 };
 
-/** Inbound message types normalized into `metorial_chat$message.received`. */
 export let WHATSAPP_RECEIVED_MESSAGE_TYPES = [
   'text',
   'image',

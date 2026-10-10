@@ -59,10 +59,7 @@ export let chatAddReaction = addContract
   })
   .build();
 
-/**
- * WhatsApp keeps a single reaction per sender and message; sending an empty
- * emoji clears it, whichever emoji was set.
- */
+// One reaction per sender and message; an empty emoji clears it.
 export let chatRemoveReaction = removeContract
   .implement(spec)
   .handleInvocation(async ctx => {

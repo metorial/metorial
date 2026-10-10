@@ -28,10 +28,7 @@ export let whatsappWebhookRegistrationSchema = z.object({
     )
 });
 
-export type WhatsAppWebhookRegistration = z.infer<typeof whatsappWebhookRegistrationSchema>;
-
-// Meta signs the raw POST body with the app secret:
-// https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint#post-requests
+// Signed with the app secret: https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint#post-requests
 let SIGNATURE_PATTERN = /^sha256=[a-f0-9]{64}$/;
 
 type WebhookContext = {
@@ -83,8 +80,7 @@ export let processWhatsAppWebhook = async (ctx: WebhookContext) => {
     );
   }
 
-  // Meta verifies the callback URL with a GET `hub.challenge` handshake:
-  // https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint#get-requests
+  // GET hub.challenge handshake: https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint#get-requests
   if (request.method === 'GET') {
     let verification = getMetaWebhookVerificationResponse(
       request,
@@ -142,8 +138,7 @@ export let processWhatsAppWebhook = async (ctx: WebhookContext) => {
     return reject(400, 'whatsapp_webhook_payload_invalid', 'Invalid webhook payload.');
   }
 
-  // The same Meta app can also deliver Page/Instagram objects; only WhatsApp
-  // Business Account deliveries belong to this integration.
+  // The same Meta app may deliver Page/Instagram objects; only WABA deliveries are ours.
   if (envelope.data.object !== 'whatsapp_business_account') {
     return reject(200, 'whatsapp_webhook_object_unsupported', '');
   }
@@ -192,8 +187,7 @@ export let processWhatsAppWebhook = async (ctx: WebhookContext) => {
           continue;
         }
 
-        // Groups API messages belong to a group conversation, not the sender's
-        // 1:1 chat; this adapter only models 1:1 customer conversations.
+        // Groups API messages are skipped; only 1:1 customer conversations are modelled.
         if (message.data.group_id) {
           ignore('group_message');
           continue;

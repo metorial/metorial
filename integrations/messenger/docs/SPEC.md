@@ -1,4 +1,4 @@
-# Slates Specification for Facebook Messenger
+# Facebook Messenger integration specification
 
 ## Overview
 

@@ -9,9 +9,6 @@ import { spec } from '../../spec';
 import { requireTeamsBotIdentity } from '../lib/client';
 import { mapTeamsBotAuthor, mapTeamsWorkspace } from '../lib/mappers';
 
-// Teams bots have no workspace object; the bot app is exposed as one stable
-// synthetic workspace whose id is stamped on every conversation.
-
 export let chatListWorkspaces = listWorkspacesContract
   .implement(spec)
   .authMethods([BOT_FRAMEWORK_AUTH_METHOD_KEY])

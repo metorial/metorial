@@ -2,11 +2,7 @@ import type { MessengerEvent } from '../../triggers/event-schemas';
 import { MessengerChatClient } from './client';
 import { mapMessengerChannel, mapMessengerUserAuthor, tryGetUserProfile } from './mappers';
 
-/**
- * Maps the person behind a Messenger event to an author and its DM channel. The
- * workspace id is the Page id from the signed delivery (the routing identity),
- * and the profile lookup is best-effort enrichment.
- */
+// The workspace id is the signed delivery's Page id; the profile lookup is best-effort.
 export let resolveMessengerEventParticipants = async (
   ctx: { auth: { token: string }; config?: { apiVersion?: string } },
   event: MessengerEvent,

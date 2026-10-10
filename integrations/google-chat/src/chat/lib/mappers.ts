@@ -6,6 +6,7 @@ import type {
   Message,
   Thread
 } from '@slates/adapter-chat';
+import { attachmentTypeForMime } from '@slates/adapter-chat';
 import type { GoogleChatAppIdentity } from './identity';
 
 /** https://developers.google.com/workspace/chat/api/reference/rest/v1/User */
@@ -110,8 +111,7 @@ export let mapGoogleChatAuthor = (
     fullName: display,
     type,
     providerType: user?.type,
-    // The app's own user ID is not readable with app authentication, so only
-    // paths that created the message (send/edit) mark it as this app's.
+    // The app's own user id is not readable, so only send/edit mark messages as this app's.
     isMe: options.isMe ?? false,
     email: user?.email || undefined,
     imageUrl: user?.avatarUrl || undefined,
@@ -170,13 +170,6 @@ export let mapGoogleChatThread = (
   };
 };
 
-let attachmentType = (contentType: string | undefined): AttachmentRef['type'] => {
-  if (contentType?.startsWith('image/')) return 'image';
-  if (contentType?.startsWith('video/')) return 'video';
-  if (contentType?.startsWith('audio/')) return 'audio';
-  return 'file';
-};
-
 export interface GoogleChatFileReference {
   attachmentName?: string;
   resourceName?: string;
@@ -196,7 +189,7 @@ export let mapGoogleChatAttachment = (
     contentType: attachment.contentType
   };
   return {
-    type: attachmentType(attachment.contentType),
+    type: attachmentTypeForMime(attachment.contentType),
     id: attachment.name,
     name: attachment.contentName,
     mimeType: attachment.contentType,
@@ -216,7 +209,6 @@ export let messageHasAppMention = (message: GoogleChatMessageResource | undefine
 
 export let mapGoogleChatMessage = (
   message: GoogleChatMessageResource,
-  _identity: GoogleChatAppIdentity,
   options: { isMe?: boolean; channelId?: string } = {}
 ): Message => {
   let id = message.name ?? 'spaces/unknown/messages/unknown';

@@ -93,7 +93,7 @@ export class MessengerChatClient {
     type: MessengerUploadType;
     filename: string;
     contentType: string;
-    content: ArrayBuffer;
+    content: ArrayBuffer | Uint8Array<ArrayBuffer>;
   }) {
     return this.request<MessengerSendResponse>(
       { channelId: opts.recipientId, notFound: 'chat.channel.not_found' },
@@ -136,10 +136,7 @@ export class MessengerChatClient {
     );
   }
 
-  /**
-   * The Page's name and picture are optional details: with a messaging-only token
-   * the Page is returned as its id alone, so connections still resolve.
-   */
+  // Messaging-only tokens return the Page as its id alone.
   getPage() {
     return this.request<MessengerPage>(
       { workspaceId: this.pageId, notFound: 'chat.workspace.not_found' },

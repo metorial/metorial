@@ -3,7 +3,6 @@ import { spec } from '../../spec';
 import { createMessengerChatClient } from '../lib/client';
 import { mapMessengerPageAuthor, mapMessengerWorkspace } from '../lib/mappers';
 
-/** Messenger acts as the Facebook Page, which is also the connection's workspace. */
 export let chatGetAuthenticatedUser = contract
   .implement(spec)
   .handleInvocation(async ctx => {

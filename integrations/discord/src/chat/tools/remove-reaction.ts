@@ -4,7 +4,6 @@ import { runDiscordChatAction } from '../lib/context';
 import { toDiscordReactionEmoji } from '../lib/emoji';
 
 // Removes the bot's own reaction.
-// https://docs.discord.com/developers/resources/message#delete-own-reaction
 export let chatRemoveReaction = contract
   .implement(spec)
   .authMethods(['bot_token'])

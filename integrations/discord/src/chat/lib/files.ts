@@ -9,6 +9,8 @@ export let discordFileReferenceSchema = z.object({
   attachmentId: z.string().min(1)
 });
 
+export type DiscordFileReference = z.infer<typeof discordFileReferenceSchema>;
+
 let ALLOWED_HOSTS = new Set(['cdn.discordapp.com', 'media.discordapp.net']);
 // Renew a little before Discord's signed URL expires.
 let REFRESH_MARGIN_MS = 5 * 60 * 1000;
@@ -25,10 +27,7 @@ export let parseDiscordFileReference = (value: unknown, action: string) => {
   return parsed.data;
 };
 
-/**
- * Attachment CDN URLs are signed and expire; `ex` is the hex expiry timestamp in seconds.
- * https://docs.discord.com/developers/reference#signed-attachment-cdn-urls
- */
+// `ex` is the signed CDN URL's hex expiry timestamp in seconds.
 export let signedUrlExpiry = (url: string): Date | undefined => {
   let ex = new URL(url).searchParams.get('ex');
   if (!ex) return undefined;
@@ -36,10 +35,9 @@ export let signedUrlExpiry = (url: string): Date | undefined => {
   return Number.isFinite(seconds) ? new Date(seconds * 1000) : undefined;
 };
 
-/** Re-reads the owning message to obtain a fresh signed CDN URL for the attachment. */
 export let resolveDiscordAttachment = async (
   client: DiscordChatClient,
-  reference: z.infer<typeof discordFileReferenceSchema>,
+  reference: DiscordFileReference,
   action: string
 ): Promise<{ attachment: DiscordApiAttachment; url: string; expiresAt?: Date }> => {
   let message = await client.getMessage(reference.channelId, reference.messageId);

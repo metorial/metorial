@@ -1,14 +1,9 @@
 import { normalizeAppId } from './botFramework';
 
-/** Tenant value for connections of a multi-tenant bot, which receive every tenant's activity. */
+/** Multi-tenant bot connections receive every tenant's activity. */
 export let TEAMS_ANY_TENANT = '*';
 
-/**
- * One shared builder for both sides of Bot Framework routing:
- * `.routingMatchers` (connection auth) and `process` (the verified JWT
- * audience plus the activity's tenant). A connection with a tenant ID only
- * receives that tenant's activity; one without receives every tenant's.
- */
+// Shared by `.routingMatchers` and `process` so both sides compare equal.
 export let buildTeamsBotRoutingMatcher = (
   appId: string,
   tenantId: string = TEAMS_ANY_TENANT
@@ -24,7 +19,7 @@ export let buildTeamsBotConnectionRoutingMatchers = (auth: {
 }) =>
   auth.appId ? [buildTeamsBotRoutingMatcher(auth.appId, auth.tenantId || undefined)] : [];
 
-/** Matchers for one activity: every connection of the bot, plus those scoped to its tenant. */
+/** Every connection of the bot, plus those scoped to the activity's tenant. */
 export let buildTeamsBotActivityRoutingMatchers = (
   appId: string,
   tenantId: string | undefined

@@ -10,6 +10,8 @@ import type {
   ReactionCount,
   Workspace
 } from '@slates/adapter-chat';
+import { attachmentTypeForMime } from '@slates/adapter-chat';
+import type { DiscordFileReference } from './files';
 import type {
   DiscordApiAttachment,
   DiscordApiChannel,
@@ -42,7 +44,6 @@ export let DISCORD_CHANNEL_TYPE_NAMES: Record<number, string> = {
   16: 'GUILD_MEDIA'
 };
 
-/** Channel types that cannot hold messages themselves. */
 export let NON_MESSAGE_CHANNEL_TYPES = new Set([4, 14]);
 
 let VIEW_CHANNEL = 1n << 10n;
@@ -165,10 +166,7 @@ export let mapChannel = (raw: DiscordApiChannel, identity: DiscordIdentity): Cha
   };
 };
 
-/**
- * Builds a channel from the fields a gateway event carries, without a REST lookup.
- * DMs have no guild, so `workspaceId` is omitted for them.
- */
+// From gateway event fields only; DMs have no guild, so no `workspaceId`.
 export let mapEventChannel = (input: {
   channelId: string;
   guildId?: string;
@@ -208,24 +206,11 @@ export let mapWorkspace = (guild: {
   raw: guild
 });
 
-let attachmentType = (contentType: string | undefined): AttachmentRef['type'] => {
-  if (contentType?.startsWith('image/')) return 'image';
-  if (contentType?.startsWith('video/')) return 'video';
-  if (contentType?.startsWith('audio/')) return 'audio';
-  return 'file';
-};
-
-export interface DiscordFileReference {
-  channelId: string;
-  messageId: string;
-  attachmentId: string;
-}
-
 export let mapAttachment = (
   attachment: DiscordApiAttachment,
   location: { channelId: string; messageId: string }
 ): AttachmentRef => ({
-  type: attachmentType(attachment.content_type),
+  type: attachmentTypeForMime(attachment.content_type),
   id: attachment.id,
   name: attachment.filename,
   mimeType: attachment.content_type,
@@ -260,8 +245,7 @@ export let mapReactions = (reactions: DiscordApiReaction[] | undefined): Reactio
     count: reaction.count
   }));
 
-// Embed types Discord generates from links, as opposed to `rich` embeds an app sends.
-// https://docs.discord.com/developers/resources/message#embed-object-embed-types
+// Embed types Discord generates from links, as opposed to app-sent `rich` embeds.
 let UNFURL_EMBED_TYPES = new Set(['link', 'article', 'image', 'video', 'gifv']);
 
 let embedToCard = (embed: DiscordApiEmbed): ChatPart => {
@@ -311,9 +295,7 @@ export let mapMessageParts = (raw: DiscordApiMessage): ChatPart[] => {
     if (!UNFURL_EMBED_TYPES.has(embed.type ?? 'rich')) parts.push(embedToCard(embed));
   }
 
-  // The shared body schema requires at least one part; a file-only or empty-content
-  // message (for example without the message content intent) carries an empty text part
-  // instead of invented text.
+  // The body schema needs a part; file-only/empty messages get an empty text part.
   if (parts.length === 0) parts.push({ type: 'text', content: '' });
   return parts;
 };

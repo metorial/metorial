@@ -6,8 +6,7 @@ import {
 } from '../../triggers/gateway';
 import { mapMessageEvent, mentionsBot } from '../lib/events';
 
-// A message that @-mentions the bot user. The same message also fires message.received.
-// https://docs.discord.com/developers/events/gateway-events#message-create
+// The same message also fires message.received.
 export let chatMentionReceived = contract
   .implement(spec, discordGatewayTriggerGroup)
   .authMethods(['bot_token'])

@@ -54,7 +54,6 @@ export let teamsChatAdapter = ChatAdapter.register({
   tools: teamsChatTools,
   triggers: teamsChatTriggers,
   capabilities: {
-    // Replies post into a channel thread or answer an activity in a chat.
     message_reply: true,
     content_markdown: true,
     content_images: false,

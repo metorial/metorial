@@ -7,7 +7,6 @@ import {
 import { mapEventChannel } from '../lib/mappers';
 
 // MESSAGE_DELETE, and each id of MESSAGE_DELETE_BULK (expanded by the gateway group).
-// https://docs.discord.com/developers/events/gateway-events#message-delete
 export let chatMessageDeleted = contract
   .implement(spec, discordGatewayTriggerGroup)
   .authMethods(['bot_token'])

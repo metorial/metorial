@@ -1,6 +1,6 @@
-import type { CommandOptionType, CommandOptionValue } from '@slates/adapter-chat';
+import type { CommandOptionValue } from '@slates/adapter-chat';
 import type { DiscordGatewayEventPayload } from '../../triggers/gateway';
-import { encodeDiscordResponseToken } from './interaction';
+import { DISCORD_COMMAND_OPTION_TYPES, encodeDiscordResponseToken } from './interaction';
 import { mapAuthor, mapEmoji, mapEventChannel, mapMessage } from './mappers';
 import type { DiscordApiMessage, DiscordIdentity } from './types';
 
@@ -9,7 +9,6 @@ export let identityFromEvent = (payload: DiscordGatewayEventPayload): DiscordIde
   applicationId: payload.applicationId ?? undefined
 });
 
-/** Message events carry everything needed for routing; no REST call is made. */
 export let mapMessageEvent = (payload: DiscordGatewayEventPayload) => {
   let identity = identityFromEvent(payload);
   let data = payload.data as DiscordApiMessage;
@@ -71,21 +70,6 @@ export let reactionEventId = (
   ].join(':');
 };
 
-// https://docs.discord.com/developers/interactions/application-commands#application-command-object-application-command-option-type
-let OPTION_TYPES: Record<number, CommandOptionType> = {
-  1: 'subcommand',
-  2: 'subcommand_group',
-  3: 'string',
-  4: 'integer',
-  5: 'boolean',
-  6: 'user',
-  7: 'channel',
-  8: 'role',
-  9: 'mentionable',
-  10: 'number',
-  11: 'attachment'
-};
-
 interface InteractionOption {
   name: string;
   type: number;
@@ -114,7 +98,7 @@ export let flattenCommandOptions = (options: InteractionOption[] | undefined) =>
     name: option.name,
     value:
       option.value === undefined || option.value === null ? undefined : String(option.value),
-    type: OPTION_TYPES[option.type] ?? 'unknown'
+    type: DISCORD_COMMAND_OPTION_TYPES[option.type] ?? 'unknown'
   }));
 
   return { subcommandGroup, subcommand, options: values };
@@ -142,8 +126,7 @@ export let mapCommandEvent = (payload: DiscordGatewayEventPayload) => {
         })
       : undefined;
 
-  // The interaction token is a short-lived response credential; it only travels inside
-  // the opaque responseToken, never in public raw data.
+  // The interaction token only travels inside the opaque responseToken, never in raw.
   let { token: _token, ...raw } = data;
 
   return {

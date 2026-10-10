@@ -227,8 +227,7 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       let headers = { Authorization: `Bot ${ctx.input.botToken}` };
 
-      // Identity enrichment is best-effort so an existing connection flow keeps working
-      // when Discord is briefly unavailable; chat actions resolve it again on demand.
+      // Best-effort: chat actions resolve the identity again on demand.
       let [botUser, application] = await Promise.all([
         discordApi
           .get('/users/@me', { headers })

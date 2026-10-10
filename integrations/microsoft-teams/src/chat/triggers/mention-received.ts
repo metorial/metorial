@@ -5,7 +5,6 @@ import { teamsBotTriggerGroup } from '../../triggers/botFrameworkTriggerGroup';
 import { asTeamsEvent, isTeamsEventKind, resolveEventAppId } from '../lib/events';
 import { isBotMentioned, mapActivityMessage, stripMessageRelations } from '../lib/mappers';
 
-// A `message` activity whose `mention` entity targets the bot (recipient):
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/channel-and-group-conversations#retrieve-mentions
 export let chatMentionReceived = contract
   .implement(spec, teamsBotTriggerGroup)

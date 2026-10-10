@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-// Bot API object shapes: https://core.telegram.org/bots/api#available-types
-// Objects stay loose so newer provider fields are preserved in raw output.
+// Loose so newer provider fields survive in raw: https://core.telegram.org/bots/api#available-types
 
 export let telegramUserSchema = z
   .object({
@@ -158,10 +157,6 @@ export let telegramChatMemberUpdatedSchema = z
   })
   .loose();
 
-export type TelegramChatMemberUpdated = z.infer<typeof telegramChatMemberUpdatedSchema>;
-export type TelegramMessageReaction = z.infer<typeof telegramMessageReactionSchema>;
-
-/** Update kinds this integration subscribes to and delivers. */
 export let telegramMessageUpdateKinds = [
   'message',
   'edited_message',
@@ -184,12 +179,7 @@ export let telegramUpdateEnvelopeSchema = z
   })
   .loose();
 
-/**
- * Event emitted by the updates trigger group. `update` is the provider update,
- * unchanged. `bot` comes from the saved registration so mapping needs no lookup.
- * Reaction updates are split into one event per added or removed reaction, and
- * membership updates carry their computed transition.
- */
+// Reaction updates are split per reaction; membership updates carry their transition.
 export let telegramEventSchema = z.object({
   bot: z.object({
     id: z.string(),

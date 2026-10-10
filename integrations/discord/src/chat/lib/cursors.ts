@@ -1,9 +1,4 @@
-import {
-  ChatErrors,
-  decodeCursor,
-  encodeCursor,
-  type PageDirection
-} from '@slates/adapter-chat';
+import { decodeChatCursor, encodeCursor, type PageDirection } from '@slates/adapter-chat';
 import { z } from 'zod';
 
 let PROVIDER = 'discord';
@@ -19,16 +14,11 @@ export let decodeDiscordCursor = <Data>(
 ): { direction: PageDirection; data: Data | undefined } => {
   if (!cursor) return { direction: fallbackDirection, data: undefined };
 
-  try {
-    let decoded = decodeCursor(PROVIDER, cursor, schema);
-    return { direction: decoded.direction, data: decoded.data };
-  } catch (error) {
-    throw ChatErrors.cursorInvalid({
-      action,
-      cause: error,
-      message: 'The cursor is not a valid Discord page cursor. Request the first page again.'
-    });
-  }
+  let decoded = decodeChatCursor(PROVIDER, cursor, schema, {
+    action,
+    message: 'The cursor is not a valid Discord page cursor. Request the first page again.'
+  });
+  return { direction: decoded.direction, data: decoded.data };
 };
 
 export let snowflakeCursorSchema = z.object({ id: z.string().regex(/^\d+$/) });

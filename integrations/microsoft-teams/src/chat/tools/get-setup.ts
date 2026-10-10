@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { getSetup as contract } from '@slates/adapter-chat';
 import { spec } from '../../spec';
 
-// App manifest reference (bots, RSC permissions):
 // https://learn.microsoft.com/en-us/microsoft-365/extensibility/schema/root-bots
 // https://learn.microsoft.com/en-us/microsoftteams/platform/agents-in-teams/enable-receive-all-chat-messages
 let MANIFEST_VERSION = '1.30';

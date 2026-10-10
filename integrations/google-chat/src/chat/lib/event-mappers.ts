@@ -11,10 +11,7 @@ import {
   messageHasAppMention
 } from './mappers';
 
-/**
- * Interaction events carry the sender twice: `message.sender` and the richer
- * event `user` (with email and avatar). Merge them when they are the same user.
- */
+// Merges `message.sender` with the richer event `user` when they are the same person.
 let mergeSender = (event: GoogleChatInteractionEvent): GoogleChatUserResource | undefined => {
   let sender = (event.message as GoogleChatMessageResource | undefined)?.sender;
   let user = event.user as GoogleChatUserResource | undefined;
@@ -73,10 +70,10 @@ export let mapGoogleChatEventMessage = (
 ) => {
   let spaceName = event.space.name;
   let raw = event.message as GoogleChatMessageResource;
-  let message = mapGoogleChatMessage({ ...raw, sender: mergeSender(event) }, identity, {
-    isMe: false,
-    channelId: spaceName
-  });
+  let message = mapGoogleChatMessage(
+    { ...raw, sender: mergeSender(event) },
+    { isMe: false, channelId: spaceName }
+  );
   return {
     message,
     channel: mapGoogleChatEventChannel(event, identity),

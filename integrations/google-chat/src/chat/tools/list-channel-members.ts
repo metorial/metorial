@@ -11,11 +11,7 @@ import { decodePageCursor, encodePageCursor, resolveChannelName } from '../lib/r
 import { loadGoogleChatSpace } from '../lib/results';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/**
- * spaces.members.list with chat.bot lists joined user memberships in a space the
- * app belongs to; Google excludes Chat app memberships, including this app's.
- * Google Group memberships are not users and are omitted.
- */
+// Google excludes app memberships; group memberships are not users and are omitted.
 export let chatListChannelMembers = contract
   .implement(spec)
   .scopes(googleChatAppScopes)

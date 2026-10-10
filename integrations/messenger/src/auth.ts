@@ -23,7 +23,7 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Facebook OAuth',
     key: 'facebook_oauth',
-    // Yields a Page access token plus its Page id, so it can act as the Page.
+    // Yields a Page access token plus its Page id.
     adapters: ['chat'],
 
     scopes: [
@@ -192,7 +192,7 @@ export let auth = SlateAuth.create()
     type: 'auth.token',
     name: 'Page Access Token',
     key: 'page_access_token',
-    // A Page access token acts as the Page; the Page id comes from this input or config.
+    // The Page id comes from this input or config.
     adapters: ['chat'],
 
     inputSchema: z.object({

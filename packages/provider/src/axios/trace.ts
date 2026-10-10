@@ -563,9 +563,7 @@ let redactHashFragment = (hash: string, redactor?: AuthConfigSecretRedactor) => 
   return redacted ? `#${redacted}` : '';
 };
 
-// Some APIs carry a credential inside the path (Telegram's `/bot<token>/sendMessage`), so
-// auth-config values stored under a secret-like key are replaced wherever they appear.
-// Ids and regions from the auth output stay readable.
+// Redacts secret-keyed auth values embedded in URL paths (e.g. Telegram's `/bot<token>/...`).
 let isEmbeddedPathSecret = (secret: string, path: string) =>
   secret.length >= 8 && isSecretKeyName(path.split('.').pop() ?? '');
 

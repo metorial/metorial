@@ -8,17 +8,11 @@ export interface GoogleChatSendTarget {
   action: string;
   space: string;
   threadId?: string;
-  /** Message to reply to; its thread is used when no threadId is given. */
   replyToMessageId?: string;
   privateViewerUserId?: string;
 }
 
-/**
- * Creates a message as the Chat app with spaces.messages.create
- * (https://developers.google.com/workspace/chat/api/reference/rest/v1/spaces.messages/create).
- * Thread replies use `thread.name` with REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD;
- * private messages use `privateMessageViewer`, which cannot carry attachments.
- */
+// privateMessageViewer messages cannot carry attachments.
 export let createGoogleChatMessage = async (
   client: GoogleChatAppClient,
   body: ChatBody,

@@ -14,13 +14,7 @@ let SPACE_TYPE_FILTERS: Record<string, string> = {
   shared: 'spaceType = "SPACE"'
 };
 
-/**
- * spaces.list with app authentication lists the spaces the Chat app is a member
- * of. Pages use Google's page token; type and query filters are applied to each
- * returned page, so a page can be empty while nextCursor still continues. Space
- * access state is not returned with chat.bot, so named spaces usually map to
- * `unknown` (or `shared` when external users are allowed).
- */
+// Filters apply per page, so a page can be empty while nextCursor continues.
 export let chatListChannels = contract
   .implement(spec)
   .scopes(googleChatAppScopes)

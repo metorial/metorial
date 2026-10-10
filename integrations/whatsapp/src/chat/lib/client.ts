@@ -1,6 +1,7 @@
 import type { Buffer } from 'node:buffer';
-import { createAxios } from 'slates';
-import { whatsappGraphErrorMapping } from '../../lib/graphErrors';
+import { WhatsAppGraphApi } from '../../lib/graph';
+
+export { DEFAULT_WHATSAPP_API_VERSION } from '../../lib/graph';
 
 export interface WhatsAppPhoneNumberInfo {
   id?: string;
@@ -25,7 +26,6 @@ export interface WhatsAppMediaInfo {
   messaging_product?: string;
 }
 
-/** Recipient fields for the Messages API: phone number (`to`) or business-scoped user id (`recipient`). */
 export type WhatsAppRecipient = { to: string } | { recipient: string };
 
 export interface WhatsAppChatClientConfig {
@@ -34,31 +34,23 @@ export interface WhatsAppChatClientConfig {
   apiVersion?: string;
 }
 
-export let DEFAULT_WHATSAPP_API_VERSION = 'v21.0';
-
-/**
- * Minimal Cloud API client for the chat adapter. Errors keep the Graph API's
- * numeric error code as the upstream code so the chat boundary can classify them.
- */
+// Errors stay mapped Graph SlateErrors (numeric upstream code) for chat classification.
 export class WhatsAppChatClient {
   readonly phoneNumberId: string;
-  private axios: ReturnType<typeof createAxios>;
+  private graph: WhatsAppGraphApi;
 
   constructor(config: WhatsAppChatClientConfig) {
     this.phoneNumberId = config.phoneNumberId;
-    this.axios = createAxios({
-      baseURL: `https://graph.facebook.com/${config.apiVersion || DEFAULT_WHATSAPP_API_VERSION}`,
-      headers: { Authorization: `Bearer ${config.token}` },
-      errorMapping: whatsappGraphErrorMapping
-    });
+    this.graph = new WhatsAppGraphApi({ token: config.token, apiVersion: config.apiVersion });
   }
 
   // https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/phone-numbers#get-a-single-phone-number
   async getPhoneNumber(): Promise<WhatsAppPhoneNumberInfo> {
-    let response = await this.axios.get(`/${encodeURIComponent(this.phoneNumberId)}`, {
-      params: { fields: 'id,display_phone_number,verified_name,quality_rating' }
-    });
-    return response.data as WhatsAppPhoneNumberInfo;
+    return this.graph.request<WhatsAppPhoneNumberInfo>(
+      'GET',
+      `/${encodeURIComponent(this.phoneNumberId)}`,
+      { params: { fields: 'id,display_phone_number,verified_name,quality_rating' } }
+    );
   }
 
   // https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages
@@ -66,27 +58,27 @@ export class WhatsAppChatClient {
     recipient: WhatsAppRecipient,
     payload: Record<string, unknown>
   ): Promise<WhatsAppSendResponse> {
-    let response = await this.axios.post(
+    return this.graph.request<WhatsAppSendResponse>(
+      'POST',
       `/${encodeURIComponent(this.phoneNumberId)}/messages`,
       {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        ...recipient,
-        ...payload
-      },
-      { headers: { 'Content-Type': 'application/json' } }
+        body: {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          ...recipient,
+          ...payload
+        }
+      }
     );
-    return response.data as WhatsAppSendResponse;
   }
 
   // https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/mark-message-as-read
   async markRead(messageId: string): Promise<{ success?: boolean }> {
-    let response = await this.axios.post(
+    return this.graph.request<{ success?: boolean }>(
+      'POST',
       `/${encodeURIComponent(this.phoneNumberId)}/messages`,
-      { messaging_product: 'whatsapp', status: 'read', message_id: messageId },
-      { headers: { 'Content-Type': 'application/json' } }
+      { body: { messaging_product: 'whatsapp', status: 'read', message_id: messageId } }
     );
-    return response.data as { success?: boolean };
   }
 
   // https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media#upload-media
@@ -104,27 +96,27 @@ export class WhatsAppChatClient {
       input.filename
     );
 
-    let response = await this.axios.post(
+    return this.graph.request<{ id?: string }>(
+      'POST',
       `/${encodeURIComponent(this.phoneNumberId)}/media`,
-      form
+      { body: form }
     );
-    return response.data as { id?: string };
   }
 
   // https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media#get-media-url
   async getMedia(mediaId: string): Promise<WhatsAppMediaInfo> {
-    let response = await this.axios.get(`/${encodeURIComponent(mediaId)}`, {
+    return this.graph.request<WhatsAppMediaInfo>('GET', `/${encodeURIComponent(mediaId)}`, {
       params: { phone_number_id: this.phoneNumberId }
     });
-    return response.data as WhatsAppMediaInfo;
   }
 
   // https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media#delete-media
   async deleteMedia(mediaId: string): Promise<{ success?: boolean }> {
-    let response = await this.axios.delete(`/${encodeURIComponent(mediaId)}`, {
-      params: { phone_number_id: this.phoneNumberId }
-    });
-    return response.data as { success?: boolean };
+    return this.graph.request<{ success?: boolean }>(
+      'DELETE',
+      `/${encodeURIComponent(mediaId)}`,
+      { params: { phone_number_id: this.phoneNumberId } }
+    );
   }
 }
 

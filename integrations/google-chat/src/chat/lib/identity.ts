@@ -8,12 +8,7 @@ export interface GoogleChatAppAuth {
   projectNumber?: string;
 }
 
-/**
- * Google Chat has no workspace object that an app can read with `chat.bot`, so
- * the connected Chat app is modeled as one synthetic workspace. Its stable id is
- * derived from the service account's Google Cloud project ID, which every
- * Google-issued service account key carries.
- */
+// Chat has no app-readable workspace, so the app is one synthetic workspace keyed by project ID.
 export let getGoogleChatAppIdentity = (auth: GoogleChatAppAuth, action?: string) => {
   let projectId =
     auth.projectId?.trim() ||
@@ -47,11 +42,7 @@ export let mapGoogleChatWorkspace = (identity: GoogleChatAppIdentity): Workspace
   }
 });
 
-/**
- * `users/app` is the alias the Chat API uses for the calling Chat app (for
- * example `spaces/{space}/members/app`); the app's numeric user id is not
- * readable with app authentication.
- */
+// `users/app` is the API alias for the calling app; its numeric id is not readable.
 export let GOOGLE_CHAT_APP_USER_ID = 'users/app';
 
 export let mapGoogleChatAppAuthor = (identity: GoogleChatAppIdentity): Author => ({

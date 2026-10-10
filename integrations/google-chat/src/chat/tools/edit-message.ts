@@ -8,10 +8,7 @@ import { resolveMessageName } from '../lib/resources';
 import { buildGoogleChatMessageResult } from '../lib/results';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/**
- * spaces.messages.patch with updateMask=text. With app authentication Google
- * only allows updating messages created by the calling Chat app.
- */
+// App auth can only update messages the app created.
 export let chatEditMessage = contract
   .implement(spec)
   .scopes(googleChatAppScopes)

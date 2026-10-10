@@ -8,10 +8,7 @@ import { isGoogleChatMessageEvent, mapGoogleChatEventMessage } from '../lib/even
 import { getGoogleChatAppIdentity } from '../lib/identity';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/**
- * MESSAGE interaction events: direct messages to the app and space messages
- * that @mention it. Slash commands are delivered as chat.command.invoked only.
- */
+// Slash commands are delivered only as chat.command.invoked.
 export let chatMessageReceived = contract
   .implement(spec, googleChatInteractionEvents)
   .scopes(googleChatAppScopes)

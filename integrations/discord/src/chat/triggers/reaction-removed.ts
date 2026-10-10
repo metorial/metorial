@@ -6,8 +6,7 @@ import {
 } from '../../triggers/gateway';
 import { mapReactionEvent, reactionEventId } from '../lib/events';
 
-// The remove event carries only `user_id` (no member), so the actor has no name.
-// https://docs.discord.com/developers/events/gateway-events#message-reaction-remove
+// The remove event carries only `user_id`, so the actor has no name.
 export let chatReactionRemoved = contract
   .implement(spec, discordGatewayTriggerGroup)
   .authMethods(['bot_token'])

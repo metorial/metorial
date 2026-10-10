@@ -4,8 +4,7 @@ import { spec } from '../../spec';
 import { createTeamsBotClient } from '../lib/client';
 import { buildTeamsChannel, teamsBotUserId } from '../lib/ids';
 
-// Create conversation for a 1:1 chat; requires the user id and tenant id, and
-// the app must be installed for the user:
+// Needs user and tenant ids, and the app installed for the user.
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/send-proactive-messages#create-the-conversation
 export let chatOpenSingleDm = contract
   .implement(spec)

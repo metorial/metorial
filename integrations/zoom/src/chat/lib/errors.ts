@@ -1,21 +1,12 @@
-import { ServiceError } from '@lowerdeck/error';
 import {
-  ChatError,
   type ChatErrorCode,
-  type ChatErrorDetailsInput,
   type ChatErrorTargetType,
-  getChatErrorTargetType,
-  wrapChatError
+  chatErrorCodeForStatus,
+  createChatErrorMapper
 } from '@slates/adapter-chat';
 import { SlateError } from '@slates/provider';
 
-/**
- * Chatbot API error codes from the official OpenAPI description
- * (https://developers.zoom.us/api-hub/chatbot/methods/endpoints.json):
- * 7001 invalid body, 7002 invalid robot_jid, 7003 no chatbot for robot_jid,
- * 7004 not authorized / no channel or user for to_jid, 7010 bad Authorization,
- * 8001 invalid message_id.
- */
+// https://developers.zoom.us/api-hub/chatbot/methods/endpoints.json
 let ZOOM_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
   '7001': 'chat.input.invalid',
   '7002': 'chat.auth.invalid',
@@ -25,24 +16,14 @@ let ZOOM_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
   '8001': 'chat.message.not_found'
 };
 
-let SLATE_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
-  'upstream.rate_limited': 'chat.rate_limit.exceeded',
-  'upstream.timeout': 'chat.provider.timeout',
-  'upstream.network_error': 'chat.provider.network_error',
-  'upstream.unavailable': 'chat.provider.unavailable',
-  'upstream.invalid_request': 'chat.input.invalid',
-  'auth.invalid': 'chat.auth.invalid',
-  'auth.expired': 'chat.auth.expired',
-  'auth.required': 'chat.auth.invalid',
-  'permission.denied': 'chat.access.forbidden'
-};
-
 export interface ZoomChatErrorContext {
   action?: string;
   channelId?: string;
   messageId?: string;
   userId?: string;
   workspaceId?: string;
+  /** Classification for an HTTP 404 without a known Zoom code. */
+  notFound?: ChatErrorCode;
 }
 
 let TARGET_FIELDS: Partial<Record<ChatErrorTargetType, keyof ZoomChatErrorContext>> = {
@@ -53,59 +34,20 @@ let TARGET_FIELDS: Partial<Record<ChatErrorTargetType, keyof ZoomChatErrorContex
   reaction: 'messageId'
 };
 
-let getZoomCode = (error: unknown): string | undefined => {
-  if (SlateError.is(error)) {
-    let code = error.data.upstream?.code;
-    if (typeof code === 'string' || typeof code === 'number') return String(code);
+let zoomChatErrors = createChatErrorMapper<ZoomChatErrorContext>({
+  targetFields: TARGET_FIELDS,
+  extraCodes: { 'upstream.invalid_request': 'chat.input.invalid' },
+  classify: (error, context, { code, status }) => {
+    // Only a real HTTP status; slates derives one from its code (timeouts become 504).
+    let httpStatus = SlateError.is(error) ? error.data.upstream?.status : status;
+    return {
+      code:
+        (code ? ZOOM_CHAT_ERROR_CODES[code] : undefined) ??
+        chatErrorCodeForStatus(httpStatus, context.notFound),
+      provider: code ? { code } : undefined
+    };
   }
+});
 
-  if (error instanceof ServiceError) {
-    let code = error.data.upstreamCode;
-    if (typeof code === 'string' || typeof code === 'number') return String(code);
-  }
-
-  return undefined;
-};
-
-let resolveCode = (error: unknown, zoomCode: string | undefined): ChatErrorCode => {
-  if (zoomCode) {
-    let mapped = ZOOM_CHAT_ERROR_CODES[zoomCode];
-    if (mapped) return mapped;
-  }
-
-  if (SlateError.is(error)) {
-    let mapped = SLATE_CHAT_ERROR_CODES[error.code];
-    if (mapped) return mapped;
-  }
-
-  return 'chat.provider.error';
-};
-
-export let mapZoomChatError = (error: unknown, context: ZoomChatErrorContext = {}) => {
-  if (ChatError.is(error)) return error;
-
-  let zoomCode = getZoomCode(error);
-  let code = resolveCode(error, zoomCode);
-  let entity = getChatErrorTargetType(code);
-  let field = entity ? TARGET_FIELDS[entity] : undefined;
-  let target = field ? context[field] : undefined;
-
-  let details: ChatErrorDetailsInput = {
-    action: context.action,
-    target: typeof target === 'string' ? target : undefined,
-    provider: zoomCode ? { code: zoomCode } : undefined
-  };
-
-  return wrapChatError(code, error, details);
-};
-
-export let withZoomChatErrors = async <T>(
-  context: ZoomChatErrorContext,
-  run: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw mapZoomChatError(error, context);
-  }
-};
+export let mapZoomChatError = zoomChatErrors.map;
+export let withZoomChatErrors = zoomChatErrors.withErrors;

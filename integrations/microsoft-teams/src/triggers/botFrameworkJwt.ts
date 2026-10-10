@@ -1,17 +1,21 @@
 import { createPublicKey, type JsonWebKey, verify } from 'node:crypto';
+import {
+  type ErrorRecord,
+  forbiddenError,
+  internalServerError,
+  ServiceError,
+  unauthorizedError
+} from '@lowerdeck/error';
 
-// Connector-to-bot authentication, public Azure cloud:
 // https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-authentication?view=azure-bot-service-4.0#authenticate-requests-from-the-bot-connector-service-to-your-bot
 export let BOT_CONNECTOR_OPENID_METADATA_URL =
   'https://login.botframework.com/v1/.well-known/openidconfiguration';
 export let BOT_CONNECTOR_ISSUER = 'https://api.botframework.com';
 // "Industry-standard clock-skew is 5 minutes."
 export let BOT_CONNECTOR_CLOCK_SKEW_SECONDS = 300;
-// "All bot instances should refresh their local cache of the document at
-// least once every 24 hours."
+// Bot Framework requires refreshing the keys at least every 24 hours.
 let KEY_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-// Unknown key ids trigger an early refresh, rate limited so forged tokens with
-// random kids cannot force a metadata fetch per request.
+// Rate-limits unknown-kid refreshes so forged tokens can't force a fetch per request.
 let UNKNOWN_KID_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export type BotConnectorJwtFailure =
@@ -27,20 +31,20 @@ export type BotConnectorJwtFailure =
   | 'service_url_mismatch'
   | 'endorsement_missing';
 
-export class BotConnectorJwtError extends Error {
+export class BotConnectorJwtError extends ServiceError<ErrorRecord<any, any>> {
   constructor(
     readonly failure: BotConnectorJwtFailure,
     message: string
   ) {
-    super(message);
+    let record = failure === 'endorsement_missing' ? forbiddenError : unauthorizedError;
+    super(record({ message, reason: failure }));
     this.name = 'BotConnectorJwtError';
   }
 }
 
-/** Raised when the public OpenID/JWKS documents cannot be fetched. */
-export class BotConnectorMetadataError extends Error {
+export class BotConnectorMetadataError extends ServiceError<ErrorRecord<any, any>> {
   constructor(message: string) {
-    super(message);
+    super(internalServerError({ message, reason: 'bot_connector_metadata_unavailable' }));
     this.name = 'BotConnectorMetadataError';
   }
 }
@@ -59,7 +63,6 @@ interface KeyCache {
 let keyCache: KeyCache | null = null;
 let pendingKeyFetch: Promise<KeyCache> | null = null;
 
-/** Clears the process-local signing-key cache (public keys only). */
 export let resetBotConnectorKeyCache = () => {
   keyCache = null;
   pendingKeyFetch = null;
@@ -159,12 +162,7 @@ export interface VerifiedBotConnectorToken {
   endorsements?: string[];
 }
 
-/**
- * Verifies the Bot Connector bearer token (signature, issuer, audience,
- * validity window). Activity-dependent checks (serviceUrl claim, channel
- * endorsement) are done by `assertActivityMatchesToken` once the body is
- * parsed.
- */
+// Activity-dependent checks happen later in `assertActivityMatchesToken`.
 export let verifyBotConnectorToken = async (input: {
   authorization: string | null;
   appId: string;

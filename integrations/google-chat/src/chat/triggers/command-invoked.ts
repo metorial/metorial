@@ -14,12 +14,7 @@ import { getGoogleChatAppIdentity } from '../lib/identity';
 import type { GoogleChatMessageResource } from '../lib/mappers';
 import { googleChatAppAuthMethods, googleChatAppScopes } from '../lib/scopes';
 
-/**
- * Slash commands arrive as MESSAGE events with `message.slashCommand`; quick
- * commands and message actions arrive as APP_COMMAND events with
- * `appCommandMetadata` (https://developers.google.com/workspace/chat/commands).
- * Replies are sent asynchronously with chat.message.send.
- */
+// Slash commands arrive as MESSAGE, quick commands as APP_COMMAND: https://developers.google.com/workspace/chat/commands
 export let chatCommandInvoked = contract
   .implement(spec, googleChatInteractionEvents)
   .scopes(googleChatAppScopes)

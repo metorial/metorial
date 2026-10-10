@@ -201,11 +201,7 @@ let validateEmbeds = (embeds: DiscordEmbed[], action: string) => {
   }
 };
 
-/**
- * Renders a chat body to Discord message fields: markdown-like parts become `content`,
- * cards and standalone images become embeds. Over-limit content is rejected rather
- * than truncated.
- */
+// Cards and standalone images become embeds; over-limit content is rejected, not truncated.
 export let renderDiscordBody = (
   body: Pick<ChatBody, 'parts'>,
   action: string

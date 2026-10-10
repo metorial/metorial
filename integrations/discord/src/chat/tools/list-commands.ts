@@ -2,21 +2,7 @@ import { type CommandOptionDefinition, listCommands as contract } from '@slates/
 import { spec } from '../../spec';
 import { resolveApplicationId, runDiscordChatAction } from '../lib/context';
 import { decodeDiscordCursor, encodeDiscordCursor, offsetCursorSchema } from '../lib/cursors';
-
-// https://docs.discord.com/developers/interactions/application-commands#application-command-object-application-command-option-type
-let OPTION_TYPES: Record<number, NonNullable<CommandOptionDefinition['type']>> = {
-  1: 'subcommand',
-  2: 'subcommand_group',
-  3: 'string',
-  4: 'integer',
-  5: 'boolean',
-  6: 'user',
-  7: 'channel',
-  8: 'role',
-  9: 'mentionable',
-  10: 'number',
-  11: 'attachment'
-};
+import { DISCORD_COMMAND_OPTION_TYPES } from '../lib/interaction';
 
 interface RawOption {
   name: string;
@@ -30,16 +16,12 @@ interface RawOption {
 let mapOption = (option: RawOption): CommandOptionDefinition => ({
   name: option.name,
   description: option.description,
-  type: OPTION_TYPES[option.type] ?? 'unknown',
+  type: DISCORD_COMMAND_OPTION_TYPES[option.type] ?? 'unknown',
   required: option.required,
   choices: option.choices?.map(choice => ({ name: choice.name, value: String(choice.value) })),
   options: option.options?.map(mapOption)
 });
 
-/**
- * Global commands, or a server's commands when `workspaceId` is set.
- * https://docs.discord.com/developers/interactions/application-commands#get-global-application-commands
- */
 export let chatListCommands = contract
   .implement(spec)
   .authMethods(['bot_token'])

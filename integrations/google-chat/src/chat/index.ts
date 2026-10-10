@@ -17,13 +17,7 @@ import {
 } from './tools';
 import { chatCommandInvoked, chatMentionReceived, chatMessageReceived } from './triggers';
 
-/**
- * Actions available to a Google Chat app with `chat.bot` app authentication.
- * Omitted because Google requires user authentication or administrator-approved
- * `chat.app.*` scopes: message list/search, reactions, file upload, group DMs,
- * creating new DMs, and user lookup. Google Chat has no typing indicator, read
- * receipts for apps, thread listing, or command introspection API.
- */
+// Other actions need user auth or admin-approved chat.app.* scopes, or have no Google API.
 export let googleChatChatTools = [
   chatSendMessage,
   chatEditMessage,

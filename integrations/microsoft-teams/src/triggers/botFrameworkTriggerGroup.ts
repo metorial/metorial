@@ -1,6 +1,6 @@
 import { skipWebhook, triggerGroup } from 'slates';
 import { z } from 'zod';
-import { normalizeAppId } from '../lib/botFramework';
+import { GUID_PATTERN, normalizeAppId } from '../lib/botFramework';
 import {
   buildTeamsBotActivityRoutingMatchers,
   buildTeamsBotConnectionRoutingMatchers
@@ -12,8 +12,6 @@ import {
   BotConnectorMetadataError,
   verifyBotConnectorToken
 } from './botFrameworkJwt';
-
-let GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 let webhookConfigSchema = z.object({
   microsoftAppId: z
@@ -54,31 +52,22 @@ let activityEnvelopeSchema = z
 export type TeamsActivity = z.infer<typeof activityEnvelopeSchema> & Record<string, any>;
 export type TeamsChannelAccount = z.infer<typeof channelAccountSchema>;
 
-export type TeamsActivityEventKind =
-  | 'message'
-  | 'message_update'
-  | 'message_delete'
-  | 'reaction_added'
-  | 'reaction_removed'
-  | 'member_added'
-  | 'member_removed';
+// One payload per activity, member, or reaction, so each trigger maps one change.
+let activityEventKindSchema = z.enum([
+  'message',
+  'message_update',
+  'message_delete',
+  'reaction_added',
+  'reaction_removed',
+  'member_added',
+  'member_removed'
+]);
 
-/**
- * Normalized payload emitted per activity, or per member / reaction for
- * activities that carry several of them, so each trigger maps exactly one
- * provider change.
- */
+export type TeamsActivityEventKind = z.infer<typeof activityEventKindSchema>;
+
 export let teamsActivityEventSchema = z
   .object({
-    kind: z.enum([
-      'message',
-      'message_update',
-      'message_delete',
-      'reaction_added',
-      'reaction_removed',
-      'member_added',
-      'member_removed'
-    ]),
+    kind: activityEventKindSchema,
     activity: z.object({ type: z.string() }).loose(),
     member: channelAccountSchema.optional(),
     reaction: z.object({ type: z.string() }).loose().optional()
@@ -222,8 +211,7 @@ export let teamsBotTriggerGroup = triggerGroup(spec, {
         });
       } catch (error) {
         if (error instanceof BotConnectorMetadataError) {
-          // Not skipped: a 5xx lets the Bot Connector retry once the public
-          // signing keys are reachable again.
+          // A 5xx makes the Bot Connector retry once the keys are reachable.
           ctx.warn({ message: 'Teams bot activity: signing keys unavailable' });
           return {
             events: [],
@@ -280,8 +268,7 @@ export let teamsBotTriggerGroup = triggerGroup(spec, {
         throw error;
       }
 
-      // Bot ids in Teams are `28:<MicrosoftAppId>`; a different bot id means
-      // the activity was addressed to another bot.
+      // Bot ids are `28:<appId>`; any other id means another bot.
       let recipientId = activity.recipient?.id?.toLowerCase();
       if (recipientId?.startsWith('28:') && recipientId !== `28:${appId}`) {
         ctx.warn({ message: 'Rejected Teams bot activity: recipient is not this bot' });

@@ -6,9 +6,7 @@ import {
   tablePartToAltText
 } from '@slates/adapter-chat';
 
-// By default Teams renders only Markdown bold, italic, and hyperlinks in bot
-// messages (`textFormat: markdown`). Tables, charts, and images are therefore
-// rendered as plain-text tables and links rather than dropped:
+// Teams renders only bold, italic and links, so tables/charts/images become text.
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/format-your-bot-messages#default-formatting-features
 
 let escapeLinkLabel = (value: string) => value.replace(/([[\]])/g, '\\$1');

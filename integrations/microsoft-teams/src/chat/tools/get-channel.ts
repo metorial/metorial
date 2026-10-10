@@ -4,13 +4,7 @@ import { spec } from '../../spec';
 import { requireTeamsBotIdentity } from '../lib/client';
 import { buildTeamsChannel, classifyConversation } from '../lib/ids';
 
-/**
- * Documented fallback: the Bot Connector has no "get conversation" operation
- * for Teams, so the channel is derived from the conversation id format
- * (personal `a:`, group chat `@thread.v2`, channel `@thread.tacv2`). Names,
- * topics, and channel visibility are not fabricated.
- * https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-api-reference?view=azure-bot-service-4.0#conversation-operations
- */
+// No "get conversation" API for Teams; the channel is derived from the id format.
 export let chatGetChannel = contract
   .implement(spec)
   .authMethods([BOT_FRAMEWORK_AUTH_METHOD_KEY])
@@ -24,13 +18,14 @@ export let chatGetChannel = contract
         message: 'The id is not a Microsoft Teams conversation id.'
       });
     }
+    let raw = { conversationId: ctx.input.channelId, derivedFromId: true };
     let channel = buildTeamsChannel({
       conversationId: ctx.input.channelId,
       appId: identity.appId,
-      raw: { conversationId: ctx.input.channelId, derivedFromId: true }
+      raw
     });
     return {
-      output: { channel, raw: { conversationId: ctx.input.channelId, derivedFromId: true } },
+      output: { channel, raw },
       message: `Resolved Teams conversation \`${channel.id}\`.`
     };
   })

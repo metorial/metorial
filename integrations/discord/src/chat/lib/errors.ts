@@ -1,13 +1,10 @@
-import { ServiceError } from '@lowerdeck/error';
 import {
-  ChatError,
   type ChatErrorCode,
-  type ChatErrorDetailsInput,
   type ChatErrorTargetType,
-  getChatErrorTargetType,
-  wrapChatError
+  type ChatErrorUpstream,
+  chatErrorCodeForStatus,
+  createChatErrorMapper
 } from '@slates/adapter-chat';
-import { SlateError } from '@slates/provider';
 
 // https://docs.discord.com/developers/topics/opcodes-and-status-codes#json-json-error-codes
 let DISCORD_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
@@ -39,17 +36,6 @@ let DISCORD_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
   '160002': 'chat.access.forbidden'
 };
 
-let SLATE_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
-  'upstream.rate_limited': 'chat.rate_limit.exceeded',
-  'upstream.timeout': 'chat.provider.timeout',
-  'upstream.network_error': 'chat.provider.network_error',
-  'upstream.unavailable': 'chat.provider.unavailable',
-  'auth.invalid': 'chat.auth.invalid',
-  'auth.expired': 'chat.auth.expired',
-  'auth.required': 'chat.auth.invalid',
-  'permission.denied': 'chat.access.forbidden'
-};
-
 export interface DiscordChatErrorContext {
   action?: string;
   channelId?: string;
@@ -78,36 +64,10 @@ let TARGET_FIELDS: Record<ChatErrorTargetType, keyof DiscordChatErrorContext> = 
   command: 'command'
 };
 
-let readUpstream = (error: unknown) => {
-  if (SlateError.is(error)) {
-    let upstream = error.data.upstream;
-    let retryAfterMs = error.data.baggage?.retryAfterMs;
-    return {
-      code: typeof upstream?.code === 'string' ? upstream.code : undefined,
-      status: upstream?.status ?? error.data.status,
-      retryAfterMs: typeof retryAfterMs === 'number' ? retryAfterMs : undefined,
-      message: error.message
-    };
-  }
-
-  if (error instanceof ServiceError) {
-    let status = error.data.upstreamStatus;
-    return {
-      code: undefined,
-      status: typeof status === 'number' ? status : undefined,
-      retryAfterMs: undefined,
-      message: error.message
-    };
-  }
-
-  return { code: undefined, status: undefined, retryAfterMs: undefined, message: undefined };
-};
-
 let resolveCode = (
-  error: unknown,
-  upstream: ReturnType<typeof readUpstream>,
+  upstream: ChatErrorUpstream,
   context: DiscordChatErrorContext
-): ChatErrorCode => {
+): ChatErrorCode | undefined => {
   if (upstream.code) {
     let ambiguous = context.ambiguous?.[upstream.code];
     if (ambiguous) return ambiguous;
@@ -116,68 +76,21 @@ let resolveCode = (
     if (mapped && mapped !== 'chat.provider.error') return mapped;
   }
 
-  switch (upstream.status) {
-    case 401:
-      return 'chat.auth.invalid';
-    case 403:
-      return 'chat.access.forbidden';
-    case 404:
-      return context.notFound ?? 'chat.provider.error';
-    case 413:
-      return 'chat.attachment.too_large';
-    case 429:
-      return 'chat.rate_limit.exceeded';
-  }
-
-  if (upstream.status !== undefined && upstream.status >= 500) {
-    return 'chat.provider.unavailable';
-  }
-
-  if (SlateError.is(error)) {
-    let mapped = SLATE_CHAT_ERROR_CODES[error.code];
-    if (mapped) return mapped;
-  }
-
-  return 'chat.provider.error';
+  if (upstream.status === 404) return context.notFound ?? 'chat.provider.error';
+  if (upstream.status === 413) return 'chat.attachment.too_large';
+  return chatErrorCodeForStatus(upstream.status);
 };
 
-let resolveTarget = (code: ChatErrorCode, context: DiscordChatErrorContext) => {
-  let entity = getChatErrorTargetType(code);
-  if (!entity) return undefined;
-
-  let id = context[TARGET_FIELDS[entity]];
-  return typeof id === 'string' ? id : undefined;
-};
-
-export let mapDiscordChatError = (error: unknown, context: DiscordChatErrorContext = {}) => {
-  if (ChatError.is(error)) return error;
-
-  let upstream = readUpstream(error);
-  let code = resolveCode(error, upstream, context);
-
-  let details: ChatErrorDetailsInput = {
-    action: context.action,
-    target: resolveTarget(code, context),
+let discordChatErrors = createChatErrorMapper<DiscordChatErrorContext>({
+  targetFields: TARGET_FIELDS,
+  classify: (_error, context, upstream) => ({
+    code: resolveCode(upstream, context),
     provider:
       upstream.code || upstream.message
         ? { code: upstream.code, message: upstream.message }
         : undefined
-  };
+  })
+});
 
-  if (code === 'chat.rate_limit.exceeded' && upstream.retryAfterMs !== undefined) {
-    details.retryAfterMs = upstream.retryAfterMs;
-  }
-
-  return wrapChatError(code, error, details);
-};
-
-export let withDiscordChatErrors = async <T>(
-  context: DiscordChatErrorContext,
-  run: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw mapDiscordChatError(error, context);
-  }
-};
+export let mapDiscordChatError = discordChatErrors.map;
+export let withDiscordChatErrors = discordChatErrors.withErrors;

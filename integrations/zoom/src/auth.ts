@@ -592,8 +592,7 @@ export let auth = SlateAuth.create()
       output: await exchangeChatbotToken(ctx.input)
     }),
 
-    // The chatbot token only carries the imchat:bot scope, which has no profile
-    // endpoint; the bot identity is the configured Bot JID and account.
+    // imchat:bot has no profile endpoint; the identity is the configured Bot JID and account.
     getProfile: async (ctx: {
       output: { botJid?: string; accountId?: string };
       input: ZoomChatbotAuthInput;

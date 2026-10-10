@@ -1,9 +1,4 @@
-/**
- * Routing identity shared by the webhook `process` handler (built from the
- * signed delivery's `entry[].id`) and the trigger group's `routingMatchers`
- * (built from the connection's Page). Keeping both sides on one helper keeps
- * field names and value normalization identical.
- */
+// Shared by `process` and `routingMatchers` so both sides normalize identically.
 export interface MessengerPageRoutingMatcher {
   object: 'page';
   pageId: string;

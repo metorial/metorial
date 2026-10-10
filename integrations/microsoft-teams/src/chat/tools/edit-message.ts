@@ -6,7 +6,7 @@ import { buildTeamsChannel } from '../lib/ids';
 import { mapSentMessage } from '../lib/mappers';
 import { renderTeamsMarkdown } from '../lib/render';
 
-// Update activity (bots can edit only their own messages):
+// Bots can edit only their own messages.
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/build-conversational-capability#update-messages
 export let chatEditMessage = contract
   .implement(spec)
@@ -29,8 +29,7 @@ export let chatEditMessage = contract
       conversationId: ctx.input.channelId,
       appId: identity.appId
     });
-    // Teams does not return the edited message; the timestamps record when
-    // this edit was accepted.
+    // Teams doesn't return the edited message.
     let message = mapSentMessage({
       id: ctx.input.messageId,
       channelId: channel.id,

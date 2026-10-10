@@ -32,8 +32,7 @@ export let chatSendMessage = contract
       input.reply?.reference?.threadId ??
       input.reply?.reference?.id ??
       input.reply?.id;
-    // Inbound chatbot messages carry no Zoom message ID, so a reply to one is sent unthreaded
-    // into the same conversation. https://developers.zoom.us/docs/chat/capabilities/#slash-commands
+    // Inbound messages have no Zoom message ID, so replies to them are sent unthreaded.
     let replyTo = isZoomNotificationMessageId(target) ? undefined : target;
 
     let rendered = renderZoomBody(input, action);
@@ -60,7 +59,6 @@ export let chatSendMessage = contract
         let message = mapZoomSentMessage({
           messageId: raw.message_id,
           channelId,
-          accountId: client.accountId,
           botJid: client.botJid,
           body: { parts: input.parts, altText: input.altText },
           sentAt: parseZoomSentTime(raw.sent_time) ?? new Date().toISOString(),

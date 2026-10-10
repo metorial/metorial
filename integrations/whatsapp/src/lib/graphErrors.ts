@@ -1,14 +1,6 @@
-import type { SlateAxiosErrorOptions } from 'slates';
+import { buildApiServiceError, type SlateAxiosErrorOptions, SlateError } from 'slates';
 
-/**
- * Graph API error body used by the WhatsApp Cloud API:
- * `{ error: { message, type, code, error_data: { details }, fbtrace_id } }`.
- * https://developers.facebook.com/documentation/business-messaging/whatsapp/support/error-codes
- *
- * The numeric `code` is the documented classification, so it is preserved as the
- * upstream code (the default axios inference only keeps string codes and would
- * otherwise record `OAuthException` from `type`).
- */
+// Keep the numeric Graph `code` as upstream code; axios inference keeps only string codes.
 export let whatsappGraphErrorMapping: SlateAxiosErrorOptions = {
   mapAxiosError: error => {
     let data = error.response?.data as { error?: unknown } | undefined;
@@ -45,3 +37,16 @@ export let whatsappGraphErrorMapping: SlateAxiosErrorOptions = {
     };
   }
 };
+
+export let getWhatsAppGraphErrorCode = (error: unknown) => {
+  let code = SlateError.is(error) ? error.data.upstream?.code : undefined;
+  return typeof code === 'string' && code ? code : undefined;
+};
+
+export let toWhatsAppServiceError = (error: unknown, operation: string) =>
+  buildApiServiceError(error, {
+    providerLabel: 'WhatsApp',
+    reason: 'whatsapp_api_error',
+    operation,
+    extractUpstreamCode: getWhatsAppGraphErrorCode
+  });

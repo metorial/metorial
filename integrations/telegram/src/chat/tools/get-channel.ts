@@ -13,13 +13,10 @@ export let chatGetChannel = contract
       let bot = await resolveTelegramBot(client, ctx.auth);
       let chat = await client.getChat(ctx.input.channelId);
 
-      // Member count is display metadata; a failure here must not fail the lookup.
-      let memberCount: number | undefined;
-      try {
-        memberCount = await client.getChatMemberCount(ctx.input.channelId);
-      } catch {
-        memberCount = undefined;
-      }
+      // Best-effort display metadata.
+      let memberCount = await client
+        .getChatMemberCount(ctx.input.channelId)
+        .catch(() => undefined);
 
       let channel = mapTelegramChat(chat, bot.id, { memberCount });
       return {

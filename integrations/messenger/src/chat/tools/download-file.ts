@@ -62,8 +62,7 @@ export let chatDownloadFile = contract
     let reference = parsed.data;
     let client = createMessengerChatClient(ctx, action);
 
-    // Attachment URLs in webhook payloads are signed CDN links that can expire, so
-    // a fresh URL is resolved from the message when its id is known.
+    // Webhook CDN URLs expire, so a fresh one is resolved from the message when possible.
     let resolved: MessengerMessageAttachment | undefined;
     let lookupError: unknown;
     if (reference.messageId) {
@@ -72,7 +71,7 @@ export let chatDownloadFile = contract
         resolved = pickAttachment(attachments, reference);
       } catch (error) {
         // Only a missing message falls back to the webhook URL; other failures surface.
-        if (!(error instanceof ChatError && error.code.endsWith('.not_found'))) throw error;
+        if (!(ChatError.is(error) && error.chat.code.endsWith('.not_found'))) throw error;
         lookupError = error;
       }
     }

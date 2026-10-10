@@ -48,7 +48,6 @@ export let messengerChatAdapter = ChatAdapter.register({
   tools: messengerChatTools,
   triggers: messengerChatTriggers,
   capabilities: {
-    // Send API `reply_to.mid` quotes a specific message.
     message_reply: true,
     // Messenger renders plain text; markdown, tables, and fields are flattened.
     content_markdown: false,
@@ -75,7 +74,6 @@ export let messengerChatAdapter = ChatAdapter.register({
     channel_forum: false,
     thread_posts: false,
     thread_subject: false,
-    // `typing_on` applies to the whole one-to-one conversation.
     typing_without_thread: true,
     resource_context: false,
     command_freeform: false,

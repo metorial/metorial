@@ -10,7 +10,12 @@ export let chatDeleteMessage = contract
   .handleInvocation(async ctx => {
     let action = contract.key;
     return withZoomChatErrors(
-      { action, channelId: ctx.input.channelId, messageId: ctx.input.messageId },
+      {
+        action,
+        channelId: ctx.input.channelId,
+        messageId: ctx.input.messageId,
+        notFound: 'chat.message.not_found'
+      },
       async () => {
         let client = new ZoomChatbotClient(ctx.auth, action);
         // The chatbot delete endpoint is addressed by message ID; channelId is not sent.

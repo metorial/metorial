@@ -4,11 +4,7 @@ import { createMessengerChatClient } from '../lib/client';
 import { resolveMessengerChannel } from '../lib/mappers';
 import { assertMessengerPsid } from '../lib/validation';
 
-/**
- * Documented fallback: Messenger has no channel lookup by PSID, so the DM channel
- * is derived from the PSID and enriched with the person's profile when the Page
- * is allowed to read it.
- */
+// Messenger has no channel lookup, so the DM channel is derived from the PSID.
 export let chatGetChannel = contract
   .implement(spec)
   .handleInvocation(async ctx => {

@@ -28,10 +28,8 @@ export let zoomChatAdapter = ChatAdapter.register({
   tools: zoomChatTools,
   triggers: zoomChatTriggers,
   capabilities: {
-    // `reply_to` threads a chatbot message under a parent message.
     message_reply: true,
     thread_posts: true,
-    // `is_markdown_support` plus message card text, fields, and sections.
     content_markdown: true,
     content_images: true,
     content_fields: true,

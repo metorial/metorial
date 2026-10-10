@@ -10,17 +10,9 @@ import type {
 import type { WhatsAppContact, WhatsAppMessageEvent } from '../../triggers/event-schemas';
 import type { WhatsAppPhoneNumberInfo, WhatsAppRecipient } from './client';
 
-/**
- * Identity model:
- * - one synthetic workspace per connection = the configured business phone number
- *   (id = phone number ID);
- * - one `dm` channel per customer, keyed by the customer's WhatsApp ID (`wa_id`),
- *   or by the business-scoped user ID when Meta omits the phone number for a user
- *   with a WhatsApp username.
- * https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
- */
+// One workspace per business phone number; one dm channel per customer (wa_id or BSUID).
 
-// BSUIDs: ISO country code, a period, optional `ENT.` (parent BSUID), then alphanumerics.
+// BSUID format: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
 let BSUID_PATTERN = /^[A-Z]{2}\.(?:ENT\.)?[A-Za-z0-9]{1,128}$/;
 let PHONE_PATTERN = /^\+?[0-9]{5,20}$/;
 
@@ -101,7 +93,7 @@ export let mapWhatsAppChannel = (input: {
   };
 };
 
-/** The conversation key for an inbound message: phone-based WhatsApp ID first, then BSUID. */
+// Phone-based WhatsApp ID first, then BSUID.
 export let getWhatsAppSenderChannelId = (
   event: Pick<WhatsAppMessageEvent, 'message' | 'contact'>
 ) =>
@@ -130,8 +122,7 @@ let MEDIA_ATTACHMENT_TYPES: Record<MediaKind, AttachmentRef['type']> = {
 
 export let mapWhatsAppMediaAttachment = (
   kind: MediaKind,
-  media: Record<string, any>,
-  extra: Partial<AttachmentRef> = {}
+  media: Record<string, any>
 ): AttachmentRef => {
   let mediaId = typeof media.id === 'string' ? media.id : undefined;
   let { url: _url, ...raw } = media;
@@ -142,8 +133,7 @@ export let mapWhatsAppMediaAttachment = (
     mimeType: typeof media.mime_type === 'string' ? media.mime_type : undefined,
     providerFileReference: mediaId ? { mediaId } : undefined,
     status: 'complete',
-    raw: { ...raw, kind },
-    ...extra
+    raw: { ...raw, kind }
   };
 };
 
@@ -225,7 +215,6 @@ let mapOrderParts = (order: Record<string, any> | undefined): ChatPart[] => {
   return parts.length > 0 ? parts : [WHATSAPP_EMPTY_TEXT_PART];
 };
 
-/** Normalized body for a supported inbound message type. */
 export let mapWhatsAppInboundBody = (message: Record<string, any>): ChatBody => {
   switch (message.type) {
     case 'text':

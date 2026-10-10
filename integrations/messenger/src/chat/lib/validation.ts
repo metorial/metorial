@@ -1,7 +1,7 @@
 import { ChatErrors } from '@slates/adapter-chat';
 import type { MessengerChatClient } from './client';
 
-/** Channel ids are Page-scoped user ids (PSIDs); the Page itself is not a conversation. */
+// The Page itself is not a conversation.
 export let assertMessengerPsid = (
   client: MessengerChatClient,
   channelId: string,

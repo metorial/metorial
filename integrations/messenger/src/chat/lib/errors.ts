@@ -1,19 +1,12 @@
 import { ServiceError } from '@lowerdeck/error';
 import {
-  ChatError,
   type ChatErrorCode,
-  type ChatErrorDetailsInput,
   type ChatErrorTargetType,
-  getChatErrorTargetType,
-  wrapChatError
+  createChatErrorMapper
 } from '@slates/adapter-chat';
 import { SlateError } from '@slates/provider';
 
-/**
- * Graph API error classification for the Messenger Send, User Profile, and Page
- * endpoints. Codes and subcodes come from
- * https://developers.facebook.com/docs/messenger-platform/reference/send-api/error-codes
- */
+// https://developers.facebook.com/docs/messenger-platform/reference/send-api/error-codes
 
 export interface MessengerGraphError {
   code?: number;
@@ -29,7 +22,7 @@ export interface MessengerChatErrorContext {
   userId?: string;
   workspaceId?: string;
   attachmentId?: string;
-  /** Chat code to use when Graph reports an unknown object/recipient (code 100). */
+  // Chat code for Graph code 100 (unknown object/recipient).
   notFound?: ChatErrorCode;
 }
 
@@ -57,7 +50,6 @@ let readGraphErrorBody = (data: unknown): MessengerGraphError | undefined => {
   };
 };
 
-/** Reads the Graph `error` object from an axios error or a normalized SlateError. */
 export let getMessengerGraphError = (error: unknown): MessengerGraphError | undefined => {
   if (!isRecord(error)) return undefined;
 
@@ -83,12 +75,7 @@ export let getMessengerGraphError = (error: unknown): MessengerGraphError | unde
   return undefined;
 };
 
-/**
- * Reading the Page (`GET /{page-id}`) needs `pages_read_engagement`, but a token
- * generated in the Messenger dashboard carries only `pages_messaging`. Graph refuses
- * that read with code 100 (no subcode) naming the permission, or with a permission
- * code (10, 200-299). An unknown Page id is 100/33 and is not matched here.
- */
+// Messaging-only tokens lack pages_read_engagement; an unknown Page id (100/33) is not matched.
 export let isMessengerPagePermissionError = (error: unknown) => {
   let graph = getMessengerGraphError(error);
   if (graph?.code === undefined) return false;
@@ -98,17 +85,6 @@ export let isMessengerPagePermissionError = (error: unknown) => {
     graph.subcode === undefined &&
     /pages_read_engagement/i.test(graph.message ?? '')
   );
-};
-
-let SLATE_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
-  'upstream.rate_limited': 'chat.rate_limit.exceeded',
-  'upstream.timeout': 'chat.provider.timeout',
-  'upstream.network_error': 'chat.provider.network_error',
-  'upstream.unavailable': 'chat.provider.unavailable',
-  'auth.invalid': 'chat.auth.invalid',
-  'auth.expired': 'chat.auth.expired',
-  'auth.required': 'chat.auth.invalid',
-  'permission.denied': 'chat.access.forbidden'
 };
 
 let resolveGraphCode = (
@@ -183,53 +159,25 @@ let TARGET_FIELDS: Partial<Record<ChatErrorTargetType, keyof MessengerChatErrorC
   reaction: 'messageId'
 };
 
-let resolveTarget = (code: ChatErrorCode, context: MessengerChatErrorContext) => {
-  let entity = getChatErrorTargetType(code);
-  if (!entity) return undefined;
-  let field = TARGET_FIELDS[entity];
-  if (!field) return undefined;
-  let id = context[field];
-  return typeof id === 'string' ? id : undefined;
-};
-
-export let mapMessengerChatError = (
-  error: unknown,
-  context: MessengerChatErrorContext = {}
-): ChatError => {
-  if (ChatError.is(error)) return error;
-
-  let graph = getMessengerGraphError(error);
-  let resolved = graph ? resolveGraphCode(graph, context) : undefined;
-  let code: ChatErrorCode =
-    resolved?.code ??
-    (SlateError.is(error) ? SLATE_CHAT_ERROR_CODES[error.code] : undefined) ??
-    'chat.provider.error';
-
-  let providerCode =
-    graph?.code !== undefined
-      ? `${graph.code}${graph.subcode !== undefined ? `/${graph.subcode}` : ''}`
-      : undefined;
-
-  let details: ChatErrorDetailsInput = {
-    action: context.action,
-    target: resolveTarget(code, context),
-    message: resolved?.message,
-    provider:
-      providerCode || graph?.message
-        ? { code: providerCode, message: graph?.message }
-        : undefined
-  };
-
-  return wrapChatError(code, error, details);
-};
-
-export let withMessengerChatErrors = async <T>(
-  context: MessengerChatErrorContext,
-  run: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await run();
-  } catch (error) {
-    throw mapMessengerChatError(error, context);
+let messengerChatErrors = createChatErrorMapper<MessengerChatErrorContext>({
+  targetFields: TARGET_FIELDS,
+  classify: (error, context) => {
+    let graph = getMessengerGraphError(error);
+    let resolved = graph ? resolveGraphCode(graph, context) : undefined;
+    let providerCode =
+      graph?.code !== undefined
+        ? `${graph.code}${graph.subcode !== undefined ? `/${graph.subcode}` : ''}`
+        : undefined;
+    return {
+      code: resolved?.code,
+      message: resolved?.message,
+      provider:
+        providerCode || graph?.message
+          ? { code: providerCode, message: graph?.message }
+          : undefined
+    };
   }
-};
+});
+
+export let mapMessengerChatError = messengerChatErrors.map;
+export let withMessengerChatErrors = messengerChatErrors.withErrors;

@@ -12,7 +12,7 @@ import {
 } from '../lib/routingMatcher';
 import { spec } from '../spec';
 
-/** Zoom does not document a replay window; this mirrors the common 5 minute tolerance. */
+// Zoom documents no replay window; this is the common 5 minute tolerance.
 export let ZOOM_WEBHOOK_MAX_AGE_SECONDS = 300;
 
 let webhookConfigSchema = z.object({
@@ -53,7 +53,6 @@ let botNotificationPayloadSchema = z
   })
   .loose();
 
-/** Event payload emitted to the chatbot triggers. */
 export let zoomChatbotEventSchema = z
   .object({
     event: z.string(),
@@ -73,10 +72,7 @@ let jsonResponse = (status: number, body?: unknown) => ({
 
 let normalizeCommand = (value: string) => value.trim().replace(/^\/+/, '');
 
-/**
- * Stable per-delivery identity for a `bot_notification`: Zoom's `triggerId`
- * when present, otherwise robot/destination/user plus the event timestamp.
- */
+// Zoom's `triggerId`, else robot/destination/user plus the event timestamp.
 export let getZoomBotNotificationKey = (
   payload: Record<string, unknown>,
   eventTs?: number

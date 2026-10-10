@@ -1,25 +1,18 @@
-import { ChatErrors, downloadFile as contract } from '@slates/adapter-chat';
-import { z } from 'zod';
+import {
+  attachmentTypeForMime,
+  ChatErrors,
+  downloadFile as contract
+} from '@slates/adapter-chat';
 import { BOT_FRAMEWORK_AUTH_METHOD_KEY, isTeamsServiceHost } from '../../lib/botFramework';
 import { spec } from '../../spec';
 import { requireTeamsBotIdentity } from '../lib/client';
+import { type TeamsFileReference, teamsFileReferenceSchema } from '../lib/mappers';
 
-// Files sent to the bot in personal chats carry a OneDrive `downloadUrl` that
-// can be fetched directly; inline media carries a Bot Connector `contentUrl`
-// that requires the bot token.
-// https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/bots-filesv4#receive-files-in-personal-chat
-// https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/bots-filesv4#fetch-inline-images-from-message
-let referenceSchema = z.object({
-  kind: z.enum(['download_info', 'content_url']),
-  url: z.string(),
-  name: z.string().optional(),
-  contentType: z.string().optional(),
-  uniqueId: z.string().optional()
-});
-
+// OneDrive downloadUrl needs no credential; Bot Connector contentUrl needs the bot token.
+// https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/bots-filesv4
 let SHAREPOINT_HOST_SUFFIXES = ['.sharepoint.com', '.sharepoint.us', '.sharepoint-mil.us'];
 
-let isAllowedHost = (hostname: string, kind: 'download_info' | 'content_url') => {
+let isAllowedHost = (hostname: string, kind: TeamsFileReference['kind']) => {
   let host = hostname.toLowerCase();
   if (kind === 'download_info') {
     return SHAREPOINT_HOST_SUFFIXES.some(suffix => host.endsWith(suffix));
@@ -28,19 +21,12 @@ let isAllowedHost = (hostname: string, kind: 'download_info' | 'content_url') =>
   return isTeamsServiceHost(host);
 };
 
-let attachmentType = (mimeType: string | undefined) => {
-  if (mimeType?.startsWith('image/')) return 'image' as const;
-  if (mimeType?.startsWith('video/')) return 'video' as const;
-  if (mimeType?.startsWith('audio/')) return 'audio' as const;
-  return 'file' as const;
-};
-
 export let chatDownloadFile = contract
   .implement(spec)
   .authMethods([BOT_FRAMEWORK_AUTH_METHOD_KEY])
   .handleInvocation(async ctx => {
     let action = contract.key;
-    let parsed = referenceSchema.safeParse(ctx.input.providerFileReference);
+    let parsed = teamsFileReferenceSchema.safeParse(ctx.input.providerFileReference);
     if (!parsed.success) {
       throw ChatErrors.inputInvalid({
         action,
@@ -87,7 +73,7 @@ export let chatDownloadFile = contract
     return {
       output: {
         attachment: {
-          type: attachmentType(reference.contentType),
+          type: attachmentTypeForMime(reference.contentType),
           ...(reference.uniqueId ? { id: reference.uniqueId } : {}),
           ...(reference.name ? { name: reference.name } : {}),
           ...(reference.contentType ? { mimeType: reference.contentType } : {}),

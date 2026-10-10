@@ -12,8 +12,11 @@ import {
 } from '../lib/routingMatcher';
 import { spec } from '../spec';
 import {
+  getMessengerEditEventId,
+  getMessengerReactionEventId,
   type MessengerEvent,
   type MessengerEventType,
+  type MessengerMessagingEvent,
   messengerEventSchema,
   messengerMessagingEventSchema,
   messengerWebhookEnvelopeSchema
@@ -60,36 +63,20 @@ let normalizeParticipantIds = (value: unknown): unknown => {
 };
 
 let classifyMessagingEvent = (
-  event: z.infer<typeof messengerMessagingEventSchema>
+  event: MessengerMessagingEvent
 ): { type: MessengerEventType; idempotencyKey: string } | { ignored: string } => {
   if (event.message) {
-    // Echoes are copies of messages the Page itself sent (including messages this
-    // integration sends). Dropping them here keeps the app from reacting to its
-    // own output.
+    // Echoes are the Page's own sends; dropping them prevents feedback loops.
     if (event.message.is_echo) return { ignored: 'echo' };
     return { type: 'message', idempotencyKey: `message:${event.message.mid}` };
   }
 
   if (event.message_edit) {
-    return {
-      type: 'message_edit',
-      idempotencyKey: `message_edit:${event.message_edit.mid}:${event.message_edit.num_edit ?? event.timestamp}`
-    };
+    return { type: 'message_edit', idempotencyKey: getMessengerEditEventId(event) };
   }
 
   if (event.reaction) {
-    let reaction = event.reaction;
-    return {
-      type: 'reaction',
-      idempotencyKey: [
-        'reaction',
-        reaction.mid,
-        event.sender.id,
-        reaction.action,
-        reaction.emoji ?? reaction.reaction ?? '',
-        event.timestamp
-      ].join(':')
-    };
+    return { type: 'reaction', idempotencyKey: getMessengerReactionEventId(event) };
   }
 
   if ('delivery' in event) return { ignored: 'delivery' };
@@ -188,8 +175,7 @@ export let messengerEventsTriggerGroup = triggerGroup(spec, {
         );
       }
 
-      // Meta signs the exact bytes it sends (an escaped-Unicode JSON body), so the
-      // HMAC is computed over the raw bytes, never a re-serialized object.
+      // Meta signs the exact escaped-Unicode bytes, so the HMAC uses the raw body.
       let signatureValid = verifyHmacSignature({
         secret: config.appSecret,
         payload: rawBody,
@@ -272,8 +258,6 @@ export let messengerEventsTriggerGroup = triggerGroup(spec, {
             continue;
           }
 
-          // Conversation events from a person are addressed to the Page that the
-          // entry belongs to; anything else is not routed.
           if (messaging.data.recipient.id !== pageId) {
             countIgnored('recipient_mismatch');
             continue;

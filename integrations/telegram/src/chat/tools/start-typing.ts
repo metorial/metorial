@@ -4,7 +4,6 @@ import { spec } from '../../spec';
 import { withTelegramChatErrors } from '../lib/errors';
 import { parseOptionalTelegramInteger } from '../lib/ids';
 
-// The typing status lasts up to five seconds or until the bot's next message.
 // https://core.telegram.org/bots/api#sendchataction
 export let chatStartTyping = contract
   .implement(spec)

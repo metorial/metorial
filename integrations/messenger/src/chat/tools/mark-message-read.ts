@@ -8,8 +8,7 @@ export let chatMarkMessageRead = contract
   .handleInvocation(async ctx => {
     let client = createMessengerChatClient(ctx, contract.key);
     assertMessengerPsid(client, ctx.input.channelId, contract.key);
-    // `mark_seen` marks the conversation as seen up to now; Messenger has no
-    // per-message read receipt, so messageId only identifies the caller's intent.
+    // `mark_seen` is conversation-wide; Messenger has no per-message read receipt.
     let raw = await client.senderAction({
       recipientId: ctx.input.channelId,
       action: 'mark_seen'

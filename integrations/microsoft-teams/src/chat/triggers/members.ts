@@ -11,8 +11,7 @@ import {
 import { asTeamsEvent, isTeamsEventKind, resolveEventAppId } from '../lib/events';
 import { mapActivityChannel, mapTeamsAuthor } from '../lib/mappers';
 
-// `conversationUpdate` with `membersAdded` / `membersRemoved`; one event per
-// member. The bot itself appears when it is installed or removed.
+// One event per member; the bot itself appears when installed or removed.
 // https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/subscribe-to-conversation-events#members-added
 let mapMember = (event: TeamsActivityEvent, auth: { appId?: string }) => {
   let { activity } = event;

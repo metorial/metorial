@@ -1,5 +1,9 @@
 import { type Emoji, parseEmoji } from '@slates/adapter-chat';
-import { isMessengerEventOfType, type MessengerEvent } from '../../triggers/event-schemas';
+import {
+  getMessengerReactionEventId,
+  isMessengerEventOfType,
+  type MessengerEvent
+} from '../../triggers/event-schemas';
 import { resolveMessengerEventParticipants } from './events';
 
 /** Reaction labels Messenger sends when it reports a reaction without its emoji. */
@@ -30,16 +34,8 @@ export let mapMessengerReactionEvent = async (
 ) => {
   let reaction = event.messaging.reaction!;
   let { author, channel } = await resolveMessengerEventParticipants(ctx, event, action);
-  let id = [
-    'reaction',
-    reaction.mid,
-    event.messaging.sender.id,
-    reaction.action,
-    reaction.emoji ?? reaction.reaction ?? '',
-    event.messaging.timestamp
-  ].join(':');
   return {
-    id,
+    id: getMessengerReactionEventId(event.messaging),
     messageId: reaction.mid,
     channelId: channel.id,
     emoji: mapMessengerReactionEmoji(reaction),

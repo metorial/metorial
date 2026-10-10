@@ -49,10 +49,7 @@ let tokenResponseSchema = z
   })
   .loose();
 
-/**
- * Only accept a Zoom-operated HTTPS API host from the token response, so a
- * tampered response cannot redirect bearer tokens to an arbitrary server.
- */
+// Only Zoom HTTPS API hosts, so a tampered response cannot redirect bearer tokens.
 let normalizeApiUrl = (value: string | undefined) => {
   if (!value) return ZOOM_DEFAULT_API_URL;
 
@@ -70,12 +67,7 @@ let normalizeApiUrl = (value: string | undefined) => {
   return ZOOM_DEFAULT_API_URL;
 };
 
-/**
- * Requests a chatbot token with the client credentials grant.
- * https://developers.zoom.us/docs/chat/installation-and-authentication/#request-chatbot-token
- * Chatbot tokens expire after one hour; a new token is requested the same way
- * (there is no separate refresh grant).
- */
+// Tokens last one hour and have no refresh grant; renewal repeats this request.
 export let exchangeChatbotToken = async (input: ZoomChatbotAuthInput) => {
   let credentials = btoa(`${input.clientId}:${input.clientSecret}`);
 

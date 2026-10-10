@@ -15,7 +15,12 @@ export let chatEditMessage = contract
     let rendered = renderZoomBody(input, action);
 
     return withZoomChatErrors(
-      { action, channelId: input.channelId, messageId: input.messageId },
+      {
+        action,
+        channelId: input.channelId,
+        messageId: input.messageId,
+        notFound: 'chat.message.not_found'
+      },
       async () => {
         let client = new ZoomChatbotClient(ctx.auth, action);
         let raw = await client.editMessage({
@@ -32,7 +37,6 @@ export let chatEditMessage = contract
             message: mapZoomSentMessage({
               messageId: raw.message_id || input.messageId,
               channelId,
-              accountId: client.accountId,
               botJid: client.botJid,
               body: { parts: input.parts, altText: input.altText },
               sentAt: parseZoomSentTime(raw.sent_time) ?? editedAt,

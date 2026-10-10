@@ -54,7 +54,6 @@ export let mapMessengerUserAuthor = (
   };
 };
 
-/** Each person's Messenger conversation with the Page is a DM channel keyed by PSID. */
 export let mapMessengerChannel = (pageId: string, recipient: Author): Channel => ({
   id: recipient.userId,
   workspaceId: pageId,
@@ -66,19 +65,10 @@ export let mapMessengerChannel = (pageId: string, recipient: Author): Channel =>
   raw: { psid: recipient.userId, pageId }
 });
 
-/** Best-effort profile lookup; enrichment never fails an event or a completed send. */
 export let tryGetUserProfile = async (client: MessengerChatClient, userId: string) => {
   try {
     let profile = await client.getUserProfile(userId);
     return profile && Object.keys(profile).length > 0 ? profile : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-export let tryGetPage = async (client: MessengerChatClient) => {
-  try {
-    return await client.getPage();
   } catch {
     return undefined;
   }
@@ -153,8 +143,7 @@ export let mapInboundMessage = (opts: {
   let parts: ChatPart[] = [];
   if (message.text) parts.push({ type: 'text', content: message.text });
   parts.push(...links);
-  // The shared body schema requires one part; attachment-only messages carry an
-  // empty text part (same convention as the Slack adapter) rather than invented text.
+  // Attachment-only messages carry an empty text part; the body schema requires one part.
   if (parts.length === 0) parts.push({ type: 'text', content: '' });
 
   return {
@@ -189,8 +178,7 @@ export let mapEditedMessage = (opts: {
       ...(edit.text ? { altText: edit.text } : {})
     },
     providerType: 'message',
-    // The edit event does not carry the original send time; the edit time is the
-    // only timestamp available.
+    // The edit event has no original send time.
     metadata: { sentAt: editedAt, edited: true, editedAt },
     raw: opts.event
   };
@@ -220,7 +208,6 @@ export let mapSentMessage = (opts: {
   raw: opts.raw
 });
 
-/** Resolves the connection's channel for a PSID, enriching the recipient when allowed. */
 export let resolveMessengerChannel = async (client: MessengerChatClient, psid: string) => {
   let profile = await tryGetUserProfile(client, psid);
   return mapMessengerChannel(client.pageId, mapMessengerUserAuthor(psid, profile));

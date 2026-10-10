@@ -1,7 +1,6 @@
 import {
-  ChatErrors,
   listCommands as contract,
-  decodeCursor,
+  decodeChatCursor,
   encodeCursor
 } from '@slates/adapter-chat';
 import { z } from 'zod';
@@ -14,15 +13,11 @@ let cursorDataSchema = z.object({ offset: z.number().int().nonnegative() });
 
 let readOffset = (cursor: string | undefined, action: string) => {
   if (!cursor) return 0;
-  try {
-    return decodeCursor(TELEGRAM_CHAT_PROVIDER, cursor, cursorDataSchema).data.offset;
-  } catch (error) {
-    throw ChatErrors.cursorInvalid({ action, cause: error });
-  }
+  return decodeChatCursor(TELEGRAM_CHAT_PROVIDER, cursor, cursorDataSchema, { action }).data
+    .offset;
 };
 
-// Lists the commands registered for the default scope and language (at most 100).
-// https://core.telegram.org/bots/api#getmycommands
+// Default scope and language only: https://core.telegram.org/bots/api#getmycommands
 export let chatListCommands = contract
   .implement(spec)
   .handleInvocation(async ctx => {

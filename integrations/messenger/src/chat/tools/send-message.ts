@@ -43,7 +43,7 @@ export let chatSendMessage = contract
     assertMessengerPsid(client, input.channelId, action);
 
     let text = renderMessengerText(input, action);
-    let replyToMessageId = input.reply?.id ?? input.reply?.reference?.id ?? undefined;
+    let replyToMessageId = input.reply?.id ?? input.reply?.reference?.id;
 
     let response = await client.sendText({
       recipientId: input.channelId,

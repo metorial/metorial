@@ -7,12 +7,7 @@ import type {
   Workspace
 } from '@slates/adapter-chat';
 
-/**
- * JID conventions documented at
- * https://developers.zoom.us/docs/chat/send-edit-and-delete-messages/#getting-to_jid-account_id-and-user_jid-values
- * - channel: `CHANNEL_ID@conference.xmpp.zoom.us`
- * - user:    `USER_ID@xmpp.zoom.us`
- */
+// https://developers.zoom.us/docs/chat/send-edit-and-delete-messages/#getting-to_jid-account_id-and-user_jid-values
 export type ZoomJidKind = 'channel' | 'user' | 'unknown';
 
 export let getZoomJidKind = (jid: string): ZoomJidKind => {
@@ -29,11 +24,6 @@ export let getZoomJidKind = (jid: string): ZoomJidKind => {
 };
 
 export let normalizeJid = (jid: string) => jid.trim().toLowerCase();
-
-export interface ZoomChatbotIdentity {
-  botJid: string;
-  accountId: string;
-}
 
 export let mapZoomWorkspace = (accountId: string): Workspace => ({
   id: accountId,
@@ -74,10 +64,7 @@ export let mapZoomUserAuthor = (input: {
   };
 };
 
-/**
- * The chatbot API exposes no channel lookup, so a channel is derived from its
- * JID (documented convention above). Names are only set when Zoom supplied them.
- */
+// No channel lookup exists, so the channel is derived from its JID.
 export let mapZoomChannel = (
   jid: string,
   accountId: string,
@@ -103,7 +90,7 @@ export let mapZoomThread = (channelId: string, rootMessageId: string): Thread =>
   raw: { reply_main_message_id: rootMessageId }
 });
 
-/** Chatbot API timestamps: `yyyy-MM-dd HH:mm:ss` in UTC, sometimes with ` +0000`. */
+// `yyyy-MM-dd HH:mm:ss` in UTC, sometimes with ` +0000`.
 export let parseZoomSentTime = (value: unknown): string | undefined => {
   if (typeof value !== 'string' || !value.trim()) return undefined;
   let match = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\s*(?:Z|\+0000|\+00:00))?$/.exec(
@@ -123,7 +110,6 @@ export let epochToIso = (value: unknown): string | undefined => {
 export let mapZoomSentMessage = (input: {
   messageId: string;
   channelId: string;
-  accountId: string;
   botJid: string;
   body: ChatBody;
   sentAt: string;

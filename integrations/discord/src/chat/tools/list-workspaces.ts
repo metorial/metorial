@@ -8,10 +8,6 @@ import {
 } from '../lib/cursors';
 import { mapWorkspace } from '../lib/mappers';
 
-/**
- * Discord servers (guilds) the bot belongs to, paged by guild id.
- * https://docs.discord.com/developers/resources/user#get-current-user-guilds
- */
 export let chatListWorkspaces = contract
   .implement(spec)
   .authMethods(['bot_token'])

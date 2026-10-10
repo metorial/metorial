@@ -57,14 +57,7 @@ let fullConfigSchema = userConfigSchema.extend({
     .describe('HTTP endpoint URL configured in the Chat API configuration')
 });
 
-export type GoogleChatWebhookRegistration = z.infer<typeof fullConfigSchema>;
-
-/**
- * Event types this group forwards. Google Chat's other interaction events
- * (ADDED_TO_SPACE, REMOVED_FROM_SPACE, CARD_CLICKED, WIDGET_UPDATED, APP_HOME,
- * SUBMIT_FORM) are acknowledged without events.
- * https://developers.google.com/workspace/chat/api/reference/rest/v1/EventType
- */
+// Other event types are acknowledged without events.
 export let GOOGLE_CHAT_FORWARDED_EVENT_TYPES = ['MESSAGE', 'APP_COMMAND'] as const;
 
 let interactionEventSchema = z
@@ -97,13 +90,7 @@ let addOnPayloadTypes = {
   widgetUpdatedPayload: 'WIDGET_UPDATED'
 } as const;
 
-/**
- * Chat apps built as Google Workspace add-ons nest the interaction under
- * `chat.<kind>Payload`; this rebuilds the Chat API event shape so one set of
- * triggers handles both app types. App Home events (no payload) become APP_HOME;
- * payload kinds this group does not know become ADD_ON_<kind> and are ignored.
- * https://developers.google.com/workspace/add-ons/concepts/event-objects#chat-event-object
- */
+// Rebuilds add-on `chat.<kind>Payload` events into the Chat API event shape.
 export let normalizeGoogleChatAddOnEvent = (body: unknown): unknown => {
   let chat = (body as { chat?: unknown } | null)?.chat;
   if (!chat || typeof chat !== 'object' || 'type' in (body as object)) return body;
@@ -132,8 +119,7 @@ export let normalizeGoogleChatAddOnEvent = (body: unknown): unknown => {
   };
 };
 
-// A JSON object is a valid "no synchronous reply" response; replies are sent
-// asynchronously through the Chat API.
+// A JSON object means no synchronous reply.
 let jsonResponse = (status: number, body: unknown = {}) => ({
   status,
   headers: { 'content-type': 'application/json' },
@@ -144,11 +130,7 @@ let isCommandEvent = (event: GoogleChatInteractionEvent) =>
   event.type === 'APP_COMMAND' ||
   (event.type === 'MESSAGE' && Boolean((event.message as any)?.slashCommand));
 
-/**
- * Idempotency key per provider occurrence. A slash command may be described by
- * both a MESSAGE and an APP_COMMAND event for the same message; both share the
- * `command:` key so it is delivered once.
- */
+// MESSAGE and APP_COMMAND events for one slash command share the `command:` key.
 export let getGoogleChatEventIdempotencyKey = (event: GoogleChatInteractionEvent) => {
   let messageName = event.message?.name;
   if (isCommandEvent(event)) {
@@ -251,8 +233,7 @@ export let googleChatInteractionEvents = triggerGroup(spec, {
           config.authenticationAudience === 'project_number'
             ? config.projectNumber
             : config.endpointUrl,
-        // Converting to an add-on is irreversible, so add-on registrations accept only
-        // the add-on's own service account.
+        // Add-on conversion is irreversible, so only the add-on's service account is accepted.
         allowedEmails: config.addOnServiceAccountEmail
           ? [config.addOnServiceAccountEmail]
           : [GOOGLE_CHAT_ISSUER]
@@ -322,8 +303,7 @@ export let googleChatInteractionEvents = triggerGroup(spec, {
         return skipWebhook('google_chat_webhook_ignored_event_type', jsonResponse(200));
       }
 
-      // The deprecated verification token is a shared secret; do not forward it.
-      // `authorizationEventObject` can carry user and system ID tokens.
+      // Drop the shared legacy token and the ID tokens in authorizationEventObject.
       let {
         token: _legacyToken,
         authorizationEventObject: _authorization,

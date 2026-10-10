@@ -1,6 +1,7 @@
 import {
   type AttachmentRef,
   type Author,
+  attachmentTypeForMime,
   type Channel,
   type Message,
   parseEmoji,
@@ -143,13 +144,7 @@ export let mapSlackThread = (
 });
 
 export let mapSlackFile = (file: SlackFile): AttachmentRef => ({
-  type: file.mimetype?.startsWith('image/')
-    ? 'image'
-    : file.mimetype?.startsWith('video/')
-      ? 'video'
-      : file.mimetype?.startsWith('audio/')
-        ? 'audio'
-        : 'file',
+  type: attachmentTypeForMime(file.mimetype),
   id: file.id,
   name: file.name ?? file.title,
   mimeType: file.mimetype,
