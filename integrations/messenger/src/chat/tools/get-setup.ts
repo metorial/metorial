@@ -47,7 +47,7 @@ export let chatGetSetup = contract
 1. In the [Meta App Dashboard](https://developers.facebook.com/apps/), create a **Business** app and add the **Messenger** product. Keep the Facebook Page you want to connect ready; you need a role on it that can manage messages.
 2. Add **Facebook Login for Business** and register these **Valid OAuth Redirect URIs**:
 ${redirectList}
-3. Connect the Page with the permissions ${OAUTH_PERMISSIONS.map(permission => `\`${permission}\``).join(', ')}. The connection stores the Page access token and Page id.
+3. Connect the Page. The Facebook OAuth connection requests ${OAUTH_PERMISSIONS.map(permission => `\`${permission}\``).join(', ')} and stores the Page access token and Page id. A Page Access Token connection needs only \`pages_messaging\`, which is all a token from **Messenger API Settings > Generate access tokens** carries; add \`pages_read_engagement\` to show the Page name and picture, otherwise the Page appears by its id.
 4. Copy the **App Secret** from **App settings > Basic** and choose a **Verify Token**. Enter both in the webhook setup for this integration and save it *before* configuring Meta, because Meta verifies the callback immediately.
 5. Under **Messenger > Messenger API Settings**, set the **Callback URL** to \`${webhookUrl ?? 'YOUR_WEBHOOK_URL'}\`, enter the same Verify Token, and select **Verify and save**.
 6. Subscribe to the webhook fields ${WEBHOOK_FIELDS.map(field => `\`${field}\``).join(', ')}.

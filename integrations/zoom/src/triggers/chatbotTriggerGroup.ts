@@ -22,14 +22,11 @@ let webhookConfigSchema = z.object({
     .describe(
       'Secret Token from the app build flow (Features page), used to verify every request from Zoom'
     ),
-  botJid: z
-    .string()
-    .min(1)
-    .describe('Bot JID from Features > Surface > Zoom Chat Subscription'),
+  botJid: z.string().min(1).describe('Bot JID from Features > Surface > Chat Subscription'),
   slashCommand: z
     .string()
     .min(1)
-    .describe('Slash command entered in Zoom Chat Subscription, for example /mybot')
+    .describe('Slash command entered in Chat Subscription, for example /mybot')
 });
 
 type ZoomWebhookConfig = z.infer<typeof webhookConfigSchema>;
@@ -113,14 +110,14 @@ export let zoomChatbotTriggerGroup = triggerGroup(spec, {
       setup: async ctx => ({
         webhookSetupDocument: [
           '1. In the Zoom App Marketplace, open your General app (Develop > Build App), then go to **Features > Surface**.',
-          '2. Select **Zoom Chat**, enable **Zoom Chat Subscription**, and set the **Bot Endpoint URL** to:',
+          '2. Under **Select where to use your app**, select **Chat**, then enable **Chat Subscription**.',
+          '3. Enter the slash command users type to talk to the chatbot (for example `mybot`), set the **Bot Endpoint URL** to the URL below, and save:',
           '',
           `\`\`\`\n${ctx.input.webhookUrl}\n\`\`\``,
           '',
-          '3. Enter the slash command users type to talk to the chatbot (for example `/mybot`).',
-          '4. Copy the **Bot JID** shown in Zoom Chat Subscription and the app **Secret Token** from the Features page, then enter them here together with the slash command.',
+          '4. Copy the **Bot JID** that Chat Subscription now shows and the app **Secret Token** (**Features > Access**), then enter them here together with the slash command.',
           '',
-          '> NOTE: Finish this setup and save it before Zoom validates the endpoint. Until then, the endpoint rejects requests, including the `endpoint.url_validation` check Zoom runs when you save the Bot Endpoint URL.'
+          '> NOTE: The endpoint rejects requests from Zoom, including its `endpoint.url_validation` check, until you finish this setup. Zoom does not need to reach it while you save the URL.'
         ].join('\n'),
         partialWebhookRegistrationPayload: {}
       }),

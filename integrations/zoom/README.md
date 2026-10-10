@@ -102,7 +102,7 @@ Update an existing Zoom webinar's topic, schedule, duration, agenda, or settings
 
 ## Team Chat Chatbot
 
-Connect with the **Team Chat Chatbot** auth method to let this integration act as a Zoom Team Chat chatbot (a Zoom General app with **Zoom Chat Subscription** enabled). It needs the app's Client ID and Client Secret, the Bot JID, the Zoom Account ID where the chatbot is installed, and, for user-managed apps only, the JID of the authorizing user. A chatbot token is requested with the client credentials grant and renewed hourly. The OAuth and Server-to-Server OAuth methods act as Zoom users; the tools above use them, and the chatbot actions below are available only with the chatbot method.
+Connect with the **Team Chat Chatbot** auth method to let this integration act as a Zoom Team Chat chatbot (a Zoom General app with **Chat Subscription** enabled). It needs the app's Client ID and Client Secret, the Bot JID, the Zoom Account ID where the chatbot is installed, and, for user-managed apps only, the JID of the authorizing user. The Account ID is the API account ID, not the Account Number shown in the web portal; Zoom shows it in the build flow of a Server-to-Server OAuth app. A wrong Account ID makes sends fail and leaves inbound messages undelivered, because requests are routed by Bot JID and account. A chatbot token is requested with the client credentials grant and renewed hourly. The OAuth and Server-to-Server OAuth methods act as Zoom users; the tools above use them, and the chatbot actions below are available only with the chatbot method.
 
 Destinations are JIDs: a user JID (`USER_ID@xmpp.zoom.us`) for the chatbot's direct chat with that user, or a channel JID (`CHANNEL_ID@conference.xmpp.zoom.us`). The workspace is the Zoom account.
 
@@ -130,7 +130,7 @@ Not supported:
 
 ### Receiving chatbot requests
 
-Chatbot requests arrive at the **Bot Endpoint URL** of the Marketplace app. Create the endpoint, then enter the app's **Secret Token**, the **Bot JID**, and the **slash command** before saving the Bot Endpoint URL in Zoom, because Zoom validates it (`endpoint.url_validation`) on save. Every request is verified with the `x-zm-signature` HMAC and a 5 minute timestamp window, and is routed to the connection whose Bot JID and account match. Each event is deduplicated by Zoom's `triggerId`, or by bot, destination, user, and timestamp when `triggerId` is absent.
+Chatbot requests arrive at the **Bot Endpoint URL** of the Marketplace app. Create the endpoint, save its URL in Chat Subscription, then finish the endpoint setup with the **Bot JID** that Zoom shows after saving, the **slash command**, and the app's **Secret Token**. Until then the endpoint rejects Zoom's requests, including `endpoint.url_validation`; Zoom does not need to reach it while you save the URL. Every request is verified with the `x-zm-signature` HMAC and a 5 minute timestamp window, and is routed to the connection whose Bot JID and account match. Each event is deduplicated by Zoom's `triggerId`, or by bot, destination, user, and timestamp when `triggerId` is absent.
 
 References: [Create a chatbot](https://developers.zoom.us/docs/chat/create-chatbot/), [Chatbot authorization](https://developers.zoom.us/docs/chat/installation-and-authentication/), [Send, edit, and delete messages](https://developers.zoom.us/docs/chat/send-edit-and-delete-messages/), [Chatbot events](https://developers.zoom.us/docs/api/chatbot/events/), [Webhook verification](https://developers.zoom.us/docs/api/webhooks/#verify-webhook-events).
 

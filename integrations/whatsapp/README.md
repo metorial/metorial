@@ -71,8 +71,9 @@ WhatsApp is also available as a normalized chat provider. A connection represent
 Events arrive through a webhook you configure in the [Meta App Dashboard](https://developers.facebook.com/apps):
 
 1. Create the webhook registration and enter your Meta app's **App Secret** (App settings > Basic) and a **Verify token** of your choosing. Save it first: Meta verifies the callback URL immediately.
-2. In **WhatsApp > Configuration**, set the **Callback URL** to the registration's URL and the **Verify token** to the same value, then **Verify and save**.
-3. Subscribe to the **messages** webhook field, and make sure the app is subscribed to your WhatsApp Business Account (`POST /<WABA_ID>/subscribed_apps`).
+2. In **Use cases > Connect with customers through WhatsApp > Customize > Step 2. Production setup > Configure Webhooks**, set the **Callback URL** to the registration's URL and the **Verify token** to the same value, then **Verify and save**.
+3. In the **Webhook fields** list that appears after saving, subscribe to **messages**. Subscribe the app to your WhatsApp Business Account (`POST /<WABA_ID>/subscribed_apps`) and confirm it with `GET`; dashboard setup can leave only Meta's own test app subscribed.
+4. Publish the app (it needs a privacy policy URL). Unpublished apps receive only dashboard test webhooks, not real messages. A Meta test number replies only to numbers on its recipient list.
 
 Every request is verified with the `X-Hub-Signature-256` HMAC of the raw body. Each event is routed to the connection whose Phone Number ID matches the delivery's `metadata.phone_number_id`. Events are deduplicated on the WhatsApp message ID (`wamid`); reaction events also include the emoji and timestamp, because Meta can reuse the reaction message ID for a removal. Example message event output:
 

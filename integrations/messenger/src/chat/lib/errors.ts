@@ -83,6 +83,23 @@ export let getMessengerGraphError = (error: unknown): MessengerGraphError | unde
   return undefined;
 };
 
+/**
+ * Reading the Page (`GET /{page-id}`) needs `pages_read_engagement`, but a token
+ * generated in the Messenger dashboard carries only `pages_messaging`. Graph refuses
+ * that read with code 100 (no subcode) naming the permission, or with a permission
+ * code (10, 200-299). An unknown Page id is 100/33 and is not matched here.
+ */
+export let isMessengerPagePermissionError = (error: unknown) => {
+  let graph = getMessengerGraphError(error);
+  if (graph?.code === undefined) return false;
+  if (graph.code === 10 || (graph.code >= 200 && graph.code <= 299)) return true;
+  return (
+    graph.code === 100 &&
+    graph.subcode === undefined &&
+    /pages_read_engagement/i.test(graph.message ?? '')
+  );
+};
+
 let SLATE_CHAT_ERROR_CODES: Record<string, ChatErrorCode> = {
   'upstream.rate_limited': 'chat.rate_limit.exceeded',
   'upstream.timeout': 'chat.provider.timeout',

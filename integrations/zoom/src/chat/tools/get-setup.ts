@@ -45,7 +45,7 @@ export let chatGetSetup = contract
    ${redirectUri}
    \`\`\`
 
-4. On **Features > Surface**, select **Zoom Chat** and enable **Zoom Chat Subscription**:
+4. On **Features > Surface**, under **Select where to use your app**, select **Chat** and enable **Chat Subscription**:
    - **Slash command**: \`${slashCommand}\`
    - **Bot Endpoint URL**:
 
@@ -53,14 +53,13 @@ export let chatGetSetup = contract
      ${webhookUrl}
      \`\`\`
 
-   Finish the endpoint setup (Secret Token, Bot JID, and slash command) before saving here, because Zoom validates the endpoint when you save.
-5. Optionally enable **Add this app to Chat channels** so members can use the chatbot in channels.
-6. On **Scopes**, confirm the chatbot scope \`imchat:bot\` was added automatically.
-7. On **Local Test**, click **Add App Now** and allow it to install the chatbot in your account.
-8. Connect the chatbot with the **Team Chat Chatbot** method using:
+   Save. Chat Subscription then shows the **Bot JID**. Finish the endpoint setup with the Bot JID, the slash command, and the app **Secret Token** from **Features > Access**; until then the endpoint rejects requests from Zoom.
+5. On **Scopes**, confirm the chatbot scope \`imchat:bot\` was added automatically.
+6. On **Local Test**, click **Add App Now** and allow it to install the chatbot in your account.
+7. Connect the chatbot with the **Team Chat Chatbot** method using:
    - **Client ID** and **Client Secret** from Basic Info > App Credentials
-   - **Bot JID** from Features > Surface > Zoom Chat Subscription
-   - **Account ID** of the Zoom account where the chatbot is installed
+   - **Bot JID** from Features > Surface > Chat Subscription
+   - **Account ID** of the Zoom account where the chatbot is installed. This is the API account ID, not the Account Number in the web portal; Zoom shows it in the build flow of a **Server to Server OAuth** app (**Develop > Build App**). A wrong value makes sends fail and inbound messages go undelivered.
    - For user-managed apps only, the authorizing user's JID (\`USER_ID@xmpp.zoom.us\`)
 
 Messages are sent to a user JID (\`USER_ID@xmpp.zoom.us\`) for a direct chat or to a channel JID (\`CHANNEL_ID@conference.xmpp.zoom.us\`).`;

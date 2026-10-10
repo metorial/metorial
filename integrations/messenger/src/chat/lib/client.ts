@@ -2,7 +2,11 @@ import { ChatErrors } from '@slates/adapter-chat';
 import { createAxios } from '@slates/provider';
 import { MESSENGER_DEFAULT_API_VERSION } from '../../config';
 import { resolveMessengerConnectionPageId } from '../../lib/routingMatcher';
-import { type MessengerChatErrorContext, withMessengerChatErrors } from './errors';
+import {
+  isMessengerPagePermissionError,
+  type MessengerChatErrorContext,
+  withMessengerChatErrors
+} from './errors';
 
 export interface MessengerSendResponse {
   recipient_id?: string;
@@ -132,10 +136,23 @@ export class MessengerChatClient {
     );
   }
 
+  /**
+   * The Page's name and picture are optional details: with a messaging-only token
+   * the Page is returned as its id alone, so connections still resolve.
+   */
   getPage() {
     return this.request<MessengerPage>(
       { workspaceId: this.pageId, notFound: 'chat.workspace.not_found' },
-      api => api.get(`/${this.pageId}`, { params: { fields: 'id,name,link,picture' } })
+      async api => {
+        try {
+          return await api.get(`/${this.pageId}`, {
+            params: { fields: 'id,name,link,picture' }
+          });
+        } catch (error) {
+          if (isMessengerPagePermissionError(error)) return { data: { id: this.pageId } };
+          throw error;
+        }
+      }
     );
   }
 

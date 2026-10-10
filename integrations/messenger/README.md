@@ -37,6 +37,7 @@ Display a typing indicator or mark a message as read in a Messenger conversation
 This integration also exposes a normalized chat interface that acts as the connected Facebook Page. Both the Facebook OAuth and Page Access Token connections can use it.
 
 - **Workspace:** the connected Facebook Page (its Page id and name).
+- **Permissions:** sending and receiving need only `pages_messaging`, which is all a token from **Messenger API Settings > Generate access tokens** carries. With `pages_read_engagement` the Page name and picture are included; without it the Page appears by its id.
 - **Channels:** each person's conversation with the Page is a direct-message channel whose id is the person's Page-scoped id (PSID).
 - **Messages:** text is sent as plain text. Markdown is flattened (links keep their URL), and tables, charts, and fields use a plain-text layout. Inline images and card images are rejected instead of dropped. Replies quote a specific message.
 - **Files:** each file is delivered as its own Messenger message (up to 25 MB), which is returned together with the attachment. Downloads resolve a fresh Meta CDN link from the message when possible.

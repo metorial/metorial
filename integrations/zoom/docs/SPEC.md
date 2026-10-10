@@ -31,7 +31,7 @@ Used to authenticate with Zoom using server-to-server OAuth account credentials 
 
 ### Team Chat Chatbot (Client Credentials)
 
-Used to act as a Team Chat chatbot from a General app with Zoom Chat Subscription enabled.
+Used to act as a Team Chat chatbot from a General app with Chat Subscription enabled.
 
 - **Token URL:** `https://zoom.us/oauth/token?grant_type=client_credentials` with a Basic Auth header (Client ID and Client Secret).
 - The token carries only the `imchat:bot` scope and expires after one hour; a new token is requested the same way.

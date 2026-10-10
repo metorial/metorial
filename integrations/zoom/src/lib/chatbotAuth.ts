@@ -21,14 +21,14 @@ export let chatbotAuthInputSchema = z.object({
     .trim()
     .min(1)
     .describe(
-      'Bot JID, shown in the app build flow under Features > Surface > Zoom Chat Subscription'
+      'Bot JID, shown in the app build flow under Features > Surface > Chat Subscription'
     ),
   accountId: z
     .string()
     .trim()
     .min(1)
     .describe(
-      'Zoom account ID the chatbot is installed in; messages are sent to this account'
+      'Zoom account ID the chatbot is installed in (the API account ID, not the Account Number shown in the web portal). Zoom shows it in the Server-to-Server OAuth app build flow. A wrong value makes sends fail and inbound messages go undelivered.'
     ),
   userJid: z
     .string()
@@ -97,7 +97,7 @@ export let exchangeChatbotToken = async (input: ZoomChatbotAuthInput) => {
   let data = parsed.data;
   if (data.scope && !data.scope.split(/[\s,]+/).includes(ZOOM_CHATBOT_SCOPE)) {
     throw zoomServiceError(
-      `Zoom issued a token without the ${ZOOM_CHATBOT_SCOPE} scope. Enable Zoom Chat Subscription (chatbot) on this General app and use its Client ID and Client Secret.`
+      `Zoom issued a token without the ${ZOOM_CHATBOT_SCOPE} scope. Enable Chat Subscription (chatbot) on this General app and use its Client ID and Client Secret.`
     );
   }
 
