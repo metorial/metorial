@@ -1,6 +1,7 @@
 import { ChatErrors, downloadFile as contract } from '@slates/adapter-chat';
 import { z } from 'zod';
 import { TelegramClient } from '../../lib/client';
+import { telegramFileAttachment } from '../../lib/files';
 import { spec } from '../../spec';
 import { withTelegramChatErrors } from '../lib/errors';
 
@@ -9,22 +10,18 @@ let referenceSchema = z.object({
   fileUniqueId: z.string().optional()
 });
 
-let typeFor = (mimeType: string | undefined, filePath: string) => {
-  let kind = mimeType?.split('/')[0] ?? filePath.split('/')[0];
-  if (kind === 'image' || kind === 'photos' || kind === 'stickers') return 'image' as const;
-  if (
-    kind === 'video' ||
-    kind === 'videos' ||
-    kind === 'video_notes' ||
-    kind === 'animations'
-  ) {
+// Telegram groups stored files into folders by kind (photos/, videos/, voice/, ...).
+let typeFor = (filePath: string) => {
+  let kind = filePath.split('/')[0];
+  if (kind === 'photos' || kind === 'stickers') return 'image' as const;
+  if (kind === 'videos' || kind === 'video_notes' || kind === 'animations') {
     return 'video' as const;
   }
-  if (kind === 'audio' || kind === 'music' || kind === 'voice') return 'audio' as const;
+  if (kind === 'music' || kind === 'voice') return 'audio' as const;
   return 'file' as const;
 };
 
-// The file URL embeds the bot token, so the bytes are delivered instead of the link.
+// The file link embeds the bot token; it is hidden before storage and reissued from the file ID.
 export let chatDownloadFile = contract
   .implement(spec)
   .handleInvocation(async ctx => {
@@ -50,42 +47,16 @@ export let chatDownloadFile = contract
         });
       }
 
-      let response: Response;
-      try {
-        response = await client.downloadFile(file.file_path);
-      } catch (error) {
-        throw ChatErrors.attachmentDownloadFailed({
-          action,
-          attachmentId: fileId,
-          cause: error
-        });
-      }
-      if (!response.ok) {
-        throw ChatErrors.attachmentDownloadFailed({
-          action,
-          attachmentId: fileId,
-          message: `Telegram responded with HTTP ${response.status} while downloading the file.`
-        });
-      }
-
-      let name = String(file.file_path).split('/').pop() || fileId;
-      let mimeType = response.headers.get('content-type')?.split(';')[0]?.trim();
-      if (mimeType === 'application/octet-stream') mimeType = undefined;
-
-      await ctx.addAttachment({
-        type: 'content',
-        content: response,
-        filename: name,
-        mimeType
-      });
+      let attachment = telegramFileAttachment(client, file);
+      await ctx.addAttachment(attachment);
+      let name = attachment.filename;
 
       return {
         output: {
           attachment: {
-            type: typeFor(mimeType, String(file.file_path)),
+            type: typeFor(String(file.file_path)),
             id: file.file_id,
             name,
-            mimeType,
             size: file.file_size,
             status: 'complete' as const,
             providerFileReference: { fileId: file.file_id, fileUniqueId: file.file_unique_id },

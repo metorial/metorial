@@ -167,7 +167,7 @@ describe('redactUrlAttachmentSecrets', () => {
     ]);
   });
 
-  it('only changes header and query values, preserving metadata and the original attachment', () => {
+  it('only changes credential values, preserving metadata and the original attachment', () => {
     let attachment: SlateAttachment = {
       mimeType: 'application/pdf',
       attachmentHash: 'file-hash',
@@ -187,6 +187,7 @@ describe('redactUrlAttachmentSecrets', () => {
         ...original,
         content: {
           ...original.content,
+          url: 'https://example.com/$$MT$secret$authConfig$token$$/file.pdf',
           headers: { Authorization: 'Bearer $$MT$secret$authConfig$token$$' },
           query: { key: '$$MT$secret$authConfig$nested.token2$$-suffix' }
         }
@@ -195,7 +196,35 @@ describe('redactUrlAttachmentSecrets', () => {
     expect(attachment).toEqual(original);
   });
 
-  it('leaves url attachments with no headers/query untouched', () => {
+  it('redacts a bot token embedded in the url path', () => {
+    let attachments = [
+      urlAttachment({ url: 'https://api.telegram.org/file/bot123:ABCDEFGH/photos/a.jpg' })
+    ];
+
+    expect(
+      redactUrlAttachmentSecrets(attachments, { token: '123:ABCDEFGH', botId: '12345678' })
+    ).toEqual([
+      urlAttachment({
+        url: 'https://api.telegram.org/file/bot$$MT$secret$authConfig$token$$/photos/a.jpg'
+      })
+    ]);
+  });
+
+  it('keeps non-credential and short auth values in the url', () => {
+    let attachments = [
+      urlAttachment({ url: 'https://example.com/AC12345678/12345678/abc/file.pdf' })
+    ];
+
+    expect(
+      redactUrlAttachmentSecrets(attachments, {
+        account_sid: 'AC12345678',
+        botId: '12345678',
+        token: 'abc'
+      })
+    ).toEqual(attachments);
+  });
+
+  it('leaves url attachments with no credentials untouched', () => {
     let attachments = [urlAttachment()];
     expect(redactUrlAttachmentSecrets(attachments, authConfig)).toEqual(attachments);
   });

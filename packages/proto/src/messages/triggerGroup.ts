@@ -389,9 +389,16 @@ export let slatesMessageTriggerGroupGatewayReceiveResponse = z.object({
     send: z.array(z.string()),
     events: z.array(slatesTriggerGroupPollEvent),
     heartbeat: z
-      .object({ intervalMs: z.number().int().positive(), frame: z.string() })
+      .object({
+        intervalMs: z.number().int().positive(),
+        frame: z.string(),
+        // The hub requires `heartbeatAcked` between beats and reconnects otherwise.
+        expectsAck: z.boolean().optional()
+      })
       .nullable()
       .optional(),
+    // Set when these frames included the provider's acknowledgement of a heartbeat.
+    heartbeatAcked: z.boolean().optional(),
     close: z
       .object({ reconnect: z.boolean(), reason: z.string().optional() })
       .nullable()

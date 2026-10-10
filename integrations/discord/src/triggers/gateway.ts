@@ -293,6 +293,7 @@ export let discordGatewayTriggerGroup = triggerGroup(spec, {
       let send: string[] = [];
       let events: { payload: DiscordGatewayEventPayload; idempotencyKey: string }[] = [];
       let close: { reconnect: boolean; reason?: string } | null = null;
+      let heartbeatAcked = false;
 
       for (let frame of ctx.input.frames) {
         let message: { op?: number; d?: any; s?: number | null; t?: string | null };
@@ -326,7 +327,10 @@ export let discordGatewayTriggerGroup = triggerGroup(spec, {
           continue;
         }
 
-        if (message.op === GatewayOp.HEARTBEAT_ACK) continue;
+        if (message.op === GatewayOp.HEARTBEAT_ACK) {
+          heartbeatAcked = true;
+          continue;
+        }
 
         if (message.op === GatewayOp.RECONNECT) {
           close = { reconnect: true, reason: 'Discord requested a gateway reconnect' };
@@ -422,10 +426,16 @@ export let discordGatewayTriggerGroup = triggerGroup(spec, {
         state,
         send,
         events,
+        // Discord: no ACK between heartbeats means a zombie connection; reconnect and resume.
         heartbeat:
           close || !state.heartbeatIntervalMs
             ? null
-            : { intervalMs: state.heartbeatIntervalMs, frame: heartbeatFrame(state.seq) },
+            : {
+                intervalMs: state.heartbeatIntervalMs,
+                frame: heartbeatFrame(state.seq),
+                expectsAck: true
+              },
+        heartbeatAcked,
         close
       };
     }

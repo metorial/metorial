@@ -13,6 +13,28 @@ export let attachmentTypeForMime = (
 
 export let ATTACHMENT_SOURCE_TIMEOUT_MS = 120_000;
 
+/** How long before an expiring provider download URL lapses it should be reissued. */
+export let DOWNLOAD_URL_REFRESH_MARGIN_MS = 5 * 60 * 1000;
+
+/** Reads a signed CDN URL's expiry from a hex Unix-seconds query parameter (Discord `ex`, Meta `oe`). */
+export let signedUrlHexExpiry = (url: string, param: string): Date | undefined => {
+  let value: string | null;
+  try {
+    value = new URL(url).searchParams.get(param);
+  } catch {
+    return undefined;
+  }
+  if (!value || !/^[0-9a-f]{1,12}$/i.test(value)) return undefined;
+  let seconds = Number.parseInt(value, 16);
+  return seconds > 0 ? new Date(seconds * 1000) : undefined;
+};
+
+/** ISO time to reissue a URL expiring at `expiresAt`: `marginMs` early, never in the past. */
+export let downloadUrlRefreshAt = (
+  expiresAt: Date,
+  marginMs: number = DOWNLOAD_URL_REFRESH_MARGIN_MS
+) => new Date(Math.max(Date.now(), expiresAt.getTime() - marginMs)).toISOString();
+
 export interface FetchAttachmentSourceOptions {
   action: string;
   /** Byte limit, or a limit chosen from the source's `content-type`. */

@@ -78,7 +78,7 @@ chat the bot belongs to is a channel in it.
 | Workspace list / get, authenticated user | Native | One workspace for the bot. |
 | Typing indicator | Native | Shown for up to five seconds or until the bot's next message; works without a thread. |
 | File upload | Native | Each file is sent as its own message (photo, video, audio, or document, up to 50 MB) and both the file and the new message are returned. |
-| File download | Native | By file reference, up to 20 MB, delivered as a downloadable file. |
+| File download | Native | By file reference, up to 20 MB, delivered as a downloadable file that stays available after Telegram's one-hour link expires. |
 | Command list | Native | Commands registered for the default scope. |
 | Setup instructions | Native | BotFather steps and a pasteable command list; available before connecting. |
 | Message received / updated, mention, command | Native | Includes channel posts. Album items share a group ID. A command addressed to the bot arrives only as a command, not also as a message or mention. |

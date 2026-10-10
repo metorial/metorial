@@ -2,6 +2,7 @@ export * from './add-reaction';
 export * from './download-file';
 export * from './get-authenticated-user';
 export * from './get-channel';
+export * from './get-file-url';
 export * from './get-setup';
 export * from './get-user';
 export * from './get-workspace';

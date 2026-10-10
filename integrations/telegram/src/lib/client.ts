@@ -252,7 +252,7 @@ export class TelegramClient {
     return response.data.result;
   }
 
-  private getFileDownloadUrl(filePath: string): string {
+  getFileDownloadUrl(filePath: string): string {
     return `${TELEGRAM_API_ORIGIN}/file/bot${this.token}/${filePath}`;
   }
 
@@ -540,10 +540,6 @@ export class TelegramClient {
     form.append(params.field, params.file, params.filename);
     let response = await this.axios.post(`/${params.method}`, form);
     return response.data.result;
-  }
-
-  async downloadFile(filePath: string): Promise<Response> {
-    return fetch(this.getFileDownloadUrl(filePath));
   }
 
   // ---- Webhook ----

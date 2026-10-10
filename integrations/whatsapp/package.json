@@ -11,7 +11,7 @@
     "@lowerdeck/error": "^1.1.0",
     "@slates/adapter-chat": "1.0.0-rc.13",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.26",
+    "slates": "1.0.0-rc.27",
     "zod": "^4.2"
   },
   "devDependencies": {

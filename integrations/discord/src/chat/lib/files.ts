@@ -1,4 +1,4 @@
-import { ChatErrors } from '@slates/adapter-chat';
+import { ChatErrors, downloadUrlRefreshAt, signedUrlHexExpiry } from '@slates/adapter-chat';
 import { z } from 'zod';
 import type { DiscordChatClient } from './client';
 import type { DiscordApiAttachment } from './types';
@@ -12,8 +12,8 @@ export let discordFileReferenceSchema = z.object({
 export type DiscordFileReference = z.infer<typeof discordFileReferenceSchema>;
 
 let ALLOWED_HOSTS = new Set(['cdn.discordapp.com', 'media.discordapp.net']);
-// Renew a little before Discord's signed URL expires.
-let REFRESH_MARGIN_MS = 5 * 60 * 1000;
+// URLs without an `ex` signature are reissued hourly.
+let FALLBACK_TTL_MS = 60 * 60 * 1000;
 
 export let parseDiscordFileReference = (value: unknown, action: string) => {
   let parsed = discordFileReferenceSchema.safeParse(value);
@@ -27,19 +27,11 @@ export let parseDiscordFileReference = (value: unknown, action: string) => {
   return parsed.data;
 };
 
-// `ex` is the signed CDN URL's hex expiry timestamp in seconds.
-export let signedUrlExpiry = (url: string): Date | undefined => {
-  let ex = new URL(url).searchParams.get('ex');
-  if (!ex) return undefined;
-  let seconds = Number.parseInt(ex, 16);
-  return Number.isFinite(seconds) ? new Date(seconds * 1000) : undefined;
-};
-
 export let resolveDiscordAttachment = async (
   client: DiscordChatClient,
   reference: DiscordFileReference,
   action: string
-): Promise<{ attachment: DiscordApiAttachment; url: string; expiresAt?: Date }> => {
+): Promise<{ attachment: DiscordApiAttachment; url: string; refreshAt: string }> => {
   let message = await client.getMessage(reference.channelId, reference.messageId);
   let attachment = message.attachments?.find(item => item.id === reference.attachmentId);
   if (!attachment?.url) {
@@ -60,10 +52,11 @@ export let resolveDiscordAttachment = async (
     });
   }
 
-  return { attachment, url: attachment.url, expiresAt: signedUrlExpiry(attachment.url) };
+  // https://docs.discord.com/developers/reference#signed-attachment-cdn-urls
+  let expiresAt = signedUrlHexExpiry(attachment.url, 'ex');
+  return {
+    attachment,
+    url: attachment.url,
+    refreshAt: downloadUrlRefreshAt(expiresAt ?? new Date(Date.now() + FALLBACK_TTL_MS))
+  };
 };
-
-export let refreshAtFor = (expiresAt: Date | undefined) =>
-  expiresAt
-    ? new Date(Math.max(Date.now(), expiresAt.getTime() - REFRESH_MARGIN_MS)).toISOString()
-    : undefined;

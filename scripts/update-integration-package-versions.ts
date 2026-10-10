@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { existsSync } from 'node:fs';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -266,6 +267,11 @@ async function updateIntegrationManifests(
   return updates;
 }
 
+// Skips leftover build-output folders without a manifest.
+function hasPackageJson(parent: string, entry: { name: string; isDirectory(): boolean }) {
+  return entry.isDirectory() && existsSync(path.join(parent, entry.name, 'package.json'));
+}
+
 async function loadManifest(target: {
   directory: string;
   kind: 'package' | 'integration';
@@ -445,7 +451,7 @@ async function getWorkspacePackages(): Promise<WorkspacePackage[]> {
 
       return Promise.all(
         entries
-          .filter(entry => entry.isDirectory())
+          .filter(entry => hasPackageJson(directoryPath, entry))
           .map(async entry => {
             const packageJsonPath = path.join(directoryPath, entry.name, 'package.json');
             const raw = await readFile(packageJsonPath, 'utf8');
@@ -481,7 +487,7 @@ async function getManifestTargets(): Promise<
 
   const workspaceTargets = WORKSPACE_PACKAGE_DIRECTORIES.flatMap((directory, index) =>
     workspaceEntryLists[index]
-      .filter(entry => entry.isDirectory())
+      .filter(entry => hasPackageJson(path.join(ROOT_DIRECTORY, directory), entry))
       .map(entry => ({
         directory: path.join(ROOT_DIRECTORY, directory, entry.name),
         kind: 'package' as const

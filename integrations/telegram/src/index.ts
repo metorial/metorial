@@ -9,6 +9,7 @@ import {
   forwardMessageTool,
   getChatTool,
   getFileTool,
+  getFileUrl,
   manageChatMemberTool,
   pinMessageTool,
   sendInvoiceTool,
@@ -37,7 +38,8 @@ export let provider = Slate.create({
     sendInvoiceTool,
     answerCallbackQueryTool,
     answerInlineQueryTool,
-    getFileTool
+    getFileTool,
+    getFileUrl
   ],
   adapters: [telegramChatAdapter],
   triggerGroups: [telegramUpdatesTriggerGroup],

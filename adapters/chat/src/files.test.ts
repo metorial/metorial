@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChatError } from './errors';
-import { attachmentTypeForMime, fetchAttachmentSource } from './files';
+import {
+  attachmentTypeForMime,
+  DOWNLOAD_URL_REFRESH_MARGIN_MS,
+  downloadUrlRefreshAt,
+  fetchAttachmentSource,
+  signedUrlHexExpiry
+} from './files';
 
 let action = 'metorial_chat$file.upload';
 
@@ -36,6 +42,38 @@ describe('attachmentTypeForMime', () => {
     expect(attachmentTypeForMime('application/pdf')).toBe('file');
     expect(attachmentTypeForMime(undefined)).toBe('file');
     expect(attachmentTypeForMime(null)).toBe('file');
+  });
+});
+
+describe('signedUrlHexExpiry', () => {
+  it('reads a hex Unix-seconds expiry parameter', () => {
+    expect(
+      signedUrlHexExpiry('https://cdn.discordapp.com/a/b/c.png?ex=7fffffff&is=1', 'ex')
+    ).toEqual(new Date(0x7fffffff * 1000));
+    expect(
+      signedUrlHexExpiry('https://scontent.xx.fbcdn.net/v/x.jpg?oe=6553F100', 'oe')
+    ).toEqual(new Date(0x6553f100 * 1000));
+  });
+
+  it('ignores missing, malformed, and zero values', () => {
+    expect(signedUrlHexExpiry('https://cdn.discordapp.com/a.png', 'ex')).toBeUndefined();
+    expect(signedUrlHexExpiry('https://cdn.discordapp.com/a.png?ex=zz', 'ex')).toBeUndefined();
+    expect(signedUrlHexExpiry('https://cdn.discordapp.com/a.png?ex=0', 'ex')).toBeUndefined();
+    expect(signedUrlHexExpiry('not a url', 'ex')).toBeUndefined();
+  });
+});
+
+describe('downloadUrlRefreshAt', () => {
+  it('renews a margin before expiry, and immediately once that has passed', () => {
+    let expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    expect(downloadUrlRefreshAt(expiresAt)).toBe(
+      new Date(expiresAt.getTime() - DOWNLOAD_URL_REFRESH_MARGIN_MS).toISOString()
+    );
+    expect(downloadUrlRefreshAt(expiresAt, 1000)).toBe(
+      new Date(expiresAt.getTime() - 1000).toISOString()
+    );
+    let soon = Date.parse(downloadUrlRefreshAt(new Date(Date.now() + 1000)));
+    expect(Math.abs(soon - Date.now())).toBeLessThan(1000);
   });
 });
 

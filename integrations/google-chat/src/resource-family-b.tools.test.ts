@@ -394,41 +394,32 @@ describe('google-chat resource tool family B', () => {
     );
   });
 
-  it('returns downloaded bytes as a downloadable file', async () => {
-    let fileBytes = Buffer.from([0, 255, 10, 65]);
-    requestSpy.mockResolvedValueOnce(fileBytes);
-
-    let result = await downloadAttachment.handleInvocation(
-      createContext({
+  it('returns the authenticated media URL as a downloadable file', async () => {
+    let ctx = {
+      ...createContext({
         attachmentDataResourceName: 'spaces/AAAA/attachments/upload-1',
         filename: 'sample.bin',
         mimeType: 'application/octet-stream'
-      })
-    );
+      }),
+      addAttachment: vi.fn()
+    };
+
+    let result = await downloadAttachment.handleInvocation(ctx);
 
     expect(result.output).toEqual({
       attachmentDataResourceName: 'spaces/AAAA/attachments/upload-1',
       filename: 'sample.bin',
+      mimeType: 'application/octet-stream'
+    });
+    expect(ctx.addAttachment).toHaveBeenCalledWith({
+      type: 'url',
+      url: 'https://chat.googleapis.com/v1/media/spaces/AAAA/attachments/upload-1',
+      query: { alt: 'media' },
       mimeType: 'application/octet-stream',
-      byteLength: 4
+      filename: 'sample.bin',
+      headers: { Authorization: 'Bearer test-token' }
     });
-    expect(result.output).not.toHaveProperty('contentBase64');
-    expect(result.attachments).toEqual([
-      {
-        mimeType: 'application/octet-stream',
-        content: {
-          type: 'content',
-          encoding: 'base64',
-          content: fileBytes.toString('base64')
-        }
-      }
-    ]);
-    expect(requestSpy).toHaveBeenCalledWith('media/spaces/AAAA/attachments/upload-1', {
-      method: 'get',
-      params: { alt: 'media' },
-      responseType: 'arraybuffer',
-      operation: 'download attachment'
-    });
+    expect(requestSpy).not.toHaveBeenCalled();
   });
 
   it('rejects invalid branch combinations and unsafe media resource names with ServiceError', () => {

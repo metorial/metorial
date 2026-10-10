@@ -5,7 +5,6 @@ import { withDiscordChatErrors } from '../lib/errors';
 import { parseDiscordFileReference, resolveDiscordAttachment } from '../lib/files';
 
 let ACTION = 'metorial$getFileUrl';
-let FALLBACK_TTL_MS = 60 * 60 * 1000;
 
 export let discordGetFileUrl = getFileUrlTool(spec, async ctx =>
   withDiscordChatErrors(
@@ -17,10 +16,8 @@ export let discordGetFileUrl = getFileUrlTool(spec, async ctx =>
         reference,
         ACTION
       );
-      return {
-        url: resolved.url,
-        expiresAt: (resolved.expiresAt ?? new Date(Date.now() + FALLBACK_TTL_MS)).toISOString()
-      };
+      // The hub reissues at `expiresAt`, so it carries the renewal margin.
+      return { url: resolved.url, expiresAt: resolved.refreshAt };
     }
   )
 );

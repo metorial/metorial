@@ -57,7 +57,10 @@ export type SlateTriggerGroupGatewayReceiveHandler<
   state?: any;
   send?: string[];
   events?: SlateGatewayEvent[];
-  heartbeat?: { intervalMs: number; frame: string } | null;
+  /** With `expectsAck`, the hub reconnects when no `heartbeatAcked` arrives before the next beat. */
+  heartbeat?: { intervalMs: number; frame: string; expectsAck?: boolean } | null;
+  /** Set when `frames` included the provider's heartbeat acknowledgement. */
+  heartbeatAcked?: boolean;
   close?: { reconnect: boolean; reason?: string } | null;
 }>;
 

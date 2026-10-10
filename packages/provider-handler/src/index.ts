@@ -1532,6 +1532,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           context._getAuthConfigForRedaction()
         ).redactEmbedded(res.send ?? []),
         heartbeat: res.heartbeat ?? null,
+        heartbeatAcked: res.heartbeatAcked,
         close: res.close ?? null,
         events: (res.events ?? []).map(event => ({
           payload: event.payload,

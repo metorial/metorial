@@ -1,5 +1,5 @@
 import { Slate } from '@slates/provider';
-import { messengerChatAdapter } from './chat';
+import { messengerChatAdapter, messengerGetFileUrl } from './chat';
 import { spec } from './spec';
 import {
   getUserProfile,
@@ -21,7 +21,8 @@ export let provider = Slate.create({
     manageProfile,
     getUserProfile,
     senderAction,
-    handover
+    handover,
+    messengerGetFileUrl
   ],
   adapters: [messengerChatAdapter],
   triggerGroups: [messengerEventsTriggerGroup],
