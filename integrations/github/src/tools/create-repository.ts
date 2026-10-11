@@ -22,6 +22,16 @@ export let createRepository = SlateTool.create(spec, {
         .optional()
         .describe('Whether the repository should be private (default: true)'),
       autoInit: z.boolean().optional().describe('Initialize with a README'),
+      gitignoreTemplate: z
+        .string()
+        .optional()
+        .describe(
+          'Language or platform .gitignore template to apply, such as "Node" or "Python"'
+        ),
+      licenseTemplate: z
+        .string()
+        .optional()
+        .describe('Open source license keyword to apply, such as "mit" or "apache-2.0"'),
       organization: z
         .string()
         .optional()

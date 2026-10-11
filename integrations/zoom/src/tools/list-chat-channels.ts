@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let listChatChannels = SlateTool.create(spec, {
   name: 'List Chat Channels',
   key: 'list_chat_channels',
-  description: `List Zoom Team Chat channels the user belongs to. Returns channel names, IDs, and types for use with sending messages or managing channel membership.`,
+  description: `List Zoom Team Chat channels the user belongs to. Returns channel names, IDs, JIDs, and types for sending or reading messages and listing channel members.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -19,7 +19,7 @@ export let listChatChannels = SlateTool.create(spec, {
         .string()
         .default('me')
         .describe('User ID or email. Use "me" for the authenticated user'),
-      pageSize: z.number().optional().describe('Number of records per page'),
+      pageSize: z.number().optional().describe('Number of records per page (default 10)'),
       nextPageToken: z.string().optional().describe('Pagination token for next page')
     })
   )
@@ -31,12 +31,16 @@ export let listChatChannels = SlateTool.create(spec, {
         .array(
           z.object({
             channelId: z.string().describe('Channel ID'),
-            channelName: z.string().describe('Channel name'),
+            channelName: z.string().optional().describe('Channel name'),
+            channelJid: z
+              .string()
+              .optional()
+              .describe('Channel JID (CHANNEL_ID@conference.xmpp.zoom.us)'),
             channelType: z
               .number()
               .optional()
               .describe(
-                'Channel type: 1=private, 2=private with external, 3=public, 4=instant'
+                'Channel type: 0=unknown, 1=private, 2=private with members from the same account, 3=public, 4=instant (group chat), 5=public with members from other accounts'
               )
           })
         )
@@ -53,7 +57,8 @@ export let listChatChannels = SlateTool.create(spec, {
 
     let channels = (result.channels || []).map((c: any) => ({
       channelId: c.id,
-      channelName: c.name,
+      channelName: c.name || undefined,
+      channelJid: c.jid || undefined,
       channelType: c.type
     }));
 

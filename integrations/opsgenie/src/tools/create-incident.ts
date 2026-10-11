@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createIncident = SlateTool.create(spec, {
@@ -23,11 +24,15 @@ export let createIncident = SlateTool.create(spec, {
         .array(
           z.object({
             type: z.enum(['team', 'user']).describe('Responder type'),
-            id: z.string().optional().describe('Responder ID')
+            id: z.string().optional().describe('Responder ID'),
+            name: z.string().optional().describe('Team name (for team responders)'),
+            username: z.string().optional().describe('Username/email (for user responders)')
           })
         )
         .optional()
-        .describe('Teams or users to notify about the incident'),
+        .describe(
+          'Teams or users to notify about the incident. Provide id, or name for teams / username for users.'
+        ),
       tags: z.array(z.string()).optional().describe('Tags for the incident'),
       details: z
         .record(z.string(), z.string())
@@ -41,7 +46,9 @@ export let createIncident = SlateTool.create(spec, {
       impactedServiceIds: z
         .array(z.string())
         .optional()
-        .describe('IDs of services impacted by this incident'),
+        .describe(
+          'IDs of services impacted by this incident (max 20). Use list_services to find IDs.'
+        ),
       statusPageTitle: z.string().optional().describe('Title for the status page entry'),
       statusPageDetail: z
         .string()
@@ -76,14 +83,22 @@ export let createIncident = SlateTool.create(spec, {
       notifyStakeholders: ctx.input.notifyStakeholders
     };
 
+    for (let responder of ctx.input.responders ?? []) {
+      if (!responder.id && !responder.name && !responder.username) {
+        throw opsgenieServiceError(
+          'Each incident responder must include id, name (team), or username (user).'
+        );
+      }
+    }
+
     if (ctx.input.impactedServiceIds) {
-      data.impactedServices = ctx.input.impactedServiceIds.map((id: string) => ({ id }));
+      data.impactedServices = [...ctx.input.impactedServiceIds];
     }
 
     if (ctx.input.statusPageTitle || ctx.input.statusPageDetail) {
       data.statusPageEntry = {
         title: ctx.input.statusPageTitle ?? ctx.input.message,
-        detail: ctx.input.statusPageDetail ?? ''
+        detail: ctx.input.statusPageDetail
       };
     }
 

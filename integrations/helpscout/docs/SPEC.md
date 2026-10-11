@@ -1,6 +1,4 @@
-Now let me get the specific webhook events and the Mailbox API details:Now I have comprehensive information. Let me also check on the Docs API authentication since it uses a different method:
-
-# Slates Specification for Help Scout
+# Help Scout Specification
 
 ## Overview
 
@@ -48,7 +46,7 @@ Create, read, update, and delete support conversations across mailboxes. Convers
 
 ### Thread Management
 
-Add replies, notes, and other thread types to conversations. Agent replies send actual emails to customers. Notes are internal-only communications not visible to the customer. You can also manage attachments on threads.
+Add replies, notes, and other thread types to conversations. Agent replies send actual emails to customers. Notes are internal-only communications not visible to the customer. Threads can carry file attachments (uploaded as base64 content). Files attached to any thread can be downloaded by conversation ID and attachment ID; attachment IDs, file names, and MIME types are listed with each thread.
 
 ### Customer Management
 
@@ -64,7 +62,7 @@ Read mailbox configuration including folders and custom fields. Mailboxes repres
 
 ### Tags
 
-Create, update, and delete tags used to categorize and organize conversations.
+List and read the tags used to categorize conversations. The Inbox API has no endpoints to create, rename, or delete tags; a tag is created automatically when it is applied to a conversation.
 
 ### Teams
 

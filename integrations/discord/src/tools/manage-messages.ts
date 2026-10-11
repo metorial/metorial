@@ -11,7 +11,11 @@ let messageSchema = z.object({
   content: z.string().describe('The text content of the message'),
   authorUsername: z.string().describe('The username of the message author'),
   authorId: z.string().describe('The user ID of the message author'),
-  timestamp: z.string().describe('ISO 8601 timestamp of when the message was created')
+  timestamp: z.string().describe('ISO 8601 timestamp of when the message was created'),
+  pinnedAt: z
+    .string()
+    .optional()
+    .describe('ISO 8601 timestamp of when the message was pinned (list_pinned only)')
 });
 
 let formatMessage = (msg: any, channelId: string) => ({
@@ -33,7 +37,7 @@ export let manageMessages = SlateTool.create(spec, {
     'Use action "edit" to modify the content of a message. Only messages authored by the bot can be edited.',
     'Use action "delete" to remove a single message from a channel.',
     'Use action "pin" or "unpin" to pin or unpin a message in a channel.',
-    'Use action "list_pinned" to get all currently pinned messages in a channel.',
+    'Use action "list_pinned" to get pinned messages in a channel, newest pin first (up to 50 per page). When hasMore is true, pass the oldest pinnedAt as pinnedBefore for the next page.',
     'Use action "bulk_delete" to delete multiple messages at once (2-100 messages, must be less than 14 days old).'
   ],
   tags: {
@@ -57,7 +61,7 @@ export let manageMessages = SlateTool.create(spec, {
         .number()
         .optional()
         .describe(
-          'Maximum number of messages to retrieve, 1-100 (for list action, defaults to 50)'
+          'Maximum number of messages to retrieve: 1-100 for list (defaults to 50), 1-50 for list_pinned (defaults to 50)'
         ),
       before: z
         .string()
@@ -74,7 +78,13 @@ export let manageMessages = SlateTool.create(spec, {
       messageIds: z
         .array(z.string())
         .optional()
-        .describe('Array of message IDs to delete (required for bulk_delete, 2-100 IDs)')
+        .describe('Array of message IDs to delete (required for bulk_delete, 2-100 IDs)'),
+      pinnedBefore: z
+        .string()
+        .optional()
+        .describe(
+          'ISO 8601 timestamp; list_pinned returns messages pinned before it (for list_pinned pagination)'
+        )
     })
   )
   .output(
@@ -86,7 +96,11 @@ export let manageMessages = SlateTool.create(spec, {
       messages: z
         .array(messageSchema)
         .optional()
-        .describe('Array of message objects (for list, list_pinned actions)')
+        .describe('Array of message objects (for list, list_pinned actions)'),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether more pinned messages exist (for list_pinned)')
     })
   )
   .handleInvocation(async ctx => {
@@ -177,12 +191,21 @@ export let manageMessages = SlateTool.create(spec, {
       };
     }
 
-    // list_pinned
-    let rawPinned = await client.getPinnedMessages(channelId);
-    let messages = rawPinned.map((msg: any) => formatMessage(msg, channelId));
+    // list_pinned: https://docs.discord.com/developers/resources/message#get-channel-pins
+    // The pins endpoint accepts 1-50; clamp so callers of the legacy unpaged list keep working.
+    let limit =
+      ctx.input.limit === undefined ? undefined : Math.min(50, Math.max(1, ctx.input.limit));
+    let pins = await client.getPinnedMessages(channelId, {
+      before: ctx.input.pinnedBefore,
+      limit
+    });
+    let messages = pins.items.map(pin => ({
+      ...formatMessage(pin.message, channelId),
+      pinnedAt: pin.pinned_at
+    }));
     return {
-      output: { success: true, messages },
-      message: `Found ${messages.length} pinned message(s) in channel \`${channelId}\`.`
+      output: { success: true, messages, hasMore: pins.has_more },
+      message: `Found ${messages.length} pinned message(s) in channel \`${channelId}\`${pins.has_more ? ' (more available)' : ''}.`
     };
   })
   .build();

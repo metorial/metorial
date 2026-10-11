@@ -1,6 +1,6 @@
 # Reddit Ads API coverage
 
-This integration exposes 16 tools: the 12 original keys plus `list_ad_accounts`, `list_pixels`, `get_resource` and `delete_custom_audience`. See [README](../README.md) for exact version, scope, compatibility and effect limits.
+This integration exposes 18 tools: the 12 original keys plus `list_ad_accounts`, `list_pixels`, `get_resource`, `delete_custom_audience`, `list_posts` and `list_targeting_options`. See [README](../README.md) for exact version, scope, compatibility and effect limits.
 
 Management requests use `https://ads-api.reddit.com/api/v3` with Bearer authentication, 30-second timeout, no redirects, no automatic write retries, validated identities and credential-free error ancestry. Read responses are checked and credential metadata is omitted from retained raw fields; actual credential echoes and unsafe numbers fail safely.
 
@@ -13,6 +13,8 @@ Management requests use `https://ads-api.reddit.com/api/v3` with Bearer authenti
 | Campaign/ad-group/ad/audience list/create | `GET`/`POST /ad_accounts/{accountId}/{campaigns,ad_groups,ads,custom_audiences}` |
 | Exact resource read | `GET /{campaigns,ad_groups,ads,custom_audiences}/{id}` |
 | Campaign/ad-group/ad update | `PATCH /{campaigns,ad_groups,ads}/{id}` |
+| Profiles and posts | `GET /ad_accounts/{accountId}/profiles`, `GET /profiles/{profileId}/structured_posts` |
+| Targeting discovery | `GET /targeting/communities/search`, `/targeting/interests`, `/targeting/geolocations` |
 | Audience membership | `PATCH /custom_audiences/{id}/users`, HTTP 204 |
 | Audience delete | `DELETE /custom_audiences/{id}`, HTTP 204 |
 | Reports | `POST /ad_accounts/{accountId}/reports` |

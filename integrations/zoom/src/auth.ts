@@ -358,6 +358,36 @@ export let auth = SlateAuth.create()
         description: 'Delete Zoom Team Chat messages as admin',
         scope: 'team_chat:delete:user_message:admin'
       },
+      {
+        title: 'Read Chat Threads',
+        description: 'Read replies in Zoom Team Chat threads',
+        scope: 'team_chat:read:thread_message'
+      },
+      {
+        title: 'Read Chat Threads (Admin)',
+        description: 'Read replies in Zoom Team Chat threads as admin',
+        scope: 'team_chat:read:thread_message:admin'
+      },
+      {
+        title: 'React to Chat Messages',
+        description: 'Add and remove emoji reactions on Zoom Team Chat messages',
+        scope: 'team_chat:update:message_emoji'
+      },
+      {
+        title: 'React to Chat Messages (Admin)',
+        description: 'Add and remove emoji reactions on Zoom Team Chat messages as admin',
+        scope: 'team_chat:update:message_emoji:admin'
+      },
+      {
+        title: 'List Chat Channel Members',
+        description: 'List members of Zoom Team Chat channels',
+        scope: 'team_chat:read:list_members'
+      },
+      {
+        title: 'List Chat Channel Members (Admin)',
+        description: 'List members of Zoom Team Chat channels as admin',
+        scope: 'team_chat:read:list_members:admin'
+      },
 
       // Report scopes
       {

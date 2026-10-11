@@ -1,4 +1,5 @@
 export * from './get-audit-log';
+export * from './get-current-user';
 export * from './manage-application-commands';
 export * from './manage-auto-moderation';
 export * from './manage-channels';
@@ -12,4 +13,5 @@ export * from './manage-roles';
 export * from './manage-scheduled-events';
 export * from './manage-threads';
 export * from './manage-webhooks';
+export * from './open-dm-channel';
 export * from './send-message';

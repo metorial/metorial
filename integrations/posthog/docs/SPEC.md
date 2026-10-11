@@ -32,10 +32,10 @@ Private GET, POST, PATCH, DELETE endpoints are used for querying, creating, upda
 
 PostHog supports OAuth 2.0 with authorization code flow for third-party integrations.
 
-- Must authenticate with both client_id and client_secret when exchanging authorization code for tokens. OAuth supports all the same scopes as Personal API Keys.
+- Uses the authorization code flow with S256 PKCE. Confidential clients send client_id and client_secret at the token endpoint; client ID metadata document (CIMD) clients use an HTTPS metadata URL as client_id and send no secret. OAuth supports all the same scopes as Personal API Keys.
 - Each scope has a read and/or write action (e.g., `experiment:read`, `experiment:write`).
 - Standard OpenID Connect scopes are also supported: `openid`, `profile`.
-- Token endpoint: `https://oauth.posthog.com/oauth/token` for PostHog Cloud OAuth, or your self-hosted instance URL.
+- Authorization and token endpoints: `/oauth/authorize/` and `/oauth/token/` on the selected location (`https://us.posthog.com`, `https://eu.posthog.com`, or the self-hosted instance URL). Each connection stores its selected region, which every API call also uses.
 - PostHog rotates refresh tokens: when a refresh token is exchanged, the previous access and refresh tokens are invalidated and new tokens are returned.
 - Access tokens are prefixed with `pha_`, refresh tokens with `phr_`.
 - You can use the `required_access_level=project` or `required_access_level=organization` query parameter in the authorization URL to force the user to scope access.

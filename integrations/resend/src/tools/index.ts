@@ -1,5 +1,6 @@
 export * from './cancel-scheduled-email';
 export * from './get-email';
+export * from './get-file-url';
 export * from './get-received-email';
 export * from './manage-api-keys';
 export * from './manage-attachments';
@@ -12,6 +13,7 @@ export * from './manage-domains';
 export * from './manage-events';
 export * from './manage-logs';
 export * from './manage-segments';
+export * from './manage-suppressions';
 export * from './manage-templates';
 export * from './manage-topics';
 export * from './manage-webhooks';

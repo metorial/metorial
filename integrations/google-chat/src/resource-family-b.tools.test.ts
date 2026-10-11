@@ -127,8 +127,9 @@ describe('google-chat resource tool family B', () => {
     expect(manageSpace.scopes?.AND[0]?.OR).toContain(googleChatScopes.delete);
     expect(getAttachment.authMethods).toEqual(['service_account']);
     expect(JSON.stringify(getAttachment.scopes)).toContain(googleChatScopes.bot);
-    expect(uploadAttachment.authMethods).toEqual(['oauth', 'service_account']);
-    expect(JSON.stringify(uploadAttachment.scopes)).toContain(googleChatScopes.bot);
+    // media.upload supports user authentication only.
+    expect(uploadAttachment.authMethods).toEqual(['oauth']);
+    expect(JSON.stringify(uploadAttachment.scopes)).not.toContain(googleChatScopes.bot);
   });
 
   it('builds all spaces create, setup, get, update, and delete requests', () => {

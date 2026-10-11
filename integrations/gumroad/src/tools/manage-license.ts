@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
 import { gumroadServiceError } from '../lib/errors';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
 export let manageLicense = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let manageLicense = SlateTool.create(spec, {
     destructive: true
   }
 })
+  .scopes(gumroadActionScopes.editProducts)
   .input(
     z.object({
       action: z

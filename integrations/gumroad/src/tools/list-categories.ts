@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
 let categorySchema = z.object({
@@ -19,6 +20,7 @@ export let listCategories = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(gumroadActionScopes.read)
   .input(z.object({}))
   .output(
     z.object({

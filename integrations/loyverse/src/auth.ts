@@ -1,5 +1,28 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+
+let oauthAxios = createAxios({ baseURL: 'https://api.loyverse.com' });
+
+let getMerchantProfile = async (token: string) => {
+  let response = await oauthAxios.get('/v1.0/merchant/', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  let merchant = response.data;
+
+  return {
+    profile: {
+      id: merchant.id,
+      name: merchant.business_name ?? merchant.name,
+      email: merchant.email
+    }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -32,12 +55,13 @@ export let auth = SlateAuth.create()
       },
       {
         title: 'Items Read',
-        description: 'Read items, categories, modifiers, and variants',
+        description: 'Read items, variants, categories, discounts, and modifiers',
         scope: 'ITEMS_READ'
       },
       {
         title: 'Items Write',
-        description: 'Create, update, and delete items, categories, modifiers, and variants',
+        description:
+          'Create, update, and delete items, variants, categories, discounts, and modifiers',
         scope: 'ITEMS_WRITE'
       },
       {
@@ -106,14 +130,12 @@ export let auth = SlateAuth.create()
       });
 
       return {
-        url: `https://cloud.loyverse.com/oauth/authorize?${params.toString()}`
+        url: `https://api.loyverse.com/oauth/authorize?${params.toString()}`
       };
     },
 
     handleCallback: async ctx => {
-      let axios = createAxios({ baseURL: 'https://api.loyverse.com' });
-
-      let response = await axios.post(
+      let response = await oauthAxios.post(
         '/oauth/token',
         new URLSearchParams({
           grant_type: 'authorization_code',
@@ -127,28 +149,27 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Loyverse',
+          operation: 'token exchange'
+        })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        throw createApiServiceError(
+          'Loyverse refresh token is missing. Reconnect your Loyverse account.',
+          { reason: 'oauth_refresh_token_missing' }
+        );
       }
 
-      let axios = createAxios({ baseURL: 'https://api.loyverse.com' });
-
-      let response = await axios.post(
+      let response = await oauthAxios.post(
         '/oauth/token',
         new URLSearchParams({
           grant_type: 'refresh_token',
@@ -161,37 +182,17 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Loyverse',
+          operation: 'token refresh',
+          previousRefreshToken: ctx.output.refreshToken
+        })
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
-      let axios = createAxios({ baseURL: 'https://api.loyverse.com' });
-
-      let response = await axios.get('/v1.0/merchant/', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
-
-      let merchant = response.data;
-
-      return {
-        profile: {
-          id: merchant.id,
-          name: merchant.business_name ?? merchant.name,
-          email: merchant.email
-        }
-      };
-    }
+    getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) =>
+      getMerchantProfile(ctx.output.token)
   })
   .addTokenAuth({
     type: 'auth.token',
@@ -214,21 +215,6 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({ baseURL: 'https://api.loyverse.com' });
-
-      let response = await axios.get('/v1.0/merchant/', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
-
-      let merchant = response.data;
-
-      return {
-        profile: {
-          id: merchant.id,
-          name: merchant.business_name ?? merchant.name,
-          email: merchant.email
-        }
-      };
-    }
+    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) =>
+      getMerchantProfile(ctx.output.token)
   });

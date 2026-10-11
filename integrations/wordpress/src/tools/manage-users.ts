@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient, extractUserSummary } from '../lib/helpers';
+import { apiTypeFor, createClient, extractUserSummary } from '../lib/helpers';
 import { spec } from '../spec';
 
 let userOutputSchema = z.object({
@@ -29,7 +29,9 @@ export let listUsersTool = SlateTool.create(spec, {
       roles: z
         .string()
         .optional()
-        .describe('Filter by role (administrator, editor, author, contributor, subscriber)'),
+        .describe(
+          'Filter by role (administrator, editor, author, contributor, subscriber). WordPress.com accepts one role; self-hosted sites also accept a comma-separated list.'
+        ),
       perPage: z.number().optional().describe('Number of users per page (default: 20)'),
       page: z.number().optional().describe('Page number for pagination')
     })
@@ -41,9 +43,9 @@ export let listUsersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let users = await client.listUsers(ctx.input);
-    let results = users.map((u: any) => extractUserSummary(u, ctx.config.apiType));
+    let results = users.map((u: any) => extractUserSummary(u, apiTypeFor(ctx.auth)));
     return {
       output: {
         users: results,
@@ -73,11 +75,11 @@ export let getCurrentUserTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let user = await client.getCurrentUser();
 
     let result: any;
-    if (ctx.config.apiType === 'wpcom') {
+    if (apiTypeFor(ctx.auth) === 'wpcom') {
       result = {
         userId: String(user.ID),
         username: user.username || '',

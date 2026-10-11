@@ -1,5 +1,6 @@
 export * from './create-team';
 export * from './delete-team';
+export * from './get-current-user';
 export * from './get-presence';
 export * from './get-team';
 export * from './list-channel-messages';
@@ -9,6 +10,7 @@ export * from './list-chats';
 export * from './list-teams';
 export * from './manage-channel';
 export * from './manage-members';
+export * from './manage-message';
 export * from './manage-online-meeting';
 export * from './manage-shifts';
 export * from './manage-tags';

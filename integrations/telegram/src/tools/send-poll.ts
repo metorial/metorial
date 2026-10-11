@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TelegramClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let sendPollTool = SlateTool.create(spec, {
   name: 'Send Poll',
   key: 'send_poll',
-  description: `Create and send a poll or quiz to a chat. Supports regular polls with optional multiple-answer mode, and quiz-mode polls with a single correct answer and explanation.`,
+  description: `Create and send a poll or quiz to a chat. Supports regular polls with optional multiple-answer mode, and quiz-mode polls with one or more correct answers and an explanation.`,
   instructions: [
-    'For a quiz, set pollType to "quiz" and provide correctOptionIndex (0-based index of the correct answer).',
+    'For a quiz, set pollType to "quiz" and provide correctOptionIndexes (0-based indexes of the correct answers) or correctOptionIndex for a single correct answer.',
     'Use openPeriod (seconds) or closeDate (unix timestamp) to auto-close the poll.'
   ],
   tags: {
@@ -20,25 +20,31 @@ export let sendPollTool = SlateTool.create(spec, {
     z.object({
       chatId: z.string().describe('Chat ID or @username'),
       question: z.string().describe('Poll question (1-300 characters)'),
-      options: z.array(z.string()).min(2).max(10).describe('Answer options (2-10 choices)'),
+      options: z.array(z.string()).min(1).max(12).describe('Answer options (1-12 choices)'),
       pollType: z.enum(['regular', 'quiz']).optional().describe('Poll type: regular or quiz'),
       isAnonymous: z
         .boolean()
         .optional()
         .describe('Whether the poll is anonymous (default true)'),
-      allowsMultipleAnswers: z
-        .boolean()
-        .optional()
-        .describe('Allow multiple answers (regular polls only)'),
+      allowsMultipleAnswers: z.boolean().optional().describe('Allow multiple answers'),
       correctOptionIndex: z
         .number()
         .optional()
-        .describe('0-based index of the correct answer (quiz only)'),
+        .describe(
+          '0-based index of the single correct answer (quiz only). Ignored when correctOptionIndexes is set.'
+        ),
+      correctOptionIndexes: z
+        .array(z.number().int().nonnegative())
+        .optional()
+        .describe('0-based indexes of the correct answers in increasing order (quiz only)'),
       explanation: z
         .string()
         .optional()
         .describe('Explanation shown after answering (quiz only, 0-200 chars)'),
-      openPeriod: z.number().optional().describe('Auto-close after this many seconds (5-600)'),
+      openPeriod: z
+        .number()
+        .optional()
+        .describe('Auto-close after this many seconds (5-2628000)'),
       closeDate: z
         .number()
         .optional()
@@ -57,6 +63,20 @@ export let sendPollTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let correctOptionIds =
+      ctx.input.correctOptionIndexes ??
+      (ctx.input.correctOptionIndex === undefined
+        ? undefined
+        : [ctx.input.correctOptionIndex]);
+    if (ctx.input.pollType === 'quiz' && !correctOptionIds?.length) {
+      throw createApiServiceError(
+        'A quiz needs correctOptionIndexes or correctOptionIndex to mark the correct answer.'
+      );
+    }
+    if (ctx.input.pollType !== 'quiz' && correctOptionIds !== undefined) {
+      throw createApiServiceError('Correct answers can only be set when pollType is "quiz".');
+    }
+
     let client = new TelegramClient(ctx.auth.token);
 
     let result = await client.sendPoll({
@@ -66,7 +86,9 @@ export let sendPollTool = SlateTool.create(spec, {
       type: ctx.input.pollType,
       isAnonymous: ctx.input.isAnonymous,
       allowsMultipleAnswers: ctx.input.allowsMultipleAnswers,
-      correctOptionId: ctx.input.correctOptionIndex,
+      correctOptionIds: correctOptionIds
+        ? [...new Set(correctOptionIds)].sort((a, b) => a - b)
+        : undefined,
       explanation: ctx.input.explanation,
       openPeriod: ctx.input.openPeriod,
       closeDate: ctx.input.closeDate,

@@ -14,6 +14,7 @@ let cartItemSchema = z.object({
   price: z.number().describe('Item price.'),
   quantity: z.number().optional().describe('Quantity.'),
   sku: z.string().optional().describe('SKU.'),
+  brand: z.string().optional().describe('Product brand, vendor or manufacturer.'),
   categories: z.array(z.string()).optional().describe('Product categories.'),
   imageUrl: z.string().optional().describe('Product image URL.'),
   productUrl: z.string().optional().describe('Product page URL.')
@@ -46,6 +47,10 @@ export let manageCart = SlateTool.create(spec, {
         .describe('Ecommerce provider identifier (e.g. "shopify", "my_custom_platform").'),
       action: z.enum(['created', 'updated']).describe('Cart action.'),
       cartId: z.string().describe('Unique cart identifier.'),
+      cartPublicId: z
+        .string()
+        .optional()
+        .describe('Customer-facing cart identifier shown in Drip, such as "#5".'),
       cartUrl: z
         .string()
         .optional()
@@ -84,6 +89,7 @@ export let manageCart = SlateTool.create(spec, {
     };
 
     if (ctx.input.initialStatus !== undefined) cart.initial_status = ctx.input.initialStatus;
+    if (ctx.input.cartPublicId) cart.cart_public_id = ctx.input.cartPublicId;
     if (ctx.input.cartUrl) cart.cart_url = ctx.input.cartUrl;
     if (ctx.input.grandTotal !== undefined) cart.grand_total = ctx.input.grandTotal;
     if (ctx.input.totalDiscounts !== undefined)
@@ -98,6 +104,7 @@ export let manageCart = SlateTool.create(spec, {
       price: item.price,
       quantity: item.quantity,
       sku: item.sku,
+      brand: item.brand,
       categories: item.categories,
       image_url: item.imageUrl,
       product_url: item.productUrl

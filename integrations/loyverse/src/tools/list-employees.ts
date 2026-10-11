@@ -8,8 +8,13 @@ let employeeSchema = z.object({
   employeeName: z.string().optional().describe('Employee name'),
   email: z.string().nullable().optional().describe('Email'),
   phoneNumber: z.string().nullable().optional().describe('Phone number'),
-  role: z.string().nullable().optional().describe('Employee role'),
-  storeIds: z.array(z.string()).optional().describe('Assigned store IDs'),
+  role: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Employee role, when provided (OWNER for the account owner)'),
+  isOwner: z.boolean().nullable().optional().describe('Whether this is the account owner'),
+  storeIds: z.array(z.string()).optional().describe('Store IDs the employee can access'),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   deletedAt: z.string().nullable().optional()
@@ -23,8 +28,9 @@ export let listEmployees = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().min(1).max(250).optional(),
-      cursor: z.string().optional()
+      limit: z.number().min(1).max(250).optional().describe('Number of employees to return'),
+      cursor: z.string().optional().describe('Pagination cursor'),
+      showDeleted: z.boolean().optional().describe('Include deleted employees')
     })
   )
   .output(
@@ -37,7 +43,8 @@ export let listEmployees = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listEmployees({
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      showDeleted: ctx.input.showDeleted
     });
 
     let employees = (result.employees ?? []).map((e: any) => ({
@@ -45,8 +52,9 @@ export let listEmployees = SlateTool.create(spec, {
       employeeName: e.name,
       email: e.email,
       phoneNumber: e.phone_number,
-      role: e.role,
-      storeIds: e.stores,
+      role: e.role ?? (e.is_owner ? 'OWNER' : undefined),
+      isOwner: e.is_owner,
+      storeIds: e.stores ?? undefined,
       createdAt: e.created_at,
       updatedAt: e.updated_at,
       deletedAt: e.deleted_at
@@ -54,7 +62,7 @@ export let listEmployees = SlateTool.create(spec, {
 
     return {
       output: { employees, cursor: result.cursor },
-      message: `Retrieved **${employees.length}** employee(s).`
+      message: `Retrieved **${employees.length}** employee(s).${result.cursor ? ' More available via cursor.' : ''}`
     };
   })
   .build();

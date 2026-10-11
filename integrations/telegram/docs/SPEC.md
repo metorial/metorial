@@ -1,4 +1,4 @@
-# Slates Specification for Telegram
+# Telegram Integration Specification
 
 ## Overview
 

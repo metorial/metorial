@@ -1,6 +1,6 @@
-import { createApiServiceError, createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
-import { wixApiError } from './lib/errors';
+import { createInstanceToken, verifyInstalledInstance } from './lib/oauth';
 
 let validateContextIds = (siteId?: string, accountId?: string) => {
   if (siteId && accountId) {
@@ -12,10 +12,100 @@ export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      expiresAt: z.string().optional(),
+      instanceId: z.string().optional(),
       siteId: z.string().optional(),
       accountId: z.string().optional()
     })
   )
+  .addOauth({
+    type: 'auth.oauth',
+    name: 'OAuth (Site Owner)',
+    key: 'oauth',
+    scopes: [],
+    inputSchema: z.object({
+      shareUrlId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe(
+          'App developer setup only: share install link ID for an unlisted Wix app. Leave empty for an App Market listed app.'
+        )
+    }),
+    getAuthorizationUrl: async ctx => {
+      let callbackUrl = new URL(ctx.redirectUri);
+      if (callbackUrl.protocol !== 'https:') {
+        throw createApiServiceError('Wix requires an HTTPS callback URL.');
+      }
+      callbackUrl.searchParams.set('state', ctx.state);
+      // The callback router requires a code; this public marker is only routing
+      // metadata. The signed installation is the credential, verified below.
+      callbackUrl.searchParams.set('code', 'wix-external-install');
+      let url = new URL('https://www.wix.com/app-installer');
+      url.searchParams.set('appId', ctx.clientId);
+      url.searchParams.set('postInstallationUrl', callbackUrl.toString());
+      if (ctx.input.shareUrlId) url.searchParams.set('shareUrlId', ctx.input.shareUrlId);
+      return {
+        url: url.toString(),
+        callbackState: { state: ctx.state, startedAt: Date.now() }
+      };
+    },
+    handleCallback: async ctx => {
+      if (
+        !ctx.state ||
+        ctx.state !== ctx.callbackState?.state ||
+        ctx.code !== 'wix-external-install' ||
+        ctx.callbackParams?.appId !== ctx.clientId
+      ) {
+        throw createApiServiceError(
+          'Wix installation callback did not match this connection.'
+        );
+      }
+      let signedInstance = ctx.callbackParams?.signedInstance;
+      if (!signedInstance || !ctx.callbackParams?.instanceId) {
+        throw createApiServiceError(
+          'Wix installation was canceled or its signed confirmation is missing.'
+        );
+      }
+      let instanceId = verifyInstalledInstance(
+        signedInstance,
+        ctx.clientSecret,
+        ctx.callbackState.startedAt
+      );
+      if (instanceId !== ctx.callbackParams.instanceId) {
+        throw createApiServiceError(
+          'Wix installation identifier did not match its signed confirmation.'
+        );
+      }
+      return {
+        output: {
+          ...(await createInstanceToken(ctx.clientId, ctx.clientSecret, instanceId)),
+          instanceId
+        }
+      };
+    },
+    handleTokenRefresh: async (ctx: {
+      output: {
+        token: string;
+        instanceId?: string;
+        expiresAt?: string;
+        siteId?: string;
+        accountId?: string;
+      };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.instanceId) {
+        throw createApiServiceError('Wix installation is missing. Connect Wix again.');
+      }
+      return {
+        output: {
+          ...ctx.output,
+          ...(await createInstanceToken(ctx.clientId, ctx.clientSecret, ctx.output.instanceId))
+        }
+      };
+    }
+  })
   .addTokenAuth({
     type: 'auth.token',
     name: 'API Key',
@@ -51,26 +141,16 @@ export let auth = SlateAuth.create()
     }),
     getOutput: async ctx => {
       validateContextIds(ctx.input.siteId, ctx.input.accountId);
-      let axios = createAxios({ baseURL: 'https://www.wixapis.com' });
-      let response: { data: { access_token?: string } };
-      try {
-        response = await axios.post('/oauth2/token', {
-          grant_type: 'client_credentials',
-          client_id: ctx.input.appId,
-          client_secret: ctx.input.appSecret,
-          instance_id: ctx.input.instanceId
-        });
-      } catch (error) {
-        throw wixApiError(error, 'create OAuth app access token');
-      }
-
-      if (!response.data.access_token) {
-        throw createApiServiceError('Wix OAuth response did not include an access token.');
-      }
+      // This method has no refresh handler, so it keeps its original output without expiresAt.
+      let { token } = await createInstanceToken(
+        ctx.input.appId,
+        ctx.input.appSecret,
+        ctx.input.instanceId
+      );
 
       return {
         output: {
-          token: response.data.access_token,
+          token,
           siteId: ctx.input.siteId,
           accountId: ctx.input.accountId
         }

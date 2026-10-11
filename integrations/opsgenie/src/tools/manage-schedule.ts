@@ -6,16 +6,21 @@ import { spec } from '../spec';
 
 let rotationSchema = z.object({
   name: z.string().optional().describe('Rotation name'),
-  startDate: z.string().describe('Start date in ISO 8601 format'),
+  startDate: z
+    .string()
+    .describe(
+      'Start date in ISO 8601 format (e.g., 2024-01-15T08:00:00+02:00). Minutes are rounded to 0 or 30.'
+    ),
   endDate: z.string().optional().describe('End date in ISO 8601 format'),
   type: z.enum(['daily', 'weekly', 'hourly']).describe('Rotation type'),
-  length: z.number().optional().describe('Length of rotation period'),
+  length: z.number().optional().describe('Length of rotation period (default 1)'),
   participants: z
     .array(
       z.object({
         type: z.enum(['user', 'team', 'escalation', 'none']).describe('Participant type'),
         id: z.string().optional().describe('Participant ID'),
-        username: z.string().optional().describe('Username (for user type)')
+        username: z.string().optional().describe('Username (for user type)'),
+        name: z.string().optional().describe('Name (for team and escalation types)')
       })
     )
     .describe('Rotation participants')

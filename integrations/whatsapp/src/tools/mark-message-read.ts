@@ -6,7 +6,11 @@ import { spec } from '../spec';
 export let markMessageRead = SlateTool.create(spec, {
   name: 'Mark Message as Read',
   key: 'mark_message_read',
-  description: `Mark an incoming WhatsApp message as read. This sends a read receipt (blue checkmarks) to the sender and also opens the 24-hour customer service messaging window.`,
+  description: `Mark an incoming WhatsApp message as read. This sends a read receipt (blue checkmarks) to the sender and also marks earlier messages in the conversation as read. Optionally shows a typing indicator while you prepare a reply.`,
+  instructions: [
+    'Only show the typing indicator when you are about to reply; it disappears when you respond or after 25 seconds'
+  ],
+  constraints: ['Messages can be marked as read only within 30 days of receipt'],
   tags: {
     destructive: false,
     readOnly: false
@@ -14,7 +18,13 @@ export let markMessageRead = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      messageId: z.string().describe('ID of the message to mark as read (wamid.xxx format)')
+      messageId: z.string().describe('ID of the message to mark as read (wamid.xxx format)'),
+      showTypingIndicator: z
+        .boolean()
+        .optional()
+        .describe(
+          'Also show a typing indicator to the sender (cleared on reply or after 25 seconds)'
+        )
     })
   )
   .output(
@@ -30,13 +40,16 @@ export let markMessageRead = SlateTool.create(spec, {
       apiVersion: ctx.config.apiVersion
     });
 
-    let result = await client.markMessageAsRead(ctx.input.messageId);
+    let result = await client.markMessageAsRead(
+      ctx.input.messageId,
+      ctx.input.showTypingIndicator
+    );
 
     return {
       output: {
         success: result.success === true
       },
-      message: `Marked message \`${ctx.input.messageId}\` as read.`
+      message: `Marked message \`${ctx.input.messageId}\` as read${ctx.input.showTypingIndicator ? ' and showed a typing indicator' : ''}.`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { createAxios } from '@slates/provider';
+import { createAxios, pickDefined } from '@slates/provider';
 import { zoomApiError } from './errors';
 
 let api = createAxios({
@@ -33,16 +33,6 @@ let encodeZoomPathId = (value: number | string) => {
   }
 
   return encoded;
-};
-
-let appendDefinedFormField = (
-  formData: FormData,
-  name: string,
-  value: string | number | boolean | undefined
-) => {
-  if (value !== undefined) {
-    formData.append(name, String(value));
-  }
 };
 
 export class ZoomClient {
@@ -476,6 +466,7 @@ export class ZoomClient {
       pageSize?: number;
       nextPageToken?: string;
       includeDeletedAndEditedMessage?: boolean;
+      excludeChildMessage?: boolean;
     }
   ) {
     let query = new URLSearchParams();
@@ -491,6 +482,9 @@ export class ZoomClient {
         'include_deleted_and_edited_message',
         String(params.includeDeletedAndEditedMessage)
       );
+    }
+    if (params.excludeChildMessage !== undefined) {
+      query.set('exclude_child_message', String(params.excludeChildMessage));
     }
 
     let response = await api.get(
@@ -525,16 +519,18 @@ export class ZoomClient {
       message: string;
       toChannel?: string;
       toContact?: string;
+      replyMainMessageId?: string;
     }
   ) {
-    let formData = new FormData();
-    formData.append('message', messageData.message);
-    appendDefinedFormField(formData, 'to_channel', messageData.toChannel);
-    appendDefinedFormField(formData, 'to_contact', messageData.toContact);
-
+    // https://developers.zoom.us/docs/api/team-chat/#tag/chat-messages/POST/chat/users/{userId}/messages
     let response = await api.post(
       `/chat/users/${encodeURIComponent(userId)}/messages`,
-      formData,
+      pickDefined({
+        message: messageData.message,
+        to_channel: messageData.toChannel,
+        to_contact: messageData.toContact,
+        reply_main_message_id: messageData.replyMainMessageId
+      }),
       { headers: this.headers }
     );
     return response.data;
@@ -549,14 +545,76 @@ export class ZoomClient {
       toContact?: string;
     }
   ) {
-    let formData = new FormData();
-    formData.append('message', messageData.message);
-    appendDefinedFormField(formData, 'to_channel', messageData.toChannel);
-    appendDefinedFormField(formData, 'to_contact', messageData.toContact);
-
+    // https://developers.zoom.us/docs/api/team-chat/#tag/chat-messages/PUT/chat/users/{userId}/messages/{messageId}
     let response = await api.put(
       `/chat/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}`,
-      formData,
+      pickDefined({
+        message: messageData.message,
+        to_channel: messageData.toChannel,
+        to_contact: messageData.toContact
+      }),
+      { headers: this.headers }
+    );
+    return response.data;
+  }
+
+  async getChatThread(
+    messageId: string,
+    userId: string,
+    params: {
+      toChannel?: string;
+      toContact?: string;
+      from: string;
+      to?: string;
+      limit?: number;
+      sort?: 'asc' | 'desc';
+      needMainMessage?: boolean;
+      needEmoji?: boolean;
+      needAttachment?: boolean;
+    }
+  ) {
+    // https://developers.zoom.us/docs/api/team-chat/#tag/chat-messages/GET/chat/users/{userId}/messages/{messageId}/thread
+    let query = new URLSearchParams();
+    if (params.toChannel) query.set('to_channel', params.toChannel);
+    if (params.toContact) query.set('to_contact', params.toContact);
+    query.set('from', params.from);
+    if (params.to) query.set('to', params.to);
+    if (params.limit) query.set('limit', String(params.limit));
+    if (params.sort) query.set('sort', params.sort);
+    if (params.needMainMessage !== undefined) {
+      query.set('need_main_message', String(params.needMainMessage));
+    }
+    if (params.needEmoji !== undefined) query.set('need_emoji', String(params.needEmoji));
+    if (params.needAttachment !== undefined) {
+      query.set('need_attachment', String(params.needAttachment));
+    }
+
+    let response = await api.get(
+      `/chat/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/thread?${query.toString()}`,
+      { headers: this.headers }
+    );
+    return response.data;
+  }
+
+  async reactToChatMessage(
+    messageId: string,
+    userId: string,
+    reaction: {
+      action: 'add' | 'remove';
+      emoji: string;
+      toChannel?: string;
+      toContact?: string;
+    }
+  ) {
+    // https://developers.zoom.us/docs/api/team-chat/#tag/chat-messages/PATCH/chat/users/{userId}/messages/{messageId}/emoji_reactions
+    let response = await api.patch(
+      `/chat/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/emoji_reactions`,
+      pickDefined({
+        action: reaction.action,
+        emoji: reaction.emoji,
+        to_channel: reaction.toChannel,
+        to_contact: reaction.toContact
+      }),
       { headers: this.headers }
     );
     return response.data;
@@ -594,9 +652,11 @@ export class ZoomClient {
     if (params?.pageSize) query.set('page_size', String(params.pageSize));
     if (params?.nextPageToken) query.set('next_page_token', params.nextPageToken);
 
-    let response = await api.get(`/chat/channels/${channelId}/members?${query.toString()}`, {
-      headers: this.headers
-    });
+    // https://developers.zoom.us/docs/api/team-chat/#tag/chat-channels/GET/chat/channels/{channelId}/members
+    let response = await api.get(
+      `/chat/channels/${encodeURIComponent(channelId)}/members?${query.toString()}`,
+      { headers: this.headers }
+    );
     return response.data;
   }
 

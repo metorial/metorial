@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
@@ -47,6 +47,11 @@ export let manageChannel = SlateTool.create(spec, {
     let client = new GraphClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.displayName) {
+        throw createApiServiceError('displayName is required to create a channel.', {
+          reason: 'microsoft_teams_channel_display_name_missing'
+        });
+      }
       let body: any = {
         displayName: ctx.input.displayName,
         description: ctx.input.description || ''
@@ -67,7 +72,14 @@ export let manageChannel = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.channelId) throw new Error('channelId is required for update');
+      if (!ctx.input.channelId) {
+        throw createApiServiceError(
+          'channelId is required for update. Call list_channels to find it.',
+          {
+            reason: 'microsoft_teams_channel_id_missing'
+          }
+        );
+      }
       let body: any = {};
       if (ctx.input.displayName) body.displayName = ctx.input.displayName;
       if (ctx.input.description !== undefined) body.description = ctx.input.description;
@@ -84,7 +96,14 @@ export let manageChannel = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.channelId) throw new Error('channelId is required for delete');
+      if (!ctx.input.channelId) {
+        throw createApiServiceError(
+          'channelId is required for delete. Call list_channels to find it.',
+          {
+            reason: 'microsoft_teams_channel_id_missing'
+          }
+        );
+      }
       await client.deleteChannel(ctx.input.teamId, ctx.input.channelId);
       return {
         output: {
@@ -95,6 +114,8 @@ export let manageChannel = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`, {
+      reason: 'microsoft_teams_action_invalid'
+    });
   })
   .build();

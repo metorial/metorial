@@ -26,7 +26,7 @@ let extractWordPressMessage = (error: unknown) => {
   let details: string[] = [];
 
   if (isRecord(data)) {
-    for (let key of ['message', 'error', 'code']) {
+    for (let key of ['message', 'error_description', 'error', 'code']) {
       addDetail(details, data[key]);
     }
 

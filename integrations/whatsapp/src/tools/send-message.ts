@@ -99,10 +99,11 @@ export let sendMessage = SlateTool.create(spec, {
   description: `Send a WhatsApp message to a recipient. Supports multiple message types: **text**, **image**, **video**, **audio**, **document**, **location**, **contacts**, **sticker**, and **reaction**.
 For text messages within the 24-hour customer service window, use this tool. For messages outside the window, use the Send Template Message tool instead.`,
   instructions: [
-    'The recipient phone number must include the country code (e.g. +15551234567 or 15551234567)',
+    'The recipient phone number must include the country code; Meta recommends the leading plus sign (e.g. +15551234567) to avoid misdelivery',
     'For media messages, provide either a public URL (link) or a previously uploaded media ID, not both',
     'Stickers must be WEBP format, 512x512px. Static: max 100KB, animated: max 500KB',
-    'Reaction messages require the original message ID to react to'
+    'Reaction messages require the original message ID to react to',
+    'Set replyToMessageId to quote an earlier message as a contextual reply (not available for reactions)'
   ],
   constraints: [
     'Free-form messages can only be sent within the 24-hour customer service window after the customer messages you',
@@ -180,7 +181,14 @@ For text messages within the 24-hour customer service window, use this tool. For
             )
         })
         .optional()
-        .describe('Required when type is "reaction"')
+        .describe('Required when type is "reaction"'),
+      replyToMessageId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'Optional WhatsApp message ID (wamid) to quote, sending this message as a contextual reply. Not supported for reactions.'
+        )
     })
   )
   .output(
@@ -199,7 +207,13 @@ For text messages within the 24-hour customer service window, use this tool. For
     });
 
     let result: any;
-    let { type, to } = ctx.input;
+    let { type, to, replyToMessageId } = ctx.input;
+
+    if (type === 'reaction' && replyToMessageId) {
+      throw createApiServiceError(
+        'Reactions cannot be sent as contextual replies. Remove replyToMessageId and set reaction.messageId instead.'
+      );
+    }
 
     switch (type) {
       case 'text': {
@@ -208,38 +222,39 @@ For text messages within the 24-hour customer service window, use this tool. For
         result = await client.sendTextMessage(
           to,
           ctx.input.text.body,
-          ctx.input.text.previewUrl
+          ctx.input.text.previewUrl,
+          replyToMessageId
         );
         break;
       }
       case 'image': {
         if (!ctx.input.image)
           throw createApiServiceError('image field is required for image messages');
-        result = await client.sendImageMessage(to, ctx.input.image);
+        result = await client.sendImageMessage(to, ctx.input.image, replyToMessageId);
         break;
       }
       case 'video': {
         if (!ctx.input.video)
           throw createApiServiceError('video field is required for video messages');
-        result = await client.sendVideoMessage(to, ctx.input.video);
+        result = await client.sendVideoMessage(to, ctx.input.video, replyToMessageId);
         break;
       }
       case 'audio': {
         if (!ctx.input.audio)
           throw createApiServiceError('audio field is required for audio messages');
-        result = await client.sendAudioMessage(to, ctx.input.audio);
+        result = await client.sendAudioMessage(to, ctx.input.audio, replyToMessageId);
         break;
       }
       case 'document': {
         if (!ctx.input.document)
           throw createApiServiceError('document field is required for document messages');
-        result = await client.sendDocumentMessage(to, ctx.input.document);
+        result = await client.sendDocumentMessage(to, ctx.input.document, replyToMessageId);
         break;
       }
       case 'location': {
         if (!ctx.input.location)
           throw createApiServiceError('location field is required for location messages');
-        result = await client.sendLocationMessage(to, ctx.input.location);
+        result = await client.sendLocationMessage(to, ctx.input.location, replyToMessageId);
         break;
       }
       case 'contacts': {
@@ -281,13 +296,13 @@ For text messages within the 24-hour customer service window, use this tool. For
             : undefined,
           birthday: c.birthday
         }));
-        result = await client.sendContactsMessage(to, formattedContacts);
+        result = await client.sendContactsMessage(to, formattedContacts, replyToMessageId);
         break;
       }
       case 'sticker': {
         if (!ctx.input.sticker)
           throw createApiServiceError('sticker field is required for sticker messages');
-        result = await client.sendStickerMessage(to, ctx.input.sticker);
+        result = await client.sendStickerMessage(to, ctx.input.sticker, replyToMessageId);
         break;
       }
       case 'reaction': {

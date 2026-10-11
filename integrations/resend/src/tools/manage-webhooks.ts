@@ -18,7 +18,29 @@ let webhookEventSchema = z.enum([
   'contact.deleted',
   'domain.created',
   'domain.updated',
-  'domain.deleted'
+  'domain.deleted',
+  'email.scheduled',
+  'email.suppressed',
+  'contact.topics.updated',
+  'suppression.added',
+  'suppression.removed',
+  'topic.created',
+  'topic.updated',
+  'topic.deleted',
+  'inbox.created',
+  'inbox.updated',
+  'inbox.deleted',
+  'inbox.email.received',
+  'inbox.email.sent',
+  'inbox.thread.created',
+  'inbox.thread.assigned',
+  'inbox.thread.unassigned',
+  'inbox.thread.folder.updated',
+  'inbox.thread.labels.updated',
+  'inbox.draft.created',
+  'inbox.draft.updated',
+  'inbox.draft.deleted',
+  'inbox.draft.sent'
 ]);
 
 let webhookOutputSchema = z.object({
@@ -36,7 +58,7 @@ let webhookOutputSchema = z.object({
 export let createWebhook = SlateTool.create(spec, {
   name: 'Create Webhook',
   key: 'create_webhook',
-  description: `Create a Resend webhook endpoint for email, contact, or domain events.`,
+  description: `Create a Resend webhook endpoint for email, contact, domain, suppression, topic, or inbox events. The signing secret is returned on creation.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -45,7 +67,11 @@ export let createWebhook = SlateTool.create(spec, {
   .input(
     z.object({
       endpoint: z.string().describe('HTTPS endpoint URL that will receive webhook events.'),
-      events: z.array(webhookEventSchema).describe('Resend event names to subscribe to.')
+      events: z
+        .array(webhookEventSchema)
+        .describe(
+          'Resend event names to subscribe to. inbox.* events require Resend Inboxes, which is in private beta.'
+        )
     })
   )
   .output(webhookOutputSchema)
@@ -115,7 +141,12 @@ export let updateWebhook = SlateTool.create(spec, {
     z.object({
       webhookId: z.string().describe('Webhook ID.'),
       endpoint: z.string().optional().describe('Updated HTTPS endpoint URL.'),
-      events: z.array(webhookEventSchema).optional().describe('Updated event subscriptions.'),
+      events: z
+        .array(webhookEventSchema)
+        .optional()
+        .describe(
+          'Updated event subscriptions. inbox.* events require Resend Inboxes, which is in private beta.'
+        ),
       status: z.enum(['enabled', 'disabled']).optional().describe('Updated webhook status.')
     })
   )

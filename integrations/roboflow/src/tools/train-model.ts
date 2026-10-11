@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let trainModelTool = SlateTool.create(spec, {
   name: 'Train Model',
   key: 'train_model',
-  description: `Start training a model on a specific dataset version using Roboflow Train. Training runs asynchronously and typically completes within 24 hours. Once done, the model is automatically deployed to a hosted inference API. Use **Get Version** to monitor training progress and results.`,
+  description: `Start training a model on a specific dataset version using Roboflow Train. Training runs asynchronously and typically completes within 24 hours. Once done, the model is automatically deployed to a hosted inference API. Use **Get Version** to monitor training progress and results, and **Stop Training** to end it early.`,
   instructions: [
     'The dataset version must already be generated before training.',
     'Training is asynchronous - this returns immediately after starting.'
@@ -28,7 +28,14 @@ export let trainModelTool = SlateTool.create(spec, {
           'Specific model architecture (e.g., "rfdetr-nano"). Overrides speed if provided.'
         ),
       epochs: z.number().int().positive().optional().describe('Number of training epochs'),
-      checkpoint: z.string().optional().describe('Checkpoint to resume training from')
+      checkpoint: z.string().optional().describe('Checkpoint to resume training from'),
+      trainingCreditCap: z
+        .number()
+        .positive()
+        .optional()
+        .describe(
+          'Maximum credits the training may spend before it stops and keeps its weights. Must be at least the model minimum; only valid on credit-billed workspaces.'
+        )
     })
   )
   .output(
@@ -48,7 +55,8 @@ export let trainModelTool = SlateTool.create(spec, {
         speed: ctx.input.speed,
         modelType: ctx.input.modelType,
         epochs: ctx.input.epochs,
-        checkpoint: ctx.input.checkpoint
+        checkpoint: ctx.input.checkpoint,
+        trainingCreditCap: ctx.input.trainingCreditCap
       }
     );
 

@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import { GitHubClient } from './lib/client';
 import {
@@ -16,15 +17,21 @@ import {
 } from './tools';
 import { mapCommit, mapRelease } from './tools/repository-read-contracts';
 
-const invoke = (tool: any, input: unknown) =>
-  tool.handleInvocation({
+const invoke = async (tool: any, input: unknown) => {
+  const addedAttachments: unknown[] = [];
+  const result = await tool.handleInvocation({
     auth: {
       token: 'test-token',
       instanceUrl: 'https://github.com'
     },
     config: {},
-    input
+    input,
+    addAttachment: async (attachment: unknown) => {
+      addedAttachments.push(attachment);
+    }
   });
+  return { ...result, addedAttachments };
+};
 
 describe('GitHub read-tool runtime validation', () => {
   it('returns file content as an attachment without exposing transport metadata', async () => {
@@ -56,14 +63,11 @@ describe('GitHub read-tool runtime validation', () => {
         size: 5
       });
       expect(result.output).not.toHaveProperty('attachmentReturned');
-      expect(result.attachments).toEqual([
+      expect(result.addedAttachments).toEqual([
         {
-          mimeType: 'application/octet-stream',
-          content: {
-            type: 'content',
-            encoding: 'base64',
-            content: 'aGVsbG8='
-          }
+          type: 'content',
+          content: Uint8Array.from(Buffer.from('aGVsbG8=', 'base64')),
+          mimeType: 'application/octet-stream'
         }
       ]);
     } finally {

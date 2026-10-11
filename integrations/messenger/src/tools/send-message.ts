@@ -1,7 +1,13 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createMessengerClient } from '../lib/client';
 import { messengerServiceError } from '../lib/errors';
+import {
+  messageTagSchema,
+  messagingTypeSchema,
+  replyToMessageIdSchema,
+  validateMessagingPolicy
+} from '../lib/messaging';
 import { spec } from '../spec';
 
 let isHttpsUrl = (value: string) => /^https:\/\//i.test(value);
@@ -32,16 +38,6 @@ let quickReplySchema = z
   })
   .describe('A quick reply option presented to the user');
 
-let validateMessagingPolicy = (messagingType: string, tag?: string) => {
-  if (messagingType === 'MESSAGE_TAG' && !tag) {
-    throw messengerServiceError('tag is required when messagingType is MESSAGE_TAG');
-  }
-
-  if (tag && messagingType !== 'MESSAGE_TAG') {
-    throw messengerServiceError('tag can only be used when messagingType is MESSAGE_TAG');
-  }
-};
-
 let validateQuickReplies = (
   quickReplies?: Array<{ contentType: string; title?: string; payload?: string }>
 ) => {
@@ -55,16 +51,18 @@ let validateQuickReplies = (
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a text message or media attachment to a Messenger user. Supports plain text with optional quick reply buttons, and media attachments (images, videos, audio, files) via URL.
-Use **messagingType** and **tag** to send messages outside the 24-hour messaging window.`,
+  description: `Send a text message or media attachment to a Messenger user. Supports plain text with optional quick reply buttons, media attachments (images, videos, audio, files) via URL or reusable attachment ID, multiple images, and replies to a specific earlier message.
+Use **messagingType** and **tag** to send a human agent reply outside the 24-hour messaging window.`,
   instructions: [
-    'The recipientId is the Page-Scoped User ID (PSID) of the recipient.',
+    'The recipientId is the Page-Scoped User ID (PSID) of the recipient. Use List Conversations to find PSIDs of people who messaged the Page.',
     'Quick replies can only be attached to text messages.',
+    'Set replyToMessageId to quote an earlier message from the conversation.',
     'For sending structured templates (carousels, buttons, receipts), use the Send Template tool instead.'
   ],
   constraints: [
-    'Messages can only be sent to users who have initiated a conversation within the last 24 hours, unless a message tag is used.',
-    'Quick replies are limited to 13 items.'
+    'Messages can only be sent within the standard messaging window (usually 24 hours after the person’s last message). Outside it, only the HUMAN_AGENT tag is accepted, within 7 days and with the Human Agent permission.',
+    'Quick replies are limited to 13 items.',
+    'Media fetched from a URL is limited to 8 MB for images and 25 MB for other files.'
   ],
   tags: {
     destructive: false,
@@ -101,7 +99,9 @@ Use **messagingType** and **tag** to send messages outside the 24-hour messaging
       isReusable: z
         .boolean()
         .optional()
-        .describe('Whether the attachment can be reused in future messages'),
+        .describe(
+          'Whether Messenger should save a URL attachment for reuse and return its attachment ID (IDs expire after 90 days)'
+        ),
       imageUrls: z
         .array(z.string().refine(isHttpsUrl, 'Each image URL must be a public HTTPS URL'))
         .min(2)
@@ -115,37 +115,25 @@ Use **messagingType** and **tag** to send messages outside the 24-hour messaging
         .max(13)
         .optional()
         .describe('Quick reply buttons to display (only for text messages)'),
-      messagingType: z
-        .enum(['RESPONSE', 'UPDATE', 'MESSAGE_TAG'])
-        .default('RESPONSE')
-        .describe(
-          'The messaging type: RESPONSE (reply to user message), UPDATE (proactive update), MESSAGE_TAG (outside 24h window)'
-        ),
-      tag: z
-        .enum([
-          'CONFIRMED_EVENT_UPDATE',
-          'POST_PURCHASE_UPDATE',
-          'ACCOUNT_UPDATE',
-          'HUMAN_AGENT'
-        ])
-        .optional()
-        .describe(
-          'Message tag for sending outside the 24-hour window. Required when messagingType is MESSAGE_TAG.'
-        )
+      replyToMessageId: replyToMessageIdSchema,
+      messagingType: messagingTypeSchema,
+      tag: messageTagSchema
     })
   )
   .output(
     z.object({
       recipientId: z.string().describe('PSID of the message recipient'),
-      messageId: z.string().describe('ID of the sent message')
+      messageId: z.string().describe('ID of the sent message'),
+      attachmentId: z
+        .string()
+        .optional()
+        .describe(
+          'Reusable attachment ID, returned when isReusable was set for a URL attachment'
+        )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      pageId: ctx.config.pageId,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = createMessengerClient(ctx);
 
     let result: any;
     let hasText = typeof ctx.input.text === 'string' && ctx.input.text.length > 0;
@@ -170,7 +158,8 @@ Use **messagingType** and **tag** to send messages outside the 24-hour messaging
         recipientId: ctx.input.recipientId,
         imageUrls: ctx.input.imageUrls,
         messagingType: ctx.input.messagingType,
-        tag: ctx.input.tag
+        tag: ctx.input.tag,
+        replyToMessageId: ctx.input.replyToMessageId
       });
     } else if (ctx.input.attachmentType) {
       if (Boolean(ctx.input.attachmentUrl) === Boolean(ctx.input.attachmentId)) {
@@ -186,7 +175,8 @@ Use **messagingType** and **tag** to send messages outside the 24-hour messaging
         attachmentId: ctx.input.attachmentId,
         isReusable: ctx.input.isReusable,
         messagingType: ctx.input.messagingType,
-        tag: ctx.input.tag
+        tag: ctx.input.tag,
+        replyToMessageId: ctx.input.replyToMessageId
       });
     } else {
       result = await client.sendTextMessage({
@@ -194,14 +184,22 @@ Use **messagingType** and **tag** to send messages outside the 24-hour messaging
         text: ctx.input.text as string,
         quickReplies: ctx.input.quickReplies,
         messagingType: ctx.input.messagingType,
-        tag: ctx.input.tag
+        tag: ctx.input.tag,
+        replyToMessageId: ctx.input.replyToMessageId
       });
+    }
+
+    if (!result?.message_id) {
+      throw messengerServiceError(
+        'Messenger accepted the request but did not return a message ID'
+      );
     }
 
     return {
       output: {
-        recipientId: result.recipient_id,
-        messageId: result.message_id
+        recipientId: result.recipient_id ?? ctx.input.recipientId,
+        messageId: result.message_id,
+        ...(result.attachment_id ? { attachmentId: String(result.attachment_id) } : {})
       },
       message: `Message sent successfully to user **${result.recipient_id}** (message ID: ${result.message_id}).`
     };

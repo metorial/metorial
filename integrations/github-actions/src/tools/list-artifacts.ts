@@ -39,6 +39,7 @@ export let listArtifacts = SlateTool.create(spec, {
   .output(
     z.object({
       totalCount: z.number().describe('Total number of artifacts'),
+      nextPage: z.number().optional().describe('Next page number, when more artifacts exist'),
       artifacts: z.array(artifactSchema).describe('List of artifacts')
     })
   )
@@ -65,6 +66,7 @@ export let listArtifacts = SlateTool.create(spec, {
     return {
       output: {
         totalCount: data.total_count,
+        nextPage: data.nextPage,
         artifacts
       },
       message: `Found **${data.total_count}** artifacts${runId ? ` for run #${runId}` : ''} in **${owner}/${repo}**.`

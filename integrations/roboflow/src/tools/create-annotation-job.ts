@@ -32,7 +32,12 @@ export let createAnnotationJobTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      jobId: z.string().optional().describe('Unique identifier of the created job'),
+      jobId: z
+        .string()
+        .optional()
+        .describe('Unique identifier of the created job for list_annotation_jobs'),
+      status: z.string().optional().describe('Initial job status, such as assigned'),
+      totalImages: z.number().optional().describe('Number of images moved into the job'),
       success: z.boolean().describe('Whether the job was created successfully')
     })
   )
@@ -51,6 +56,8 @@ export let createAnnotationJobTool = SlateTool.create(spec, {
     return {
       output: {
         jobId: result.id || result.job?.id,
+        status: result.status ?? result.job?.status,
+        totalImages: result.numImages ?? result.job?.numImages,
         success: true
       },
       message: `Created annotation job **${ctx.input.name}** with labeler **${ctx.input.labelerEmail}** and reviewer **${ctx.input.reviewerEmail}**.`

@@ -75,6 +75,12 @@ export let listWorkflowRuns = SlateTool.create(spec, {
   .output(
     z.object({
       totalCount: z.number().describe('Total number of matching runs'),
+      nextPage: z
+        .number()
+        .optional()
+        .describe(
+          'Next page number, when GitHub can return more runs; filtered searches stop after 1,000 runs even if totalCount is higher'
+        ),
       runs: z.array(workflowRunSchema).describe('List of workflow runs')
     })
   )
@@ -115,6 +121,7 @@ export let listWorkflowRuns = SlateTool.create(spec, {
     return {
       output: {
         totalCount: data.total_count,
+        nextPage: data.nextPage,
         runs
       },
       message: `Found **${data.total_count}** workflow runs in **${ctx.input.owner}/${ctx.input.repo}**.`

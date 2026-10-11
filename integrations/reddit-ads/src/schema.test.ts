@@ -37,10 +37,10 @@ it.each(
   compare(schemas.input, z.toJSONSchema(action.inputSchema as z.ZodType), true);
   compare(schemas.output, z.toJSONSchema(action.outputSchema as z.ZodType), false);
 });
-it('retains12 legacy keys and registers only four bounded additions with short IDs', () => {
+it('retains 12 legacy keys and registers only six bounded additions with short IDs', () => {
   expect(Object.keys(legacy)).toHaveLength(12);
-  expect(provider.actions.filter(action => action.type === 'tool')).toHaveLength(16);
-  expect(new Set(provider.actions.map(action => action.key)).size).toBe(16);
+  expect(provider.actions.filter(action => action.type === 'tool')).toHaveLength(18);
+  expect(new Set(provider.actions.map(action => action.key)).size).toBe(18);
   for (const action of provider.actions)
     expect(`reddit-ads-${action.key}`.length).toBeLessThan(60);
   expect(spec.authSchema.parse({ token: 'schema-only-token' })).toEqual({

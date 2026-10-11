@@ -32,14 +32,19 @@ export let manageCaches = SlateTool.create(spec, {
       key: z
         .string()
         .optional()
-        .describe('Cache key for filtering (list) or deleting (delete_by_key)'),
-      ref: z.string().optional().describe('Git ref to filter by'),
+        .describe(
+          'Cache key or key prefix for filtering (list), or the complete cache key to delete (delete_by_key)'
+        ),
+      ref: z
+        .string()
+        .optional()
+        .describe('Full Git ref to filter by, such as refs/heads/main or refs/pull/123/merge'),
       sort: z
         .enum(['created_at', 'last_accessed_at', 'size_in_bytes'])
         .optional()
         .describe('Sort field'),
       direction: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
-      perPage: z.number().optional().describe('Results per page'),
+      perPage: z.number().optional().describe('Results per page (max 100, default 30)'),
       page: z.number().optional().describe('Page number')
     })
   )
@@ -47,6 +52,7 @@ export let manageCaches = SlateTool.create(spec, {
     z.object({
       caches: z.array(cacheSchema).optional().describe('List of caches'),
       totalCount: z.number().optional().describe('Total number of caches'),
+      nextPage: z.number().optional().describe('Next page number, when more caches exist'),
       deleted: z.boolean().optional().describe('Whether the cache(s) were deleted')
     })
   )
@@ -96,7 +102,7 @@ export let manageCaches = SlateTool.create(spec, {
     }));
 
     return {
-      output: { caches, totalCount: data.total_count },
+      output: { caches, totalCount: data.total_count, nextPage: data.nextPage },
       message: `Found **${data.total_count}** caches in **${owner}/${repo}**.`
     };
   })

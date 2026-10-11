@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { HubClient } from '../lib/client';
+import { collectionWebUrl, HubClient } from '../lib/client';
 import { huggingFaceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
@@ -10,18 +10,33 @@ let collectionSummarySchema = z.object({
   description: z.string().optional().describe('Collection description'),
   owner: z.string().optional().describe('Owner username or organization'),
   private: z.boolean().optional().describe('Whether the collection is private'),
-  itemCount: z.number().optional().describe('Number of items in the collection'),
+  itemCount: z
+    .number()
+    .optional()
+    .describe(
+      'Number of item previews included in this listing (Hugging Face returns at most 4 per collection); call get_collection for the full item list'
+    ),
   lastUpdated: z.string().optional().describe('Last updated timestamp')
 });
+
+let ownerName = (owner: any) =>
+  typeof owner === 'string' ? owner : (owner?.name ?? undefined);
 
 let mapCollectionSummary = (collection: any) => ({
   slug: collection.slug,
   title: collection.title,
-  description: collection.description,
-  owner: collection.owner?.name || collection.owner,
+  description: collection.description ?? undefined,
+  owner: ownerName(collection.owner),
   private: collection.private,
   itemCount: Array.isArray(collection.items) ? collection.items.length : collection.itemCount,
   lastUpdated: collection.lastUpdated || collection.updatedAt
+});
+
+let mapCollectionItem = (item: any) => ({
+  itemObjectId: item._id,
+  itemId: item.id ?? item._id,
+  itemType: item.type,
+  note: typeof item.note === 'string' ? item.note : (item.note?.text ?? undefined)
 });
 
 export let listCollectionsTool = SlateTool.create(spec, {
@@ -66,15 +81,13 @@ export let listCollectionsTool = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let rawCollections = Array.isArray(result)
-      ? result
-      : result.collections || result.items || result.data || [];
+    let rawCollections = Array.isArray(result.data) ? result.data : [];
     let collections = rawCollections.map(mapCollectionSummary);
 
     return {
       output: {
         collections,
-        nextCursor: result.nextCursor || result.cursor
+        nextCursor: result.nextCursor
       },
       message: `Found **${collections.length}** collection(s).`
     };
@@ -104,13 +117,20 @@ export let getCollectionTool = SlateTool.create(spec, {
       items: z
         .array(
           z.object({
-            itemId: z.string().describe('Item ID'),
-            itemType: z.string().describe('Item type (model, dataset, space)'),
+            itemObjectId: z
+              .string()
+              .optional()
+              .describe('Collection item object ID, used by remove_collection_item'),
+            itemId: z.string().describe('Item ID (repository ID or paper ID)'),
+            itemType: z
+              .string()
+              .describe('Item type (model, dataset, space, paper, collection)'),
             note: z.string().optional().describe('Note about the item')
           })
         )
         .describe('Items in the collection'),
-      lastUpdated: z.string().optional().describe('Last updated timestamp')
+      lastUpdated: z.string().optional().describe('Last updated timestamp'),
+      url: z.string().optional().describe('URL to the collection')
     })
   )
   .handleInvocation(async ctx => {
@@ -118,21 +138,18 @@ export let getCollectionTool = SlateTool.create(spec, {
 
     let collection = await client.getCollection({ slug: ctx.input.slug });
 
-    let items = (collection.items || []).map((item: any) => ({
-      itemId: item.id || item._id,
-      itemType: item.type,
-      note: item.note
-    }));
+    let items = (collection.items || []).map(mapCollectionItem);
 
     return {
       output: {
         slug: collection.slug,
         title: collection.title,
-        description: collection.description,
-        owner: collection.owner,
+        description: collection.description ?? undefined,
+        owner: ownerName(collection.owner),
         private: collection.private,
         items,
-        lastUpdated: collection.lastUpdated
+        lastUpdated: collection.lastUpdated,
+        url: collectionWebUrl(collection.slug ?? ctx.input.slug)
       },
       message: `Retrieved collection **"${collection.title}"** with **${items.length}** item(s).`
     };
@@ -149,9 +166,16 @@ export let createCollectionTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      title: z.string().describe('Collection title'),
-      namespace: z.string().describe('User or organization namespace for the collection'),
-      description: z.string().optional().describe('Collection description'),
+      title: z.string().describe('Collection title (up to 60 characters)'),
+      namespace: z
+        .string()
+        .describe(
+          'User or organization namespace for the collection. Call get_user_info to discover your username and organizations.'
+        ),
+      description: z
+        .string()
+        .optional()
+        .describe('Collection description (up to 150 characters)'),
       private: z
         .boolean()
         .optional()
@@ -180,7 +204,7 @@ export let createCollectionTool = SlateTool.create(spec, {
       output: {
         slug: result.slug,
         title: result.title,
-        url: result.url
+        url: result.url ?? (result.slug ? collectionWebUrl(result.slug) : undefined)
       },
       message: `Created collection **"${ctx.input.title}"** in namespace **${ctx.input.namespace}**.`
     };
@@ -240,13 +264,13 @@ export let updateCollectionTool = SlateTool.create(spec, {
 
     return {
       output: {
-        slug: result.slug || ctx.input.slug,
-        title: result.title,
-        description: result.description,
-        private: result.private,
-        url: result.url
+        slug: result?.slug || ctx.input.slug,
+        title: result?.title,
+        description: result?.description ?? undefined,
+        private: result?.private,
+        url: collectionWebUrl(result?.slug || ctx.input.slug)
       },
-      message: `Updated collection **${result.slug || ctx.input.slug}**.`
+      message: `Updated collection **${result?.slug || ctx.input.slug}**.`
     };
   })
   .build();
@@ -297,21 +321,31 @@ export let addCollectionItemTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      added: z.boolean().describe('Whether the item was successfully added')
+      added: z.boolean().describe('Whether the item was successfully added'),
+      itemObjectId: z
+        .string()
+        .optional()
+        .describe(
+          'Collection item object ID of the added item, used by remove_collection_item'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new HubClient({ token: ctx.auth.token });
 
-    await client.addCollectionItem({
+    let collection = await client.addCollectionItem({
       slug: ctx.input.slug,
       itemId: ctx.input.itemId,
       itemType: ctx.input.itemType,
       note: ctx.input.note
     });
 
+    let addedItem = (collection?.items || []).find(
+      (item: any) => item.id === ctx.input.itemId && item.type === ctx.input.itemType
+    );
+
     return {
-      output: { added: true },
+      output: { added: true, itemObjectId: addedItem?._id },
       message: `Added **${ctx.input.itemId}** (${ctx.input.itemType}) to collection **${ctx.input.slug}**.`
     };
   })
@@ -320,7 +354,7 @@ export let addCollectionItemTool = SlateTool.create(spec, {
 export let removeCollectionItemTool = SlateTool.create(spec, {
   name: 'Remove Collection Item',
   key: 'remove_collection_item',
-  description: `Remove an item from a collection.`,
+  description: `Remove an item from a collection. Accepts either the collection item object ID returned by get_collection or add_collection_item, or the repository ID of the item.`,
   tags: {
     destructive: true
   }
@@ -328,7 +362,15 @@ export let removeCollectionItemTool = SlateTool.create(spec, {
   .input(
     z.object({
       slug: z.string().describe('Collection slug'),
-      itemId: z.string().describe('ID of the item to remove')
+      itemId: z
+        .string()
+        .describe(
+          'Collection item object ID (itemObjectId from get_collection) or the repository ID of the item (e.g. "username/repo-name")'
+        ),
+      itemType: z
+        .enum(['model', 'dataset', 'space', 'paper', 'collection'])
+        .optional()
+        .describe('Item type, used to disambiguate when itemId is a repository ID')
     })
   )
   .output(
@@ -339,14 +381,37 @@ export let removeCollectionItemTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HubClient({ token: ctx.auth.token });
 
+    let itemObjectId = ctx.input.itemId;
+    let collection = await client.getCollection({ slug: ctx.input.slug });
+    let items: any[] = Array.isArray(collection?.items) ? collection.items : [];
+
+    if (!items.some(item => item._id === itemObjectId)) {
+      let matches = items.filter(
+        item =>
+          item.id === ctx.input.itemId &&
+          (!ctx.input.itemType || item.type === ctx.input.itemType)
+      );
+      if (matches.length === 0) {
+        throw huggingFaceServiceError(
+          `Item "${ctx.input.itemId}" was not found in collection "${ctx.input.slug}". Call get_collection to list its items.`
+        );
+      }
+      if (matches.length > 1) {
+        throw huggingFaceServiceError(
+          `Multiple items match "${ctx.input.itemId}" in collection "${ctx.input.slug}". Provide itemType or the itemObjectId from get_collection.`
+        );
+      }
+      itemObjectId = matches[0]._id;
+    }
+
     await client.removeCollectionItem({
       slug: ctx.input.slug,
-      itemId: ctx.input.itemId
+      itemObjectId
     });
 
     return {
       output: { removed: true },
-      message: `Removed item from collection **${ctx.input.slug}**.`
+      message: `Removed **${ctx.input.itemId}** from collection **${ctx.input.slug}**.`
     };
   })
   .build();

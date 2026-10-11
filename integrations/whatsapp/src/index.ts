@@ -15,7 +15,8 @@ import {
   sendInteractiveMessage,
   sendMessage,
   sendTemplateMessage,
-  updateBusinessProfile
+  updateBusinessProfile,
+  updateTemplate
 } from './tools';
 import { getFileUrl } from './tools/get-file-url';
 import { whatsappWebhookTriggerGroup } from './triggers';
@@ -28,6 +29,7 @@ export let provider = Slate.create({
     sendTemplateMessage,
     listTemplates,
     createTemplate,
+    updateTemplate,
     deleteTemplate,
     getMediaUrl,
     deleteMedia,

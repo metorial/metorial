@@ -1,5 +1,6 @@
 export * from './get-catalog-version';
 export * from './get-site-properties';
+export * from './list-data-collections';
 export * from './manage-blog';
 export * from './manage-bookings';
 export * from './manage-collections';

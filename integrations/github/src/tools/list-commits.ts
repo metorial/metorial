@@ -53,7 +53,11 @@ export let listCommits = SlateTool.create(spec, {
           htmlUrl: z.string().describe('URL to the commit on GitHub')
         })
       ),
-      totalCount: z.number().describe('Number of commits returned')
+      totalCount: z.number().describe('Number of commits returned'),
+      hasNextPage: z
+        .boolean()
+        .optional()
+        .describe('Whether GitHub reports another page; request page + 1 to continue')
     })
   )
   .handleInvocation(async ctx => {
@@ -61,7 +65,7 @@ export let listCommits = SlateTool.create(spec, {
       token: ctx.auth.token,
       instanceUrl: ctx.auth.instanceUrl
     });
-    let commits = await client.listCommits(ctx.input.owner, ctx.input.repo, {
+    let result = await client.listCommits(ctx.input.owner, ctx.input.repo, {
       sha: ctx.input.sha,
       path: ctx.input.path,
       author: ctx.input.author,
@@ -71,7 +75,7 @@ export let listCommits = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let mapped = commits.map((c: any) => ({
+    let mapped = result.items.map((c: any) => ({
       sha: c.sha,
       message: c.commit.message,
       author: c.author?.login ?? null,
@@ -82,7 +86,7 @@ export let listCommits = SlateTool.create(spec, {
     }));
 
     return {
-      output: { commits: mapped, totalCount: mapped.length },
+      output: { commits: mapped, totalCount: mapped.length, hasNextPage: result.hasNextPage },
       message: `Found **${mapped.length}** commits in **${ctx.input.owner}/${ctx.input.repo}**${ctx.input.sha ? ` on \`${ctx.input.sha}\`` : ''}.`
     };
   })

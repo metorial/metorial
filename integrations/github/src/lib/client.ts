@@ -106,6 +106,16 @@ export let cursorPageInfoFromLink = (linkHeader: string | undefined): GitHubCurs
   };
 };
 
+// GitHub REST list endpoints paginate with page/per_page and advertise the next page through
+// a Link header rel="next": https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api
+export let hasNextPageInLink = (linkHeader: string | undefined) =>
+  Boolean(linkHeader?.split(',').some(part => /;\s*rel="next"/.test(part)));
+
+export interface GitHubRestPage<T> {
+  items: T[];
+  hasNextPage: boolean;
+}
+
 export type GitHubDownloadMode = 'text' | 'binary';
 
 export interface GitHubDownloadRequestOptions {
@@ -291,6 +301,23 @@ export class GitHubClient {
     return `${this.instanceUrl}/${owner}/${repo}`;
   }
 
+  getApiBaseUrl() {
+    return this.apiBaseUrl;
+  }
+
+  private async readPage<T = any>(
+    path: string,
+    operation: string,
+    reason: string,
+    params: Record<string, unknown>
+  ): Promise<GitHubRestPage<T>> {
+    let response = await this.read(path, operation, reason, { params });
+    return {
+      items: Array.isArray(response.data) ? response.data : [],
+      hasNextPage: hasNextPageInLink(getResponseHeaderValue(response.headers, 'link'))
+    };
+  }
+
   // ─── Repositories ──────────────────────────────────────────────
 
   async listRepositories(
@@ -302,16 +329,18 @@ export class GitHubClient {
       page?: number;
     } = {}
   ) {
-    let response = await this.http.get('/user/repos', {
-      params: {
+    return await this.readPage(
+      '/user/repos',
+      'list repositories for the authenticated user',
+      'github_list_repositories_failed',
+      {
         type: params.type,
         sort: params.sort,
         direction: params.direction,
         per_page: params.perPage,
         page: params.page
       }
-    });
-    return response.data;
+    );
   }
 
   async getRepository(owner: string, repo: string) {
@@ -384,13 +413,19 @@ export class GitHubClient {
     description?: string;
     private: boolean;
     autoInit?: boolean;
+    gitignoreTemplate?: string;
+    licenseTemplate?: string;
     organization?: string;
   }) {
-    let { organization, autoInit, ...rest } = data;
     let body = {
-      ...rest,
-      auto_init: autoInit
+      name: data.name,
+      description: data.description,
+      private: data.private,
+      auto_init: data.autoInit,
+      gitignore_template: data.gitignoreTemplate,
+      license_template: data.licenseTemplate
     };
+    let organization = data.organization;
 
     let url = organization ? `/orgs/${organization}/repos` : '/user/repos';
     let response = await this.write(
@@ -1195,23 +1230,20 @@ export class GitHubClient {
       page?: number;
     } = {}
   ) {
-    let response = await this.read(
+    return await this.readPage(
       `/repos/${owner}/${repo}/pulls`,
       'list pull requests',
       'github_list_pull_requests_failed',
       {
-        params: {
-          state: params.state,
-          head: params.head,
-          base: params.base,
-          sort: params.sort,
-          direction: params.direction,
-          per_page: params.perPage,
-          page: params.page
-        }
+        state: params.state,
+        head: params.head,
+        base: params.base,
+        sort: params.sort,
+        direction: params.direction,
+        per_page: params.perPage,
+        page: params.page
       }
     );
-    return response.data;
   }
 
   async getPullRequest(owner: string, repo: string, pullNumber: number) {
@@ -1307,12 +1339,14 @@ export class GitHubClient {
       commitTitle?: string;
       commitMessage?: string;
       mergeMethod?: string;
+      sha?: string;
     } = {}
   ) {
     let body: Record<string, any> = {};
     if (data.commitTitle) body.commit_title = data.commitTitle;
     if (data.commitMessage) body.commit_message = data.commitMessage;
     if (data.mergeMethod) body.merge_method = data.mergeMethod;
+    if (data.sha) body.sha = data.sha;
 
     let response = await this.write(
       'put',
@@ -1371,6 +1405,7 @@ export class GitHubClient {
                 totalCount: number;
                 nodes: Array<{
                   id: string;
+                  fullDatabaseId: string | number | null;
                   body: string;
                   path: string;
                   line: number | null;
@@ -1418,6 +1453,7 @@ export class GitHubClient {
                   totalCount
                   nodes {
                     id
+                    fullDatabaseId
                     body
                     path
                     line
@@ -1489,17 +1525,26 @@ export class GitHubClient {
     owner: string,
     repo: string,
     params: {
+      protected?: boolean;
       perPage?: number;
       page?: number;
     } = {}
   ) {
-    let response = await this.read(
+    return await this.readPage(
       `/repos/${owner}/${repo}/branches`,
       'list repository branches',
       'github_list_branches_failed',
-      { params: { per_page: params.perPage, page: params.page } }
+      { protected: params.protected, per_page: params.perPage, page: params.page }
     );
-    return response.data;
+  }
+
+  async deleteBranch(owner: string, repo: string, branch: string) {
+    await this.requestRest<unknown>({
+      method: 'DELETE',
+      path: `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${this.encodePath(branch)}`,
+      operation: 'delete branch',
+      reason: 'github_delete_branch_failed'
+    });
   }
 
   async getBranch(owner: string, repo: string, branch: string) {
@@ -1764,10 +1809,18 @@ export class GitHubClient {
       page?: number;
     } = {}
   ) {
-    let response = await this.http.get(`/repos/${owner}/${repo}/milestones`, {
-      params: { ...params, per_page: params.perPage }
-    });
-    return response.data;
+    return await this.readPage(
+      `/repos/${owner}/${repo}/milestones`,
+      'list repository milestones',
+      'github_list_milestones_failed',
+      {
+        state: params.state,
+        sort: params.sort,
+        direction: params.direction,
+        per_page: params.perPage,
+        page: params.page
+      }
+    );
   }
 
   // ─── Workflows / Actions ───────────────────────────────────────
@@ -1928,7 +1981,13 @@ export class GitHubClient {
     } = {}
   ) {
     let response = await this.http.get('/search/repositories', {
-      params: { q: query, ...params, per_page: params.perPage }
+      params: {
+        q: query,
+        sort: params.sort,
+        order: params.order,
+        per_page: params.perPage,
+        page: params.page
+      }
     });
     return response.data;
   }
@@ -1943,7 +2002,13 @@ export class GitHubClient {
     } = {}
   ) {
     let response = await this.http.get('/search/code', {
-      params: { q: query, ...params, per_page: params.perPage }
+      params: {
+        q: query,
+        sort: params.sort,
+        order: params.order,
+        per_page: params.perPage,
+        page: params.page
+      }
     });
     return response.data;
   }
@@ -1958,7 +2023,13 @@ export class GitHubClient {
     } = {}
   ) {
     let response = await this.http.get('/search/issues', {
-      params: { q: query, ...params, per_page: params.perPage }
+      params: {
+        q: query,
+        sort: params.sort,
+        order: params.order,
+        per_page: params.perPage,
+        page: params.page
+      }
     });
     return response.data;
   }
@@ -1973,7 +2044,13 @@ export class GitHubClient {
     } = {}
   ) {
     let response = await this.http.get('/search/users', {
-      params: { q: query, ...params, per_page: params.perPage }
+      params: {
+        q: query,
+        sort: params.sort,
+        order: params.order,
+        per_page: params.perPage,
+        page: params.page
+      }
     });
     return response.data;
   }
@@ -2050,10 +2127,18 @@ export class GitHubClient {
       page?: number;
     } = {}
   ) {
-    let response = await this.http.get(`/orgs/${org}/repos`, {
-      params: { ...params, per_page: params.perPage }
-    });
-    return response.data;
+    return await this.readPage(
+      `/orgs/${org}/repos`,
+      'list organization repositories',
+      'github_list_organization_repositories_failed',
+      {
+        type: params.type,
+        sort: params.sort,
+        direction: params.direction,
+        per_page: params.perPage,
+        page: params.page
+      }
+    );
   }
 
   // ─── Teams ─────────────────────────────────────────────────────
@@ -2407,23 +2492,20 @@ export class GitHubClient {
       page?: number;
     } = {}
   ) {
-    let response = await this.read(
+    return await this.readPage(
       `/repos/${owner}/${repo}/commits`,
       'list repository commits',
       'github_list_commits_failed',
       {
-        params: {
-          sha: params.sha,
-          path: params.path,
-          author: params.author,
-          since: params.since,
-          until: params.until,
-          per_page: params.perPage,
-          page: params.page
-        }
+        sha: params.sha,
+        path: params.path,
+        author: params.author,
+        since: params.since,
+        until: params.until,
+        per_page: params.perPage,
+        page: params.page
       }
     );
-    return response.data;
   }
 
   async getCommit(
@@ -2510,7 +2592,7 @@ export class GitHubClient {
 
   async listGists(params: { since?: string; perPage?: number; page?: number } = {}) {
     let response = await this.http.get('/gists', {
-      params: { ...params, per_page: params.perPage }
+      params: { since: params.since, per_page: params.perPage, page: params.page }
     });
     return response.data;
   }

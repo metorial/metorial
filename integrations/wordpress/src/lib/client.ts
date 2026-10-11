@@ -1,12 +1,19 @@
 import { createAxios } from 'slates';
 import { wordpressApiError, wordpressServiceError } from './errors';
 
-export interface WordPressClientConfig {
-  siteUrl: string;
-  apiType: 'wpcom' | 'selfhosted';
-  token: string;
-  authMethod: 'oauth' | 'application_password';
-}
+export type WordPressClientConfig =
+  | {
+      authMethod: 'oauth';
+      token: string;
+      // WordPress.com blog ID from the OAuth token response; the token only
+      // grants access to this blog.
+      blogId: string;
+    }
+  | {
+      authMethod: 'application_password';
+      token: string;
+      siteUrl: string;
+    };
 
 export class WordPressClient {
   private http: ReturnType<typeof createAxios>;
@@ -16,25 +23,25 @@ export class WordPressClient {
   private siteId: string;
 
   constructor(config: WordPressClientConfig) {
-    this.siteUrl = config.siteUrl.replace(/\/+$/, '');
-    this.apiType = config.apiType;
-    this.siteId = this.siteUrl.replace(/^https?:\/\//, '');
-
-    let authorization =
-      config.apiType === 'wpcom' || config.authMethod !== 'application_password'
-        ? `Bearer ${config.token}`
-        : `Basic ${config.token}`;
-
-    this.headers = {
-      Authorization: authorization,
-      'Content-Type': 'application/json'
-    };
-
-    this.http = this.createHttp(
-      config.apiType === 'wpcom'
-        ? 'https://public-api.wordpress.com/rest/v1.1'
-        : `${this.siteUrl}/wp-json/wp/v2`
-    );
+    if (config.authMethod === 'oauth') {
+      this.apiType = 'wpcom';
+      this.siteId = encodeURIComponent(config.blogId);
+      this.siteUrl = '';
+      this.headers = {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json'
+      };
+      this.http = this.createHttp('https://public-api.wordpress.com/rest/v1.1');
+    } else {
+      this.apiType = 'selfhosted';
+      this.siteId = '';
+      this.siteUrl = config.siteUrl.replace(/\/+$/, '');
+      this.headers = {
+        Authorization: `Basic ${config.token}`,
+        'Content-Type': 'application/json'
+      };
+      this.http = this.createHttp(`${this.siteUrl}/wp-json/wp/v2`);
+    }
   }
 
   private createHttp(baseURL: string, headers: Record<string, string> = this.headers) {
@@ -53,6 +60,63 @@ export class WordPressClient {
 
   private normalizeSelfHostedOrder(order?: string) {
     return (order || 'desc').toLowerCase();
+  }
+
+  private normalizeWpcomOrder(order?: string) {
+    return (order || 'DESC').toUpperCase();
+  }
+
+  private normalizeSelfHostedOrderBy(orderBy?: string) {
+    return (orderBy || 'date').toLowerCase();
+  }
+
+  private normalizeWpcomOrderBy(orderBy?: string) {
+    let value = orderBy || 'date';
+    return value.toLowerCase() === 'id' ? 'ID' : value.toLowerCase();
+  }
+
+  private wpcomDiscussion(data: { commentStatus?: string; pingStatus?: string }) {
+    if (data.commentStatus === undefined && data.pingStatus === undefined) {
+      return undefined;
+    }
+
+    let discussion: Record<string, boolean> = {};
+    if (data.commentStatus !== undefined) {
+      discussion.comments_open = data.commentStatus === 'open';
+    }
+    if (data.pingStatus !== undefined) {
+      discussion.pings_open = data.pingStatus === 'open';
+    }
+    return discussion;
+  }
+
+  // WordPress.com comment statuses: approved, unapproved, spam, trash, all.
+  // Self-hosted (wp/v2) list filters use approve, hold, spam, trash, all and
+  // updates accept approved/approve, hold, spam, trash.
+  private normalizeCommentStatus(status: string | undefined, usage: 'list' | 'update') {
+    if (status === undefined) return undefined;
+    let value = status.toLowerCase();
+
+    if (this.apiType === 'wpcom') {
+      if (value === 'hold' || value === 'pending') return 'unapproved';
+      if (value === 'approve') return 'approved';
+      return value;
+    }
+
+    if (value === 'unapproved' || value === 'pending') return 'hold';
+    if (usage === 'list' && value === 'approved') return 'approve';
+    return value;
+  }
+
+  // WordPress.com moves posts and comments to the trash on the first delete
+  // request when trash is enabled; a second request deletes permanently. The
+  // response status is "deleted" once the item is permanently removed.
+  private async deleteWpcomPermanently(path: string) {
+    let response = await this.http.post(path);
+    if (response.data?.status !== 'deleted') {
+      response = await this.http.post(path);
+    }
+    return response.data;
   }
 
   private sanitizeHeaderValue(value: string) {
@@ -183,8 +247,8 @@ export class WordPressClient {
           author: params.author,
           number: params.perPage || 20,
           page: params.page || 1,
-          order_by: params.orderBy || 'date',
-          order: params.order || 'DESC',
+          order_by: this.normalizeWpcomOrderBy(params.orderBy),
+          order: this.normalizeWpcomOrder(params.order),
           after: params.after,
           before: params.before
         }
@@ -200,7 +264,7 @@ export class WordPressClient {
           author: params.author,
           per_page: params.perPage || 20,
           page: params.page || 1,
-          orderby: params.orderBy || 'date',
+          orderby: this.normalizeSelfHostedOrderBy(params.orderBy),
           order: this.normalizeSelfHostedOrder(params.order),
           after: params.after,
           before: params.before
@@ -248,8 +312,7 @@ export class WordPressClient {
         date: data.date,
         slug: data.slug,
         password: data.password,
-        comment_status: data.commentStatus,
-        ping_status: data.pingStatus
+        discussion: this.wpcomDiscussion(data)
       });
       return response.data;
     } else {
@@ -310,8 +373,7 @@ export class WordPressClient {
         date: data.date,
         slug: data.slug,
         password: data.password,
-        comment_status: data.commentStatus,
-        ping_status: data.pingStatus
+        discussion: this.wpcomDiscussion(data)
       });
       return response.data;
     } else {
@@ -343,8 +405,7 @@ export class WordPressClient {
 
   async deletePost(postId: string): Promise<any> {
     if (this.apiType === 'wpcom') {
-      let response = await this.http.post(`/sites/${this.siteId}/posts/${postId}/delete`);
-      return response.data;
+      return this.deleteWpcomPermanently(`/sites/${this.siteId}/posts/${postId}/delete`);
     } else {
       let response = await this.http.delete(`/posts/${postId}`, {
         params: { force: true }
@@ -373,8 +434,8 @@ export class WordPressClient {
           search: params.search,
           number: params.perPage || 20,
           page: params.page || 1,
-          order_by: params.orderBy || 'date',
-          order: params.order || 'DESC'
+          order_by: this.normalizeWpcomOrderBy(params.orderBy),
+          order: this.normalizeWpcomOrder(params.order)
         }
       });
       return response.data.posts || [];
@@ -385,7 +446,7 @@ export class WordPressClient {
           search: params.search,
           per_page: params.perPage || 20,
           page: params.page || 1,
-          orderby: params.orderBy || 'date',
+          orderby: this.normalizeSelfHostedOrderBy(params.orderBy),
           order: this.normalizeSelfHostedOrder(params.order)
         }
       });
@@ -425,7 +486,7 @@ export class WordPressClient {
         slug: data.slug,
         date: data.date,
         featured_image: data.featuredImageId,
-        comment_status: data.commentStatus
+        discussion: this.wpcomDiscussion(data)
       });
       return response.data;
     } else {
@@ -468,7 +529,7 @@ export class WordPressClient {
         slug: data.slug,
         date: data.date,
         featured_image: data.featuredImageId,
-        comment_status: data.commentStatus
+        discussion: this.wpcomDiscussion(data)
       });
       return response.data;
     } else {
@@ -489,8 +550,7 @@ export class WordPressClient {
 
   async deletePage(pageId: string): Promise<any> {
     if (this.apiType === 'wpcom') {
-      let response = await this.http.post(`/sites/${this.siteId}/posts/${pageId}/delete`);
-      return response.data;
+      return this.deleteWpcomPermanently(`/sites/${this.siteId}/posts/${pageId}/delete`);
     } else {
       let response = await this.http.delete(`/pages/${pageId}`, {
         params: { force: true }
@@ -516,7 +576,7 @@ export class WordPressClient {
         : `/sites/${this.siteId}/comments`;
       let response = await this.http.get(url, {
         params: {
-          status: params.status,
+          status: this.normalizeCommentStatus(params.status, 'list'),
           number: params.perPage || 20,
           page: params.page || 1
         }
@@ -526,7 +586,7 @@ export class WordPressClient {
       let response = await this.http.get('/comments', {
         params: {
           post: params.postId,
-          status: params.status,
+          status: this.normalizeCommentStatus(params.status, 'list'),
           per_page: params.perPage || 20,
           page: params.page || 1,
           search: params.search
@@ -554,13 +614,12 @@ export class WordPressClient {
     authorEmail?: string;
   }): Promise<any> {
     if (this.apiType === 'wpcom') {
-      let response = await this.http.post(
-        `/sites/${this.siteId}/posts/${data.postId}/replies/new`,
-        {
-          content: data.content,
-          parent: data.parentCommentId ? Number(data.parentCommentId) : undefined
-        }
-      );
+      // Replies to an existing comment use the comment replies endpoint;
+      // the post replies endpoint only accepts top-level comment content.
+      let path = data.parentCommentId
+        ? `/sites/${this.siteId}/comments/${encodeURIComponent(data.parentCommentId)}/replies/new`
+        : `/sites/${this.siteId}/posts/${encodeURIComponent(data.postId)}/replies/new`;
+      let response = await this.http.post(path, { content: data.content });
       return response.data;
     } else {
       let response = await this.http.post('/comments', {
@@ -584,14 +643,16 @@ export class WordPressClient {
     if (this.apiType === 'wpcom') {
       let body: Record<string, any> = {};
       if (data.content !== undefined) body.content = data.content;
-      if (data.status !== undefined) body.status = data.status;
+      if (data.status !== undefined) {
+        body.status = this.normalizeCommentStatus(data.status, 'update');
+      }
 
       let response = await this.http.post(`/sites/${this.siteId}/comments/${commentId}`, body);
       return response.data;
     } else {
       let response = await this.http.post(`/comments/${commentId}`, {
         content: data.content,
-        status: data.status
+        status: this.normalizeCommentStatus(data.status, 'update')
       });
       return response.data;
     }
@@ -599,10 +660,7 @@ export class WordPressClient {
 
   async deleteComment(commentId: string): Promise<any> {
     if (this.apiType === 'wpcom') {
-      let response = await this.http.post(
-        `/sites/${this.siteId}/comments/${commentId}/delete`
-      );
-      return response.data;
+      return this.deleteWpcomPermanently(`/sites/${this.siteId}/comments/${commentId}/delete`);
     } else {
       let response = await this.http.delete(`/comments/${commentId}`, {
         params: { force: true }
@@ -954,11 +1012,14 @@ export class WordPressClient {
     params: { search?: string; perPage?: number; page?: number; roles?: string } = {}
   ): Promise<any[]> {
     if (this.apiType === 'wpcom') {
+      // The WordPress.com users endpoint paginates with number/offset only.
+      let number = params.perPage || 20;
       let response = await this.http.get(`/sites/${this.siteId}/users`, {
         params: {
           search: params.search,
-          number: params.perPage || 20,
-          page: params.page || 1
+          role: params.roles,
+          number,
+          offset: ((params.page || 1) - 1) * number
         }
       });
       return response.data.users || [];
@@ -1027,8 +1088,10 @@ export class WordPressClient {
 
   async updateSiteSettings(data: Record<string, any>): Promise<any> {
     if (this.apiType === 'wpcom') {
-      let response = await this.http.post(`/sites/${this.siteId}/settings`, data);
-      return response.data;
+      // The WordPress.com settings endpoint responds with only the changed
+      // keys, so return the full settings after the update.
+      await this.http.post(`/sites/${this.siteId}/settings`, data);
+      return this.getSiteSettings();
     } else {
       let response = await this.http.post('/settings', data);
       return response.data;
@@ -1043,26 +1106,28 @@ export class WordPressClient {
       return response.data;
     } else {
       throw wordpressServiceError(
-        'Site statistics are only available for WordPress.com or Jetpack-connected sites.'
+        'Site statistics require a WordPress.com OAuth connection to a WordPress.com or Jetpack-connected site.'
       );
     }
   }
 
   async getStatsTopPosts(
-    params: { period?: string; num?: number; date?: string } = {}
+    params: { period?: string; max?: number; date?: string } = {}
   ): Promise<any> {
     if (this.apiType === 'wpcom') {
+      // `num` is the number of periods; `max` limits the number of posts.
       let response = await this.http.get(`/sites/${this.siteId}/stats/top-posts`, {
         params: {
           period: params.period || 'day',
-          num: params.num || 10,
+          num: 1,
+          max: params.max || 10,
           date: params.date
         }
       });
       return response.data;
     } else {
       throw wordpressServiceError(
-        'Site statistics are only available for WordPress.com or Jetpack-connected sites.'
+        'Site statistics require a WordPress.com OAuth connection to a WordPress.com or Jetpack-connected site.'
       );
     }
   }
@@ -1081,7 +1146,7 @@ export class WordPressClient {
       return response.data;
     } else {
       throw wordpressServiceError(
-        'Site statistics are only available for WordPress.com or Jetpack-connected sites.'
+        'Site statistics require a WordPress.com OAuth connection to a WordPress.com or Jetpack-connected site.'
       );
     }
   }
@@ -1100,17 +1165,21 @@ export class WordPressClient {
       let response = await this.http.get(`/sites/${this.siteId}/posts`, {
         params: {
           search: query,
-          type: params.postType,
+          // "any" searches both posts and pages; the endpoint defaults to posts only.
+          type: params.postType || 'any',
           number: params.perPage || 20,
           page: params.page || 1
         }
       });
       return response.data.posts || [];
     } else {
+      // wp/v2/search: `type` is the object kind (post, term, post-format) and
+      // `subtype` is the post type (post, page, ...). Default subtype is "any".
       let response = await this.http.get('/search', {
         params: {
           search: query,
-          type: params.postType,
+          type: 'post',
+          subtype: params.postType,
           per_page: params.perPage || 20,
           page: params.page || 1
         }

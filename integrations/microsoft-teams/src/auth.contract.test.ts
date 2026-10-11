@@ -14,6 +14,7 @@ let adminConsentScopes = [
   microsoftTeamsScopes.channelSettingsReadWriteAll,
   microsoftTeamsScopes.channelDeleteAll,
   microsoftTeamsScopes.channelMessageReadAll,
+  microsoftTeamsScopes.channelMessageReadWrite,
   microsoftTeamsScopes.teamMemberReadWriteAll,
   microsoftTeamsScopes.channelMemberReadWriteAll,
   microsoftTeamsScopes.teamworkTagReadWrite,

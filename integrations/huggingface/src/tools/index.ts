@@ -3,7 +3,8 @@ export {
   chatCompletionTool,
   featureExtractionTool,
   runInferenceTool,
-  textGenerationTool
+  textGenerationTool,
+  textToImageTool
 } from './inference';
 export {
   addCollectionItemTool,
@@ -32,6 +33,7 @@ export {
   deleteRepositoryTool,
   duplicateRepositoryTool,
   getRepositoryInfoTool,
+  listRepoRefsTool,
   updateRepositoryVisibilityTool
 } from './manage-repository';
 export {

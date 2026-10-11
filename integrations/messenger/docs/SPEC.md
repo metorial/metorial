@@ -53,7 +53,9 @@ The Send API allows sending messages from a Page to users who have initiated a c
 - Reusable attachments uploaded from public URLs and sent later by attachment ID.
 - Multiple image attachments in one message.
 
-**Messaging Window:** Facebook Messenger has a standard messaging window of 24 hours. After 24 hours from the user's last message, businesses can only send messages using **Message Tags** (e.g., `CONFIRMED_EVENT_UPDATE`, `POST_PURCHASE_UPDATE`, `ACCOUNT_UPDATE`) or **Marketing Messages** (requires user opt-in).
+- Replies to a specific earlier message (`reply_to.mid`).
+
+**Messaging Window:** Facebook Messenger has a standard messaging window, usually 24 hours after the person's last message (up to 7 days after a Click-to-Messenger ad). Outside it, the only remaining message tag is `HUMAN_AGENT` (a human agent reply within 7 days, with the Human Agent permission). Meta retired `CONFIRMED_EVENT_UPDATE`, `POST_PURCHASE_UPDATE`, and `ACCOUNT_UPDATE` on April 27, 2026; the tools reject them with an explanation. Promotional follow-ups use **Marketing Messages** (requires user opt-in).
 
 ### Message Templates
 
@@ -71,22 +73,30 @@ Configures the appearance and behavior of the Messenger experience for a Page:
 
 - **Get Started Button:** Displays a "Get Started" button for first-time users, triggering a postback event.
 - **Greeting Text:** Allows you to specify the greeting message people will see on the welcome screen of your bot. The welcome screen is displayed for people interacting with your bot for the first time. Supports personalization with user name variables and localization by locale.
-- **Persistent Menu:** A fixed navigation bar inside Messenger conversations. It's always visible to the user, providing quick access to essential actions. It's called persistent because it remains visible regardless of where the user is in the conversation. Supports up to 20 call-to-action items per locale.
+- **Persistent Menu:** A fixed navigation bar inside Messenger conversations. It's always visible to the user, providing quick access to essential actions. It's called persistent because it remains visible regardless of where the user is in the conversation. Supports up to 20 `postback` or `web_url` items per locale; nested submenus are no longer supported and are rejected.
 - **Account Linking URL:** A profile-level URL that starts the secure webview flow used to link a Messenger PSID to an external account.
-- **Ice Breakers:** Clickable questions users can select when first interacting with the bot. This helps reduce friction and guides them to the right flow.
+- **Ice Breakers:** Up to 4 clickable questions users can select when first interacting with the bot. They are set in the localized format for the `default` locale and take precedence over the Get Started button.
 - **Whitelisted Domains:** Specifies a list of third-party domains that are accessible in the Messenger webview for use with the Messenger Extensions SDK, the Checkbox Plugin, and the Customer Chat Plugin.
 
 ### User Profile Retrieval
 
-The API allows retrieving basic profile information for users who have interacted with the Page, including first name, last name, profile picture, locale, timezone, and gender. Requires appropriate permissions.
+The API allows retrieving basic profile information for users who have interacted with the Page. The tool returns name, first name, last name, and profile picture by default (Business Asset User Profile Access); locale, timezone, and gender are opt-in because each needs its own Page permission (`pages_user_locale`, `pages_user_timezone`, `pages_user_gender`).
+
+### Conversations
+
+The Conversations API (`GET /{page-id}/conversations?platform=messenger`) lists the Page's conversations with participant PSIDs, optionally filtered to one person with `user_id`, and `GET /{conversation-id}/messages` lists messages with sender, recipients, text, reply target, and attachment metadata. Both use cursor pagination. Messenger only returns details for the 20 most recent messages in a conversation. Listing conversations needs `pages_messaging`, `pages_manage_metadata`, and `pages_read_engagement`.
+
+### Connected Page
+
+`GET /{page-id}?fields=id,name,link,picture` identifies the Page the connection sends as. A token that has only `pages_messaging` cannot read Page details, so only the Page ID is returned.
 
 ### Sender Actions
 
-Allows displaying typing indicators and read receipts to users, simulating a more natural conversation flow (e.g., `typing_on`, `typing_off`, `mark_seen`).
+Allows displaying typing indicators and read receipts to users, simulating a more natural conversation flow (`typing_on`, `typing_off`, `mark_seen`), and reacting to a message with an emoji (`react` with `payload.message_id` and `payload.reaction`, `unreact` to remove it). The Page has one reaction per message.
 
-### Handover Protocol
+### Conversation Routing (formerly Handover Protocol)
 
-Enables multiple apps to collaborate on the same Page's Messenger experience. A primary receiver app can pass thread control to secondary apps and take it back. Apps can also inspect the current thread owner and, when permitted, list configured secondary receiver apps. Useful for routing between automated bots and live agents.
+Enables multiple apps to collaborate on the same Page's Messenger experience. Meta migrated all Pages from the Handover Protocol to Conversation Routing, which keeps the thread control APIs: pass (`/pass_thread_control`), take, request, release (`/release_thread_control`, returning the thread to idle), extend (`/extend_thread_control`, up to 7 days), and the current owner lookup (`GET /thread_owner?recipient=<PSID>`, which returns the owner app and expiration). Listing secondary receivers is a legacy handover call. Useful for routing between automated bots and live agents.
 
 ### Account Linking
 

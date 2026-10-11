@@ -4,6 +4,18 @@ import { HubClient } from '../lib/client';
 import { requireHuggingFaceInput } from '../lib/errors';
 import { spec } from '../spec';
 
+// Secret and variable listings are returned as an object keyed by name.
+let toKeyedEntries = (value: unknown): any[] => {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, any>).map(([key, entry]) => ({
+      key,
+      ...(entry && typeof entry === 'object' ? entry : { value: entry })
+    }));
+  }
+  return [];
+};
+
 export let getSpaceRuntimeTool = SlateTool.create(spec, {
   name: 'Get Space Runtime',
   key: 'get_space_runtime',
@@ -24,6 +36,10 @@ export let getSpaceRuntimeTool = SlateTool.create(spec, {
         .optional()
         .describe('Runtime stage (e.g. "RUNNING", "BUILDING", "PAUSED")'),
       hardware: z.string().optional().describe('Current hardware flavor'),
+      requestedHardware: z
+        .string()
+        .optional()
+        .describe('Requested hardware flavor (may differ while a change is pending)'),
       sdk: z.string().optional().describe('SDK used'),
       storage: z.string().optional().describe('Storage tier'),
       gcTimeout: z.number().optional().describe('Garbage collection timeout in seconds'),
@@ -35,17 +51,27 @@ export let getSpaceRuntimeTool = SlateTool.create(spec, {
     let client = new HubClient({ token: ctx.auth.token });
     let runtime = await client.getSpaceRuntime({ repoId: ctx.input.repoId });
 
+    let hardware =
+      typeof runtime.hardware === 'string'
+        ? runtime.hardware
+        : (runtime.hardware?.current ?? undefined);
+    let requestedHardware =
+      typeof runtime.hardware === 'object'
+        ? (runtime.hardware?.requested ?? undefined)
+        : undefined;
+
     return {
       output: {
-        stage: runtime.stage,
-        hardware: runtime.hardware?.current || runtime.hardware,
-        sdk: runtime.sdk,
-        storage: runtime.storage,
-        gcTimeout: runtime.gcTimeout,
-        devMode: runtime.devMode,
+        stage: runtime.stage ?? undefined,
+        hardware,
+        requestedHardware,
+        sdk: runtime.sdk ?? undefined,
+        storage: typeof runtime.storage === 'string' ? runtime.storage : undefined,
+        gcTimeout: typeof runtime.gcTimeout === 'number' ? runtime.gcTimeout : undefined,
+        devMode: runtime.devMode ?? undefined,
         raw: runtime
       },
-      message: `Space **${ctx.input.repoId}** is in stage **${runtime.stage || 'unknown'}** on hardware **${runtime.hardware?.current || runtime.hardware || 'cpu-basic'}**.`
+      message: `Space **${ctx.input.repoId}** is in stage **${runtime.stage || 'unknown'}** on hardware **${hardware || requestedHardware || 'unknown'}**.`
     };
   })
   .build();
@@ -53,7 +79,7 @@ export let getSpaceRuntimeTool = SlateTool.create(spec, {
 export let controlSpaceTool = SlateTool.create(spec, {
   name: 'Control Space',
   key: 'control_space',
-  description: `Control a Space's lifecycle: pause, restart, or change hardware. Use this to manage running Spaces.`,
+  description: `Control a Space's lifecycle: pause, restart (which also resumes a paused Space), or change hardware. Use this to manage running Spaces.`,
   tags: {
     destructive: false
   }
@@ -101,7 +127,7 @@ export let controlSpaceTool = SlateTool.create(spec, {
       output: {
         repoId: ctx.input.repoId,
         action: ctx.input.action,
-        stage: result?.stage
+        stage: result?.stage ?? undefined
       },
       message: `Performed **${ctx.input.action}** on Space **${ctx.input.repoId}**.`
     };
@@ -148,18 +174,20 @@ export let manageSpaceSecretsTool = SlateTool.create(spec, {
     let client = new HubClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let secrets = await client.listSpaceSecrets({ repoId: ctx.input.repoId });
+      let secrets = toKeyedEntries(
+        await client.listSpaceSecrets({ repoId: ctx.input.repoId })
+      );
       return {
         output: {
           repoId: ctx.input.repoId,
           action: ctx.input.action,
-          secrets: (secrets || []).map((secret: any) => ({
+          secrets: secrets.map((secret: any) => ({
             key: secret.key || secret.name,
-            updatedAt: secret.updatedAt,
-            description: secret.description
+            updatedAt: secret.updatedAt ?? undefined,
+            description: secret.description ?? undefined
           }))
         },
-        message: `Found **${secrets?.length || 0}** secret(s) on Space **${ctx.input.repoId}**.`
+        message: `Found **${secrets.length}** secret(s) on Space **${ctx.input.repoId}**.`
       };
     }
 
@@ -235,19 +263,21 @@ export let manageSpaceVariablesTool = SlateTool.create(spec, {
     let client = new HubClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let variables = await client.listSpaceVariables({ repoId: ctx.input.repoId });
+      let variables = toKeyedEntries(
+        await client.listSpaceVariables({ repoId: ctx.input.repoId })
+      );
       return {
         output: {
           repoId: ctx.input.repoId,
           action: ctx.input.action,
-          variables: (variables || []).map((variable: any) => ({
+          variables: variables.map((variable: any) => ({
             key: variable.key || variable.name,
-            value: variable.value,
-            updatedAt: variable.updatedAt,
-            description: variable.description
+            value: variable.value ?? undefined,
+            updatedAt: variable.updatedAt ?? undefined,
+            description: variable.description ?? undefined
           }))
         },
-        message: `Found **${variables?.length || 0}** variable(s) on Space **${ctx.input.repoId}**.`
+        message: `Found **${variables.length}** variable(s) on Space **${ctx.input.repoId}**.`
       };
     }
 

@@ -10,7 +10,8 @@ export let manageDataItems = SlateTool.create(spec, {
 Use **action** to specify the operation: \`get\`, \`list\`, \`create\`, \`update\`, or \`delete\`.
 Works with any Wix content management database collection by specifying the collection ID.`,
   instructions: [
-    'The collectionId must match an existing Wix CMS data collection.',
+    'The collectionId must match an existing Wix CMS data collection; call list_data_collections to discover collection IDs and their fields.',
+    'By default "update" merges itemData into the existing item fields. Set replace to true to overwrite the whole item.',
     'Item data is a flexible key-value object that matches the collection schema.'
   ],
   tags: { destructive: false, readOnly: false }
@@ -20,7 +21,11 @@ Works with any Wix content management database collection by specifying the coll
       action: z
         .enum(['get', 'list', 'create', 'update', 'delete'])
         .describe('Operation to perform'),
-      collectionId: z.string().describe('CMS data collection ID'),
+      collectionId: z
+        .string()
+        .describe(
+          'CMS data collection ID. Call list_data_collections to discover collection IDs.'
+        ),
       itemId: z.string().optional().describe('Item ID (required for get, update, delete)'),
       itemData: z
         .record(z.string(), z.any())
@@ -28,10 +33,16 @@ Works with any Wix content management database collection by specifying the coll
         .describe(
           'Item data as key-value pairs matching the collection schema (for create/update)'
         ),
+      replace: z
+        .boolean()
+        .optional()
+        .describe(
+          'For update: replace the whole item with itemData instead of merging itemData into the existing fields (default false)'
+        ),
       filter: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Filter object for list action'),
+        .describe('Filter object for list action, e.g. {"title": {"$startsWith": "A"}}'),
       sort: z
         .array(
           z.object({
@@ -41,7 +52,7 @@ Works with any Wix content management database collection by specifying the coll
         )
         .optional()
         .describe('Sort specification for list action'),
-      limit: z.number().optional().describe('Max items to return (default 50)'),
+      limit: z.number().optional().describe('Max items to return (default 50, max 1000)'),
       offset: z.number().optional().describe('Number of items to skip')
     })
   )
@@ -69,7 +80,8 @@ Works with any Wix content management database collection by specifying the coll
         let result = await client.queryDataItems(ctx.input.collectionId, {
           filter: ctx.input.filter,
           sort: ctx.input.sort,
-          paging: { limit: ctx.input.limit, offset: ctx.input.offset }
+          limit: ctx.input.limit,
+          offset: ctx.input.offset
         });
         let dataItems = result.dataItems || [];
         return {
@@ -91,10 +103,15 @@ Works with any Wix content management database collection by specifying the coll
           throw createApiServiceError('itemId is required for update action');
         if (!ctx.input.itemData)
           throw createApiServiceError('itemData is required for update action');
-        let result = await client.updateDataItem(
+        let data = ctx.input.itemData;
+        if (!ctx.input.replace) {
+          let current = await client.getDataItem(ctx.input.collectionId, ctx.input.itemId);
+          data = { ...(current.dataItem?.data || {}), ...ctx.input.itemData };
+        }
+        let result = await client.replaceDataItem(
           ctx.input.collectionId,
           ctx.input.itemId,
-          ctx.input.itemData
+          data
         );
         return {
           output: { dataItem: result.dataItem },

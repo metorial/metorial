@@ -72,6 +72,7 @@ export let uploadAttachment = SlateTool.create(spec, {
     'Pass attachmentUploadToken to send_message.attachmentUploadTokens when creating the message.'
   ],
   constraints: [
+    'Requires user OAuth; Google Chat apps cannot upload files with app authentication.',
     'Google Chat limits uploaded attachments to 200 MB and blocks some file types.'
   ],
   tags: {

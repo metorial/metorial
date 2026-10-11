@@ -6,9 +6,17 @@ import { spec } from '../spec';
 let paymentTypeSchema = z.object({
   paymentTypeId: z.string().describe('Payment type ID'),
   paymentTypeName: z.string().optional().describe('Payment type name'),
-  type: z.string().optional().describe('Type (e.g., CASH, CARD, CUSTOM)'),
+  type: z
+    .string()
+    .optional()
+    .describe('Type (e.g., CASH, NONINTEGRATEDCARD, CHECK, OTHER, or a payment provider)'),
+  storeIds: z
+    .array(z.string())
+    .optional()
+    .describe('Stores where the payment type is available'),
   createdAt: z.string().optional(),
-  updatedAt: z.string().optional()
+  updatedAt: z.string().optional(),
+  deletedAt: z.string().nullable().optional()
 });
 
 export let listPaymentTypes = SlateTool.create(spec, {
@@ -19,8 +27,14 @@ export let listPaymentTypes = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().min(1).max(250).optional(),
-      cursor: z.string().optional()
+      limit: z
+        .number()
+        .min(1)
+        .max(250)
+        .optional()
+        .describe('Number of payment types to return'),
+      cursor: z.string().optional().describe('Pagination cursor'),
+      showDeleted: z.boolean().optional().describe('Include deleted payment types')
     })
   )
   .output(
@@ -33,15 +47,18 @@ export let listPaymentTypes = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listPaymentTypes({
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      showDeleted: ctx.input.showDeleted
     });
 
     let paymentTypes = (result.payment_types ?? []).map((pt: any) => ({
       paymentTypeId: pt.id,
       paymentTypeName: pt.name,
       type: pt.type,
+      storeIds: pt.stores ?? undefined,
       createdAt: pt.created_at,
-      updatedAt: pt.updated_at
+      updatedAt: pt.updated_at,
+      deletedAt: pt.deleted_at
     }));
 
     return {

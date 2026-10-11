@@ -20,7 +20,11 @@ export let listDeploymentsTool = SlateTool.create(spec, {
         .number()
         .optional()
         .default(10)
-        .describe('Maximum number of deployments to return (default: 10)')
+        .describe('Maximum number of deployments to return (default: 10)'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Pagination cursor from a previous response nextCursor')
     })
   )
   .output(
@@ -33,20 +37,28 @@ export let listDeploymentsTool = SlateTool.create(spec, {
             .describe('Deployment status (e.g., SUCCESS, FAILED, BUILDING, DEPLOYING)'),
           createdAt: z.string().describe('Deployment creation timestamp'),
           url: z.string().nullable().describe('Deployment URL'),
-          staticUrl: z.string().nullable().describe('Static deployment URL')
+          staticUrl: z.string().nullable().describe('Static deployment URL'),
+          projectId: z.string().nullable().describe('Project ID'),
+          serviceId: z.string().nullable().describe('Service ID'),
+          environmentId: z.string().nullable().describe('Environment ID')
         })
-      )
+      ),
+      nextCursor: z
+        .string()
+        .nullable()
+        .describe('Cursor for the next page, or null when there are no more deployments')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
-    let deployments = await client.listDeployments(
+    let { deployments, nextCursor } = await client.listDeployments(
       {
         serviceId: ctx.input.serviceId,
         environmentId: ctx.input.environmentId,
         projectId: ctx.input.projectId
       },
-      ctx.input.limit
+      ctx.input.limit,
+      ctx.input.cursor
     );
 
     let mapped = deployments.map((d: any) => ({
@@ -54,11 +66,14 @@ export let listDeploymentsTool = SlateTool.create(spec, {
       status: d.status,
       createdAt: d.createdAt,
       url: d.url ?? null,
-      staticUrl: d.staticUrl ?? null
+      staticUrl: d.staticUrl ?? null,
+      projectId: d.projectId ?? null,
+      serviceId: d.serviceId ?? null,
+      environmentId: d.environmentId ?? null
     }));
 
     return {
-      output: { deployments: mapped },
+      output: { deployments: mapped, nextCursor },
       message: `Found **${mapped.length}** deployment(s).`
     };
   })
@@ -84,6 +99,9 @@ export let getDeploymentTool = SlateTool.create(spec, {
       createdAt: z.string().describe('Creation timestamp'),
       url: z.string().nullable().describe('Deployment URL'),
       staticUrl: z.string().nullable().describe('Static deployment URL'),
+      projectId: z.string().nullable().describe('Project ID'),
+      serviceId: z.string().nullable().describe('Service ID'),
+      environmentId: z.string().nullable().describe('Environment ID'),
       canRedeploy: z.boolean().describe('Whether this deployment can be redeployed'),
       canRollback: z.boolean().describe('Whether this deployment can be rolled back to'),
       meta: z.any().nullable().describe('Deployment metadata (commit info, etc.)')
@@ -100,6 +118,9 @@ export let getDeploymentTool = SlateTool.create(spec, {
         createdAt: deployment.createdAt,
         url: deployment.url ?? null,
         staticUrl: deployment.staticUrl ?? null,
+        projectId: deployment.projectId ?? null,
+        serviceId: deployment.serviceId ?? null,
+        environmentId: deployment.environmentId ?? null,
         canRedeploy: deployment.canRedeploy ?? false,
         canRollback: deployment.canRollback ?? false,
         meta: deployment.meta ?? null
@@ -153,7 +174,7 @@ export let triggerDeploymentTool = SlateTool.create(spec, {
 export let rollbackDeploymentTool = SlateTool.create(spec, {
   name: 'Rollback Deployment',
   key: 'rollback_deployment',
-  description: `Roll back a service to a previous deployment. The target deployment must support rollback (check with Get Deployment). This creates a new deployment based on the specified one.`,
+  description: `Roll back a service to a previous deployment. The target deployment must support rollback (check canRollback with Get Deployment). Railway creates a new deployment based on the specified one; use List Deployments to follow its progress.`,
   tags: {
     destructive: false
   }
@@ -165,20 +186,74 @@ export let rollbackDeploymentTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deploymentId: z.string().describe('ID of the new rollback deployment'),
-      status: z.string().describe('Status of the new deployment')
+      rolledBack: z.boolean().describe('Whether Railway accepted the rollback request'),
+      deploymentId: z.string().describe('ID of the deployment that was rolled back to')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
-    let result = await client.rollbackDeployment(ctx.input.deploymentId);
+    let rolledBack = await client.rollbackDeployment(ctx.input.deploymentId);
 
     return {
       output: {
-        deploymentId: result.id,
-        status: result.status
+        rolledBack,
+        deploymentId: ctx.input.deploymentId
       },
-      message: `Rollback initiated — new deployment status: **${result.status}**.`
+      message: rolledBack
+        ? `Rollback to deployment **${ctx.input.deploymentId}** initiated.`
+        : `Railway did not accept the rollback to deployment **${ctx.input.deploymentId}**.`
+    };
+  })
+  .build();
+
+export let redeployDeploymentTool = SlateTool.create(spec, {
+  name: 'Redeploy Deployment',
+  key: 'redeploy_deployment',
+  description: `Redeploy an existing deployment, rebuilding and redeploying the same source. Returns the new deployment Railway created. The deployment must support redeploys (check canRedeploy with Get Deployment).`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      deploymentId: z.string().describe('ID of the deployment to redeploy'),
+      usePreviousImageTag: z
+        .boolean()
+        .optional()
+        .describe(
+          'For image-based services, redeploy the exact image tag used by this deployment instead of re-pulling the latest tag'
+        )
+    })
+  )
+  .output(
+    z.object({
+      deploymentId: z.string().describe('ID of the new deployment'),
+      status: z.string().describe('Status of the new deployment'),
+      createdAt: z.string().describe('Creation timestamp of the new deployment'),
+      url: z.string().nullable().describe('Deployment URL'),
+      staticUrl: z.string().nullable().describe('Static deployment URL'),
+      serviceId: z.string().nullable().describe('Service ID'),
+      environmentId: z.string().nullable().describe('Environment ID')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let deployment = await client.redeployDeployment(
+      ctx.input.deploymentId,
+      ctx.input.usePreviousImageTag
+    );
+
+    return {
+      output: {
+        deploymentId: deployment.id,
+        status: deployment.status,
+        createdAt: deployment.createdAt,
+        url: deployment.url ?? null,
+        staticUrl: deployment.staticUrl ?? null,
+        serviceId: deployment.serviceId ?? null,
+        environmentId: deployment.environmentId ?? null
+      },
+      message: `Redeploy started as deployment **${deployment.id}** (status: ${deployment.status}).`
     };
   })
   .build();
@@ -318,7 +393,19 @@ export let getDeploymentLogsTool = SlateTool.create(spec, {
         .number()
         .optional()
         .default(100)
-        .describe('Maximum number of log lines to return')
+        .describe('Maximum number of log lines to return (Railway allows up to 5000)'),
+      filter: z
+        .string()
+        .optional()
+        .describe('Optional text filter; only log lines matching it are returned'),
+      startDate: z
+        .string()
+        .optional()
+        .describe('Optional ISO 8601 timestamp; only return logs at or after this time'),
+      endDate: z
+        .string()
+        .optional()
+        .describe('Optional ISO 8601 timestamp; only return logs at or before this time')
     })
   )
   .output(
@@ -334,10 +421,17 @@ export let getDeploymentLogsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let logQuery = {
+      deploymentId: ctx.input.deploymentId,
+      limit: ctx.input.limit,
+      filter: ctx.input.filter,
+      startDate: ctx.input.startDate,
+      endDate: ctx.input.endDate
+    };
     let logs =
       ctx.input.logType === 'build'
-        ? await client.getBuildLogs(ctx.input.deploymentId, ctx.input.limit)
-        : await client.getDeploymentLogs(ctx.input.deploymentId, ctx.input.limit);
+        ? await client.getBuildLogs(logQuery)
+        : await client.getDeploymentLogs(logQuery);
 
     let mapped = (logs || []).map((l: any) => ({
       timestamp: l.timestamp ?? null,
@@ -365,8 +459,14 @@ export let getHttpLogsTool = SlateTool.create(spec, {
       deploymentId: z.string().describe('ID of the deployment to get HTTP logs for'),
       limit: z.number().optional().default(100).describe('Maximum number of HTTP log lines'),
       filter: z.string().optional().describe('Optional Railway log filter expression'),
-      startDate: z.string().optional().describe('Optional ISO start timestamp'),
-      endDate: z.string().optional().describe('Optional ISO end timestamp')
+      startDate: z
+        .string()
+        .optional()
+        .describe('Optional ISO 8601 timestamp; only return requests at or after this time'),
+      endDate: z
+        .string()
+        .optional()
+        .describe('Optional ISO 8601 timestamp; only return requests at or before this time')
     })
   )
   .output(

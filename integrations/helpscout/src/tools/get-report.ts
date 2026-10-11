@@ -6,14 +6,17 @@ import { spec } from '../spec';
 export let getReport = SlateTool.create(spec, {
   name: 'Get Report',
   key: 'get_report',
-  description: `Retrieve reporting data from Help Scout. Choose from company overview, conversation metrics, or customer satisfaction (happiness) reports. All reports require a date range.`,
+  description: `Retrieve reporting data from Help Scout. Choose from company overview, conversation volume, customer satisfaction (happiness), or productivity (response and resolution times) reports. All reports require a date range; add a previous range to get period-over-period deltas.`,
   tags: { readOnly: true },
-  constraints: ['Date format must be ISO 8601 (e.g., "2024-01-01T00:00:00Z").']
+  constraints: [
+    'Date format must be ISO 8601 (e.g., "2024-01-01T00:00:00Z").',
+    'Reporting endpoints are only available on Help Scout Plus and Pro plans.'
+  ]
 })
   .input(
     z.object({
       reportType: z
-        .enum(['company', 'conversations', 'happiness'])
+        .enum(['company', 'conversations', 'happiness', 'productivity'])
         .describe('Type of report to retrieve'),
       start: z.string().describe('Start date/time in ISO 8601 format'),
       end: z.string().describe('End date/time in ISO 8601 format'),
@@ -27,11 +30,17 @@ export let getReport = SlateTool.create(spec, {
       types: z
         .string()
         .optional()
-        .describe('Comma-separated list of conversation types to filter by'),
+        .describe(
+          'Comma-separated list of conversation types to filter by (email, chat, phone)'
+        ),
       folders: z
         .string()
         .optional()
-        .describe('Comma-separated list of folder IDs to filter by')
+        .describe('Comma-separated list of folder IDs to filter by'),
+      officeHours: z
+        .boolean()
+        .optional()
+        .describe('Productivity report only: take office hours into account')
     })
   )
   .output(
@@ -52,17 +61,11 @@ export let getReport = SlateTool.create(spec, {
       mailboxes: ctx.input.mailboxes,
       tags: ctx.input.tags,
       types: ctx.input.types,
-      folders: ctx.input.folders
+      folders: ctx.input.folders,
+      officeHours: ctx.input.reportType === 'productivity' ? ctx.input.officeHours : undefined
     };
 
-    let report: any;
-    if (ctx.input.reportType === 'company') {
-      report = await client.getCompanyReport(params);
-    } else if (ctx.input.reportType === 'conversations') {
-      report = await client.getConversationsReport(params);
-    } else {
-      report = await client.getHappinessReport(params);
-    }
+    let report = await client.getReport(ctx.input.reportType, params);
 
     return {
       output: { report },

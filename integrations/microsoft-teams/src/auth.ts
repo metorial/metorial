@@ -98,6 +98,11 @@ let adminConsentScopes = [
     scope: microsoftTeamsScopes.channelMessageReadAll
   },
   {
+    title: 'Edit/Delete Channel Messages',
+    description: 'Edit and delete your own channel messages (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.channelMessageReadWrite
+  },
+  {
     title: 'Read/Write Team Members',
     description: 'Read and manage team members (requires Entra admin consent)',
     scope: microsoftTeamsScopes.teamMemberReadWriteAll

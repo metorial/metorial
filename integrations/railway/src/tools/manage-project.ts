@@ -18,7 +18,9 @@ export let createProjectTool = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID to create the project in. Omit for personal projects.')
+        .describe(
+          'Workspace ID to create the project in. Call get_current_user to discover workspace IDs.'
+        )
     })
   )
   .output(
@@ -186,7 +188,7 @@ export let listRegionsTool = SlateTool.create(spec, {
     z.object({
       regions: z.array(
         z.object({
-          regionId: z.string().describe('Region identifier'),
+          regionId: z.string().nullable().describe('Region identifier'),
           name: z.string().describe('Region display name'),
           region: z.string().nullable().describe('Railway region code'),
           country: z.string().nullable().describe('Country'),
@@ -201,7 +203,7 @@ export let listRegionsTool = SlateTool.create(spec, {
     let regions = await client.listRegions(ctx.input.projectId);
 
     let mapped = regions.map((region: any) => ({
-      regionId: region.id,
+      regionId: region.id ?? null,
       name: region.name,
       region: region.region ?? null,
       country: region.country ?? null,

@@ -32,8 +32,14 @@ export let createContactProperty = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      key: z.string().describe('Property key, such as company_name.'),
-      type: contactPropertyTypeSchema.describe('Property value type.'),
+      key: z
+        .string()
+        .describe(
+          'Property key, such as company_name. Max 50 characters; letters, numbers, and underscores only.'
+        ),
+      type: contactPropertyTypeSchema.describe(
+        'Property value type. Resend currently documents string and number.'
+      ),
       fallbackValue: z
         .any()
         .optional()

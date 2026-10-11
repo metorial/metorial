@@ -78,6 +78,8 @@ const scopes = [
   ['emails:read', 'Read Emails and Templates'],
   ['email_contents:read', 'Read Email Subjects'],
   ['tasks:read', 'Read Tasks'],
+  ['tasks:write', 'Create, Update and Complete Tasks'],
+  ['tasks:delete', 'Delete Tasks'],
   ['notes:read', 'Read Notes'],
   ['notes:write', 'Create and Update Notes'],
   ['notes:delete', 'Delete Notes'],

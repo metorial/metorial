@@ -6,14 +6,20 @@ import { spec } from '../spec';
 export let listVolumesTool = SlateTool.create(spec, {
   name: 'List Volumes',
   key: 'list_volumes',
-  description: `List all persistent storage volumes in a Railway project.`,
+  description: `List all persistent storage volumes in a Railway project. Provide an environment ID to also list the volume instances in that environment (with mount paths, sizes, and the volume instance IDs used by the volume instance and backup tools).`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to list volumes for')
+      projectId: z.string().describe('ID of the project to list volumes for'),
+      environmentId: z
+        .string()
+        .optional()
+        .describe(
+          'Environment ID to list volume instances for. Call list_environments to find environment IDs.'
+        )
     })
   )
   .output(
@@ -24,7 +30,27 @@ export let listVolumesTool = SlateTool.create(spec, {
           name: z.string().describe('Volume name'),
           createdAt: z.string().describe('Creation timestamp')
         })
-      )
+      ),
+      volumeInstances: z
+        .array(
+          z.object({
+            volumeInstanceId: z.string().describe('Volume instance ID'),
+            volumeId: z.string().describe('Volume ID'),
+            volumeName: z.string().nullable().describe('Volume name'),
+            serviceId: z.string().nullable().describe('Attached service ID'),
+            environmentId: z.string().describe('Environment ID'),
+            mountPath: z.string().nullable().describe('Mount path inside the container'),
+            region: z.string().nullable().describe('Region'),
+            state: z.string().nullable().describe('Volume instance state'),
+            sizeMB: z.number().nullable().describe('Provisioned size in MB'),
+            currentSizeMB: z.number().nullable().describe('Used size in MB'),
+            createdAt: z.string().nullable().describe('Creation timestamp')
+          })
+        )
+        .nullable()
+        .describe(
+          'Volume instances in the requested environment, or null when environmentId is omitted'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -37,9 +63,29 @@ export let listVolumesTool = SlateTool.create(spec, {
       createdAt: v.createdAt
     }));
 
+    let volumeInstances: any[] | null = null;
+    if (ctx.input.environmentId) {
+      let instances = await client.listEnvironmentVolumeInstances(ctx.input.environmentId);
+      volumeInstances = instances.map((instance: any) => ({
+        volumeInstanceId: instance.id,
+        volumeId: instance.volumeId,
+        volumeName: instance.volume?.name ?? null,
+        serviceId: instance.serviceId ?? null,
+        environmentId: instance.environmentId,
+        mountPath: instance.mountPath ?? null,
+        region: instance.region ?? null,
+        state: instance.state ?? null,
+        sizeMB: instance.sizeMB ?? null,
+        currentSizeMB: instance.currentSizeMB ?? null,
+        createdAt: instance.createdAt ?? null
+      }));
+    }
+
     return {
-      output: { volumes: mapped },
-      message: `Found **${mapped.length}** volume(s).`
+      output: { volumes: mapped, volumeInstances },
+      message: volumeInstances
+        ? `Found **${mapped.length}** volume(s) and **${volumeInstances.length}** volume instance(s) in the environment.`
+        : `Found **${mapped.length}** volume(s).`
     };
   })
   .build();
@@ -54,14 +100,18 @@ export let getVolumeInstanceTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      volumeInstanceId: z.string().describe('ID of the volume instance to retrieve')
+      volumeInstanceId: z
+        .string()
+        .describe(
+          'ID of the volume instance to retrieve. Call list_volumes with an environmentId to find it.'
+        )
     })
   )
   .output(
     z.object({
       volumeInstanceId: z.string(),
       volumeId: z.string(),
-      serviceId: z.string(),
+      serviceId: z.string().nullable(),
       environmentId: z.string(),
       mountPath: z.string().nullable(),
       region: z.string().nullable(),
@@ -80,7 +130,7 @@ export let getVolumeInstanceTool = SlateTool.create(spec, {
       output: {
         volumeInstanceId: volumeInstance.id,
         volumeId: volumeInstance.volumeId,
-        serviceId: volumeInstance.serviceId,
+        serviceId: volumeInstance.serviceId ?? null,
         environmentId: volumeInstance.environmentId,
         mountPath: volumeInstance.mountPath ?? null,
         region: volumeInstance.region ?? null,
@@ -264,7 +314,7 @@ export let createVolumeBackupTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      workflowId: z.string().describe('Railway workflow ID for the backup job')
+      workflowId: z.string().nullable().describe('Railway workflow ID for the backup job')
     })
   )
   .handleInvocation(async ctx => {
@@ -273,9 +323,11 @@ export let createVolumeBackupTool = SlateTool.create(spec, {
 
     return {
       output: {
-        workflowId: backup.workflowId
+        workflowId: backup.workflowId ?? null
       },
-      message: `Volume backup workflow **${backup.workflowId}** started.`
+      message: backup.workflowId
+        ? `Volume backup workflow **${backup.workflowId}** started.`
+        : `Volume backup requested.`
     };
   })
   .build();

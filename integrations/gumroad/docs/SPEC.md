@@ -1,10 +1,8 @@
-Now let me fetch the official API documentation to get the complete picture:Now I have enough information to write the specification.
-
-# Slates Specification for Gumroad
+# Gumroad Integration Specification
 
 ## Overview
 
-Gumroad is an e-commerce platform that enables creators to sell digital products (e-books, music, videos, software), physical goods, and subscriptions directly to their audience. It handles payment processing, file delivery, and customer management. The API (v2) provides programmatic access to products, sales, subscribers, licenses, and webhook subscriptions.
+Gumroad is an e-commerce platform that enables creators to sell digital products (e-books, music, videos, software), physical goods, and subscriptions directly to their audience. It handles payment processing, file delivery, and customer management. The API (v2) provides programmatic access to products, sales, subscribers, licenses, payouts, audience emails, and webhook subscriptions.
 
 ## Authentication
 
@@ -34,14 +32,36 @@ For integrations that access any Gumroad account:
 - Token URL: `https://gumroad.com/oauth/token`
 - Base API URL: `https://api.gumroad.com/v2/`
 
-**Scopes:**
+Scopes are space-separated in the `scope` parameter. Gumroad fixes the scopes an
+application may request when the application is created, so a custom OAuth
+application created before Gumroad added a scope (for example `edit_emails`,
+added in June 2026) fails authorization with `invalid_scope`; create a new
+application in that case. A personal access token inherits its application's
+scopes, so the same applies to tokens generated from older applications.
 
-- `edit_products` – Create and manage products
-- `view_sales` – View sales data
+**Scopes** ([reference](https://gumroad.com/api#api-scopes)):
+
+The integration requests exactly these scopes:
+
+- `view_profile` – Read public profile information (including the display name) and products
+- `edit_products` – Create and manage products, variants, offer codes, custom fields, and license keys
+- `view_sales` – Read sales, subscribers, and product sales counts
+- `edit_sales` – Refund sales, revoke or restore buyer access, and resend receipts
 - `mark_sales_as_shipped` – Mark sales as shipped
-- `revenue_share` – Revenue sharing access
+- `view_payouts` – Read payouts
+- `view_tax_data` – Read the annual earnings summary
+- `edit_emails` – Draft, preview, schedule, send, and delete audience emails
 
-If no scope is defined, the default is `view_sales`.
+Not requested: `account` (broad legacy scope; some endpoints, such as revoking
+buyer access, refuse it), `edit_profile` (no profile-editing tools), and the
+undocumented legacy `refund_sales` (superseded by `edit_sales`).
+
+Tool gating: read tools for products, categories, reviews, and the user profile
+accept any read scope; product, offer code, variant, custom field, and license
+key management need `edit_products`; sales and subscribers need `view_sales`;
+sale actions need `mark_sales_as_shipped` or `edit_sales`; payouts need
+`view_payouts`; earnings need `view_tax_data`; audience emails need
+`edit_emails`.
 
 **Token Behavior:**
 While Gumroad provides a refresh_token when authenticating a user, the access_token does not expire until it is revoked manually.
@@ -50,7 +70,7 @@ While Gumroad provides a refresh_token when authenticating a user, the access_to
 
 ### Product Management
 
-View information about your products, and add, edit, and delete offer codes, variants, and custom fields. Creating new products via API is not supported; products must be created through the Gumroad website. You can update product metadata such as price, name, and enabled/disabled state. Products can also be deleted via the API.
+Create, update, publish (enable), unpublish (disable), and delete products, and add, edit, and delete offer codes, variants, and custom fields. New products are saved as drafts unless publishing is requested. Product categories can be listed for categorization, and the public reviews shown on a product page can be read.
 
 ### Variant Categories and Variants
 
@@ -64,13 +84,25 @@ Create, update, and delete discount offer codes for products. Offer codes can be
 
 List and filter sales or inspect individual sale records for reporting or reconciliation. Sales can be filtered by date range (after/before parameters). Includes customer details, product information, and transaction amounts.
 
+### Sale Actions
+
+Mark sales as shipped, issue full or partial refunds, revoke or restore a buyer's access without refunding, and resend purchase receipts.
+
+### Audience Emails
+
+List, read, draft, preview, schedule, unschedule, send, and delete audience emails (posts) for all customers and followers, customers only, followers only, or buyers of one product. Drafts are created first; sending publishes immediately to the audience.
+
+### Payouts and Earnings
+
+List historical and upcoming payouts, inspect a payout's sales and transactions, and read the annual earnings summary used for tax reporting.
+
 ### Subscriber Management
 
 Manage subscribers and subscription lifecycle events for recurring products. Retrieve a list of subscribers for a specific product or look up individual subscriber details by ID.
 
 ### License Verification
 
-Verify, enable, disable, or decrement license keys for purchase validation in apps. Requires the product permalink and license key. Useful for gating access to software or premium content.
+Verify, enable, disable, decrement, or rotate license keys for purchase validation in apps. Requires the product ID and license key. Useful for gating access to software or premium content.
 
 ### User Profile
 

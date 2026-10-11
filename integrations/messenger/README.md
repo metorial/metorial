@@ -1,28 +1,40 @@
 # <img src="https://provider-logos.metorial-cdn.com/meta.jpg" height="20"> Messenger
 
-Send and receive messages between Facebook Pages and users through Messenger. Create rich message templates including carousels, buttons, receipts, and media. Upload reusable media attachments for later sends. Manage Messenger profile settings such as greeting text, persistent menus, get started buttons, account linking, and ice breakers. Retrieve user profile information. Display typing indicators and read receipts. Handle and inspect conversation handover between bots and live agents. Supports a 24-hour messaging window with message tags for follow-up communications.
+Send and receive messages between Facebook Pages and users through Messenger. List conversations and read recent messages. Create rich message templates including carousels, buttons, receipts, and media. Upload reusable media attachments for later sends. Manage Messenger profile settings such as greeting text, persistent menus, get started buttons, account linking, and ice breakers. Retrieve user profile information. Display typing indicators, read receipts, and reactions. Handle and inspect conversation handover between bots and live agents. Supports the 24-hour standard messaging window and the human agent tag for later replies.
 
 ## Tools
 
+### Get Connected Page
+
+Get the Facebook Page this connection sends as: its Page ID, name, link, and picture. Without `pages_read_engagement` only the Page ID is returned.
+
 ### Get User Profile
 
-Retrieve profile information for a Messenger user who has interacted with your Page. Returns available fields such as name, profile picture, locale, timezone, and gender.
+Retrieve profile information for a Messenger user who has interacted with your Page. Returns the name and profile picture by default; locale, timezone, and gender can be requested when the Page has the matching permissions.
+
+### List Conversations
+
+List the Page's Messenger conversations with each participant's Page-scoped ID (PSID), optionally only the conversation with one person. Needs `pages_messaging`, `pages_manage_metadata`, and `pages_read_engagement`.
+
+### List Conversation Messages
+
+List messages in a conversation, newest first, with sender, recipients, text, reply target, and attachment details. Messenger only returns details for the 20 most recent messages.
 
 ### Manage Thread Handover
 
-Control and inspect conversation thread ownership between apps using the Handover Protocol. **Pass** thread control to another app, **take** thread control back, **request** thread control from the current owner, get the current thread owner, or list secondary receiver apps.
+Control and inspect which app owns a conversation (Conversation Routing). **Pass**, **take**, **request**, **release**, or **extend** thread control, get the current thread owner and its expiration, or list secondary receiver apps.
 
 ### Manage Messenger Profile
 
-Configure the Messenger experience for your Page. Set or update the **Get Started** button, **account linking URL**, **greeting text**, **persistent menu**, **ice breakers**, and **whitelisted domains**. Provide only the fields you want to update — unspecified fields remain unchanged. Use the **delete** action to remove specific profile settings.
+Configure the Messenger experience for your Page. Set or update the **Get Started** button, **account linking URL**, **greeting text**, **persistent menu** (postback and web URL items), **ice breakers**, and **whitelisted domains**. Provide only the fields you want to update — unspecified fields remain unchanged. Use the **delete** action to remove specific profile settings.
 
 ### Send Message
 
-Send a text message or media attachment to a Messenger user. Supports plain text with optional quick reply buttons, and media attachments (images, videos, audio, files) via URL. Use **messagingType** and **tag** to send messages outside the 24-hour messaging window.
+Send a text message or media attachment to a Messenger user. Supports plain text with optional quick reply buttons, media attachments (images, videos, audio, files) via URL or reusable attachment ID, multiple images, and replies to an earlier message. Outside the standard messaging window only the `HUMAN_AGENT` tag is accepted; Meta retired `CONFIRMED_EVENT_UPDATE`, `POST_PURCHASE_UPDATE`, and `ACCOUNT_UPDATE` on April 27, 2026.
 
 ### Upload Attachment
 
-Upload an image, video, audio file, or file URL to Messenger and receive a reusable attachment ID for later Send API calls.
+Upload an image, video, audio file, or file URL to Messenger and receive a reusable attachment ID for later Send API calls. Attachment IDs expire after 90 days.
 
 ### Send Template
 
@@ -30,7 +42,7 @@ Send a structured message template to a Messenger user. Supports **Generic** (ca
 
 ### Send Sender Action
 
-Display a typing indicator or mark a message as read in a Messenger conversation. Use **typing_on** to show a typing bubble, **typing_off** to hide it, and **mark_seen** to show a read receipt.
+Display a typing indicator, mark a conversation as read, or react to a message. Use **typing_on** / **typing_off** for the typing bubble, **mark_seen** for a read receipt, and **react** / **unreact** to add, change, or remove the Page's emoji reaction on a message.
 
 ## Chat Adapter
 

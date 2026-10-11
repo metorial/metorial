@@ -145,9 +145,11 @@ export let updateContact = SlateTool.create(spec, {
       lastName: z.string().optional().describe('Updated last name.'),
       unsubscribed: z.boolean().optional().describe('Update global subscription status.'),
       properties: z
-        .record(z.string(), z.string())
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
         .optional()
-        .describe('Updated custom properties.')
+        .describe(
+          'Updated custom property values keyed by contact property key. Use null to clear a value.'
+        )
     })
   )
   .output(
@@ -310,7 +312,10 @@ export let listContactSegments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.')
+      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.'),
+      limit: z.number().optional().describe('Max results (default 20, max 100).'),
+      after: z.string().optional().describe('Cursor for forward pagination.'),
+      before: z.string().optional().describe('Cursor for backward pagination.')
     })
   )
   .output(
@@ -321,7 +326,11 @@ export let listContactSegments = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.listContactSegments(ctx.input.contactIdOrEmail);
+    let result = await client.listContactSegments(ctx.input.contactIdOrEmail, {
+      limit: ctx.input.limit,
+      after: ctx.input.after,
+      before: ctx.input.before
+    });
     let segments = (result.data || []).map((segment: any) => ({
       segmentId: segment.id,
       name: segment.name,
@@ -388,7 +397,10 @@ export let listContactTopics = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.')
+      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.'),
+      limit: z.number().optional().describe('Max results (default 20, max 100).'),
+      after: z.string().optional().describe('Cursor for forward pagination.'),
+      before: z.string().optional().describe('Cursor for backward pagination.')
     })
   )
   .output(
@@ -399,7 +411,11 @@ export let listContactTopics = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.listContactTopics(ctx.input.contactIdOrEmail);
+    let result = await client.listContactTopics(ctx.input.contactIdOrEmail, {
+      limit: ctx.input.limit,
+      after: ctx.input.after,
+      before: ctx.input.before
+    });
     let topics = (result.data || []).map((topic: any) => ({
       topicId: topic.id,
       name: topic.name,

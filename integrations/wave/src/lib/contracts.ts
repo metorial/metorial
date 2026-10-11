@@ -105,8 +105,12 @@ export const salesTax = z.object({
   rates: z.array(z.object({ effective: id, rate: decimal })),
   ...timestamps
 });
+// Money.value is a display string that can include grouping separators (for example "2,000.00");
+// minorUnitValue is the exact Decimal amount in the minor currency unit.
+const moneyValue = z.string().min(1).max(200);
 const money = z.object({
-  value: decimal,
+  value: moneyValue,
+  minorUnitValue: optional(decimal),
   currency: z.object({ code: id, symbol: z.string() })
 });
 export const invoice = z.object({
@@ -140,7 +144,9 @@ export const invoice = z.object({
         product: z.object({ id, name: z.string() }),
         taxes: z.array(
           z.object({
-            amount: optional(z.object({ value: decimal })),
+            amount: optional(
+              z.object({ value: moneyValue, minorUnitValue: optional(decimal) })
+            ),
             salesTax: z.object({ id, name: z.string() })
           })
         )
@@ -162,6 +168,27 @@ export const user = z.object({
   ...timestamps
 });
 export const transaction = z.object({ id });
+export const invoicePayment = z.object({
+  id,
+  business: businessRef,
+  amount: text,
+  paymentDate: text,
+  paymentMethod: text,
+  memo: text,
+  exchangeRate: optional(decimal),
+  account: optional(z.object({ id, name: z.string() })),
+  invoice: optional(
+    z.object({
+      id,
+      status: id,
+      invoiceNumber: id,
+      amountDue: money,
+      amountPaid: money
+    })
+  ),
+  createdAt: text,
+  modifiedAt: text
+});
 export const resources = { business, customer, account, product, salesTax, invoice, vendor };
 export type ResourceKind = keyof typeof resources;
 export type Customer = z.output<typeof customer>;
@@ -169,3 +196,4 @@ export type Account = z.output<typeof account>;
 export type Product = z.output<typeof product>;
 export type SalesTax = z.output<typeof salesTax>;
 export type Invoice = z.output<typeof invoice>;
+export type InvoicePayment = z.output<typeof invoicePayment>;

@@ -2,16 +2,24 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
+import {
+  buildMessagePayload,
+  importanceInputSchema,
+  mentionsInputSchema
+} from '../lib/messages';
 import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
+// https://learn.microsoft.com/en-us/graph/api/channel-post-messages?view=graph-rest-1.0
+// https://learn.microsoft.com/en-us/graph/api/chatmessage-post-replies?view=graph-rest-1.0
 export let sendChannelMessage = SlateTool.create(spec, {
   name: 'Send Channel Message',
   key: 'send_channel_message',
-  description: `Send a message to a channel in a Microsoft Team. Supports plain text and HTML content. Can also reply to an existing message thread by providing a parent message ID.`,
+  description: `Send a message to a channel in a Microsoft Team. Supports plain text and HTML content, @mentions, a subject line, and importance. Can also reply to an existing message thread by providing a parent message ID.`,
   instructions: [
-    'Set contentType to "html" if your content includes HTML formatting.',
-    'To reply to an existing message thread, provide the parentMessageId.'
+    'Set contentType to "html" if your content includes HTML formatting or mentions.',
+    'To mention users, set contentType to "html", put <at id="0">Name</at> (then id="1", ...) in the content, and list the users in mentions in the same order.',
+    'To reply to an existing message thread, provide the parentMessageId. subject applies only to new posts.'
   ]
 })
   .scopes(microsoftTeamsActionScopes.sendChannelMessage)
@@ -25,7 +33,13 @@ export let sendChannelMessage = SlateTool.create(spec, {
         .enum(['text', 'html'])
         .default('text')
         .describe('Content type of the message'),
-      parentMessageId: z.string().optional().describe('ID of the parent message to reply to')
+      parentMessageId: z.string().optional().describe('ID of the parent message to reply to'),
+      subject: z
+        .string()
+        .optional()
+        .describe('Subject line for a new channel post (ignored for replies)'),
+      importance: importanceInputSchema,
+      mentions: mentionsInputSchema
     })
   )
   .output(
@@ -38,12 +52,13 @@ export let sendChannelMessage = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GraphClient({ token: ctx.auth.token });
 
-    let body = {
-      body: {
-        contentType: ctx.input.contentType,
-        content: ctx.input.content
-      }
-    };
+    let body = buildMessagePayload({
+      content: ctx.input.content,
+      contentType: ctx.input.contentType,
+      mentions: ctx.input.mentions,
+      subject: ctx.input.parentMessageId ? undefined : ctx.input.subject,
+      importance: ctx.input.importance
+    });
 
     let message: any;
     if (ctx.input.parentMessageId) {
@@ -61,7 +76,7 @@ export let sendChannelMessage = SlateTool.create(spec, {
       output: {
         messageId: message.id,
         createdDateTime: message.createdDateTime,
-        webUrl: message.webUrl
+        webUrl: message.webUrl ?? undefined
       },
       message: ctx.input.parentMessageId
         ? `Reply sent to message thread.`

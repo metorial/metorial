@@ -69,6 +69,7 @@ export let manageRunners = SlateTool.create(spec, {
     z.object({
       runners: z.array(runnerSchema).optional().describe('List of runners'),
       totalCount: z.number().optional().describe('Total number of runners'),
+      nextPage: z.number().optional().describe('Next page number, when more runners exist'),
       runner: runnerSchema.optional().describe('Single runner details'),
       removed: z.boolean().optional().describe('Whether the runner was removed'),
       registrationToken: z.string().optional().describe('Runner registration token'),
@@ -103,7 +104,7 @@ export let manageRunners = SlateTool.create(spec, {
       }));
 
     if (action === 'list') {
-      let data: { total_count: number; runners: Runner[] };
+      let data: { total_count: number; runners: Runner[]; nextPage?: number };
       if (scope === 'org') {
         if (!org) throw createApiServiceError('org is required.');
         data = await client.listOrgRunners(org, {
@@ -122,7 +123,8 @@ export let manageRunners = SlateTool.create(spec, {
       return {
         output: {
           runners: (data.runners ?? []).map(mapRunner),
-          totalCount: data.total_count
+          totalCount: data.total_count,
+          nextPage: data.nextPage
         },
         message: `Found **${data.total_count}** runners.`
       };

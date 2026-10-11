@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
@@ -70,6 +70,12 @@ export let manageTags = SlateTool.create(spec, {
         .optional()
         .describe('List of tag members'),
       tagId: z.string().optional().describe('Tag ID of created/updated tag'),
+      tagMemberId: z
+        .string()
+        .optional()
+        .describe(
+          'Tag member ID of the added member (for add_member); use it with remove_member'
+        ),
       success: z.boolean().describe('Whether the operation succeeded')
     })
   )
@@ -90,7 +96,10 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.displayName) throw new Error('displayName is required for create');
+      if (!ctx.input.displayName)
+        throw createApiServiceError('displayName is required for create.', {
+          reason: 'microsoft_teams_tag_input_invalid'
+        });
       let initialMemberIds =
         ctx.input.memberUserIds && ctx.input.memberUserIds.length > 0
           ? ctx.input.memberUserIds
@@ -107,7 +116,10 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.tagId) throw new Error('tagId is required for update');
+      if (!ctx.input.tagId)
+        throw createApiServiceError('tagId is required for update.', {
+          reason: 'microsoft_teams_tag_input_invalid'
+        });
       let body: any = {};
       if (ctx.input.displayName) body.displayName = ctx.input.displayName;
       await client.updateTag(ctx.input.teamId, ctx.input.tagId, body);
@@ -118,7 +130,10 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.tagId) throw new Error('tagId is required for delete');
+      if (!ctx.input.tagId)
+        throw createApiServiceError('tagId is required for delete.', {
+          reason: 'microsoft_teams_tag_input_invalid'
+        });
       await client.deleteTag(ctx.input.teamId, ctx.input.tagId);
       return {
         output: { success: true },
@@ -127,7 +142,10 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'list_members') {
-      if (!ctx.input.tagId) throw new Error('tagId is required for list_members');
+      if (!ctx.input.tagId)
+        throw createApiServiceError('tagId is required for list_members.', {
+          reason: 'microsoft_teams_tag_input_invalid'
+        });
       let members = await client.listTagMembers(ctx.input.teamId, ctx.input.tagId);
       let mapped = members.map((m: any) => ({
         tagMemberId: m.id,
@@ -141,18 +159,38 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'add_member') {
-      if (!ctx.input.tagId) throw new Error('tagId is required');
-      if (!ctx.input.userId) throw new Error('userId is required');
-      await client.addTagMember(ctx.input.teamId, ctx.input.tagId, ctx.input.userId);
+      if (!ctx.input.tagId)
+        throw createApiServiceError('tagId is required.', {
+          reason: 'microsoft_teams_tag_input_invalid'
+        });
+      if (!ctx.input.userId)
+        throw createApiServiceError('userId is required.', {
+          reason: 'microsoft_teams_tag_input_invalid'
+        });
+      let added = await client.addTagMember(
+        ctx.input.teamId,
+        ctx.input.tagId,
+        ctx.input.userId
+      );
       return {
-        output: { success: true },
+        output: {
+          tagId: ctx.input.tagId,
+          ...(typeof added?.id === 'string' ? { tagMemberId: added.id } : {}),
+          success: true
+        },
         message: `Member added to tag.`
       };
     }
 
     if (ctx.input.action === 'remove_member') {
-      if (!ctx.input.tagId) throw new Error('tagId is required');
-      if (!ctx.input.tagMemberId) throw new Error('tagMemberId is required');
+      if (!ctx.input.tagId)
+        throw createApiServiceError('tagId is required.', {
+          reason: 'microsoft_teams_tag_input_invalid'
+        });
+      if (!ctx.input.tagMemberId)
+        throw createApiServiceError('tagMemberId is required.', {
+          reason: 'microsoft_teams_tag_input_invalid'
+        });
       await client.removeTagMember(ctx.input.teamId, ctx.input.tagId, ctx.input.tagMemberId);
       return {
         output: { success: true },
@@ -160,6 +198,8 @@ export let manageTags = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`, {
+      reason: 'microsoft_teams_action_invalid'
+    });
   })
   .build();

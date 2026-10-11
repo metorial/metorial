@@ -202,8 +202,8 @@ describe('google-chat core A tool family', () => {
     ).toThrow(ServiceError);
   });
 
-  it('allows MESSAGE_REPLY_OPTION_UNSPECIFIED with threadKey to start a new keyed thread', () => {
-    expect(
+  it('rejects MESSAGE_REPLY_OPTION_UNSPECIFIED with threadKey because Google ignores the key', () => {
+    expect(() =>
       buildSendMessageRequest(
         {
           messageText: 'Hello',
@@ -212,14 +212,7 @@ describe('google-chat core A tool family', () => {
         },
         'spaces/space-1'
       )
-    ).toEqual({
-      parent: 'spaces/space-1',
-      data: {
-        text: 'Hello',
-        thread: { threadKey: 'application-thread' }
-      },
-      params: { messageReplyOption: 'MESSAGE_REPLY_OPTION_UNSPECIFIED' }
-    });
+    ).toThrow(ServiceError);
   });
 
   it('lists messages with exact thread/time filters, ordering, and pagination', async () => {

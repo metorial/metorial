@@ -2,23 +2,25 @@
 
 ## Overview
 
-Google Chat is Google Workspace's team messaging service. This integration exposes 25 tools for messages, spaces, memberships, reactions, direct messages, attachments, space events, the signed-in user's read state, space notification settings, sidebar sections, custom emoji, and organization-wide admin space search. It also implements the normalized chat adapter for the Google Chat app and one manual webhook trigger group for Chat app interaction events (see the README's Chat app adapter section).
+Google Chat is Google Workspace's team messaging service. This integration exposes 27 tools for messages, spaces, memberships, reactions, direct messages, attachments, space events, the signed-in user's read state, space notification settings, sidebar sections, custom emoji, and organization-wide admin space search. It also implements the normalized chat adapter for the Google Chat app and one manual webhook trigger group for Chat app interaction events (see the README's Chat app adapter section).
 
 ## Tool surface
 
 | Tool | Authentication | API behavior |
 |---|---|---|
-| `send_message` | User OAuth or Chat app | `spaces.messages.create`, including thread replies and uploaded attachment tokens |
+| `send_message` | User OAuth or Chat app | `spaces.messages.create`, including thread replies, `requestId` idempotency, client-assigned message IDs, and uploaded attachment tokens (user OAuth) |
 | `list_messages` | User OAuth | `spaces.messages.list` with thread/time filtering, `createTime ASC`/`DESC` ordering, and pagination |
 | `search_messages` | User OAuth | `POST /v1/spaces/-/messages:search`, with a `spaces.messages.list` keyword fallback when the search API is unavailable for the account or project |
 | `search_conversations` | User OAuth or Chat app | `spaces.list`, followed by client-side name matching on each returned page |
 | `manage_space` | User OAuth | Create, setup, get, update, and delete space workflows |
 | `manage_message` | User OAuth or Chat app | Get, patch, and delete messages; apps can mutate only app-authored messages |
 | `manage_reaction` | User OAuth | Create, list, and delete reactions |
+| `list_members` | User OAuth or Chat app | `spaces.members.list` with role/member-type filters, `showGroups`, `showInvited` (user OAuth), and pagination; app auth omits app memberships |
+| `manage_membership` | User OAuth | `spaces.members.get`, `create` (user by ID or email, or Google Group), `patch` (`updateMask=role`), and `delete` |
 | `find_direct_message` | User OAuth or Chat app | `spaces.findDirectMessage` |
 | `get_attachment` | Chat app only | `spaces.messages.attachments.get` metadata |
 | `download_attachment` | User OAuth or Chat app | `media.download`; returns a downloadable file |
-| `upload_attachment` | User OAuth or Chat app | Multipart `media.upload`; returns an upload token, not a posted message |
+| `upload_attachment` | User OAuth | Multipart `media.upload` (user authentication only); returns an upload token, not a posted message |
 | `list_space_events` | User OAuth | List events or get one event by ID |
 | `get_space_read_state` | User OAuth | `users.spaces.getSpaceReadState` for `users/me` |
 | `get_thread_read_state` | User OAuth | `users.spaces.threads.getThreadReadState` for `users/me` |
@@ -40,25 +42,24 @@ The four official-named core tools are `send_message`, `list_messages`, `search_
 
 ### User OAuth
 
-The OAuth authorization-code flow requests offline access and incremental authorization. Callback and refresh handling persist the access token, expiry, and refresh token, preserving the existing refresh token when Google does not rotate it. Profile lookup uses Google Account identity scopes when either identity scope is granted.
+The OAuth authorization-code flow requests offline access with a consent prompt; it does not request incremental authorization (`include_granted_scopes`). Callback and refresh handling persist the access token, expiry, and refresh token, preserving the existing refresh token when Google does not rotate it. Profile lookup uses Google Account identity scopes when either identity scope is granted.
 
 The consent surface contains:
 
-- `chat.messages`, `chat.messages.readonly`, and `chat.messages.create`
-- `chat.spaces`, `chat.spaces.readonly`, and the separate `chat.delete` scope
-- `chat.memberships` and `chat.memberships.readonly`
-- `chat.messages.reactions`
+- `chat.messages` (also covers reactions)
+- `chat.spaces` and the separate `chat.delete` scope
+- `chat.memberships`
 - `chat.users.readstate`, `chat.users.spacesettings`, `chat.users.sections`, and `chat.customemojis`
 - `chat.admin.spaces.readonly`
 - `userinfo.email` and `userinfo.profile`
 
-Connections request every scope declared on the OAuth method. Consolidated tools use relaxed `anyOf` static gates and document the per-action scope Google actually enforces in their instructions: `manage_space` accepts `chat.spaces`, `chat.spaces.readonly`, or `chat.delete` (get works read-only; create/setup/update need `chat.spaces`; delete needs `chat.delete`, and without it the tool reports that the connection must be reauthorized). `manage_message` accepts a message read scope so `action=get` works with read-only grants, while update/delete need `chat.messages`. `list_space_events` accepts any one message, reaction, membership, or space read scope because Google enforces the scope per requested `eventTypes` family. Read-only tools for read state, sections, and custom emoji also accept the matching `.readonly` scope; their write tools require the full scope. `search_spaces_admin` accepts `chat.admin.spaces.readonly` or `chat.admin.spaces`.
+Connections request every scope declared on the OAuth method, so read-only and narrower variants (`chat.messages.readonly`, `chat.messages.create`, `chat.messages.reactions`, `chat.spaces.readonly`, `chat.memberships.readonly`) are not declared; tool gates still accept them for connections that granted them earlier. Consolidated tools use relaxed `anyOf` static gates and document the per-action scope Google actually enforces in their instructions: `manage_space` accepts `chat.spaces`, `chat.spaces.readonly`, or `chat.delete` (get works read-only; create/setup/update need `chat.spaces`; delete needs `chat.delete`, and without it the tool reports that the connection must be reauthorized). `manage_message` accepts a message read scope so `action=get` works with read-only grants, while update/delete need `chat.messages`. `manage_membership` accepts either membership scope so `action=get` works read-only, while add/update/remove need `chat.memberships`. `list_space_events` accepts any one message, reaction, membership, or space read scope because Google enforces the scope per requested `eventTypes` family. Read-only tools for read state, sections, and custom emoji also accept the matching `.readonly` scope; their write tools require the full scope. `search_spaces_admin` accepts `chat.admin.spaces.readonly` or `chat.admin.spaces`.
 
 ### Chat app service account
 
 App authentication accepts the JSON key for the service account configured as the Google Chat app and an optional numeric `projectNumber`, exchanges a signed JWT for an access token, and refreshes by signing a new assertion. It requests only the app-only `chat.bot` scope; `chat.bot` is not presented on the user OAuth consent screen.
 
-The Google Cloud project must have a configured Chat app, and that app must be installed in each space it accesses. App authentication does not substitute for user authentication on user-only endpoints. Attachment metadata (`get_attachment`) is app-only, and attachment upload (`upload_attachment`) supports app authentication in addition to user OAuth, matching `media.upload`. Mixed-auth tools still follow Google restrictions; in particular, a Chat app can update or delete only its own messages.
+The Google Cloud project must have a configured Chat app, and that app must be installed in each space it accesses. App authentication does not substitute for user authentication on user-only endpoints. Attachment metadata (`get_attachment`) is app-only, while attachment upload (`upload_attachment`) is user-only because `media.upload` does not support app authentication. Mixed-auth tools still follow Google restrictions; in particular, a Chat app can update or delete only its own messages.
 
 ## Search behavior
 
@@ -83,7 +84,7 @@ Google Drive download flow.
 
 ## Live verification boundary
 
-The private E2E suite defines scenarios for all 25 tools. A real run requires both a fully consented user OAuth profile and a Chat app service-account profile, a Workspace tenant where the app can be installed, a disposable member fixture, existing OAuth/app direct-message fixtures, and stable user/app attachment fixtures. Where the search API is available the suite exercises the primary `messages.search` path; otherwise `search_messages` exercises its `spaces.messages.list` fallback instead. The read state, notification setting, section, and custom emoji scenarios need their user scopes, and `search_spaces_admin` runs only for a Workspace administrator profile. Scenarios whose profile, scope, or fixture is missing skip individually rather than claiming live provider coverage.
+The private E2E suite defines scenarios for all 27 tools. A real run requires both a fully consented user OAuth profile and a Chat app service-account profile, a Workspace tenant where the app can be installed, a disposable member fixture, existing OAuth/app direct-message fixtures, and stable user/app attachment fixtures. Where the search API is available the suite exercises the primary `messages.search` path; otherwise `search_messages` exercises its `spaces.messages.list` fallback instead. The read state, notification setting, section, and custom emoji scenarios need their user scopes, and `search_spaces_admin` runs only for a Workspace administrator profile. Scenarios whose profile, scope, or fixture is missing skip individually rather than claiming live provider coverage.
 
 ## Chat app adapter and events
 

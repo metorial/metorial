@@ -23,6 +23,7 @@ export let listWorkflows = SlateTool.create(spec, {
   .output(
     z.object({
       totalCount: z.number().describe('Total number of workflows'),
+      nextPage: z.number().optional().describe('Next page number, when more workflows exist'),
       workflows: z
         .array(
           z.object({
@@ -65,6 +66,7 @@ export let listWorkflows = SlateTool.create(spec, {
     return {
       output: {
         totalCount: data.total_count,
+        nextPage: data.nextPage,
         workflows
       },
       message: `Found **${data.total_count}** workflows in **${ctx.input.owner}/${ctx.input.repo}**.`

@@ -3,6 +3,13 @@ import { z } from 'zod';
 import { createWixClient } from '../lib/helpers';
 import { spec } from '../spec';
 
+let findFulfillment = (result: Record<string, any>, fulfillmentId?: string) =>
+  fulfillmentId
+    ? (result.orderWithFulfillments?.fulfillments || []).find(
+        (fulfillment: Record<string, any>) => fulfillment?.id === fulfillmentId
+      )
+    : undefined;
+
 export let manageOrderFulfillments = SlateTool.create(spec, {
   name: 'Manage Order Fulfillments',
   key: 'manage_order_fulfillments',
@@ -37,8 +44,12 @@ Fulfillments track delivery of specific line items and optional tracking informa
       orderWithFulfillments: z
         .any()
         .optional()
-        .describe('Order and fulfillment records returned by list'),
-      fulfillment: z.any().optional().describe('Single fulfillment response'),
+        .describe('Order ID and all of its fulfillment records after the operation'),
+      fulfillmentId: z
+        .string()
+        .optional()
+        .describe('ID of the created or updated fulfillment'),
+      fulfillment: z.any().optional().describe('Created or updated fulfillment record'),
       result: z.any().optional().describe('Raw Wix fulfillment response')
     })
   )
@@ -62,8 +73,14 @@ Fulfillments track delivery of specific line items and optional tracking informa
           ctx.input.orderId,
           ctx.input.fulfillmentData
         );
+        let fulfillmentId: string | undefined = result.fulfillmentId;
         return {
-          output: { fulfillment: result.fulfillment, result },
+          output: {
+            fulfillmentId,
+            fulfillment: findFulfillment(result, fulfillmentId),
+            orderWithFulfillments: result.orderWithFulfillments,
+            result
+          },
           message: `Created fulfillment for order **${ctx.input.orderId}**`
         };
       }
@@ -80,7 +97,12 @@ Fulfillments track delivery of specific line items and optional tracking informa
           ctx.input.fulfillmentData
         );
         return {
-          output: { fulfillment: result.fulfillment, result },
+          output: {
+            fulfillmentId: ctx.input.fulfillmentId,
+            fulfillment: findFulfillment(result, ctx.input.fulfillmentId),
+            orderWithFulfillments: result.orderWithFulfillments,
+            result
+          },
           message: `Updated fulfillment **${ctx.input.fulfillmentId}** for order **${ctx.input.orderId}**`
         };
       }
@@ -93,7 +115,7 @@ Fulfillments track delivery of specific line items and optional tracking informa
           ctx.input.fulfillmentId
         );
         return {
-          output: { result },
+          output: { orderWithFulfillments: result.orderWithFulfillments, result },
           message: `Deleted fulfillment **${ctx.input.fulfillmentId}** for order **${ctx.input.orderId}**`
         };
       }

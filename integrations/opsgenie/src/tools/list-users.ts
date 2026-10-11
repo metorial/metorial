@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { getNextNumericOffset } from '../lib/paging';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -13,7 +14,12 @@ export let listUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      query: z.string().optional().describe('Filter query (e.g., "role:admin")'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Filter query of field:value pairs (e.g., "role:admin", "blocked:false"). Fields: username, fullName, blocked, verified, role, locale, timeZone, createdAt'
+        ),
       limit: z
         .number()
         .optional()
@@ -40,7 +46,16 @@ export let listUsers = SlateTool.create(spec, {
           timezone: z.string().optional().describe('User timezone')
         })
       ),
-      totalCount: z.number().describe('Number of users returned')
+      totalCount: z.number().describe('Number of users returned'),
+      totalAvailable: z
+        .number()
+        .optional()
+        .describe('Total number of users matching the query'),
+      hasMore: z.boolean().describe('Whether another page of users is available'),
+      nextOffset: z
+        .number()
+        .optional()
+        .describe('Offset to pass to fetch the next page, when more users are available')
     })
   )
   .handleInvocation(async ctx => {
@@ -51,6 +66,7 @@ export let listUsers = SlateTool.create(spec, {
 
     let response = await client.listUsers(ctx.input);
     let data = response.data ?? [];
+    let nextOffset = getNextNumericOffset(response.paging);
 
     let users = data.map((u: any) => ({
       userId: u.id,
@@ -66,7 +82,11 @@ export let listUsers = SlateTool.create(spec, {
     return {
       output: {
         users,
-        totalCount: users.length
+        totalCount: users.length,
+        totalAvailable:
+          typeof response.totalCount === 'number' ? response.totalCount : undefined,
+        hasMore: nextOffset !== undefined,
+        nextOffset
       },
       message: `Found **${users.length}** users${ctx.input.query ? ` matching "${ctx.input.query}"` : ''}.`
     };

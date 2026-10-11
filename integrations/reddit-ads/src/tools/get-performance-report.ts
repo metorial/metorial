@@ -12,9 +12,14 @@ export let getPerformanceReport = SlateTool.create(spec, {
     'Retrieve one page of campaign performance data with documented metrics and dimensions. YYYY-MM-DD dates become UTC midnight boundaries without extending endDate. Monetary metrics retain their provider units.',
   instructions: [
     'Dates should be in YYYY-MM-DD format.',
-    'UTC is the default. Data can change with attribution and provider refreshes; no fixed freshness guarantee is made.'
+    'endDate is exclusive: for a single day use the next day as endDate.',
+    'Units: SPEND, CPC, CPV, ECPM, CONVERSION*_ECPA and APP_INSTALL*_ECPA/REVENUE/SKAN values are in microcurrency (divide by 1,000,000); CONVERSION*_TOTAL_VALUE values are in cents (divide by 100).',
+    'UTC is the default. Metrics may take up to 6 hours to stabilize and late conversions can change historical totals.'
   ],
-  constraints: ['Rate limit: 1 request per second.'],
+  constraints: [
+    'Rate limit: 60 report requests per 60 seconds.',
+    'Up to 3 dimensions including the level (4 when COUNTRY and REGION are both used).'
+  ],
   tags: {
     readOnly: true
   }

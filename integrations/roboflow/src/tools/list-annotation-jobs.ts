@@ -4,6 +4,32 @@ import { createClient } from '../lib/helpers';
 import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
+// Roboflow returns job creation times as Firestore timestamps ({ _seconds, _nanoseconds }).
+const createdSeconds = (value: unknown) => {
+  const seconds =
+    typeof value === 'object' && value !== null
+      ? Number((value as { _seconds?: unknown })._seconds)
+      : typeof value === 'number'
+        ? value
+        : Number.NaN;
+  return Number.isFinite(seconds) ? seconds : undefined;
+};
+
+const mapJob = (job: any, fallbackId?: string) => ({
+  jobId: job.id || fallbackId,
+  name: job.name,
+  status: job.status,
+  labelerEmail: job.labeler,
+  reviewerEmail: job.reviewer,
+  totalImages: job.numImages,
+  annotated: job.annotated,
+  unannotated: job.unannotated,
+  approved: job.approved,
+  rejected: job.rejected,
+  sourceBatch: job.sourceBatch,
+  createdAt: createdSeconds(job.created)
+});
+
 export let listAnnotationJobsTool = SlateTool.create(spec, {
   name: 'List Annotation Jobs',
   key: 'list_annotation_jobs',
@@ -24,13 +50,19 @@ export let listAnnotationJobsTool = SlateTool.create(spec, {
         .array(
           z.object({
             jobId: z.string().describe('Unique job identifier'),
-            status: z.string().optional().describe('Job status (e.g., active, completed)'),
+            name: z.string().optional().describe('Job name'),
+            status: z.string().optional().describe('Job status (e.g., assigned, completed)'),
+            labelerEmail: z.string().optional().describe('Email of the assigned labeler'),
+            reviewerEmail: z.string().optional().describe('Email of the assigned reviewer'),
             totalImages: z.number().optional().describe('Total images assigned to the job'),
             annotated: z.number().optional().describe('Number of annotated images'),
             unannotated: z.number().optional().describe('Number of unannotated images'),
             approved: z.number().optional().describe('Number of approved annotations'),
             rejected: z.number().optional().describe('Number of rejected annotations'),
-            sourceBatch: z.string().optional().describe('Name of the source batch'),
+            sourceBatch: z
+              .string()
+              .optional()
+              .describe('Source batch reference in the form projectKey/batchId'),
             createdAt: z
               .number()
               .optional()
@@ -49,36 +81,14 @@ export let listAnnotationJobsTool = SlateTool.create(spec, {
       let job = data.job || data;
       return {
         output: {
-          jobs: [
-            {
-              jobId: job.id || ctx.input.jobId,
-              status: job.status,
-              totalImages: job.numImages,
-              annotated: job.annotated,
-              unannotated: job.unannotated,
-              approved: job.approved,
-              rejected: job.rejected,
-              sourceBatch: job.sourceBatch,
-              createdAt: job.created
-            }
-          ]
+          jobs: [mapJob(job, ctx.input.jobId)]
         },
         message: `Job **${ctx.input.jobId}** is **${job.status || 'unknown'}** with **${job.annotated || 0}** annotated out of **${job.numImages || 0}** images.`
       };
     }
 
     let data = await client.listJobs(workspaceId, ctx.input.projectId);
-    let jobs = (data.jobs || []).map((j: any) => ({
-      jobId: j.id,
-      status: j.status,
-      totalImages: j.numImages,
-      annotated: j.annotated,
-      unannotated: j.unannotated,
-      approved: j.approved,
-      rejected: j.rejected,
-      sourceBatch: j.sourceBatch,
-      createdAt: j.created
-    }));
+    let jobs = (data.jobs || []).map((j: any) => mapJob(j));
 
     return {
       output: { jobs },

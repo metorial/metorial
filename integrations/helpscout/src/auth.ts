@@ -7,6 +7,33 @@ import {
 import { z } from 'zod';
 import { withHelpScoutErrorHandling } from './lib/errors';
 
+// Client credentials tokens expire after two days and have no refresh token,
+// so refreshing repeats the client credentials grant.
+// https://developer.helpscout.com/mailbox-api/overview/authentication/
+let requestClientCredentialsToken = async (input: {
+  clientId: string;
+  clientSecret: string;
+}) => {
+  let http = withHelpScoutErrorHandling(createAxios(), 'client credentials token request');
+
+  let response = await http.post(
+    'https://api.helpscout.net/v2/oauth2/token',
+    {
+      grant_type: 'client_credentials',
+      client_id: input.clientId,
+      client_secret: input.clientSecret
+    },
+    {
+      headers: { 'Content-Type': 'application/json' }
+    }
+  );
+
+  return normalizeOAuthTokenResponse(response.data, {
+    providerLabel: 'Help Scout',
+    operation: 'client credentials token request'
+  });
+};
+
 export let auth = SlateAuth.create()
   .output(
     z.object({
@@ -167,24 +194,7 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let http = withHelpScoutErrorHandling(createAxios(), 'client credentials token request');
-
-      let response = await http.post(
-        'https://api.helpscout.net/v2/oauth2/token',
-        {
-          grant_type: 'client_credentials',
-          client_id: ctx.input.clientId,
-          client_secret: ctx.input.clientSecret
-        },
-        {
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-
-      let token = normalizeOAuthTokenResponse(response.data, {
-        providerLabel: 'Help Scout',
-        operation: 'client credentials token request'
-      });
+      let token = await requestClientCredentialsToken(ctx.input);
 
       return {
         output: {
@@ -192,6 +202,22 @@ export let auth = SlateAuth.create()
           refreshToken: undefined,
           expiresAt: token.expiresAt,
           docsApiKey: ctx.input.docsApiKey || undefined
+        }
+      };
+    },
+
+    handleTokenRefresh: async (ctx: {
+      input: { clientId: string; clientSecret: string; docsApiKey?: string };
+      output: { docsApiKey?: string };
+    }) => {
+      let token = await requestClientCredentialsToken(ctx.input);
+
+      return {
+        output: {
+          token: token.token,
+          refreshToken: undefined,
+          expiresAt: token.expiresAt,
+          docsApiKey: ctx.input.docsApiKey || ctx.output.docsApiKey || undefined
         }
       };
     },

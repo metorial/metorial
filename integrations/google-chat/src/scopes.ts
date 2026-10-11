@@ -53,7 +53,18 @@ export let googleChatScopeClauses = {
     googleChatScopes.delete
   ),
   reactionWrite: anyOf(googleChatScopes.messageReactions, googleChatScopes.messages),
+  // media.upload supports user authentication only; Chat apps cannot upload files.
+  attachmentUpload: anyOf(googleChatScopes.messages, googleChatScopes.messagesCreate),
   appAttachmentRead: anyOf(googleChatScopes.bot),
+  // spaces.members.list accepts a membership scope (user auth) or chat.bot (app auth).
+  membershipList: anyOf(
+    googleChatScopes.memberships,
+    googleChatScopes.membershipsReadonly,
+    googleChatScopes.bot
+  ),
+  // manage_membership: get accepts either membership scope; create, patch, and delete
+  // need chat.memberships, which Google enforces per action.
+  membershipManage: anyOf(googleChatScopes.memberships, googleChatScopes.membershipsReadonly),
   readStateRead: anyOf(
     googleChatScopes.usersReadstateReadonly,
     googleChatScopes.usersReadstate
@@ -88,7 +99,7 @@ export let googleChatActionScopes = {
   findDirectMessage: googleChatScopeClauses.spaceRead,
   getAttachment: googleChatScopeClauses.appAttachmentRead,
   downloadAttachment: googleChatScopeClauses.messageReadAsUserOrApp,
-  uploadAttachment: googleChatScopeClauses.messageCreate,
+  uploadAttachment: googleChatScopeClauses.attachmentUpload,
   listSpaceEvents: googleChatScopeClauses.spaceEventRead,
   getSpaceReadState: googleChatScopeClauses.readStateRead,
   getThreadReadState: googleChatScopeClauses.readStateRead,
@@ -102,7 +113,9 @@ export let googleChatActionScopes = {
   listCustomEmojis: googleChatScopeClauses.customEmojiRead,
   getCustomEmoji: googleChatScopeClauses.customEmojiRead,
   manageCustomEmoji: googleChatScopeClauses.customEmojiWrite,
-  searchSpacesAdmin: googleChatScopeClauses.adminSpaceSearch
+  searchSpacesAdmin: googleChatScopeClauses.adminSpaceSearch,
+  listMembers: googleChatScopeClauses.membershipList,
+  manageMembership: googleChatScopeClauses.membershipManage
 } as const;
 
 export let googleChatActionAuthMethods = {
@@ -116,7 +129,8 @@ export let googleChatActionAuthMethods = {
   findDirectMessage: ['oauth', 'service_account'],
   getAttachment: ['service_account'],
   downloadAttachment: ['oauth', 'service_account'],
-  uploadAttachment: ['oauth', 'service_account'],
+  // media.upload requires user authentication.
+  uploadAttachment: ['oauth'],
   listSpaceEvents: ['oauth'],
   // Read state, notification settings, sections, custom emoji, and admin space
   // search support user authentication only.
@@ -132,5 +146,9 @@ export let googleChatActionAuthMethods = {
   listCustomEmojis: ['oauth'],
   getCustomEmoji: ['oauth'],
   manageCustomEmoji: ['oauth'],
-  searchSpacesAdmin: ['oauth']
+  searchSpacesAdmin: ['oauth'],
+  listMembers: ['oauth', 'service_account'],
+  // Adding, updating, and removing members as the app needs the admin-approved
+  // chat.app.memberships scope, which the service account method does not request.
+  manageMembership: ['oauth']
 };

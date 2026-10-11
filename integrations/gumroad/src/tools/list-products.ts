@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 import { mapProduct, productSchema } from './product-utils';
 
@@ -13,6 +14,7 @@ export let listProducts = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(gumroadActionScopes.read)
   .input(
     z.object({
       pageKey: z.string().optional().describe('Pagination cursor from a previous response')

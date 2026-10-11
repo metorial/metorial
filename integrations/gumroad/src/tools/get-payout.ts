@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 import { mapPayout, payoutSchema } from './payout-utils';
 
@@ -12,6 +13,7 @@ export let getPayout = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(gumroadActionScopes.viewPayouts)
   .input(
     z.object({
       payoutId: z.string().describe('The Gumroad payout ID to retrieve'),

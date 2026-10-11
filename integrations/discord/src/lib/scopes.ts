@@ -1,6 +1,7 @@
 import { allOf, anyOf } from '@slates/provider';
 
 let bot = 'bot';
+let identify = 'identify';
 let guilds = 'guilds';
 let guildMembersRead = 'guilds.members.read';
 let applicationsCommands = 'applications.commands';
@@ -24,6 +25,8 @@ export let discordActionScopes = {
   manageAutoModeration: botAccess,
   manageApplicationCommands: anyOf(applicationsCommands, bot),
   manageEmojis: botAccess,
+  getCurrentUser: anyOf(identify, bot),
+  openDmChannel: botAccess,
   newMessage: botAccess,
   memberUpdate: anyOf(guildMembersRead, bot),
   guildUpdate: anyOf(guilds, bot),

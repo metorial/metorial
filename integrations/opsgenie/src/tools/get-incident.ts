@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { normalizeServiceIds } from '../lib/mappers';
 import { spec } from '../spec';
 
 export let getIncident = SlateTool.create(spec, {
@@ -45,7 +46,13 @@ export let getIncident = SlateTool.create(spec, {
       details: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom key-value properties')
+        .describe('Custom key-value properties'),
+      impactStartDate: z.string().optional().describe('When the incident impact started'),
+      impactDetectDate: z
+        .string()
+        .optional()
+        .describe('When the incident impact was detected'),
+      impactEndDate: z.string().optional().describe('When the incident impact ended')
     })
   )
   .handleInvocation(async ctx => {
@@ -71,9 +78,12 @@ export let getIncident = SlateTool.create(spec, {
         priority: incident.priority,
         ownerTeam: incident.ownerTeam?.name,
         responders: incident.responders,
-        impactedServices: (incident.impactedServices ?? []).map((s: any) => s.id),
+        impactedServices: normalizeServiceIds(incident.impactedServices) ?? [],
         description: incident.description,
-        details: incident.details
+        details: incident.extraProperties ?? incident.details,
+        impactStartDate: incident.impactStartDate,
+        impactDetectDate: incident.impactDetectDate,
+        impactEndDate: incident.impactEndDate
       },
       message: `Incident **${incident.message}** — status: ${incident.status}, priority: ${incident.priority}`
     };

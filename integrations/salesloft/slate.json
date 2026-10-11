@@ -1,6 +1,6 @@
 {
   "name": "@metorial/salesloft",
-  "description": "Manage people, accounts and notes; discover cadences and memberships; read email, call, task and template activity; and log completed external calls.",
+  "description": "Manage people, accounts, notes and tasks; discover cadences and memberships; read email, call and template activity; and log completed external calls.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "manage people and contacts",
@@ -9,7 +9,8 @@
     "discover cadences and manage memberships",
     "read email and call activities",
     "log completed external calls",
-    "read tasks and email templates",
+    "create, update, complete and delete tasks",
+    "read email templates",
     "discover users and current identity"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/salesloft.png"

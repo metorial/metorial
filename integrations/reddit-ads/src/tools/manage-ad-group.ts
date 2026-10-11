@@ -12,7 +12,8 @@ export let manageAdGroup = SlateTool.create(spec, {
     'Create or update a Standard ad group. Creation requires an explicit status; ACTIVE may enable advertising spend. ARCHIVED/DELETED are retained states, not history erasure. Current API constraints and account ownership are checked before writing.',
   instructions: [
     'To create an ad group, omit adGroupId and provide campaignId. To update, provide adGroupId.',
-    'Bid amount is in cents of the account currency. CPC/CPM/CPV specify bid type; optimizationStrategy controls optimization.'
+    'Bid amount is in cents of the account currency. CPC/CPM/CPV specify bid type; optimizationStrategy controls optimization.',
+    'Each targeting list you supply replaces that list on the ad group; targeting lists you omit are preserved. Discover community names, interest IDs and geolocation IDs with list_targeting_options.'
   ],
   tags: {
     destructive: true
@@ -70,12 +71,34 @@ export let manageAdGroup = SlateTool.create(spec, {
       targetSubreddits: z
         .array(z.string())
         .optional()
-        .describe('List of subreddit names to target'),
+        .describe('Subreddit names to target (without the r/ prefix).'),
       targetInterests: z
         .array(z.string())
         .optional()
-        .describe('List of interest category IDs to target'),
+        .describe('Interest IDs from list_targeting_options to target.'),
       targetKeywords: z.array(z.string()).optional().describe('List of keywords to target'),
+      excludedSubreddits: z
+        .array(z.string())
+        .optional()
+        .describe('Subreddit names where the ad group must not deliver.'),
+      targetGeolocations: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Geolocation IDs to target, such as US, US-VA or CA:6167865. Find IDs with list_targeting_options.'
+        ),
+      excludedGeolocations: z
+        .array(z.string())
+        .optional()
+        .describe('Geolocation IDs to exclude from targeting.'),
+      targetCustomAudienceIds: z
+        .array(z.string())
+        .optional()
+        .describe('Custom audience IDs from list_custom_audiences to target.'),
+      excludedCustomAudienceIds: z
+        .array(z.string())
+        .optional()
+        .describe('Custom audience IDs to exclude from targeting.'),
       placements: z
         .array(z.enum(['FEED', 'CONVERSATIONS']))
         .optional()
@@ -87,7 +110,13 @@ export let manageAdGroup = SlateTool.create(spec, {
       adGroupId: z.string().optional(),
       campaignId: z.string().optional(),
       name: z.string().optional(),
-      status: z.string().optional(),
+      status: z.string().optional().describe('Configured status set by the advertiser.'),
+      effectiveStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Calculated delivery status, such as PENDING_APPROVAL, PENDING_BILLING_INFO or REJECTED.'
+        ),
       bidCents: z.number().optional(),
       bidStrategy: z.string().optional(),
       optimizationStrategy: z.string().optional(),

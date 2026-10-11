@@ -2,6 +2,43 @@
 
 Capture and analyze product usage events, manage feature flags, run A/B test experiments, and create user surveys. Track persons and groups, evaluate feature flags for specific users, query analytics data using HogQL, and manage cohorts. Retrieve session recording metadata, create and manage insights and dashboards (trends, funnels, retention, paths). Manage projects, organizations, annotations, actions, and event/property definitions.
 
+## Authentication
+
+Choose **OAuth 2.0 (Client Metadata URL)** for a new public OAuth client. Host a
+JSON client metadata document at an HTTPS URL on a domain you control, and use
+that exact URL as the client ID. Include `client_id`, `client_name`, and
+`redirect_uris`; every production callback URL must be listed exactly. PostHog
+fetches the document directly, so serve HTTP 200 without redirects. No client
+secret is issued or sent for this method.
+
+Both OAuth methods use authorization code with S256 PKCE. Choose **OAuth 2.0**
+only for an existing confidential PostHog application with a client ID and client
+secret. Refresh tokens are supported by both methods.
+
+Every connection, including personal API key connections, must select US Cloud,
+EU Cloud, or a self-hosted instance. A self-hosted instance URL must be the
+public HTTPS origin, such as `https://posthog.example.com`, with no path. The
+**OAuth 2.0** method supports PostHog Cloud only; self-hosted instances use a
+personal API key or **OAuth 2.0 (Client Metadata URL)**. Sign-in, token refresh, profile
+requests, and all API calls use that location. PostHog does not report an
+account's region in its token response, so EU Cloud accounts must select EU.
+
+Use a PostHog personal API key for a connection tied to your own account. Event
+capture and feature-flag evaluation also require the optional project token;
+an OAuth access token does not replace that public project token.
+
+The requested OAuth scopes cover the existing tools: read/write actions,
+annotations, cohorts, dashboards, experiments, feature flags, groups, persons,
+and surveys; read insights, organizations, users, projects, session recordings,
+event definitions, property definitions, and queries. The `scopes` list under the
+`com.posthog` object in the client metadata document caps the grantable scopes,
+so it must include every requested scope. Verification is optional and must
+be requested separately for each PostHog cloud region.
+
+See [PostHog OAuth setup](https://posthog.com/docs/api/oauth),
+[OAuth development guide](https://github.com/PostHog/posthog/blob/master/docs/published/handbook/engineering/oauth-development-guide.md),
+and [server metadata](https://oauth.posthog.com/.well-known/oauth-authorization-server).
+
 ## Tools
 
 ### Capture Event

@@ -56,7 +56,8 @@ export let forwardMessageTool = SlateTool.create(spec, {
         messageId: result.message_id,
         chatId: String(result.chat.id),
         date: result.date,
-        forwardOriginDate: result.forward_date
+        // Bot API 7.0 moved forward_date into forward_origin.
+        forwardOriginDate: result.forward_origin?.date ?? result.forward_date
       },
       message: `Message forwarded from chat **${ctx.input.fromChatId}** to chat **${ctx.input.chatId}** (new message ID: ${result.message_id}).`
     };

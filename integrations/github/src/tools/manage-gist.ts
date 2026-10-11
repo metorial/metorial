@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubClient } from '../lib/client';
 import { spec } from '../spec';
@@ -27,10 +27,12 @@ export let manageGist = SlateTool.create(spec, {
       files: z
         .record(
           z.string(),
-          z.object({
-            content: z.string().optional().describe('File content'),
-            filename: z.string().optional().describe('New filename (for rename)')
-          })
+          z
+            .object({
+              content: z.string().optional().describe('File content'),
+              filename: z.string().optional().describe('New filename (for rename)')
+            })
+            .nullable()
         )
         .optional()
         .describe(
@@ -102,7 +104,11 @@ export let manageGist = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!gistId) throw new Error('gistId is required for get action.');
+      if (!gistId) {
+        throw createApiServiceError('gistId is required for get action.', {
+          reason: 'github_gist_id_required'
+        });
+      }
       let gist = await client.getGist(gistId);
       return {
         output: {
@@ -121,13 +127,17 @@ export let manageGist = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.files) throw new Error('files are required for create action.');
       let filesPayload: Record<string, { content: string }> = {};
-      for (let [name, file] of Object.entries(ctx.input.files)) {
-        let f = file as { content?: string; filename?: string };
-        if (f.content) {
-          filesPayload[name] = { content: f.content };
+      for (let [name, file] of Object.entries(ctx.input.files ?? {})) {
+        if (file?.content) {
+          filesPayload[name] = { content: file.content };
         }
+      }
+      if (Object.keys(filesPayload).length === 0) {
+        throw createApiServiceError(
+          'files with non-empty content are required for create action.',
+          { reason: 'github_gist_files_required' }
+        );
       }
       let gist = await client.createGist({
         description: ctx.input.description,
@@ -151,7 +161,11 @@ export let manageGist = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!gistId) throw new Error('gistId is required for update action.');
+      if (!gistId) {
+        throw createApiServiceError('gistId is required for update action.', {
+          reason: 'github_gist_id_required'
+        });
+      }
       let gist = await client.updateGist(gistId, {
         description: ctx.input.description,
         files: ctx.input.files as any
@@ -173,7 +187,11 @@ export let manageGist = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!gistId) throw new Error('gistId is required for delete action.');
+      if (!gistId) {
+        throw createApiServiceError('gistId is required for delete action.', {
+          reason: 'github_gist_id_required'
+        });
+      }
       await client.deleteGist(gistId);
       return {
         output: { deleted: true },
@@ -181,6 +199,8 @@ export let manageGist = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`, {
+      reason: 'github_gist_action_unsupported'
+    });
   })
   .build();

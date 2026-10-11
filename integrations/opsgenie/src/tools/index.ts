@@ -1,6 +1,7 @@
 export * from './alert-action';
 export * from './create-alert';
 export * from './create-incident';
+export * from './get-account';
 export * from './get-alert';
 export * from './get-alert-request-status';
 export * from './get-incident';
@@ -9,6 +10,8 @@ export * from './get-on-call';
 export * from './get-team';
 export * from './get-user';
 export * from './incident-action';
+export * from './list-alert-logs';
+export * from './list-alert-notes';
 export * from './list-alerts';
 export * from './list-escalations';
 export * from './list-incidents';

@@ -102,7 +102,7 @@ Existing APPROVE, REQUEST_CHANGES, COMMENT, and request_reviewers actions remain
         .min(1)
         .optional()
         .describe(
-          'The numeric ID of the pull request review comment to reply or react to. Use the number from a #discussion_r... anchor, not the GraphQL thread node ID (PRRT_...).'
+          'The numeric ID of the pull request review comment to reply or react to. Use databaseId from pull_request_read get_review_comments or the number from a #discussion_r... anchor, not the GraphQL thread node ID (PRRT_...).'
         ),
       reaction: reactionSchema
         .optional()
@@ -111,8 +111,31 @@ Existing APPROVE, REQUEST_CHANGES, COMMENT, and request_reviewers actions remain
         .array(
           z.object({
             path: z.string().describe('File path relative to repo root'),
-            position: z.number().optional().describe('Position in the diff'),
-            body: z.string().describe('Comment body')
+            position: z
+              .number()
+              .optional()
+              .describe('Legacy diff position; prefer line and side'),
+            body: z.string().describe('Comment body'),
+            line: z
+              .number()
+              .optional()
+              .describe(
+                'Line in the file to comment on; the last line for a multi-line comment'
+              ),
+            side: z
+              .enum(['LEFT', 'RIGHT'])
+              .optional()
+              .describe(
+                'Diff side for line: LEFT for the previous state, RIGHT for the new state'
+              ),
+            start_line: z
+              .number()
+              .optional()
+              .describe('First line of a multi-line comment range'),
+            start_side: z
+              .enum(['LEFT', 'RIGHT'])
+              .optional()
+              .describe('Diff side for start_line')
           })
         )
         .optional()
@@ -199,6 +222,7 @@ Existing APPROVE, REQUEST_CHANGES, COMMENT, and request_reviewers actions remain
         pullNumber: input.pullNumber as number,
         body: input.body,
         event: input.action,
+        commitId: input.commitID,
         comments: input.comments
       });
       return {

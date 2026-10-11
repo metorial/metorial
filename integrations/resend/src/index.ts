@@ -2,6 +2,8 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   addContactToSegment,
+  addSuppression,
+  cancelBroadcast,
   cancelScheduledEmail,
   createApiKey,
   createAudience,
@@ -37,9 +39,11 @@ import {
   getDomain,
   getEmail,
   getEvent,
+  getFileUrl,
   getLog,
   getReceivedEmail,
   getSegment,
+  getSuppression,
   getTemplate,
   getTopic,
   getWebhook,
@@ -60,11 +64,13 @@ import {
   listSegmentContacts,
   listSegments,
   listSentEmails,
+  listSuppressions,
   listTemplates,
   listTopics,
   listWebhooks,
   publishTemplate,
   removeContactFromSegment,
+  removeSuppression,
   sendBatchEmails,
   sendBroadcast,
   sendEmail,
@@ -132,6 +138,10 @@ export let provider = Slate.create({
     listSegments,
     listSegmentContacts,
     deleteSegment,
+    listSuppressions,
+    addSuppression,
+    getSuppression,
+    removeSuppression,
     createTopic,
     getTopic,
     updateTopic,
@@ -141,6 +151,7 @@ export let provider = Slate.create({
     getBroadcast,
     updateBroadcast,
     sendBroadcast,
+    cancelBroadcast,
     listBroadcasts,
     deleteBroadcast,
     createTemplate,
@@ -164,7 +175,8 @@ export let provider = Slate.create({
     listLogs,
     getLog,
     listReceivedEmails,
-    getReceivedEmail
+    getReceivedEmail,
+    getFileUrl
   ],
   triggers: []
 });

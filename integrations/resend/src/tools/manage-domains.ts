@@ -13,17 +13,62 @@ let dnsRecordSchema = z.object({
   status: z.string().optional().describe('Verification status of this record.')
 });
 
+let capabilityStatusSchema = z.enum(['enabled', 'disabled']);
+
+let capabilitiesInputSchema = z
+  .object({
+    sending: capabilityStatusSchema
+      .optional()
+      .describe('Enable or disable sending from this domain.'),
+    receiving: capabilityStatusSchema
+      .optional()
+      .describe('Enable or disable receiving inbound email on this domain.')
+  })
+  .describe(
+    'Sending and receiving capabilities for the domain. At least one must stay enabled.'
+  );
+
+let capabilitiesOutputSchema = z
+  .object({
+    sending: z.string().optional().describe('Sending capability status.'),
+    receiving: z.string().optional().describe('Receiving capability status.')
+  })
+  .optional()
+  .nullable()
+  .describe('Sending and receiving capabilities.');
+
 let domainOutputSchema = z.object({
   domainId: z.string().describe('ID of the domain.'),
   name: z.string().optional().describe('Domain name.'),
   status: z.string().optional().describe('Verification status.'),
   region: z.string().optional().describe('AWS region.'),
   createdAt: z.string().optional().describe('Creation timestamp.'),
+  openTracking: z.boolean().optional().nullable().describe('Whether open tracking is on.'),
+  clickTracking: z.boolean().optional().nullable().describe('Whether click tracking is on.'),
+  trackingSubdomain: z
+    .string()
+    .optional()
+    .nullable()
+    .describe('Custom subdomain used for open and click tracking.'),
+  capabilities: capabilitiesOutputSchema,
   records: z
     .array(dnsRecordSchema)
     .optional()
     .nullable()
     .describe('DNS records for verification.')
+});
+
+let mapDomain = (domain: any) => ({
+  domainId: domain.id,
+  name: domain.name,
+  status: domain.status,
+  region: domain.region,
+  createdAt: domain.created_at,
+  openTracking: domain.open_tracking,
+  clickTracking: domain.click_tracking,
+  trackingSubdomain: domain.tracking_subdomain,
+  capabilities: domain.capabilities,
+  records: domain.records
 });
 
 export let createDomain = SlateTool.create(spec, {
@@ -48,7 +93,16 @@ export let createDomain = SlateTool.create(spec, {
         .describe('Subdomain for Return-Path header. Defaults to "send".'),
       openTracking: z.boolean().optional().describe('Enable open tracking.'),
       clickTracking: z.boolean().optional().describe('Enable click tracking.'),
-      tls: z.enum(['opportunistic', 'enforced']).optional().describe('TLS enforcement level.')
+      trackingSubdomain: z
+        .string()
+        .optional()
+        .describe('Custom subdomain for open and click tracking, such as "links".'),
+      tls: z.enum(['opportunistic', 'enforced']).optional().describe('TLS enforcement level.'),
+      capabilities: capabilitiesInputSchema
+        .optional()
+        .describe(
+          'Sending and receiving capabilities. Sending defaults to enabled and receiving to disabled.'
+        )
     })
   )
   .output(domainOutputSchema)
@@ -61,18 +115,13 @@ export let createDomain = SlateTool.create(spec, {
       customReturnPath: ctx.input.customReturnPath,
       openTracking: ctx.input.openTracking,
       clickTracking: ctx.input.clickTracking,
-      tls: ctx.input.tls
+      trackingSubdomain: ctx.input.trackingSubdomain,
+      tls: ctx.input.tls,
+      capabilities: ctx.input.capabilities
     });
 
     return {
-      output: {
-        domainId: result.id,
-        name: result.name,
-        status: result.status,
-        region: result.region,
-        createdAt: result.created_at,
-        records: result.records
-      },
+      output: mapDomain(result),
       message: `Domain **${result.name}** created with ID \`${result.id}\`. Add the returned DNS records to your registrar, then verify.`
     };
   })
@@ -97,14 +146,7 @@ export let getDomain = SlateTool.create(spec, {
     let result = await client.getDomain(ctx.input.domainId);
 
     return {
-      output: {
-        domainId: result.id,
-        name: result.name,
-        status: result.status,
-        region: result.region,
-        createdAt: result.created_at,
-        records: result.records
-      },
+      output: mapDomain(result),
       message: `Domain **${result.name}** — status: **${result.status}**.`
     };
   })
@@ -113,7 +155,7 @@ export let getDomain = SlateTool.create(spec, {
 export let updateDomain = SlateTool.create(spec, {
   name: 'Update Domain',
   key: 'update_domain',
-  description: `Update a domain's tracking and TLS settings.`,
+  description: `Update a domain's open/click tracking, tracking subdomain, TLS, and sending or receiving capabilities.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -124,7 +166,14 @@ export let updateDomain = SlateTool.create(spec, {
       domainId: z.string().describe('ID of the domain to update.'),
       openTracking: z.boolean().optional().describe('Enable or disable open tracking.'),
       clickTracking: z.boolean().optional().describe('Enable or disable click tracking.'),
-      tls: z.enum(['opportunistic', 'enforced']).optional().describe('TLS enforcement level.')
+      trackingSubdomain: z
+        .string()
+        .optional()
+        .describe('Custom subdomain for open and click tracking, such as "links".'),
+      tls: z.enum(['opportunistic', 'enforced']).optional().describe('TLS enforcement level.'),
+      capabilities: capabilitiesInputSchema
+        .optional()
+        .describe('Enable or disable sending and inbound receiving for the domain.')
     })
   )
   .output(
@@ -137,7 +186,9 @@ export let updateDomain = SlateTool.create(spec, {
     let result = await client.updateDomain(ctx.input.domainId, {
       openTracking: ctx.input.openTracking,
       clickTracking: ctx.input.clickTracking,
-      tls: ctx.input.tls
+      trackingSubdomain: ctx.input.trackingSubdomain,
+      tls: ctx.input.tls,
+      capabilities: ctx.input.capabilities
     });
 
     return {
@@ -171,7 +222,8 @@ export let listDomains = SlateTool.create(spec, {
             name: z.string().describe('Domain name.'),
             status: z.string().describe('Verification status.'),
             region: z.string().optional().describe('AWS region.'),
-            createdAt: z.string().optional().describe('Creation timestamp.')
+            createdAt: z.string().optional().describe('Creation timestamp.'),
+            capabilities: capabilitiesOutputSchema
           })
         )
         .describe('List of domains.'),
@@ -191,7 +243,8 @@ export let listDomains = SlateTool.create(spec, {
       name: d.name,
       status: d.status,
       region: d.region,
-      createdAt: d.created_at
+      createdAt: d.created_at,
+      capabilities: d.capabilities
     }));
 
     return {

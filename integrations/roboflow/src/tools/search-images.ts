@@ -54,6 +54,10 @@ export let searchImagesTool = SlateTool.create(spec, {
             split: z.string().optional().describe('Dataset split'),
             tags: z.array(z.string()).optional().describe('Image tags'),
             owner: z.string().optional().describe('Image owner/uploader'),
+            imageUrl: z
+              .string()
+              .optional()
+              .describe('Signed URL of the original image; it may expire, so do not store it'),
             createdAt: z.number().optional().describe('Unix timestamp of image creation')
           })
         )
@@ -90,7 +94,7 @@ export let searchImagesTool = SlateTool.create(spec, {
       batch: ctx.input.batchId ? true : undefined,
       offset: ctx.input.offset ?? 0,
       limit: ctx.input.limit ?? 100,
-      fields: ['id', 'name', 'labels', 'split', 'tags', 'owner', 'created']
+      fields: ['id', 'name', 'labels', 'split', 'tags', 'owner', 'url', 'created']
     });
 
     let results = (data.results || []).map((r: any) => ({
@@ -100,6 +104,7 @@ export let searchImagesTool = SlateTool.create(spec, {
       split: r.split,
       tags: r.tags,
       owner: r.owner,
+      imageUrl: r.url,
       createdAt: r.created
     }));
 

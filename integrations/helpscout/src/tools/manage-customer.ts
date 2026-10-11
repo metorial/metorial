@@ -1,23 +1,39 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { HelpScoutClient } from '../lib/client';
+import { HelpScoutClient, type HelpScoutPatchOperation } from '../lib/client';
 import { helpscoutServiceError } from '../lib/errors';
+import { halPageInfo } from '../lib/pagination';
 import { spec } from '../spec';
 
 export let listCustomers = SlateTool.create(spec, {
   name: 'List Customers',
   key: 'list_customers',
-  description: `Search and list customer profiles. Filter by email, name, mailbox, or use a custom query. Results are paginated.`,
+  description: `Search and list customer profiles. Filter by email, name, mailbox, or modification time, and optionally add an advanced search query. All filters are combined with AND. Results are paginated (50 per page).`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
-      email: z.string().optional().describe('Filter by customer email'),
+      email: z.string().optional().describe('Filter by customer email address'),
       firstName: z.string().optional().describe('Filter by first name'),
       lastName: z.string().optional().describe('Filter by last name'),
-      mailboxId: z.number().optional().describe('Filter by mailbox ID'),
-      query: z.string().optional().describe('Custom search query (overrides other filters)'),
-      sortField: z.string().optional().describe('Field to sort by'),
+      mailboxId: z
+        .number()
+        .optional()
+        .describe('Filter by mailbox ID. Call list_mailboxes to discover mailbox IDs.'),
+      modifiedSince: z
+        .string()
+        .optional()
+        .describe('Only return customers modified after this ISO 8601 timestamp'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Advanced search query in Help Scout query syntax, e.g. (firstName:"John" OR firstName:"Johnny"). Combined with the other filters using AND.'
+        ),
+      sortField: z
+        .string()
+        .optional()
+        .describe('Field to sort by: createdAt (default), firstName, lastName, or modifiedAt'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
       page: z.number().optional().describe('Page number (1-based)')
     })
@@ -31,6 +47,7 @@ export let listCustomers = SlateTool.create(spec, {
           lastName: z.string().nullable().describe('Last name'),
           email: z.string().nullable().describe('Primary email'),
           organization: z.string().nullable().describe('Organization name'),
+          organizationId: z.number().nullable().optional().describe('Organization ID'),
           jobTitle: z.string().nullable().describe('Job title'),
           createdAt: z.string().describe('Creation timestamp')
         })
@@ -42,12 +59,25 @@ export let listCustomers = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new HelpScoutClient(ctx.auth.token);
+    // Email is not a URL filter; it is only searchable through the query syntax.
+    // https://developer.helpscout.com/mailbox-api/endpoints/customers/list/
+    let queryParts: string[] = [];
+    if (ctx.input.query) queryParts.push(ctx.input.query);
+    if (ctx.input.email) {
+      queryParts.push(`(email:"${ctx.input.email.replace(/["\\]/g, '\\$&')}")`);
+    }
+
     let data = await client.listCustomers({
-      email: ctx.input.email,
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName,
       mailbox: ctx.input.mailboxId,
-      query: ctx.input.query,
+      modifiedSince: ctx.input.modifiedSince,
+      query:
+        queryParts.length > 1
+          ? `(${queryParts.join(' AND ')})`
+          : queryParts.length === 1
+            ? queryParts[0]
+            : undefined,
       sortField: ctx.input.sortField,
       sortOrder: ctx.input.sortOrder,
       page: ctx.input.page
@@ -60,20 +90,19 @@ export let listCustomers = SlateTool.create(spec, {
       lastName: c.lastName ?? null,
       email: c._embedded?.emails?.[0]?.value ?? null,
       organization: c.organization ?? null,
+      organizationId: c.organizationId ?? null,
       jobTitle: c.jobTitle ?? null,
       createdAt: c.createdAt
     }));
 
-    let page = data?.page ?? {};
+    let page = halPageInfo(data, customers.length);
 
     return {
       output: {
         customers,
-        totalCount: page.totalElements ?? customers.length,
-        currentPage: page.number ?? 1,
-        totalPages: page.totalPages ?? 1
+        ...page
       },
-      message: `Found **${page.totalElements ?? customers.length}** customers (page ${page.number ?? 1} of ${page.totalPages ?? 1}).`
+      message: `Found **${page.totalCount}** customers (page ${page.currentPage} of ${page.totalPages}).`
     };
   })
   .build();
@@ -113,7 +142,9 @@ export let getCustomer = SlateTool.create(spec, {
         )
         .describe('Customer phone numbers'),
       organization: z.string().nullable().describe('Organization name'),
+      organizationId: z.number().nullable().optional().describe('Organization ID'),
       jobTitle: z.string().nullable().describe('Job title'),
+      location: z.string().nullable().optional().describe('Location'),
       background: z.string().nullable().describe('Background notes'),
       createdAt: z.string().describe('Creation timestamp'),
       modifiedAt: z.string().optional().describe('Last modified timestamp')
@@ -143,7 +174,9 @@ export let getCustomer = SlateTool.create(spec, {
         emails,
         phones,
         organization: data.organization ?? null,
+        organizationId: data.organizationId ?? null,
         jobTitle: data.jobTitle ?? null,
+        location: data.location ?? null,
         background: data.background ?? null,
         createdAt: data.createdAt,
         modifiedAt: data.updatedAt
@@ -183,9 +216,19 @@ export let createCustomer = SlateTool.create(spec, {
         )
         .optional()
         .describe('Phone numbers to add'),
-      organization: z.string().optional().describe('Organization/company name'),
-      jobTitle: z.string().optional().describe('Job title'),
-      background: z.string().optional().describe('Background notes about the customer')
+      organization: z
+        .string()
+        .optional()
+        .describe('Organization/company name (ignored when organizationId is set)'),
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Organization ID to link. Call manage_organization to discover IDs.'),
+      jobTitle: z.string().optional().describe('Job title (max 60 characters)'),
+      background: z
+        .string()
+        .optional()
+        .describe('Background notes about the customer (max 200 characters)')
     })
   )
   .output(
@@ -208,6 +251,7 @@ export let createCustomer = SlateTool.create(spec, {
       emails: ctx.input.emails,
       phones: ctx.input.phones,
       organization: ctx.input.organization,
+      organizationId: ctx.input.organizationId,
       jobTitle: ctx.input.jobTitle,
       background: ctx.input.background
     });
@@ -224,7 +268,10 @@ export let createCustomer = SlateTool.create(spec, {
 export let updateCustomer = SlateTool.create(spec, {
   name: 'Update Customer',
   key: 'update_customer',
-  description: `Update an existing customer's profile. Change their name, organization, job title, or background notes. To manage emails and phones, use the dedicated add/remove operations.`
+  description: `Update an existing customer's profile. Change their name, organization, job title, location, or background notes, and add or remove email addresses and phone numbers. Fields that are not provided are left unchanged.`,
+  instructions: [
+    'Call get_customer to discover the email and phone entry IDs used by removeEmailIds and removePhoneIds.'
+  ]
 })
   .input(
     z.object({
@@ -232,7 +279,12 @@ export let updateCustomer = SlateTool.create(spec, {
       firstName: z.string().optional().describe('New first name'),
       lastName: z.string().optional().describe('New last name'),
       organization: z.string().optional().describe('New organization name'),
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Link the customer to this organization ID (from manage_organization)'),
       jobTitle: z.string().optional().describe('New job title'),
+      location: z.string().optional().describe('New location'),
       background: z.string().optional().describe('New background notes'),
       addEmails: z
         .array(
@@ -265,52 +317,84 @@ export let updateCustomer = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HelpScoutClient(ctx.auth.token);
     let updated: string[] = [];
+    let operations: HelpScoutPatchOperation[] = [];
 
-    let profileUpdates: Record<string, any> = {};
-    if (ctx.input.firstName !== undefined) profileUpdates.firstName = ctx.input.firstName;
-    if (ctx.input.lastName !== undefined) profileUpdates.lastName = ctx.input.lastName;
-    if (ctx.input.organization !== undefined)
-      profileUpdates.organization = ctx.input.organization;
-    if (ctx.input.jobTitle !== undefined) profileUpdates.jobTitle = ctx.input.jobTitle;
-    if (ctx.input.background !== undefined) profileUpdates.background = ctx.input.background;
-
-    if (Object.keys(profileUpdates).length > 0) {
-      await client.updateCustomer(ctx.input.customerId, profileUpdates);
-      updated.push(...Object.keys(profileUpdates));
+    // Partial updates use JSON Patch; PUT /customers/{id} would null omitted fields.
+    // https://developer.helpscout.com/mailbox-api/endpoints/customers/update/
+    let profileFields = [
+      'firstName',
+      'lastName',
+      'organization',
+      'jobTitle',
+      'location',
+      'background'
+    ] as const;
+    for (let field of profileFields) {
+      let value = ctx.input[field];
+      if (value !== undefined) {
+        operations.push({ op: 'replace', path: `/${field}`, value });
+        updated.push(field);
+      }
     }
 
-    if (ctx.input.addEmails) {
-      for (let email of ctx.input.addEmails) {
-        await client.createCustomerEmail(ctx.input.customerId, email);
-      }
+    // organizationId is not a supported patch path, so it goes through the
+    // overwrite endpoint with the current profile values preserved.
+    // https://developer.helpscout.com/mailbox-api/endpoints/customers/overwrite/
+    let organizationId = ctx.input.organizationId;
+
+    for (let email of ctx.input.addEmails ?? []) {
+      operations.push({ op: 'add', path: '/emails', value: email });
+    }
+    if (ctx.input.addEmails?.length) {
       updated.push(`added ${ctx.input.addEmails.length} email(s)`);
     }
 
-    if (ctx.input.removeEmailIds) {
-      for (let emailId of ctx.input.removeEmailIds) {
-        await client.deleteCustomerEmail(ctx.input.customerId, emailId);
-      }
+    for (let emailId of ctx.input.removeEmailIds ?? []) {
+      operations.push({ op: 'remove', path: `/emails/${emailId}` });
+    }
+    if (ctx.input.removeEmailIds?.length) {
       updated.push(`removed ${ctx.input.removeEmailIds.length} email(s)`);
     }
 
-    if (ctx.input.addPhones) {
-      for (let phone of ctx.input.addPhones) {
-        await client.createCustomerPhone(ctx.input.customerId, phone);
-      }
+    for (let phone of ctx.input.addPhones ?? []) {
+      operations.push({ op: 'add', path: '/phones', value: phone });
+    }
+    if (ctx.input.addPhones?.length) {
       updated.push(`added ${ctx.input.addPhones.length} phone(s)`);
     }
 
-    if (ctx.input.removePhoneIds) {
-      for (let phoneId of ctx.input.removePhoneIds) {
-        await client.deleteCustomerPhone(ctx.input.customerId, phoneId);
-      }
+    for (let phoneId of ctx.input.removePhoneIds ?? []) {
+      operations.push({ op: 'remove', path: `/phones/${phoneId}` });
+    }
+    if (ctx.input.removePhoneIds?.length) {
       updated.push(`removed ${ctx.input.removePhoneIds.length} phone(s)`);
     }
 
-    if (updated.length === 0) {
+    if (operations.length === 0 && organizationId === undefined) {
       throw helpscoutServiceError(
         'Provide at least one customer field or contact method to update.'
       );
+    }
+
+    if (operations.length > 0) {
+      await client.patchCustomer(ctx.input.customerId, operations);
+    }
+
+    if (organizationId !== undefined) {
+      let current = await client.getCustomer(ctx.input.customerId);
+      await client.overwriteCustomer(ctx.input.customerId, {
+        firstName: current.firstName ?? undefined,
+        lastName: current.lastName ?? undefined,
+        photoUrl: current.photoUrl ?? undefined,
+        photoType: current.photoType ?? undefined,
+        jobTitle: current.jobTitle ?? undefined,
+        location: current.location ?? undefined,
+        background: current.background ?? undefined,
+        age: current.age ?? undefined,
+        gender: current.gender ?? undefined,
+        organizationId
+      });
+      updated.push('organizationId');
     }
 
     return {

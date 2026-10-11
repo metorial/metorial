@@ -13,23 +13,44 @@ let memberSchema = z.object({
 export let manageTeam = SlateTool.create(spec, {
   name: 'Manage Team',
   key: 'manage_team',
-  description: `Create, update, or delete a team. Teams are the organizational unit for on-call schedules, escalation policies, and alert routing. When updating members, note that the members list replaces the entire existing list.`,
+  description: `Create, update, or delete a team, or add/remove a single team member. Teams are the organizational unit for on-call schedules, escalation policies, and alert routing. When updating members, note that the members list replaces the entire existing list.`,
   instructions: [
     'To create: set action to "create" and provide at least a name.',
     'To update: set action to "update" and provide teamId plus the fields to change.',
     'To delete: set action to "delete" and provide teamIdentifier.',
-    'When updating members, provide the complete desired members list — it replaces the existing list entirely.'
+    'When updating members, provide the complete desired members list — it replaces the existing list entirely.',
+    'To add one member without replacing others: set action to "add_member", provide teamIdentifier (or teamId) and memberUserId or memberUsername, optionally memberRole.',
+    'To remove one member: set action to "remove_member", provide teamIdentifier (or teamId) and memberUserId or memberUsername.'
   ]
 })
   .input(
     z.object({
-      action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
+      action: z
+        .enum(['create', 'update', 'delete', 'add_member', 'remove_member'])
+        .describe('Action to perform'),
       teamId: z.string().optional().describe('Team ID (required for update)'),
-      teamIdentifier: z.string().optional().describe('Team ID or name (for delete)'),
+      teamIdentifier: z
+        .string()
+        .optional()
+        .describe('Team ID or name (for delete, add_member, remove_member)'),
       identifierType: z
         .enum(['id', 'name'])
         .optional()
-        .describe('Type of team identifier for delete. Defaults to "id"'),
+        .describe(
+          'Type of teamIdentifier for delete, add_member, and remove_member. Defaults to "id"'
+        ),
+      memberUserId: z
+        .string()
+        .optional()
+        .describe('User ID of the member (for add_member / remove_member)'),
+      memberUsername: z
+        .string()
+        .optional()
+        .describe('Username/email of the member (for add_member / remove_member)'),
+      memberRole: z
+        .enum(['admin', 'user'])
+        .optional()
+        .describe('Member role for add_member. Defaults to "user"'),
       name: z.string().optional().describe('Team name (required for create, max 100 chars)'),
       description: z.string().optional().describe('Team description (max 200 chars)'),
       members: z
@@ -106,6 +127,44 @@ export let manageTeam = SlateTool.create(spec, {
             result: 'Team deleted successfully'
           },
           message: `Deleted team \`${identifier}\``
+        };
+      }
+      case 'add_member':
+      case 'remove_member': {
+        let identifier = ctx.input.teamIdentifier ?? ctx.input.teamId;
+        let identifierType = ctx.input.teamIdentifier
+          ? (ctx.input.identifierType ?? 'id')
+          : 'id';
+        if (!identifier) {
+          throw opsgenieServiceError(
+            `teamIdentifier or teamId is required for the ${ctx.input.action} action.`
+          );
+        }
+        let member = ctx.input.memberUserId ?? ctx.input.memberUsername;
+        if (!member) {
+          throw opsgenieServiceError(
+            `memberUserId or memberUsername is required for the ${ctx.input.action} action.`
+          );
+        }
+
+        let response =
+          ctx.input.action === 'add_member'
+            ? await client.addTeamMember(identifier, identifierType, {
+                user: ctx.input.memberUserId
+                  ? { id: ctx.input.memberUserId }
+                  : { username: ctx.input.memberUsername },
+                role: ctx.input.memberRole
+              })
+            : await client.removeTeamMember(identifier, identifierType, member);
+
+        let verb = ctx.input.action === 'add_member' ? 'Added' : 'Removed';
+        return {
+          output: {
+            teamId: response?.data?.id,
+            name: response?.data?.name,
+            result: response?.result ?? `${verb} team member`
+          },
+          message: `${verb} \`${member}\` ${ctx.input.action === 'add_member' ? 'to' : 'from'} team **${response?.data?.name ?? identifier}**`
         };
       }
     }

@@ -4,6 +4,7 @@ import { spec } from './spec';
 import {
   createTeam,
   deleteTeam,
+  getCurrentUser,
   getPresence,
   getTeam,
   listChannelMessages,
@@ -13,6 +14,7 @@ import {
   listTeams,
   manageChannel,
   manageMembers,
+  manageMessage,
   manageOnlineMeeting,
   manageShifts,
   manageTags,
@@ -25,6 +27,7 @@ import { teamsBotTriggerGroup } from './triggers/botFrameworkTriggerGroup';
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     listTeams,
     getTeam,
     createTeam,
@@ -37,6 +40,7 @@ export let provider = Slate.create({
     listChats,
     sendChatMessage,
     listChatMessages,
+    manageMessage,
     manageMembers,
     manageOnlineMeeting,
     getPresence,

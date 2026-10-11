@@ -40,18 +40,18 @@ export let getUserInfoTool = SlateTool.create(spec, {
     let organizations = (info.orgs || []).map((org: any) => ({
       organizationId: org.id || org._id,
       name: org.name,
-      fullName: org.fullname,
-      isEnterprise: org.isEnterprise
+      fullName: org.fullname ?? undefined,
+      isEnterprise: org.isEnterprise ?? undefined
     }));
 
     return {
       output: {
         userId: info.id || info._id,
         username: info.name,
-        fullName: info.fullname,
-        email: info.email,
-        avatarUrl: info.avatarUrl,
-        isPro: info.isPro,
+        fullName: info.fullname ?? undefined,
+        email: info.email ?? undefined,
+        avatarUrl: info.avatarUrl ?? undefined,
+        isPro: info.isPro ?? undefined,
         organizations
       },
       message: `Authenticated as **${info.name}**${info.orgs?.length ? ` (member of ${info.orgs.length} org(s))` : ''}.`

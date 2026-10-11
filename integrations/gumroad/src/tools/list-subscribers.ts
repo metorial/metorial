@@ -1,19 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
-
-let subscriberSchema = z.object({
-  subscriberId: z.string().describe('Unique subscriber ID'),
-  productId: z.string().optional().describe('Product ID'),
-  productName: z.string().optional().describe('Product name'),
-  userId: z.string().optional().describe('Gumroad user ID of the subscriber'),
-  email: z.string().optional().describe('Subscriber email address'),
-  status: z.string().optional().describe('Subscription status'),
-  createdAt: z.string().optional().describe('Subscription creation timestamp'),
-  endedAt: z.string().optional().describe('Subscription end timestamp'),
-  licenseKey: z.string().optional().describe('License key')
-});
+import { mapSubscriber, subscriberSchema } from './subscriber-utils';
 
 export let listSubscribers = SlateTool.create(spec, {
   name: 'List Subscribers',
@@ -24,6 +14,7 @@ export let listSubscribers = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(gumroadActionScopes.viewSales)
   .input(
     z.object({
       productId: z.string().describe('The product ID to list subscribers for'),
@@ -31,7 +22,9 @@ export let listSubscribers = SlateTool.create(spec, {
       paginated: z
         .boolean()
         .optional()
-        .describe('Whether to return paginated results. Defaults to Gumroad API behavior.'),
+        .describe(
+          'Set true to return at most 100 subscribers per page with a nextPageKey. Defaults to false, which returns all active subscribers.'
+        ),
       pageKey: z.string().optional().describe('Pagination cursor from previous response')
     })
   )
@@ -50,17 +43,7 @@ export let listSubscribers = SlateTool.create(spec, {
       pageKey: ctx.input.pageKey
     });
 
-    let mapped = result.subscribers.map((s: any) => ({
-      subscriberId: s.id,
-      productId: s.product_id || undefined,
-      productName: s.product_name || undefined,
-      userId: s.user_id || undefined,
-      email: s.email || undefined,
-      status: s.status || undefined,
-      createdAt: s.created_at || undefined,
-      endedAt: s.ended_at || undefined,
-      licenseKey: s.license_key || undefined
-    }));
+    let mapped = result.subscribers.map(mapSubscriber);
 
     return {
       output: {

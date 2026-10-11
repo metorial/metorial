@@ -14,20 +14,20 @@ All API calls target `https://api.github.com`, use `Authorization: Bearer`, acce
 | `list_workflows` | Discover workflow IDs/file paths and active/disabled state. |
 | `trigger_workflow` | Dispatch a workflow on a branch/tag with string inputs; return accepted run ID and URLs. The workflow needs `workflow_dispatch` on the default branch. |
 | `manage_workflow_state` | Read, enable, or disable a workflow; retain the deprecated `get_usage` action for compatibility. GitHub is closing its usage endpoint. |
-| `list_workflow_runs` | Page through runs, optionally filtering workflow, actor, branch, event, status, creation date, or commit SHA. GitHub caps filtered searches at 1,000 results; narrow date ranges for larger histories. |
-| `get_workflow_run` | Inspect status, attempt, commit, actor, and an optional page of jobs/steps. `jobsTotalCount` and `jobsNextPage` expose additional job pages. |
-| `control_workflow_run` | Cancel, rerun all/failed/specific jobs, delete runs, approve fork runs, or approve/reject pending environment reviews. Specific jobs must belong to the supplied run. Deployment reviews require environment IDs, state, and a nonempty comment. |
+| `list_workflow_runs` | Page through runs, optionally filtering workflow, actor, branch, event, status, creation date, or commit SHA. GitHub caps filtered searches at 1,000 results; `nextPage` follows GitHub's pagination links, so narrow date ranges for larger histories. |
+| `get_workflow_run` | Inspect status, attempt, commit, actor, and an optional page of jobs/steps from the latest attempt or, with `jobsFilter: all`, every attempt. `jobsTotalCount` and `jobsNextPage` expose additional job pages. |
+| `control_workflow_run` | Cancel or force-cancel, rerun all/failed/specific jobs (optionally with debug logging), delete runs, approve fork runs, or approve/reject pending environment reviews. Force cancellation is for runs that do not respond to a normal cancel. Specific jobs must belong to the supplied run. Deployment reviews require environment IDs, state, and a nonempty comment. |
 | `list_pending_deployments` | Read environment IDs, wait timers, and whether the connected user can approve pending reviews. |
 | `get_workflow_run_logs` | Download run logs as ZIP or individual job logs as text; permanently delete run logs. |
 | `list_artifacts` | Page through repository/run artifacts by name, including expiry and associated run IDs. |
 | `manage_artifact` | Inspect, download ZIP, or permanently delete an artifact. Expired artifacts cannot be downloaded. |
-| `manage_secrets` | List/read metadata, retrieve encryption public keys, write encrypted values, and delete secrets at repository, organization, or environment scope. Encrypt values with LibSodium sealed boxes; secret values cannot be retrieved. |
-| `manage_variables` | List/read/write/delete visible configuration values at repository, organization, or environment scope. |
+| `manage_secrets` | List/read metadata, retrieve encryption public keys, write encrypted values, and delete secrets at repository, organization, or environment scope. Encrypt values with LibSodium sealed boxes; secret values cannot be retrieved. Updating an organization secret without `visibility` keeps its current visibility; new organization secrets default to private. |
+| `manage_variables` | List/read/write/delete visible configuration values at repository, organization, or environment scope. GitHub returns at most 30 variables per page. |
 | `manage_caches` | List caches and delete by ID or exact key/ref; key deletion returns GitHub's actual deleted count. |
 | `manage_runners` | List/read/remove self-hosted runners, create short-lived registration/removal tokens, and manage repository or organization custom labels. Setting labels replaces all custom labels. |
 | `manage_permissions` | Read/write repository Actions enablement, allowed actions, selected-action patterns, and default GITHUB_TOKEN/PR-review permissions. Selected policies require `allowedActions: selected`. |
 
-Paginated tools accept `perPage` (1–100, default 30) and `page` (positive integer, default 1). Existing numeric ID and pagination input types remain numbers; invalid fractions and bounds are rejected before requests.
+Paginated tools accept `perPage` (1–100, default 30; variables are capped at 30 per page) and `page` (positive integer, default 1), and return `nextPage` when GitHub reports another page. Existing numeric ID and pagination input types remain numbers; invalid fractions and bounds are rejected before requests.
 
 ## Download behavior
 

@@ -3,6 +3,7 @@ import { discordChatAdapter, discordGetFileUrl } from './chat';
 import { spec } from './spec';
 import {
   getAuditLogTool,
+  getCurrentUser,
   manageApplicationCommands,
   manageAutoModerationTool,
   manageChannels,
@@ -16,6 +17,7 @@ import {
   manageScheduledEventsTool,
   manageThreads,
   manageWebhooks,
+  openDmChannel,
   sendMessage
 } from './tools';
 import { discordGatewayTriggerGroup } from './triggers/gateway';
@@ -37,6 +39,8 @@ export let provider = Slate.create({
     manageAutoModerationTool,
     manageApplicationCommands,
     manageEmojis,
+    getCurrentUser,
+    openDmChannel,
     discordGetFileUrl
   ],
   adapters: [discordChatAdapter],

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient, extractPostSummary } from '../lib/helpers';
+import { wordpressServiceError } from '../lib/errors';
+import { apiTypeFor, createClient, extractPostSummary } from '../lib/helpers';
 import { spec } from '../spec';
 
 let pageOutputSchema = z.object({
@@ -61,15 +62,64 @@ export let listPagesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let pages = await client.listPages(ctx.input);
-    let results = pages.map((p: any) => toPageOutput(p, ctx.config.apiType));
+    let results = pages.map((p: any) => toPageOutput(p, apiTypeFor(ctx.auth)));
     return {
       output: {
         pages: results,
         count: results.length
       },
       message: `Found **${results.length}** page(s).`
+    };
+  })
+  .build();
+
+export let getPageTool = SlateTool.create(spec, {
+  name: 'Get Page',
+  key: 'get_page',
+  description: `Retrieve a single page by its ID, including its full content, status, parent page, and URL.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      pageId: z.string().describe('ID of the page to retrieve')
+    })
+  )
+  .output(
+    pageOutputSchema.extend({
+      content: z.string().describe('Full page content (HTML)'),
+      parentId: z.string().describe('ID of the parent page (0 if top-level)')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.auth);
+    let page = await client.getPage(ctx.input.pageId);
+    // WordPress.com serves pages and posts from one endpoint, so confirm the type.
+    if (apiTypeFor(ctx.auth) === 'wpcom' && page.type && page.type !== 'page') {
+      throw wordpressServiceError(`ID ${ctx.input.pageId} is a ${page.type}, not a page.`);
+    }
+    let result = toPageOutput(page, apiTypeFor(ctx.auth));
+
+    let content: string;
+    let parentId: string;
+    if (apiTypeFor(ctx.auth) === 'wpcom') {
+      content = page.content || '';
+      parentId = String(page.parent?.ID || '0');
+    } else {
+      content = page.content?.rendered || '';
+      parentId = String(page.parent || '0');
+    }
+
+    return {
+      output: {
+        ...result,
+        content,
+        parentId
+      },
+      message: `Retrieved page **"${result.title}"** (${result.status}). [View page](${result.url})`
     };
   })
   .build();
@@ -104,9 +154,9 @@ export let createPageTool = SlateTool.create(spec, {
   )
   .output(pageOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let page = await client.createPage(ctx.input);
-    let result = toPageOutput(page, ctx.config.apiType);
+    let result = toPageOutput(page, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Created page **"${result.title}"** with status \`${result.status}\`. [View page](${result.url})`
@@ -143,9 +193,9 @@ export let updatePageTool = SlateTool.create(spec, {
   .output(pageOutputSchema)
   .handleInvocation(async ctx => {
     let { pageId, ...updateData } = ctx.input;
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let page = await client.updatePage(pageId, updateData);
-    let result = toPageOutput(page, ctx.config.apiType);
+    let result = toPageOutput(page, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Updated page **"${result.title}"** (ID: ${result.pageId}).`
@@ -174,7 +224,7 @@ export let deletePageTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     await client.deletePage(ctx.input.pageId);
     return {
       output: {

@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { wordpressServiceError } from '../lib/errors';
-import { createClient } from '../lib/helpers';
+import { apiTypeFor, createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getSiteInfoTool = SlateTool.create(spec, {
@@ -24,18 +24,18 @@ export let getSiteInfoTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let info = await client.getSiteInfo();
 
     let result: any;
-    if (ctx.config.apiType === 'wpcom') {
+    if (apiTypeFor(ctx.auth) === 'wpcom') {
       result = {
         siteName: info.name || '',
         siteDescription: info.description || '',
         siteUrl: info.URL || '',
         homeUrl: info.URL || '',
         language: info.lang || '',
-        timezone: info.options?.timezone || ''
+        timezone: String(info.options?.timezone || info.options?.gmt_offset || '')
       };
     } else {
       result = {
@@ -44,7 +44,7 @@ export let getSiteInfoTool = SlateTool.create(spec, {
         siteUrl: info.url || '',
         homeUrl: info.home || info.url || '',
         language: info.language || '',
-        timezone: info.timezone_string || info.gmt_offset || ''
+        timezone: String(info.timezone_string || info.gmt_offset || '')
       };
     }
 
@@ -70,14 +70,14 @@ export let getSiteSettingsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let settings = await client.getSiteSettings();
 
     return {
       output: {
         settings
       },
-      message: `Retrieved editable settings for **${settings.title ?? settings.name ?? ctx.config.siteUrl}**.`
+      message: `Retrieved editable settings for **${settings.title ?? settings.name ?? ctx.auth.siteUrl}**.`
     };
   })
   .build();
@@ -112,11 +112,19 @@ export let updateSiteSettingsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    // WordPress.com uses option names (blogname, blogdescription,
+    // timezone_string); self-hosted wp/v2 settings use title, description, timezone.
+    let isWpcom = apiTypeFor(ctx.auth) === 'wpcom';
     let updates: Record<string, any> = {};
-    if (ctx.input.siteTitle !== undefined) updates.title = ctx.input.siteTitle;
-    if (ctx.input.siteDescription !== undefined)
-      updates.description = ctx.input.siteDescription;
-    if (ctx.input.timezone !== undefined) updates.timezone = ctx.input.timezone;
+    if (ctx.input.siteTitle !== undefined) {
+      updates[isWpcom ? 'blogname' : 'title'] = ctx.input.siteTitle;
+    }
+    if (ctx.input.siteDescription !== undefined) {
+      updates[isWpcom ? 'blogdescription' : 'description'] = ctx.input.siteDescription;
+    }
+    if (ctx.input.timezone !== undefined) {
+      updates[isWpcom ? 'timezone_string' : 'timezone'] = ctx.input.timezone;
+    }
     if (ctx.input.dateFormat !== undefined) updates.date_format = ctx.input.dateFormat;
     if (ctx.input.timeFormat !== undefined) updates.time_format = ctx.input.timeFormat;
     if (ctx.input.startOfWeek !== undefined) updates.start_of_week = ctx.input.startOfWeek;
@@ -131,7 +139,7 @@ export let updateSiteSettingsTool = SlateTool.create(spec, {
       throw wordpressServiceError('Provide at least one site setting to update.');
     }
 
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let settings = await client.updateSiteSettings(updates);
 
     return {
@@ -146,8 +154,10 @@ export let updateSiteSettingsTool = SlateTool.create(spec, {
 export let getSiteStatsTool = SlateTool.create(spec, {
   name: 'Get Site Stats',
   key: 'get_site_stats',
-  description: `Retrieve site traffic statistics including page views, visitors, and top posts. **Only available for WordPress.com sites and Jetpack-connected self-hosted sites.**`,
-  constraints: ['Only works with WordPress.com sites or Jetpack-connected self-hosted sites'],
+  description: `Retrieve site traffic statistics including page views, visitors, and top posts. **Requires a WordPress.com OAuth connection to a WordPress.com or Jetpack-connected site.**`,
+  constraints: [
+    'Requires a WordPress.com OAuth connection; application password connections cannot read site statistics'
+  ],
   tags: {
     readOnly: true
   }
@@ -190,7 +200,7 @@ export let getSiteStatsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let stats = await client.getSiteStats();
 
     let result: any = {
@@ -205,7 +215,7 @@ export let getSiteStatsTool = SlateTool.create(spec, {
     if (ctx.input.includeTopPosts) {
       let topPostsData = await client.getStatsTopPosts({
         period: ctx.input.period || 'day',
-        num: ctx.input.topPostsCount || 10
+        max: ctx.input.topPostsCount || 10
       });
 
       let days = topPostsData?.days || {};

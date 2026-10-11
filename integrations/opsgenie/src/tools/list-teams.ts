@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listTeams = SlateTool.create(spec, {
   name: 'List Teams',
   key: 'list_teams',
-  description: `List all teams in the OpsGenie account. Returns team names, descriptions, and member counts.`,
+  description: `List all teams in the OpsGenie account. Returns team IDs, names, and descriptions. Use get_team for members.`,
   tags: {
     readOnly: true
   }

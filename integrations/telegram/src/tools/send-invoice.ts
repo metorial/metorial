@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TelegramClient } from '../lib/client';
 import { spec } from '../spec';
@@ -111,7 +111,7 @@ export let sendInvoiceTool = SlateTool.create(spec, {
     }
 
     if (!ctx.input.chatId) {
-      throw new Error('chatId is required when mode is "send"');
+      throw createApiServiceError('chatId is required when mode is "send".');
     }
 
     let result = await client.sendInvoice({

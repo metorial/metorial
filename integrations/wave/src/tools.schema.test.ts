@@ -34,9 +34,14 @@ describe('Wave compatibility and bounded capabilities', () => {
         schema(provider.actions.find(action => action.key === key)!.outputSchema)
       ).toMatchObject(saved.output));
   }
-  it('retains 28 keys and the two approved additions with no triggers', () => {
+  it('retains 28 keys and the approved additions with no triggers', () => {
     expect(provider.actions.map(action => action.key).sort()).toEqual(
-      [...Object.keys(original), 'get_resource', 'get_invoice_pdf'].sort()
+      [
+        ...Object.keys(original),
+        'get_resource',
+        'get_invoice_pdf',
+        'record_invoice_payment'
+      ].sort()
     );
     for (const action of provider.actions)
       expect(`wave-${action.key}`.length).toBeLessThan(60);

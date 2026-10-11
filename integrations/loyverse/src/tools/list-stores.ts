@@ -8,25 +8,27 @@ let storeSchema = z.object({
   storeName: z.string().optional().describe('Store name'),
   address: z.string().nullable().optional().describe('Address'),
   city: z.string().nullable().optional().describe('City'),
-  region: z.string().nullable().optional().describe('Region'),
+  region: z.string().nullable().optional().describe('State or region'),
   postalCode: z.string().nullable().optional().describe('Postal code'),
-  countryCode: z.string().nullable().optional().describe('Country code'),
+  countryCode: z.string().nullable().optional().describe('Two-letter country code'),
   phoneNumber: z.string().nullable().optional().describe('Phone number'),
   description: z.string().nullable().optional().describe('Store description'),
   createdAt: z.string().optional(),
-  updatedAt: z.string().optional()
+  updatedAt: z.string().optional(),
+  deletedAt: z.string().nullable().optional()
 });
 
 export let listStores = SlateTool.create(spec, {
   name: 'List Stores',
   key: 'list_stores',
-  description: `Retrieve all store locations and their configurations.`,
+  description: `Retrieve all store locations. Store IDs are needed for receipts, inventory, and shifts.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
-      limit: z.number().min(1).max(250).optional(),
-      cursor: z.string().optional()
+      limit: z.number().min(1).max(250).optional().describe('Number of stores to return'),
+      cursor: z.string().optional().describe('Pagination cursor'),
+      showDeleted: z.boolean().optional().describe('Include deleted stores')
     })
   )
   .output(
@@ -39,7 +41,8 @@ export let listStores = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listStores({
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      showDeleted: ctx.input.showDeleted
     });
 
     let stores = (result.stores ?? []).map((s: any) => ({
@@ -47,13 +50,14 @@ export let listStores = SlateTool.create(spec, {
       storeName: s.name,
       address: s.address,
       city: s.city,
-      region: s.region,
+      region: s.state ?? s.region,
       postalCode: s.postal_code,
-      countryCode: s.country_code,
+      countryCode: s.country ?? s.country_code,
       phoneNumber: s.phone_number,
       description: s.description,
       createdAt: s.created_at,
-      updatedAt: s.updated_at
+      updatedAt: s.updated_at,
+      deletedAt: s.deleted_at
     }));
 
     return {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getRawEmailDownload, type ResendFileReference } from '../lib/files';
 import { spec } from '../spec';
 
 let attachmentSchema = z.object({
@@ -89,14 +90,20 @@ export let listReceivedEmails = SlateTool.create(spec, {
 export let getReceivedEmail = SlateTool.create(spec, {
   name: 'Get Received Email',
   key: 'get_received_email',
-  description: `Retrieve the full details of a received inbound email including HTML/text content and attachments.`,
+  description: `Retrieve the full details of a received inbound email including HTML/text content and attachment metadata. Optionally provide the original email message (.eml, including all attachments) as a downloadable file. Use Download Email Attachment to download a single attachment.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      emailId: z.string().describe('ID of the received email.')
+      emailId: z.string().describe('ID of the received email.'),
+      includeRawEmail: z
+        .boolean()
+        .optional()
+        .describe(
+          'Set to true to also provide the original email message (.eml, including all attachments) as a downloadable file.'
+        )
     })
   )
   .output(
@@ -118,6 +125,22 @@ export let getReceivedEmail = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let e = await client.getReceivedEmail(ctx.input.emailId);
+
+    if (ctx.input.includeRawEmail) {
+      let raw = getRawEmailDownload(e);
+      let reference: ResendFileReference = {
+        type: 'received_email_raw',
+        emailId: ctx.input.emailId
+      };
+      await ctx.addAttachment({
+        type: 'url',
+        url: raw.url,
+        mimeType: 'message/rfc822',
+        filename: `${ctx.input.emailId}.eml`,
+        refreshReference: reference,
+        refreshAt: raw.refreshAt
+      });
+    }
 
     return {
       output: {
@@ -141,7 +164,9 @@ export let getReceivedEmail = SlateTool.create(spec, {
           size: a.size
         }))
       },
-      message: `Received email from **${e.from}** — subject: **${e.subject || '(no subject)'}**.`
+      message: `Received email from **${e.from}** — subject: **${e.subject || '(no subject)'}**.${
+        ctx.input.includeRawEmail ? ' Prepared the original email message for download.' : ''
+      }`
     };
   })
   .build();

@@ -60,10 +60,29 @@ let mapTemplateMediaSource = (source: TemplateMediaSource, field: string) => {
   return mapped;
 };
 
+// Named and positional parameters: https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview
+// Location headers: https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/components
+// Copy code buttons: https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/marketing-templates/coupon-templates
 let templateParameterSchema = z.object({
   type: z
-    .enum(['text', 'image', 'video', 'document', 'currency', 'date_time', 'payload'])
+    .enum([
+      'text',
+      'image',
+      'video',
+      'document',
+      'currency',
+      'date_time',
+      'payload',
+      'location',
+      'coupon_code'
+    ])
     .describe('Parameter type'),
+  parameterName: z
+    .string()
+    .optional()
+    .describe(
+      'Variable name for templates that use named parameters (e.g. "first_name" for {{first_name}}). Omit for positional templates.'
+    ),
   text: z.string().optional().describe('Text value (for type "text" or button URL suffix)'),
   image: z
     .object(templateMediaSourceFields)
@@ -90,13 +109,27 @@ let templateParameterSchema = z.object({
     })
     .optional()
     .describe('Date/time value (for type "date_time")'),
-  payload: z.string().optional().describe('Payload value (for button type "payload")')
+  payload: z.string().optional().describe('Payload value (for button type "payload")'),
+  location: z
+    .object({
+      latitude: z.number().describe('Latitude coordinate'),
+      longitude: z.number().describe('Longitude coordinate'),
+      name: z.string().optional().describe('Location name'),
+      address: z.string().optional().describe('Location address')
+    })
+    .optional()
+    .describe('Location value (for type "location" in a location header)'),
+  couponCode: z
+    .string()
+    .max(20)
+    .optional()
+    .describe('Coupon code (for type "coupon_code" in a copy code button, max 20 characters)')
 });
 
 let templateComponentSchema = z.object({
   type: z.enum(['header', 'body', 'button']).describe('Component type'),
   subType: z
-    .enum(['quick_reply', 'url'])
+    .enum(['quick_reply', 'url', 'copy_code'])
     .optional()
     .describe('Button sub-type (required for button components)'),
   index: z
@@ -115,7 +148,7 @@ export let sendTemplateMessage = SlateTool.create(spec, {
 Templates must be created and approved in the Meta dashboard before use. Use the List Templates tool to find available templates.`,
   instructions: [
     'The template name and language code must exactly match an approved template',
-    'Template parameters are positional - provide them in the order defined in the template',
+    'For positional templates ({{1}}, {{2}}), provide parameters in the order defined in the template. For named templates ({{first_name}}), set parameterName on each parameter',
     'For media headers, provide either a link or mediaId in the header component parameters',
     'Button components require a subType and index (0-based)'
   ],
@@ -157,7 +190,18 @@ Templates must be created and approved in the Meta dashboard before use. Use the
         type: comp.type,
         parameters: comp.parameters.map(param => {
           let p: Record<string, any> = { type: param.type };
+          if (param.parameterName) p.parameter_name = param.parameterName;
           if (param.text !== undefined) p.text = param.text;
+          if (param.location) {
+            // Meta's location header example sends coordinates as strings.
+            p.location = {
+              latitude: String(param.location.latitude),
+              longitude: String(param.location.longitude),
+              ...(param.location.name ? { name: param.location.name } : {}),
+              ...(param.location.address ? { address: param.location.address } : {})
+            };
+          }
+          if (param.couponCode !== undefined) p.coupon_code = param.couponCode;
           if (param.payload !== undefined) p.payload = param.payload;
           if (param.image) {
             p.image = mapTemplateMediaSource(param.image, 'image parameter');

@@ -72,7 +72,7 @@ export let teamsChatAdapter = ChatAdapter.register({
     message_unfurls: false,
     message_mentions: false,
     reaction_custom_emoji: false,
-    // Bots cannot post in private channels.
+    // Bots are not told channel visibility, so private and shared channels are typed `unknown`.
     channel_private: false,
     channel_shared: false,
     channel_announcement: false,

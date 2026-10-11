@@ -12,9 +12,15 @@ let templateSchema = z.object({
 });
 
 let emailSchema = z.object({
-  from: z.string().describe('Sender email address.'),
+  from: z
+    .string()
+    .optional()
+    .describe('Sender email address. Required unless the template provides a default sender.'),
   to: z.union([z.string(), z.array(z.string())]).describe('Recipient email address(es).'),
-  subject: z.string().describe('Email subject line.'),
+  subject: z
+    .string()
+    .optional()
+    .describe('Email subject line. Required unless the template provides a default subject.'),
   html: z.string().optional().describe('HTML content of the email.'),
   text: z.string().optional().describe('Plain text content of the email.'),
   cc: z
@@ -42,6 +48,12 @@ let emailSchema = z.object({
   template: templateSchema
     .optional()
     .describe('Published template to send. Do not provide html or text when template is set.'),
+  topicId: z
+    .string()
+    .optional()
+    .describe(
+      'Topic ID to scope this email to. Recipients who opted out of the topic are not sent the email and it is marked as failed.'
+    ),
   scheduledAt: z.string().optional().describe('Schedule delivery time in ISO 8601 format.')
 });
 
@@ -49,7 +61,11 @@ export let sendBatchEmails = SlateTool.create(spec, {
   name: 'Send Batch Emails',
   key: 'send_batch_emails',
   description: `Send multiple emails in a single API call. Each email can have different recipients, content, and settings. Use an idempotency key to prevent duplicate batch sends.`,
-  constraints: ['Rate limited to 2 requests per second.'],
+  constraints: [
+    'Up to 100 emails per batch.',
+    'Attachments are not supported in batch sends.',
+    'Rate limited to 2 requests per second.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -78,6 +94,11 @@ export let sendBatchEmails = SlateTool.create(spec, {
           'Do not provide html or text when sending a Resend template in a batch email.'
         );
       }
+      if (!email.template && (!email.from || !email.subject)) {
+        throw createApiServiceError(
+          'Each batch email needs from and subject unless it sends a template that provides them.'
+        );
+      }
     }
 
     let result = await client.sendBatchEmails({
@@ -93,6 +114,7 @@ export let sendBatchEmails = SlateTool.create(spec, {
         headers: e.headers,
         tags: e.tags,
         template: e.template,
+        topicId: e.topicId,
         scheduledAt: e.scheduledAt
       })),
       idempotencyKey: ctx.input.idempotencyKey

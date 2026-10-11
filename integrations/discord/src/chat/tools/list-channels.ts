@@ -1,4 +1,4 @@
-import { ChatErrors, listChannels as contract } from '@slates/adapter-chat';
+import { ChatErrors, listChannels as contract, matchesChatQuery } from '@slates/adapter-chat';
 import { spec } from '../../spec';
 import { resolveDiscordIdentity, runDiscordChatAction } from '../lib/context';
 import { decodeDiscordCursor, encodeDiscordCursor, offsetCursorSchema } from '../lib/cursors';
@@ -41,14 +41,13 @@ export let chatListChannels = contract
           client.getGuildChannels(workspaceId)
         ]);
 
-        let query = ctx.input.query?.trim().toLowerCase();
         let channels = (rawChannels as DiscordApiChannel[])
           .filter(channel => !NON_MESSAGE_CHANNEL_TYPES.has(channel.type))
           .map(channel =>
             mapChannel({ ...channel, guild_id: channel.guild_id ?? workspaceId }, identity)
           )
           .filter(channel => !ctx.input.type || channel.type === ctx.input.type)
-          .filter(channel => !query || (channel.name ?? '').toLowerCase().includes(query));
+          .filter(channel => matchesChatQuery(ctx.input.query, [channel.name]));
 
         let limit = ctx.input.limit ?? 100;
         let offset = cursor.data?.offset ?? 0;

@@ -8,6 +8,8 @@ export * from './list-ads';
 export * from './list-campaigns';
 export * from './list-custom-audiences';
 export * from './list-pixels';
+export * from './list-posts';
+export * from './list-targeting-options';
 export * from './manage-ad';
 export * from './manage-ad-group';
 export * from './manage-audience-users';

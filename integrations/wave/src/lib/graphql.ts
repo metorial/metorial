@@ -158,6 +158,15 @@ export let SALES_TAX_FRAGMENT = `
   modifiedAt
 `;
 
+export let MONEY_FRAGMENT = `
+  value
+  minorUnitValue
+  currency {
+    code
+    symbol
+  }
+`;
+
 export let INVOICE_FRAGMENT = `
   business { id }
   id
@@ -173,32 +182,16 @@ export let INVOICE_FRAGMENT = `
   poNumber
   dueDate
   amountDue {
-    value
-    currency {
-      code
-      symbol
-    }
+    ${MONEY_FRAGMENT}
   }
   amountPaid {
-    value
-    currency {
-      code
-      symbol
-    }
+    ${MONEY_FRAGMENT}
   }
   taxTotal {
-    value
-    currency {
-      code
-      symbol
-    }
+    ${MONEY_FRAGMENT}
   }
   total {
-    value
-    currency {
-      code
-      symbol
-    }
+    ${MONEY_FRAGMENT}
   }
   exchangeRate
   currency {
@@ -229,11 +222,7 @@ export let INVOICE_FRAGMENT = `
     quantity
     unitPrice
     total {
-      value
-      currency {
-        code
-        symbol
-      }
+      ${MONEY_FRAGMENT}
     }
     product {
       id
@@ -242,6 +231,7 @@ export let INVOICE_FRAGMENT = `
     taxes {
       amount {
         value
+        minorUnitValue
       }
       salesTax {
         id
@@ -334,11 +324,17 @@ export let GET_BUSINESS_QUERY = `
   }
 `;
 
-export let LIST_CUSTOMERS_QUERY = `
-  query($businessId: ID!, $page: Int!, $pageSize: Int!) {
+// Builds a business-scoped connection query that declares and forwards only the supplied filters,
+// so omitted filters keep Wave's documented defaults.
+export const businessConnectionQuery = (
+  field: 'customers' | 'accounts' | 'invoices',
+  fragment: string,
+  filters: [name: string, type: string][]
+) => `
+  query($businessId: ID!, $page: Int!, $pageSize: Int!${filters.map(([name, type]) => `, $${name}: ${type}`).join('')}) {
     business(id: $businessId) {
       id
-      customers(page: $page, pageSize: $pageSize) {
+      ${field}(page: $page, pageSize: $pageSize${filters.map(([name]) => `, ${name}: $${name}`).join('')}) {
         pageInfo {
           currentPage
           totalPages
@@ -346,27 +342,7 @@ export let LIST_CUSTOMERS_QUERY = `
         }
         edges {
           node {
-            ${CUSTOMER_FRAGMENT}
-          }
-        }
-      }
-    }
-  }
-`;
-
-export let LIST_ACCOUNTS_QUERY = `
-  query($businessId: ID!, $page: Int!, $pageSize: Int!) {
-    business(id: $businessId) {
-      id
-      accounts(page: $page, pageSize: $pageSize) {
-        pageInfo {
-          currentPage
-          totalPages
-          totalCount
-        }
-        edges {
-          node {
-            ${ACCOUNT_FRAGMENT}
+            ${fragment}
           }
         }
       }
@@ -387,46 +363,6 @@ export let LIST_PRODUCTS_QUERY = `
         edges {
           node {
             ${PRODUCT_FRAGMENT}
-          }
-        }
-      }
-    }
-  }
-`;
-
-export let LIST_INVOICES_QUERY = `
-  query($businessId: ID!, $page: Int!, $pageSize: Int!) {
-    business(id: $businessId) {
-      id
-      invoices(page: $page, pageSize: $pageSize) {
-        pageInfo {
-          currentPage
-          totalPages
-          totalCount
-        }
-        edges {
-          node {
-            ${INVOICE_FRAGMENT}
-          }
-        }
-      }
-    }
-  }
-`;
-
-export let LIST_INVOICES_BY_CUSTOMER_QUERY = `
-  query($businessId: ID!, $page: Int!, $pageSize: Int!, $customerId: ID!) {
-    business(id: $businessId) {
-      id
-      invoices(page: $page, pageSize: $pageSize, customerId: $customerId) {
-        pageInfo {
-          currentPage
-          totalPages
-          totalCount
-        }
-        edges {
-          node {
-            ${INVOICE_FRAGMENT}
           }
         }
       }
@@ -675,6 +611,44 @@ export let CLONE_INVOICE_MUTATION = `
       ${MUTATION_ERRORS}
       invoice {
         ${INVOICE_FRAGMENT}
+      }
+    }
+  }
+`;
+
+export let INVOICE_PAYMENT_FRAGMENT = `
+  id
+  business { id }
+  amount
+  paymentDate
+  paymentMethod
+  memo
+  exchangeRate
+  account {
+    id
+    name
+  }
+  invoice {
+    id
+    status
+    invoiceNumber
+    amountDue {
+      ${MONEY_FRAGMENT}
+    }
+    amountPaid {
+      ${MONEY_FRAGMENT}
+    }
+  }
+  createdAt
+  modifiedAt
+`;
+
+export let RECORD_INVOICE_PAYMENT_MUTATION = `
+  mutation($input: InvoicePaymentCreateManualInput!) {
+    invoicePaymentCreateManual(input: $input) {
+      ${MUTATION_ERRORS}
+      invoicePayment {
+        ${INVOICE_PAYMENT_FRAGMENT}
       }
     }
   }

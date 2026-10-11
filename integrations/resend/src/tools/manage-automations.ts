@@ -14,7 +14,13 @@ let automationStepSchema = z.object({
 
 let automationConnectionSchema = z.object({
   from: z.string().describe('Source step key.'),
-  to: z.string().describe('Destination step key.')
+  to: z.string().describe('Destination step key.'),
+  type: z
+    .enum(['default', 'condition_met', 'condition_not_met', 'timeout', 'event_received'])
+    .optional()
+    .describe(
+      'Connection type. Omit or use default for linear steps. Use condition_met/condition_not_met for condition steps and event_received/timeout for wait_for_event steps.'
+    )
 });
 
 let automationOutputSchema = z.object({
@@ -23,10 +29,15 @@ let automationOutputSchema = z.object({
   status: z.string().optional().describe('Automation status.'),
   steps: z.array(automationStepSchema).optional().describe('Automation graph steps.'),
   connections: z
-    .array(automationConnectionSchema)
+    .array(
+      automationConnectionSchema.extend({
+        type: z.string().optional().describe('Connection type.')
+      })
+    )
     .optional()
     .describe('Automation graph connections.'),
-  createdAt: z.string().optional().describe('Creation timestamp.')
+  createdAt: z.string().optional().describe('Creation timestamp.'),
+  updatedAt: z.string().optional().describe('Last update timestamp.')
 });
 
 let automationRunOutputSchema = z.object({
@@ -35,6 +46,20 @@ let automationRunOutputSchema = z.object({
   startedAt: z.string().optional().nullable().describe('Run start timestamp.'),
   completedAt: z.string().optional().nullable().describe('Run completion timestamp.'),
   createdAt: z.string().optional().describe('Creation timestamp.'),
+  steps: z
+    .array(
+      z.object({
+        key: z.string().describe('Step key.'),
+        type: z.string().optional().describe('Step type.'),
+        status: z.string().optional().describe('Step status.'),
+        startedAt: z.string().optional().nullable().describe('Step start timestamp.'),
+        completedAt: z.string().optional().nullable().describe('Step completion timestamp.'),
+        output: z.any().optional().describe('Step output, when available.'),
+        error: z.any().optional().describe('Step error, when the step failed.')
+      })
+    )
+    .optional()
+    .describe('Per-step execution details. Only returned by Get Automation Run.'),
   data: z.any().optional().describe('Provider-specific run payload.')
 });
 
@@ -44,7 +69,8 @@ let mapAutomation = (automation: any) => ({
   status: automation.status,
   steps: automation.steps,
   connections: automation.connections,
-  createdAt: automation.created_at
+  createdAt: automation.created_at,
+  updatedAt: automation.updated_at
 });
 
 let mapAutomationRun = (run: any) => ({
@@ -53,6 +79,15 @@ let mapAutomationRun = (run: any) => ({
   startedAt: run.started_at,
   completedAt: run.completed_at,
   createdAt: run.created_at,
+  steps: run.steps?.map((step: any) => ({
+    key: step.key,
+    type: step.type,
+    status: step.status,
+    startedAt: step.started_at,
+    completedAt: step.completed_at,
+    output: step.output,
+    error: step.error
+  })),
   data: run
 });
 
@@ -180,6 +215,10 @@ export let listAutomations = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      status: z
+        .enum(['enabled', 'disabled'])
+        .optional()
+        .describe('Only return automations with this status.'),
       limit: z.number().optional().describe('Max results (default 20, max 100).'),
       after: z.string().optional().describe('Cursor for forward pagination.'),
       before: z.string().optional().describe('Cursor for backward pagination.')
@@ -194,6 +233,7 @@ export let listAutomations = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listAutomations({
+      status: ctx.input.status,
       limit: ctx.input.limit,
       after: ctx.input.after,
       before: ctx.input.before
@@ -289,7 +329,12 @@ export let listAutomationRuns = SlateTool.create(spec, {
   .input(
     z.object({
       automationId: z.string().describe('Automation ID.'),
-      status: z.string().optional().describe('Optional run status filter.'),
+      status: z
+        .string()
+        .optional()
+        .describe(
+          'Run status filter. Comma-separated list of running, completed, failed, cancelled.'
+        ),
       limit: z.number().optional().describe('Max results (default 20, max 100).'),
       after: z.string().optional().describe('Cursor for forward pagination.'),
       before: z.string().optional().describe('Cursor for backward pagination.')

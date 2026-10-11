@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
 export let getEarnings = SlateTool.create(spec, {
@@ -11,6 +12,7 @@ export let getEarnings = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(gumroadActionScopes.viewTaxData)
   .input(
     z.object({
       year: z.number().int().min(2000).describe('4-digit tax year to retrieve, such as 2025')

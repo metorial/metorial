@@ -1,44 +1,53 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+
+let GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
 
 let graphAxios = createAxios({
-  baseURL: 'https://graph.microsoft.com/v1.0'
+  baseURL: GRAPH_BASE_URL
 });
 
-let getErrorMessage = (error: unknown): string => {
-  if (error instanceof Error && typeof error.message === 'string') {
-    return error.message;
-  }
-
-  if (typeof (error as { data?: { message?: unknown } })?.data?.message === 'string') {
-    return String((error as { data: { message: string } }).data.message);
-  }
-
-  if (
-    typeof (error as { response?: { data?: { error?: { message?: unknown } } } })?.response
-      ?.data?.error?.message === 'string'
-  ) {
-    return String(
-      (error as { response: { data: { error: { message: string } } } }).response.data.error
-        .message
-    );
-  }
-
-  return String(error ?? '');
-};
-
-let isOnlineMeetingsFilterRequiredError = (error: unknown) => {
-  let message = getErrorMessage(error).toLowerCase();
-  return (
-    message.includes('filter expression expected') &&
-    message.includes('/onlinemeetings?$filter')
-  );
-};
+// Collections are fully paged, but cap the page count so a runaway nextLink loop ends.
+let MAX_COLLECTION_PAGES = 50;
 
 export interface GraphListResponse<T> {
   value: T[];
   '@odata.nextLink'?: string;
   '@odata.count'?: number;
 }
+
+export interface GraphPage<T> {
+  items: T[];
+  nextPageToken?: string;
+}
+
+// Page tokens are Graph @odata.nextLink URLs; only follow them on the Graph v1.0 host
+// so the bearer token never leaves Microsoft Graph.
+// https://learn.microsoft.com/en-us/graph/paging
+let resolvePageToken = (pageToken: string) => {
+  let url: URL;
+  try {
+    url = new URL(pageToken);
+  } catch {
+    throw createApiServiceError(
+      'pageToken is not valid. Pass the nextPageToken value returned by the previous call unchanged.',
+      { reason: 'microsoft_teams_page_token_invalid' }
+    );
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.hostname.toLowerCase() !== 'graph.microsoft.com' ||
+    !url.pathname.startsWith('/v1.0/')
+  ) {
+    throw createApiServiceError(
+      'pageToken is not a Microsoft Graph continuation link. Pass the nextPageToken value returned by the previous call unchanged.',
+      { reason: 'microsoft_teams_page_token_invalid' }
+    );
+  }
+  return url.toString();
+};
+
+// OData string literals escape a single quote by doubling it.
+let odataString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
 export class GraphClient {
   private token: string;
@@ -51,13 +60,42 @@ export class GraphClient {
     return { Authorization: `Bearer ${this.token}` };
   }
 
+  // ─── Paging ──────────────────────────────────────────────────────────
+
+  /** One page of a collection; `pageToken` (a previous nextLink) replaces path and params. */
+  private async getPage<T = any>(
+    path: string,
+    params: Record<string, string> = {},
+    pageToken?: string
+  ): Promise<GraphPage<T>> {
+    let response = pageToken
+      ? await graphAxios.get<GraphListResponse<T>>(resolvePageToken(pageToken), {
+          headers: this.headers
+        })
+      : await graphAxios.get<GraphListResponse<T>>(path, { headers: this.headers, params });
+    let nextLink = response.data['@odata.nextLink'];
+    return {
+      items: Array.isArray(response.data.value) ? response.data.value : [],
+      ...(typeof nextLink === 'string' && nextLink ? { nextPageToken: nextLink } : {})
+    };
+  }
+
+  /** Every item of a collection, following @odata.nextLink. */
+  private async getAll<T = any>(path: string, params: Record<string, string> = {}) {
+    let items: T[] = [];
+    let page = await this.getPage<T>(path, params);
+    items.push(...page.items);
+    for (let count = 1; page.nextPageToken && count < MAX_COLLECTION_PAGES; count++) {
+      page = await this.getPage<T>(path, {}, page.nextPageToken);
+      items.push(...page.items);
+    }
+    return items;
+  }
+
   // ─── Teams ───────────────────────────────────────────────────────────
 
   async listJoinedTeams(): Promise<any[]> {
-    let response = await graphAxios.get<GraphListResponse<any>>('/me/joinedTeams', {
-      headers: this.headers
-    });
-    return response.data.value;
+    return this.getAll('/me/joinedTeams');
   }
 
   async getTeam(teamId: string): Promise<any> {
@@ -131,10 +169,7 @@ export class GraphClient {
   // ─── Channels ────────────────────────────────────────────────────────
 
   async listChannels(teamId: string): Promise<any[]> {
-    let response = await graphAxios.get<GraphListResponse<any>>(`/teams/${teamId}/channels`, {
-      headers: this.headers
-    });
-    return response.data.value;
+    return this.getAll(`/teams/${teamId}/channels`);
   }
 
   async getChannel(teamId: string, channelId: string): Promise<any> {
@@ -165,14 +200,19 @@ export class GraphClient {
 
   // ─── Channel Messages ───────────────────────────────────────────────
 
-  async listChannelMessages(teamId: string, channelId: string, top?: number): Promise<any[]> {
+  // $top is at most 50: https://learn.microsoft.com/en-us/graph/api/channel-list-messages?view=graph-rest-1.0
+  async listChannelMessages(
+    teamId: string,
+    channelId: string,
+    options: { top?: number; pageToken?: string } = {}
+  ): Promise<GraphPage<any>> {
     let params: Record<string, string> = {};
-    if (top) params.$top = String(top);
-    let response = await graphAxios.get<GraphListResponse<any>>(
+    if (options.top) params.$top = String(options.top);
+    return this.getPage(
       `/teams/${teamId}/channels/${channelId}/messages`,
-      { headers: this.headers, params }
+      params,
+      options.pageToken
     );
-    return response.data.value;
   }
 
   async getChannelMessage(teamId: string, channelId: string, messageId: string): Promise<any> {
@@ -206,28 +246,62 @@ export class GraphClient {
     return response.data;
   }
 
+  // https://learn.microsoft.com/en-us/graph/api/chatmessage-list-replies?view=graph-rest-1.0
   async listMessageReplies(
     teamId: string,
     channelId: string,
-    messageId: string
-  ): Promise<any[]> {
-    let response = await graphAxios.get<GraphListResponse<any>>(
+    messageId: string,
+    options: { top?: number; pageToken?: string } = {}
+  ): Promise<GraphPage<any>> {
+    let params: Record<string, string> = {};
+    if (options.top) params.$top = String(options.top);
+    return this.getPage(
       `/teams/${teamId}/channels/${channelId}/messages/${messageId}/replies`,
-      { headers: this.headers }
+      params,
+      options.pageToken
     );
-    return response.data.value;
+  }
+
+  // https://learn.microsoft.com/en-us/graph/api/chatmessage-update?view=graph-rest-1.0
+  async updateChannelMessage(
+    teamId: string,
+    channelId: string,
+    messageId: string,
+    body: any,
+    replyId?: string
+  ): Promise<void> {
+    let path = `/teams/${teamId}/channels/${channelId}/messages/${messageId}`;
+    await graphAxios.patch(replyId ? `${path}/replies/${replyId}` : path, body, {
+      headers: { ...this.headers, 'Content-Type': 'application/json' }
+    });
+  }
+
+  // https://learn.microsoft.com/en-us/graph/api/chatmessage-softdelete?view=graph-rest-1.0
+  async softDeleteChannelMessage(
+    teamId: string,
+    channelId: string,
+    messageId: string,
+    replyId?: string
+  ): Promise<void> {
+    let path = `/teams/${teamId}/channels/${channelId}/messages/${messageId}`;
+    await graphAxios.post(
+      `${replyId ? `${path}/replies/${replyId}` : path}/softDelete`,
+      null,
+      {
+        headers: this.headers
+      }
+    );
   }
 
   // ─── Chats ──────────────────────────────────────────────────────────
 
-  async listChats(top?: number): Promise<any[]> {
+  // $top is at most 50: https://learn.microsoft.com/en-us/graph/api/chat-list?view=graph-rest-1.0
+  async listChats(
+    options: { top?: number; pageToken?: string } = {}
+  ): Promise<GraphPage<any>> {
     let params: Record<string, string> = {};
-    if (top) params.$top = String(top);
-    let response = await graphAxios.get<GraphListResponse<any>>('/me/chats', {
-      headers: this.headers,
-      params
-    });
-    return response.data.value;
+    if (options.top) params.$top = String(options.top);
+    return this.getPage('/me/chats', params, options.pageToken);
   }
 
   async getChat(chatId: string): Promise<any> {
@@ -244,14 +318,35 @@ export class GraphClient {
     return response.data;
   }
 
-  async listChatMessages(chatId: string, top?: number): Promise<any[]> {
+  // $top is at most 50: https://learn.microsoft.com/en-us/graph/api/chat-list-messages?view=graph-rest-1.0
+  async listChatMessages(
+    chatId: string,
+    options: { top?: number; pageToken?: string } = {}
+  ): Promise<GraphPage<any>> {
     let params: Record<string, string> = {};
-    if (top) params.$top = String(top);
-    let response = await graphAxios.get<GraphListResponse<any>>(`/chats/${chatId}/messages`, {
-      headers: this.headers,
-      params
+    if (options.top) params.$top = String(options.top);
+    return this.getPage(`/chats/${chatId}/messages`, params, options.pageToken);
+  }
+
+  // https://learn.microsoft.com/en-us/graph/api/chatmessage-update?view=graph-rest-1.0
+  async updateChatMessage(chatId: string, messageId: string, body: any): Promise<void> {
+    await graphAxios.patch(`/chats/${chatId}/messages/${messageId}`, body, {
+      headers: { ...this.headers, 'Content-Type': 'application/json' }
     });
-    return response.data.value;
+  }
+
+  // Chat soft delete is documented only under /users/{userId}/chats.
+  // https://learn.microsoft.com/en-us/graph/api/chatmessage-softdelete?view=graph-rest-1.0
+  async softDeleteChatMessage(
+    userId: string,
+    chatId: string,
+    messageId: string
+  ): Promise<void> {
+    await graphAxios.post(
+      `/users/${userId}/chats/${chatId}/messages/${messageId}/softDelete`,
+      null,
+      { headers: this.headers }
+    );
   }
 
   async sendChatMessage(chatId: string, body: any): Promise<any> {
@@ -264,10 +359,7 @@ export class GraphClient {
   // ─── Members ────────────────────────────────────────────────────────
 
   async listTeamMembers(teamId: string): Promise<any[]> {
-    let response = await graphAxios.get<GraphListResponse<any>>(`/teams/${teamId}/members`, {
-      headers: this.headers
-    });
-    return response.data.value;
+    return this.getAll(`/teams/${teamId}/members`);
   }
 
   async addTeamMember(teamId: string, body: any): Promise<any> {
@@ -284,11 +376,7 @@ export class GraphClient {
   }
 
   async listChannelMembers(teamId: string, channelId: string): Promise<any[]> {
-    let response = await graphAxios.get<GraphListResponse<any>>(
-      `/teams/${teamId}/channels/${channelId}/members`,
-      { headers: this.headers }
-    );
-    return response.data.value;
+    return this.getAll(`/teams/${teamId}/channels/${channelId}/members`);
   }
 
   async addChannelMember(teamId: string, channelId: string, body: any): Promise<any> {
@@ -326,21 +414,13 @@ export class GraphClient {
     return response.data;
   }
 
-  async listOnlineMeetings(): Promise<any[]> {
-    try {
-      let response = await graphAxios.get<GraphListResponse<any>>('/me/onlineMeetings', {
-        headers: this.headers
-      });
-      return response.data.value;
-    } catch (error) {
-      if (isOnlineMeetingsFilterRequiredError(error)) {
-        throw new Error(
-          'Microsoft Graph does not support listing all online meetings without a filter. Use get with a meetingId or query by joinWebUrl/joinMeetingId instead.'
-        );
-      }
-
-      throw error;
-    }
+  // Graph only looks meetings up by join URL or join meeting ID; there is no unfiltered list.
+  // https://learn.microsoft.com/en-us/graph/api/onlinemeeting-get?view=graph-rest-1.0
+  async findOnlineMeetings(filter: { joinWebUrl?: string; joinMeetingId?: string }) {
+    let expression = filter.joinWebUrl
+      ? `JoinWebUrl eq ${odataString(filter.joinWebUrl)}`
+      : `joinMeetingIdSettings/joinMeetingId eq ${odataString(filter.joinMeetingId ?? '')}`;
+    return this.getAll('/me/onlineMeetings', { $filter: expression });
   }
 
   async deleteOnlineMeeting(meetingId: string): Promise<void> {
@@ -384,10 +464,7 @@ export class GraphClient {
   // ─── Tags ──────────────────────────────────────────────────────────
 
   async listTags(teamId: string): Promise<any[]> {
-    let response = await graphAxios.get<GraphListResponse<any>>(`/teams/${teamId}/tags`, {
-      headers: this.headers
-    });
-    return response.data.value;
+    return this.getAll(`/teams/${teamId}/tags`);
   }
 
   async getTag(teamId: string, tagId: string): Promise<any> {
@@ -417,11 +494,7 @@ export class GraphClient {
   }
 
   async listTagMembers(teamId: string, tagId: string): Promise<any[]> {
-    let response = await graphAxios.get<GraphListResponse<any>>(
-      `/teams/${teamId}/tags/${tagId}/members`,
-      { headers: this.headers }
-    );
-    return response.data.value;
+    return this.getAll(`/teams/${teamId}/tags/${tagId}/members`);
   }
 
   async addTagMember(teamId: string, tagId: string, userId: string): Promise<any> {
@@ -543,11 +616,7 @@ export class GraphClient {
   }
 
   async listShifts(teamId: string): Promise<any[]> {
-    let response = await graphAxios.get<GraphListResponse<any>>(
-      `/teams/${teamId}/schedule/shifts`,
-      { headers: this.headers }
-    );
-    return response.data.value;
+    return this.getAll(`/teams/${teamId}/schedule/shifts`);
   }
 
   async createShift(teamId: string, body: any): Promise<any> {

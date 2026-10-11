@@ -1,4 +1,5 @@
-import { createTextAttachment, SlateTool } from 'slates';
+import { Buffer } from 'node:buffer';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { spec } from '../spec';
 import {
@@ -125,6 +126,13 @@ let reviewThreadSchema = z.object({
   comments: z.array(
     z.object({
       commentId: z.string().describe('GraphQL review comment ID'),
+      databaseId: z
+        .number()
+        .nullable()
+        .optional()
+        .describe(
+          'Numeric review comment ID; pass it as commentId to review_pull_request add_reply_to_pull_request_comment'
+        ),
       body: z.string().describe('Review comment body'),
       path: z.string().describe('Reviewed file path'),
       line: z.number().nullable().describe('Reviewed line number'),
@@ -335,10 +343,14 @@ export let pullRequestRead = SlateTool.create(spec, {
         let diff = await client.getPullRequestDiff(owner, repo, pullNumber);
         let diffFileName = `${owner}-${repo}-pull-${pullNumber}.diff`;
         let diffByteSize = Buffer.byteLength(diff, 'utf8');
+        await ctx.addAttachment({
+          type: 'content',
+          content: Uint8Array.from(Buffer.from(diff, 'utf8')),
+          mimeType: 'text/x-diff'
+        });
         return {
           output: { method, owner, repo, pullNumber, htmlUrl, diffFileName, diffByteSize },
-          message: `Downloaded the diff for pull request **#${pullNumber}** (${diffByteSize} bytes).`,
-          attachments: [createTextAttachment(diff, 'text/x-diff')]
+          message: `Prepared the diff for pull request **#${pullNumber}** (${diffByteSize} bytes) as a downloadable file.`
         };
       }
 
@@ -447,6 +459,10 @@ export let pullRequestRead = SlateTool.create(spec, {
           totalComments: thread.comments.totalCount,
           comments: thread.comments.nodes.map(comment => ({
             commentId: String(comment.id),
+            databaseId:
+              comment.fullDatabaseId === null || comment.fullDatabaseId === undefined
+                ? null
+                : Number(comment.fullDatabaseId),
             body: comment.body,
             path: comment.path,
             line: comment.line,

@@ -164,6 +164,8 @@ export let mapGoogleChatMessage = (message: GoogleChatMessage) => {
 export type SendMessageInput = {
   conversationId?: string;
   messageText: string;
+  requestId?: string;
+  clientAssignedMessageId?: string;
   threadId?: string;
   threadKey?: string;
   messageReplyOption?:
@@ -206,6 +208,12 @@ export let buildSendMessageRequest = (input: SendMessageInput, defaultSpace?: st
     );
   }
 
+  if ((threadName || threadKey) && replyOption === 'MESSAGE_REPLY_OPTION_UNSPECIFIED') {
+    throw googleChatValidationError(
+      'messageReplyOption MESSAGE_REPLY_OPTION_UNSPECIFIED always starts a new unkeyed thread and Google ignores threadId and threadKey; omit messageReplyOption or choose a reply option.'
+    );
+  }
+
   if ((threadName || threadKey) && !replyOption) {
     replyOption = 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD';
   }
@@ -243,7 +251,11 @@ export let buildSendMessageRequest = (input: SendMessageInput, defaultSpace?: st
       ...(threadKey ? { thread: { threadKey } } : {}),
       ...(attachments ? { attachment: attachments } : {})
     },
-    params: pickDefined({ messageReplyOption: replyOption })
+    params: pickDefined({
+      messageReplyOption: replyOption,
+      requestId: input.requestId?.trim() || undefined,
+      messageId: input.clientAssignedMessageId?.trim() || undefined
+    })
   };
 };
 
@@ -254,9 +266,9 @@ export let sendMessage = SlateTool.create(spec, {
     'Send a Markdown-formatted text message to a Google Chat conversation. Optionally reply to an existing thread by resource name or start or reply to an application-owned thread using a thread key.',
   instructions: [
     'Use search_conversations to find a conversationId when it is not already known.',
-    'When threadId or threadKey is supplied without messageReplyOption, the tool defaults to REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD.',
-    'Combine messageReplyOption=MESSAGE_REPLY_OPTION_UNSPECIFIED with threadKey to always start a new thread under that key instead of replying.',
-    'Use attachmentUploadTokens with the attachmentUploadToken values returned by upload_attachment.'
+    'When threadId or threadKey is supplied without messageReplyOption, the tool defaults to REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD. A new threadKey starts a thread under that key; later messages with the same threadKey reply to it.',
+    'Use attachmentUploadTokens with the attachmentUploadToken values returned by upload_attachment (user OAuth only).',
+    'Set requestId to a UUID when retrying so Google returns the original message instead of posting a duplicate.'
   ],
   tags: {
     destructive: false,
@@ -304,7 +316,7 @@ export let sendMessage = SlateTool.create(spec, {
         ])
         .optional()
         .describe(
-          'Threading behavior: MESSAGE_REPLY_OPTION_UNSPECIFIED (default) starts a new thread, optionally keyed by threadKey; REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD replies to the referenced thread or starts a new one when it is missing; REPLY_MESSAGE_OR_FAIL replies or fails when the thread does not exist'
+          'Threading behavior in named spaces: MESSAGE_REPLY_OPTION_UNSPECIFIED starts a new thread and cannot be combined with threadId or threadKey; REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD (default when threadId or threadKey is set) replies to the referenced thread or starts a new one when it is missing; REPLY_MESSAGE_OR_FAIL replies to threadId or threadKey, creating a new thread for a new threadKey, and fails when a threadId does not exist'
         ),
       attachmentResourceNames: z
         .array(z.string().trim().min(1))
@@ -319,6 +331,26 @@ export let sendMessage = SlateTool.create(spec, {
         .optional()
         .describe(
           'Opaque attachment upload tokens returned by upload_attachment; cannot be combined with attachmentResourceNames'
+        ),
+      requestId: z
+        .string()
+        .trim()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          'Idempotency key, ideally a random UUID; repeating a request with the same requestId returns the existing message instead of creating another'
+        ),
+      clientAssignedMessageId: z
+        .string()
+        .trim()
+        .regex(
+          /^client-[a-z0-9-]{1,56}$/,
+          'Must start with client- and use only lowercase letters, numbers, and hyphens (63 characters max)'
+        )
+        .optional()
+        .describe(
+          'Custom message ID that starts with client- (lowercase letters, numbers, and hyphens, up to 63 characters, unique in the space); manage_message accepts it in place of the system message ID'
         )
     })
   )

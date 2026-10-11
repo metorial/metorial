@@ -13,14 +13,16 @@ let eventOutputSchema = z.object({
   eventId: z.string().optional().describe('Event ID.'),
   name: z.string().optional().describe('Event name.'),
   schema: z.record(z.string(), z.string()).optional().nullable().describe('Payload schema.'),
-  createdAt: z.string().optional().describe('Creation timestamp.')
+  createdAt: z.string().optional().describe('Creation timestamp.'),
+  updatedAt: z.string().optional().describe('Last update timestamp.')
 });
 
 let mapEvent = (event: any) => ({
   eventId: event.id,
   name: event.name ?? event.event,
   schema: event.schema,
-  createdAt: event.created_at
+  createdAt: event.created_at,
+  updatedAt: event.updated_at
 });
 
 export let createEvent = SlateTool.create(spec, {

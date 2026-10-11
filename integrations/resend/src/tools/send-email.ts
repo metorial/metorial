@@ -29,11 +29,19 @@ export let sendEmail = SlateTool.create(spec, {
     z.object({
       from: z
         .string()
-        .describe('Sender email address. Supports "Name <email@domain.com>" format.'),
+        .optional()
+        .describe(
+          'Sender email address. Supports "Name <email@domain.com>" format. Required unless the template provides a default sender.'
+        ),
       to: z
         .union([z.string(), z.array(z.string())])
         .describe('Recipient email address(es). Max 50.'),
-      subject: z.string().describe('Email subject line.'),
+      subject: z
+        .string()
+        .optional()
+        .describe(
+          'Email subject line. Required unless the template provides a default subject.'
+        ),
       html: z.string().optional().describe('HTML content of the email.'),
       text: z.string().optional().describe('Plain text content of the email.'),
       cc: z
@@ -58,7 +66,13 @@ export let sendEmail = SlateTool.create(spec, {
             content: z.string().optional().describe('Base64 encoded file content.'),
             filename: z.string().optional().describe('Name of the file.'),
             path: z.string().optional().describe('URL to fetch the attachment from.'),
-            contentType: z.string().optional().describe('MIME type of the attachment.')
+            contentType: z.string().optional().describe('MIME type of the attachment.'),
+            contentId: z
+              .string()
+              .optional()
+              .describe(
+                'Content ID for inline images. Reference it in HTML as <img src="cid:CONTENT_ID">.'
+              )
           })
         )
         .optional()
@@ -76,6 +90,12 @@ export let sendEmail = SlateTool.create(spec, {
         .optional()
         .describe(
           'Published template to send. Do not provide html or text when template is set.'
+        ),
+      topicId: z
+        .string()
+        .optional()
+        .describe(
+          'Topic ID to scope this email to. Recipients who opted out of the topic are not sent the email and it is marked as failed.'
         ),
       scheduledAt: z
         .string()
@@ -101,6 +121,12 @@ export let sendEmail = SlateTool.create(spec, {
       );
     }
 
+    if (!ctx.input.template && (!ctx.input.from || !ctx.input.subject)) {
+      throw createApiServiceError(
+        'from and subject are required unless you send a template that provides them.'
+      );
+    }
+
     let result = await client.sendEmail({
       from: ctx.input.from,
       to: ctx.input.to,
@@ -114,6 +140,7 @@ export let sendEmail = SlateTool.create(spec, {
       attachments: ctx.input.attachments,
       tags: ctx.input.tags,
       template: ctx.input.template,
+      topicId: ctx.input.topicId,
       scheduledAt: ctx.input.scheduledAt,
       idempotencyKey: ctx.input.idempotencyKey
     });

@@ -2,13 +2,15 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
+import { pageSizeInputSchema, pageTokenInputSchema } from '../lib/messages';
 import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
+// https://learn.microsoft.com/en-us/graph/api/chat-list?view=graph-rest-1.0
 export let listChats = SlateTool.create(spec, {
   name: 'List Chats',
   key: 'list_chats',
-  description: `List the authenticated user's chats in Microsoft Teams. Returns chat type (oneOnOne, group, meeting), topic, and last updated time.`,
+  description: `List the authenticated user's chats in Microsoft Teams. Returns chat type (oneOnOne, group, meeting), topic, and last updated time. Results are paged; pass nextPageToken back as pageToken to continue.`,
   tags: {
     readOnly: true
   }
@@ -17,7 +19,8 @@ export let listChats = SlateTool.create(spec, {
   .authMethods(graphAuthMethodKeys)
   .input(
     z.object({
-      top: z.number().optional().describe('Maximum number of chats to return')
+      top: pageSizeInputSchema,
+      pageToken: pageTokenInputSchema
     })
   )
   .output(
@@ -33,14 +36,21 @@ export let listChats = SlateTool.create(spec, {
             .describe('When the chat was last updated'),
           webUrl: z.string().optional().describe('URL to open the chat in Teams')
         })
-      )
+      ),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Pass as pageToken to fetch the next page; absent on the last page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new GraphClient({ token: ctx.auth.token });
-    let chats = await client.listChats(ctx.input.top);
+    let page = await client.listChats({
+      top: ctx.input.top,
+      pageToken: ctx.input.pageToken
+    });
 
-    let mapped = chats.map((c: any) => ({
+    let mapped = page.items.map((c: any) => ({
       chatId: c.id,
       topic: c.topic || null,
       chatType: c.chatType,
@@ -49,8 +59,11 @@ export let listChats = SlateTool.create(spec, {
     }));
 
     return {
-      output: { chats: mapped },
-      message: `Found **${mapped.length}** chats.`
+      output: {
+        chats: mapped,
+        ...(page.nextPageToken ? { nextPageToken: page.nextPageToken } : {})
+      },
+      message: `Found **${mapped.length}** chats${page.nextPageToken ? ' (more available)' : ''}.`
     };
   })
   .build();

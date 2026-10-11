@@ -1,4 +1,4 @@
-# Slates Specification for OpsGenie
+# OpsGenie Specification
 
 ## Overview
 
@@ -25,15 +25,15 @@ Access rights for account-level API keys include: Read (alerts, incidents, confi
 
 ### Alert Management
 
-Create, retrieve, update, close, acknowledge, and delete alerts. Alert creation, deletion, and action requests are processed asynchronously, and request IDs can be checked for final status and alert IDs. Alerts support rich metadata including message, description, priority (P1–P5), responders (teams, users, escalations, schedules), tags, custom actions, visibility controls, and custom key-value details. Additional alert actions include snoozing, assigning ownership, adding notes, and adding tags.
+Create, retrieve, update, close, acknowledge, and delete alerts, and read alert notes and activity logs. Alert creation, deletion, and action requests are processed asynchronously, and request IDs can be checked for final status and alert IDs. Alerts support rich metadata including message, description, priority (P1–P5), responders (teams, users, escalations, schedules), tags, custom actions, visibility controls, and custom key-value details. Additional alert actions include snoozing, assigning ownership, adding notes, and adding tags.
 
 ### Incident Management
 
-The Incident API is only available to Standard and Enterprise plans. Create and manage incidents with responders, priority levels, tags, impacted services, status page entries, and stakeholder notifications. Incident create, delete, close, resolve, and note requests are asynchronous and can be checked by request ID. Incidents can be resolved and retrieved.
+The Incident API is only available to Standard and Enterprise plans. Create and manage incidents with responders, priority levels, tags, impacted services, status page entries, and stakeholder notifications. Incident create, delete, close, resolve, and note requests are asynchronous and can be checked by request ID. Incidents can be resolved, closed, reopened, retrieved, re-prioritized, tagged, and assigned additional responders.
 
 ### On-Call Schedule Management
 
-Create, update, and delete schedules programmatically. Quickly adapt on-call personnel based on shifts or role changes. Schedules support rotations (daily, weekly, monthly, custom) with multiple participants, and overrides for temporary coverage changes. Overrides can be created, listed, retrieved, updated, and deleted. You can also query who is currently on-call and who is next on-call for a given schedule.
+Create, update, and delete schedules programmatically. Quickly adapt on-call personnel based on shifts or role changes. Schedules support rotations (hourly, daily, weekly, with optional time restrictions) with multiple participants, and overrides for temporary coverage changes. Overrides can be created, listed, retrieved, updated, and deleted. You can also query who is currently on-call and who is next on-call for a given schedule.
 
 ### Escalation Policy Management
 

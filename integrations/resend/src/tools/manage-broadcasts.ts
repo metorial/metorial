@@ -9,10 +9,18 @@ let broadcastOutputSchema = z.object({
   segmentId: z.string().optional().describe('Target segment ID.'),
   from: z.string().optional().describe('Sender address.'),
   subject: z.string().optional().describe('Email subject.'),
-  replyTo: z.string().optional().nullable().describe('Reply-to address.'),
+  replyTo: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .nullable()
+    .describe('Reply-to address(es).'),
+  previewText: z.string().optional().nullable().describe('Inbox preview text.'),
   html: z.string().optional().nullable().describe('HTML content.'),
   text: z.string().optional().nullable().describe('Plain text content.'),
-  status: z.string().optional().describe('Broadcast status (draft, queued, sent).'),
+  status: z
+    .string()
+    .optional()
+    .describe('Broadcast status, such as draft, scheduled, queued, sent, or canceled.'),
   createdAt: z.string().optional().describe('Creation timestamp.'),
   scheduledAt: z.string().optional().nullable().describe('Scheduled delivery time.'),
   sentAt: z.string().optional().nullable().describe('When the broadcast was sent.'),
@@ -43,6 +51,10 @@ export let createBroadcast = SlateTool.create(spec, {
         .optional()
         .describe('Reply-to address(es).'),
       name: z.string().optional().describe('Internal name for the broadcast.'),
+      previewText: z
+        .string()
+        .optional()
+        .describe('Short preview text shown next to the subject in recipient inboxes.'),
       topicId: z
         .string()
         .optional()
@@ -73,6 +85,7 @@ export let createBroadcast = SlateTool.create(spec, {
       text: ctx.input.text,
       replyTo: ctx.input.replyTo,
       name: ctx.input.name,
+      previewText: ctx.input.previewText,
       topicId: ctx.input.topicId,
       send: ctx.input.send,
       scheduledAt: ctx.input.scheduledAt
@@ -112,6 +125,7 @@ export let getBroadcast = SlateTool.create(spec, {
         from: b.from,
         subject: b.subject,
         replyTo: b.reply_to,
+        previewText: b.preview_text,
         html: b.html,
         text: b.text,
         status: b.status,
@@ -128,7 +142,7 @@ export let getBroadcast = SlateTool.create(spec, {
 export let updateBroadcast = SlateTool.create(spec, {
   name: 'Update Broadcast',
   key: 'update_broadcast',
-  description: `Update draft broadcast content, sender, subject, or internal name before it is sent.`,
+  description: `Update a draft broadcast's target segment, sender, subject, reply-to, content, preview text, topic, or internal name before it is sent.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -137,11 +151,21 @@ export let updateBroadcast = SlateTool.create(spec, {
   .input(
     z.object({
       broadcastId: z.string().describe('ID of the draft broadcast to update.'),
+      segmentId: z.string().optional().describe('Updated target segment ID.'),
       from: z.string().optional().describe('Updated sender email address.'),
       subject: z.string().optional().describe('Updated email subject line.'),
+      replyTo: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe('Updated reply-to address(es).'),
       html: z.string().optional().describe('Updated HTML content.'),
       text: z.string().optional().describe('Updated plain text content.'),
-      name: z.string().optional().describe('Updated internal broadcast name.')
+      name: z.string().optional().describe('Updated internal broadcast name.'),
+      previewText: z.string().optional().describe('Updated inbox preview text.'),
+      topicId: z
+        .string()
+        .optional()
+        .describe('Updated topic ID used to scope subscription preferences.')
     })
   )
   .output(
@@ -152,11 +176,15 @@ export let updateBroadcast = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.updateBroadcast(ctx.input.broadcastId, {
+      segmentId: ctx.input.segmentId,
       from: ctx.input.from,
       subject: ctx.input.subject,
+      replyTo: ctx.input.replyTo,
       html: ctx.input.html,
       text: ctx.input.text,
-      name: ctx.input.name
+      name: ctx.input.name,
+      previewText: ctx.input.previewText,
+      topicId: ctx.input.topicId
     });
 
     return {
@@ -203,6 +231,40 @@ export let sendBroadcast = SlateTool.create(spec, {
   })
   .build();
 
+export let cancelBroadcast = SlateTool.create(spec, {
+  name: 'Cancel Broadcast',
+  key: 'cancel_broadcast',
+  description: `Cancel a scheduled or queued broadcast. A scheduled broadcast returns to draft so it can be edited and rescheduled. A queued broadcast is canceled and its remaining unsent emails are dropped; emails already sent are not affected.`,
+  instructions: [
+    'Only broadcasts with status scheduled or queued can be canceled. Use Get Broadcast to check the status first.'
+  ],
+  tags: {
+    destructive: true,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      broadcastId: z.string().describe('ID of the scheduled or queued broadcast to cancel.')
+    })
+  )
+  .output(
+    z.object({
+      broadcastId: z.string().describe('ID of the canceled broadcast.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let result = await client.cancelBroadcast(ctx.input.broadcastId);
+    let broadcastId = result.id ?? ctx.input.broadcastId;
+
+    return {
+      output: { broadcastId },
+      message: `Broadcast \`${broadcastId}\` has been **canceled**.`
+    };
+  })
+  .build();
+
 export let listBroadcasts = SlateTool.create(spec, {
   name: 'List Broadcasts',
   key: 'list_broadcasts',
@@ -224,6 +286,7 @@ export let listBroadcasts = SlateTool.create(spec, {
         .array(
           z.object({
             broadcastId: z.string().describe('Broadcast ID.'),
+            name: z.string().optional().nullable().describe('Internal broadcast name.'),
             segmentId: z.string().optional().describe('Target segment.'),
             status: z.string().optional().describe('Current status.'),
             createdAt: z.string().optional().describe('Creation timestamp.'),
@@ -245,6 +308,7 @@ export let listBroadcasts = SlateTool.create(spec, {
 
     let broadcasts = (result.data || []).map((b: any) => ({
       broadcastId: b.id,
+      name: b.name,
       segmentId: b.segment_id,
       status: b.status,
       createdAt: b.created_at,

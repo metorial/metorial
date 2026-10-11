@@ -9,3 +9,4 @@ export * from './manage-customers';
 export * from './manage-invoices';
 export * from './manage-products';
 export * from './manage-sales-taxes';
+export * from './record-invoice-payment';

@@ -1,4 +1,4 @@
-import { createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { createAuthenticatedAxios } from 'slates';
 import { resendApiError } from './errors';
 
 type EmailTemplate = {
@@ -6,7 +6,7 @@ type EmailTemplate = {
   variables?: Record<string, string | number>;
 };
 
-type AttachmentMetadata = {
+export type AttachmentMetadata = {
   id: string;
   filename?: string;
   size?: number;
@@ -26,7 +26,28 @@ type AutomationStep = {
 type AutomationConnection = {
   from: string;
   to: string;
+  type?: string;
 };
+
+type TemplateVariable = {
+  key: string;
+  type: 'string' | 'number';
+  fallbackValue?: string | number;
+};
+
+type DomainCapabilities = {
+  sending?: 'enabled' | 'disabled';
+  receiving?: 'enabled' | 'disabled';
+};
+
+type PaginationParams = { limit?: number; after?: string; before?: string };
+
+let mapTemplateVariables = (variables?: TemplateVariable[]) =>
+  variables?.map(variable => ({
+    key: variable.key,
+    type: variable.type,
+    fallback_value: variable.fallbackValue
+  }));
 
 type EventSchema = Record<string, 'string' | 'number' | 'boolean' | 'date'>;
 
@@ -49,9 +70,9 @@ export class Client {
   // ── Emails ──────────────────────────────────────────────
 
   async sendEmail(params: {
-    from: string;
+    from?: string;
     to: string | string[];
-    subject: string;
+    subject?: string;
     html?: string;
     text?: string;
     cc?: string | string[];
@@ -63,9 +84,11 @@ export class Client {
       filename?: string;
       path?: string;
       contentType?: string;
+      contentId?: string;
     }>;
     tags?: Array<{ name: string; value: string }>;
     template?: EmailTemplate;
+    topicId?: string;
     scheduledAt?: string;
     idempotencyKey?: string;
   }) {
@@ -89,10 +112,12 @@ export class Client {
           content: a.content,
           filename: a.filename,
           path: a.path,
-          content_type: a.contentType
+          content_type: a.contentType,
+          content_id: a.contentId
         })),
         tags: params.tags,
         template: params.template,
+        topic_id: params.topicId,
         scheduled_at: params.scheduledAt
       },
       { headers }
@@ -102,9 +127,9 @@ export class Client {
 
   async sendBatchEmails(params: {
     emails: Array<{
-      from: string;
+      from?: string;
       to: string | string[];
-      subject: string;
+      subject?: string;
       html?: string;
       text?: string;
       cc?: string | string[];
@@ -113,6 +138,7 @@ export class Client {
       headers?: Record<string, string>;
       tags?: Array<{ name: string; value: string }>;
       template?: EmailTemplate;
+      topicId?: string;
       scheduledAt?: string;
     }>;
     idempotencyKey?: string;
@@ -133,6 +159,7 @@ export class Client {
       headers: e.headers,
       tags: e.tags,
       template: e.template,
+      topic_id: e.topicId,
       scheduled_at: e.scheduledAt
     }));
     let res = await this.axios.post('/emails/batch', body, { headers });
@@ -171,28 +198,6 @@ export class Client {
     return res.data as AttachmentMetadata;
   }
 
-  async downloadAttachment(downloadUrl: string) {
-    try {
-      let response = await fetch(downloadUrl);
-      if (!response.ok) {
-        throw createApiServiceError(
-          `Resend attachment download failed: HTTP ${response.status} ${response.statusText}`.trim()
-        );
-      }
-
-      let contentType = response.headers.get('content-type') ?? 'application/octet-stream';
-      let buffer = Buffer.from(await response.arrayBuffer());
-
-      return {
-        contentBase64: buffer.toString('base64'),
-        contentType,
-        size: buffer.byteLength
-      };
-    } catch (error) {
-      throw resendApiError(error, 'download attachment');
-    }
-  }
-
   // ── Received Emails ─────────────────────────────────────
 
   async listReceivedEmails(params?: { limit?: number; after?: string; before?: string }) {
@@ -223,7 +228,9 @@ export class Client {
     customReturnPath?: string;
     openTracking?: boolean;
     clickTracking?: boolean;
+    trackingSubdomain?: string;
     tls?: string;
+    capabilities?: DomainCapabilities;
   }) {
     let res = await this.axios.post('/domains', {
       name: params.name,
@@ -231,7 +238,9 @@ export class Client {
       custom_return_path: params.customReturnPath,
       open_tracking: params.openTracking,
       click_tracking: params.clickTracking,
-      tls: params.tls
+      tracking_subdomain: params.trackingSubdomain,
+      tls: params.tls,
+      capabilities: params.capabilities
     });
     return res.data;
   }
@@ -246,13 +255,17 @@ export class Client {
     params: {
       openTracking?: boolean;
       clickTracking?: boolean;
+      trackingSubdomain?: string;
       tls?: string;
+      capabilities?: DomainCapabilities;
     }
   ) {
     let res = await this.axios.patch(`/domains/${domainId}`, {
       open_tracking: params.openTracking,
       click_tracking: params.clickTracking,
-      tls: params.tls
+      tracking_subdomain: params.trackingSubdomain,
+      tls: params.tls,
+      capabilities: params.capabilities
     });
     return res.data;
   }
@@ -306,7 +319,7 @@ export class Client {
       firstName?: string;
       lastName?: string;
       unsubscribed?: boolean;
-      properties?: Record<string, string>;
+      properties?: Record<string, string | number | boolean | null>;
     }
   ) {
     let res = await this.axios.patch(`/contacts/${contactIdOrEmail}`, {
@@ -345,8 +358,8 @@ export class Client {
     return res.data;
   }
 
-  async listContactSegments(contactIdOrEmail: string) {
-    let res = await this.axios.get(`/contacts/${contactIdOrEmail}/segments`);
+  async listContactSegments(contactIdOrEmail: string, params?: PaginationParams) {
+    let res = await this.axios.get(`/contacts/${contactIdOrEmail}/segments`, { params });
     return res.data;
   }
 
@@ -355,8 +368,8 @@ export class Client {
     return res.data;
   }
 
-  async listContactTopics(contactIdOrEmail: string) {
-    let res = await this.axios.get(`/contacts/${contactIdOrEmail}/topics`);
+  async listContactTopics(contactIdOrEmail: string, params?: PaginationParams) {
+    let res = await this.axios.get(`/contacts/${contactIdOrEmail}/topics`, { params });
     return res.data;
   }
 
@@ -375,7 +388,7 @@ export class Client {
   async createContactProperty(params: {
     key: string;
     type: 'string' | 'number' | 'boolean' | 'date';
-    fallbackValue?: string | number | boolean;
+    fallbackValue?: string | number | boolean | null;
   }) {
     let res = await this.axios.post('/contact-properties', {
       key: params.key,
@@ -442,6 +455,7 @@ export class Client {
     html?: string;
     text?: string;
     name?: string;
+    previewText?: string;
     topicId?: string;
     send?: boolean;
     scheduledAt?: string;
@@ -454,6 +468,7 @@ export class Client {
       html: params.html,
       text: params.text,
       name: params.name,
+      preview_text: params.previewText,
       topic_id: params.topicId,
       send: params.send,
       scheduled_at: params.scheduledAt
@@ -469,20 +484,33 @@ export class Client {
   async updateBroadcast(
     broadcastId: string,
     params: {
+      segmentId?: string;
       from?: string;
       subject?: string;
+      replyTo?: string | string[];
       html?: string;
       text?: string;
       name?: string;
+      previewText?: string;
+      topicId?: string;
     }
   ) {
     let res = await this.axios.patch(`/broadcasts/${broadcastId}`, {
+      segment_id: params.segmentId,
       from: params.from,
       subject: params.subject,
+      reply_to: params.replyTo,
       html: params.html,
       text: params.text,
-      name: params.name
+      name: params.name,
+      preview_text: params.previewText,
+      topic_id: params.topicId
     });
+    return res.data;
+  }
+
+  async cancelBroadcast(broadcastId: string) {
+    let res = await this.axios.post(`/broadcasts/${broadcastId}/cancel`);
     return res.data;
   }
 
@@ -543,7 +571,12 @@ export class Client {
     return res.data;
   }
 
-  async listAutomations(params?: { limit?: number; after?: string; before?: string }) {
+  async listAutomations(params?: {
+    status?: 'enabled' | 'disabled';
+    limit?: number;
+    after?: string;
+    before?: string;
+  }) {
     let res = await this.axios.get('/automations', { params });
     return res.data;
   }
@@ -628,6 +661,7 @@ export class Client {
     subject?: string;
     replyTo?: string | string[];
     text?: string;
+    variables?: TemplateVariable[];
   }) {
     let res = await this.axios.post('/templates', {
       name: params.name,
@@ -636,7 +670,8 @@ export class Client {
       from: params.from,
       subject: params.subject,
       reply_to: params.replyTo,
-      text: params.text
+      text: params.text,
+      variables: mapTemplateVariables(params.variables)
     });
     return res.data;
   }
@@ -656,6 +691,7 @@ export class Client {
       subject?: string;
       replyTo?: string | string[];
       text?: string;
+      variables?: TemplateVariable[];
     }
   ) {
     let res = await this.axios.patch(`/templates/${templateId}`, {
@@ -665,7 +701,8 @@ export class Client {
       from: params.from,
       subject: params.subject,
       reply_to: params.replyTo,
-      text: params.text
+      text: params.text,
+      variables: mapTemplateVariables(params.variables)
     });
     return res.data;
   }
@@ -799,12 +836,14 @@ export class Client {
   async createTopic(params: {
     name: string;
     description?: string;
-    defaultSubscription?: 'opt_in' | 'opt_out';
+    defaultSubscription: 'opt_in' | 'opt_out';
+    visibility?: 'public' | 'private';
   }) {
     let res = await this.axios.post('/topics', {
       name: params.name,
       description: params.description,
-      default_subscription: params.defaultSubscription
+      default_subscription: params.defaultSubscription,
+      visibility: params.visibility
     });
     return res.data;
   }
@@ -814,10 +853,14 @@ export class Client {
     return res.data;
   }
 
-  async updateTopic(topicId: string, params: { name?: string; description?: string }) {
+  async updateTopic(
+    topicId: string,
+    params: { name?: string; description?: string; visibility?: 'public' | 'private' }
+  ) {
     let res = await this.axios.patch(`/topics/${topicId}`, {
       name: params.name,
-      description: params.description
+      description: params.description,
+      visibility: params.visibility
     });
     return res.data;
   }
@@ -829,6 +872,33 @@ export class Client {
 
   async deleteTopic(topicId: string) {
     let res = await this.axios.delete(`/topics/${topicId}`);
+    return res.data;
+  }
+
+  // ── Suppressions ───────────────────────────────────────
+
+  async listSuppressions(params?: {
+    origin?: 'bounce' | 'complaint' | 'manual';
+    limit?: number;
+    after?: string;
+    before?: string;
+  }) {
+    let res = await this.axios.get('/suppressions', { params });
+    return res.data;
+  }
+
+  async addSuppression(email: string) {
+    let res = await this.axios.post('/suppressions', { email });
+    return res.data;
+  }
+
+  async getSuppression(suppressionIdOrEmail: string) {
+    let res = await this.axios.get(`/suppressions/${suppressionIdOrEmail}`);
+    return res.data;
+  }
+
+  async removeSuppression(suppressionIdOrEmail: string) {
+    let res = await this.axios.delete(`/suppressions/${suppressionIdOrEmail}`);
     return res.data;
   }
 }

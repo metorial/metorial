@@ -6,17 +6,52 @@ import { spec } from '../spec';
 let logOutputSchema = z.object({
   logId: z.string().describe('Log ID.'),
   createdAt: z.string().optional().describe('Log creation timestamp.'),
-  event: z.string().optional().describe('Resend event or log type.'),
-  emailId: z.string().optional().nullable().describe('Related email ID, when available.'),
-  status: z.string().optional().describe('Log status, when available.'),
-  data: z.any().optional().describe('Additional provider-specific log payload.')
+  endpoint: z
+    .string()
+    .optional()
+    .describe('API endpoint path that was called, such as /emails.'),
+  method: z.string().optional().describe('HTTP method of the API request.'),
+  responseStatus: z.number().optional().describe('HTTP status code Resend returned.'),
+  userAgent: z.string().optional().nullable().describe('User agent of the API client.'),
+  requestBody: z
+    .any()
+    .optional()
+    .describe('Request body sent to Resend. Only returned by Get Log.'),
+  responseBody: z
+    .any()
+    .optional()
+    .describe('Response body Resend returned. Only returned by Get Log.'),
+  event: z
+    .string()
+    .optional()
+    .describe('Legacy field; Resend API request logs do not set it.'),
+  emailId: z
+    .string()
+    .optional()
+    .nullable()
+    .describe('Related email ID, when the response body contains one.'),
+  status: z.string().optional().describe('Legacy field; use responseStatus instead.'),
+  data: z.any().optional().describe('Raw log record as returned by Resend.')
 });
 
 let toLogOutput = (log: any) => ({
   logId: log.id,
   createdAt: log.created_at,
+  endpoint: log.endpoint,
+  method: log.method,
+  responseStatus: log.response_status,
+  userAgent: log.user_agent,
+  requestBody: log.request_body,
+  responseBody: log.response_body,
   event: log.event ?? log.type,
-  emailId: log.email_id ?? log.email?.id,
+  emailId:
+    log.email_id ??
+    log.email?.id ??
+    (log.method === 'POST' &&
+    log.endpoint === '/emails' &&
+    typeof log.response_body?.id === 'string'
+      ? log.response_body.id
+      : undefined),
   status: log.status,
   data: log
 });
@@ -24,7 +59,7 @@ let toLogOutput = (log: any) => ({
 export let listLogs = SlateTool.create(spec, {
   name: 'List Logs',
   key: 'list_logs',
-  description: `List Resend account logs for recent email and account activity.`,
+  description: `List Resend API request logs, including endpoint, HTTP method, response status, and user agent. Use Get Log for request and response bodies.`,
   tags: {
     readOnly: true
   }
@@ -64,7 +99,7 @@ export let listLogs = SlateTool.create(spec, {
 export let getLog = SlateTool.create(spec, {
   name: 'Get Log',
   key: 'get_log',
-  description: `Retrieve one Resend log entry by ID.`,
+  description: `Retrieve one Resend API request log by ID, including the request and response bodies.`,
   tags: {
     readOnly: true
   }
@@ -81,7 +116,7 @@ export let getLog = SlateTool.create(spec, {
 
     return {
       output: toLogOutput(log),
-      message: `Log \`${log.id}\` retrieved.`
+      message: `Log \`${log.id}\` — **${log.method ?? ''} ${log.endpoint ?? ''}** returned ${log.response_status ?? 'unknown status'}.`
     };
   })
   .build();

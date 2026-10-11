@@ -7,6 +7,13 @@ let httpClient = createAxios({
 
 export type RailwayTokenHeader = 'authorization' | 'project-access-token';
 
+export type LogQueryInput = {
+  limit?: number;
+  filter?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
 export class Client {
   private token: string;
   private tokenHeader: RailwayTokenHeader;
@@ -61,25 +68,61 @@ export class Client {
 
   // ─── User ───
 
-  async getMe(): Promise<{ id: string; name: string; email: string }> {
-    let data = await this.graphql<{ me: { id: string; name: string; email: string } }>(
-      `query { me { id name email } }`
+  get usesProjectToken() {
+    return this.tokenHeader === 'project-access-token';
+  }
+
+  async getMe(): Promise<any> {
+    let data = await this.graphql<{ me: any }>(
+      `query { me { id name email username avatar workspaces { id name } } }`
     );
     return data.me;
   }
 
+  async getApiTokenWorkspaces(): Promise<{ id: string; name: string }[]> {
+    let data = await this.graphql<{
+      apiToken: { workspaces: { id: string; name: string }[] };
+    }>(`query { apiToken { workspaces { id name } } }`);
+    return data.apiToken.workspaces;
+  }
+
+  async getProjectToken(): Promise<any> {
+    let data = await this.graphql<{ projectToken: any }>(
+      `query { projectToken { id name projectId environmentId project { name } environment { name } } }`
+    );
+    return data.projectToken;
+  }
+
   // ─── Projects ───
 
-  async listProjects(workspaceId?: string): Promise<any[]> {
-    let query = workspaceId
-      ? `query($workspaceId: String!) { projects(workspaceId: $workspaceId) { edges { node { id name description createdAt updatedAt } } } }`
-      : `query { projects { edges { node { id name description createdAt updatedAt } } } }`;
-
-    let data = await this.graphql<{ projects: { edges: { node: any }[] } }>(
-      query,
-      workspaceId ? { workspaceId } : undefined
+  async listProjects(input: {
+    workspaceId?: string;
+    first?: number;
+    after?: string;
+  }): Promise<{
+    projects: any[];
+    nextCursor: string | null;
+  }> {
+    let data = await this.graphql<{
+      projects: {
+        edges: { node: any }[];
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+    }>(
+      `
+      query($workspaceId: String, $first: Int, $after: String) {
+        projects(workspaceId: $workspaceId, first: $first, after: $after) {
+          edges { node { id name description workspaceId createdAt updatedAt } }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    `,
+      input
     );
-    return data.projects.edges.map(e => e.node);
+    return {
+      projects: data.projects.edges.map(e => e.node),
+      nextCursor: data.projects.pageInfo.hasNextPage ? data.projects.pageInfo.endCursor : null
+    };
   }
 
   async getProject(projectId: string): Promise<any> {
@@ -190,8 +233,8 @@ export class Client {
       `
       query($serviceId: String!, $environmentId: String!) {
         serviceInstance(serviceId: $serviceId, environmentId: $environmentId) {
-          id serviceName startCommand buildCommand rootDirectory
-          healthcheckPath region numReplicas
+          id serviceId environmentId serviceName startCommand buildCommand rootDirectory
+          healthcheckPath region numReplicas cronSchedule
           restartPolicyType restartPolicyMaxRetries
           latestDeployment { id status createdAt }
         }
@@ -205,6 +248,7 @@ export class Client {
   async createService(input: {
     projectId: string;
     name?: string;
+    branch?: string;
     source?: { repo?: string; image?: string };
   }): Promise<any> {
     let data = await this.graphql<{ serviceCreate: any }>(
@@ -303,19 +347,33 @@ export class Client {
 
   async listDeployments(
     input: { projectId?: string; serviceId?: string; environmentId?: string },
-    first: number = 10
-  ): Promise<any[]> {
-    let data = await this.graphql<{ deployments: { edges: { node: any }[] } }>(
+    first: number = 10,
+    after?: string
+  ): Promise<{ deployments: any[]; nextCursor: string | null }> {
+    let data = await this.graphql<{
+      deployments: {
+        edges: { node: any }[];
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+    }>(
       `
-      query($input: DeploymentListInput!, $first: Int) {
-        deployments(input: $input, first: $first) {
-          edges { node { id status createdAt url staticUrl } }
+      query($input: DeploymentListInput!, $first: Int, $after: String) {
+        deployments(input: $input, first: $first, after: $after) {
+          edges {
+            node { id status createdAt url staticUrl projectId serviceId environmentId }
+          }
+          pageInfo { hasNextPage endCursor }
         }
       }
     `,
-      { input, first }
+      { input, first, after }
     );
-    return data.deployments.edges.map(e => e.node);
+    return {
+      deployments: data.deployments.edges.map(e => e.node),
+      nextCursor: data.deployments.pageInfo.hasNextPage
+        ? data.deployments.pageInfo.endCursor
+        : null
+    };
   }
 
   async getDeployment(deploymentId: string): Promise<any> {
@@ -324,6 +382,7 @@ export class Client {
       query($id: String!) {
         deployment(id: $id) {
           id status createdAt url staticUrl
+          projectId serviceId environmentId
           canRedeploy canRollback
           meta
         }
@@ -334,24 +393,24 @@ export class Client {
     return data.deployment;
   }
 
-  async redeployDeployment(deploymentId: string): Promise<any> {
+  async redeployDeployment(deploymentId: string, usePreviousImageTag?: boolean): Promise<any> {
     let data = await this.graphql<{ deploymentRedeploy: any }>(
       `
-      mutation($id: String!) {
-        deploymentRedeploy(id: $id) { id status }
+      mutation($id: String!, $usePreviousImageTag: Boolean) {
+        deploymentRedeploy(id: $id, usePreviousImageTag: $usePreviousImageTag) {
+          id status createdAt url staticUrl serviceId environmentId
+        }
       }
     `,
-      { id: deploymentId }
+      { id: deploymentId, usePreviousImageTag }
     );
     return data.deploymentRedeploy;
   }
 
-  async rollbackDeployment(deploymentId: string): Promise<any> {
-    let data = await this.graphql<{ deploymentRollback: any }>(
+  async rollbackDeployment(deploymentId: string): Promise<boolean> {
+    let data = await this.graphql<{ deploymentRollback: boolean }>(
       `
-      mutation($id: String!) {
-        deploymentRollback(id: $id) { id status }
-      }
+      mutation($id: String!) { deploymentRollback(id: $id) }
     `,
       { id: deploymentId }
     );
@@ -398,63 +457,89 @@ export class Client {
     return true;
   }
 
-  async getBuildLogs(deploymentId: string, limit: number = 100): Promise<any[]> {
+  async getBuildLogs(input: LogQueryInput & { deploymentId: string }): Promise<any[]> {
     let data = await this.graphql<{ buildLogs: any[] }>(
-      `
-      query($deploymentId: String!, $limit: Int) {
-        buildLogs(deploymentId: $deploymentId, limit: $limit) {
-          timestamp message severity
-        }
-      }
-    `,
-      { deploymentId, limit }
-    );
-    return data.buildLogs;
-  }
-
-  async getDeploymentLogs(deploymentId: string, limit: number = 100): Promise<any[]> {
-    let data = await this.graphql<{ deploymentLogs: any[] }>(
-      `
-      query($deploymentId: String!, $limit: Int) {
-        deploymentLogs(deploymentId: $deploymentId, limit: $limit) {
-          timestamp message severity
-        }
-      }
-    `,
-      { deploymentId, limit }
-    );
-    return data.deploymentLogs;
-  }
-
-  async getHttpLogs(input: {
-    deploymentId: string;
-    limit?: number;
-    filter?: string;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<any[]> {
-    let data = await this.graphql<{ httpLogs: any[] }>(
       `
       query(
         $deploymentId: String!
         $limit: Int
         $filter: String
-        $startDate: String
-        $endDate: String
+        $startDate: DateTime
+        $endDate: DateTime
       ) {
-        httpLogs(
+        buildLogs(
           deploymentId: $deploymentId
           limit: $limit
           filter: $filter
           startDate: $startDate
           endDate: $endDate
         ) {
+          timestamp message severity
+        }
+      }
+    `,
+      input
+    );
+    return data.buildLogs;
+  }
+
+  async getDeploymentLogs(input: LogQueryInput & { deploymentId: string }): Promise<any[]> {
+    let data = await this.graphql<{ deploymentLogs: any[] }>(
+      `
+      query(
+        $deploymentId: String!
+        $limit: Int
+        $filter: String
+        $startDate: DateTime
+        $endDate: DateTime
+      ) {
+        deploymentLogs(
+          deploymentId: $deploymentId
+          limit: $limit
+          filter: $filter
+          startDate: $startDate
+          endDate: $endDate
+        ) {
+          timestamp message severity
+        }
+      }
+    `,
+      input
+    );
+    return data.deploymentLogs;
+  }
+
+  async getHttpLogs(input: LogQueryInput & { deploymentId: string }): Promise<any[]> {
+    // Railway ignores the legacy startDate/endDate args on httpLogs; the window is
+    // expressed as beforeDate (oldest) .. anchorDate (newest) with beforeLimit.
+    let data = await this.graphql<{ httpLogs: any[] }>(
+      `
+      query(
+        $deploymentId: String!
+        $beforeLimit: Int
+        $filter: String
+        $beforeDate: String
+        $anchorDate: String
+      ) {
+        httpLogs(
+          deploymentId: $deploymentId
+          beforeLimit: $beforeLimit
+          filter: $filter
+          beforeDate: $beforeDate
+          anchorDate: $anchorDate
+        ) {
           timestamp requestId method path host httpStatus responseDetails
           totalDuration upstreamRqDuration rxBytes txBytes srcIp clientUa edgeRegion
         }
       }
     `,
-      input
+      {
+        deploymentId: input.deploymentId,
+        beforeLimit: input.limit,
+        filter: input.filter,
+        beforeDate: input.startDate,
+        anchorDate: input.endDate
+      }
     );
     return data.httpLogs;
   }
@@ -481,7 +566,9 @@ export class Client {
       query($id: String!) {
         environment(id: $id) {
           id name createdAt
-          serviceInstances { edges { node { id serviceName latestDeployment { id status } } } }
+          serviceInstances {
+            edges { node { id serviceId serviceName latestDeployment { id status } } }
+          }
         }
       }
     `,
@@ -531,18 +618,31 @@ export class Client {
     return true;
   }
 
-  async getEnvironmentLogs(input: {
-    environmentId: string;
-    limit?: number;
-    filter?: string;
-  }): Promise<any[]> {
+  async getEnvironmentLogs(input: LogQueryInput & { environmentId: string }): Promise<any[]> {
+    // Anchored log window: return up to beforeLimit logs between beforeDate (oldest)
+    // and anchorDate (newest), with nothing after the anchor.
+    let hasWindow = input.startDate !== undefined || input.endDate !== undefined;
+    let anchorDate = hasWindow ? (input.endDate ?? new Date().toISOString()) : undefined;
+
     let data = await this.graphql<{ environmentLogs: any[] }>(
       `
-      query($environmentId: String!, $beforeLimit: Int, $filter: String) {
+      query(
+        $environmentId: String!
+        $beforeLimit: Int
+        $filter: String
+        $beforeDate: String
+        $anchorDate: String
+        $afterDate: String
+        $afterLimit: Int
+      ) {
         environmentLogs(
           environmentId: $environmentId
           beforeLimit: $beforeLimit
           filter: $filter
+          beforeDate: $beforeDate
+          anchorDate: $anchorDate
+          afterDate: $afterDate
+          afterLimit: $afterLimit
         ) {
           timestamp message severity
         }
@@ -551,7 +651,11 @@ export class Client {
       {
         environmentId: input.environmentId,
         beforeLimit: input.limit,
-        filter: input.filter
+        filter: input.filter,
+        beforeDate: hasWindow ? (input.startDate ?? new Date(0).toISOString()) : undefined,
+        anchorDate,
+        afterDate: anchorDate,
+        afterLimit: hasWindow ? 0 : undefined
       }
     );
     return data.environmentLogs;
@@ -575,28 +679,13 @@ export class Client {
     return data.variables;
   }
 
-  async upsertVariable(input: {
-    projectId: string;
-    environmentId: string;
-    serviceId: string;
-    name: string;
-    value: string;
-  }): Promise<boolean> {
-    await this.graphql(
-      `
-      mutation($input: VariableUpsertInput!) { variableUpsert(input: $input) }
-    `,
-      { input }
-    );
-    return true;
-  }
-
   async upsertVariables(input: {
     projectId: string;
     environmentId: string;
-    serviceId: string;
+    serviceId?: string;
     variables: Record<string, string>;
     replace?: boolean;
+    skipDeploys?: boolean;
   }): Promise<boolean> {
     await this.graphql(
       `
@@ -610,7 +699,7 @@ export class Client {
   async deleteVariable(input: {
     projectId: string;
     environmentId: string;
-    serviceId: string;
+    serviceId?: string;
     name: string;
   }): Promise<boolean> {
     await this.graphql(
@@ -661,20 +750,23 @@ export class Client {
     return data.customDomainAvailable;
   }
 
-  async getDomainStatus(domainId: string, projectId: string): Promise<any> {
-    let data = await this.graphql<{ domainStatus: any }>(
+  async getCustomDomain(domainId: string, projectId: string): Promise<any> {
+    let data = await this.graphql<{ customDomain: any }>(
       `
       query($id: String!, $projectId: String!) {
-        domainStatus(id: $id, projectId: $projectId) {
-          cdnProvider certificateStatus certificateStatusDetailed
-          certificateErrorMessage certificateErrorType certificateRetryable
-          dnsRecords { hostlabel requiredValue currentValue status }
+        customDomain(id: $id, projectId: $projectId) {
+          id domain serviceId environmentId targetPort
+          status {
+            verified cdnProvider certificateStatus certificateStatusDetailed
+            certificateErrorMessage certificateErrorType certificateRetryable
+            dnsRecords { hostlabel requiredValue currentValue status }
+          }
         }
       }
     `,
       { id: domainId, projectId }
     );
-    return data.domainStatus;
+    return data.customDomain;
   }
 
   async createServiceDomain(input: {
@@ -770,6 +862,30 @@ export class Client {
     return data.project.volumes.edges.map(e => e.node);
   }
 
+  async listEnvironmentVolumeInstances(environmentId: string): Promise<any[]> {
+    let data = await this.graphql<{
+      environment: { volumeInstances: { edges: { node: any }[] } };
+    }>(
+      `
+      query($id: String!) {
+        environment(id: $id) {
+          volumeInstances {
+            edges {
+              node {
+                id volumeId serviceId environmentId mountPath region
+                state sizeMB currentSizeMB createdAt
+                volume { name }
+              }
+            }
+          }
+        }
+      }
+    `,
+      { id: environmentId }
+    );
+    return data.environment.volumeInstances.edges.map(e => e.node);
+  }
+
   async createVolume(input: {
     projectId: string;
     serviceId: string;
@@ -859,7 +975,7 @@ export class Client {
       `
       query($serviceId: String!, $environmentId: String!) {
         tcpProxies(serviceId: $serviceId, environmentId: $environmentId) {
-          id domain proxyPort applicationPort
+          id domain proxyPort applicationPort serviceId environmentId syncStatus createdAt
         }
       }
     `,

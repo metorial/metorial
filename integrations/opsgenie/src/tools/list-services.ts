@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { getNextNumericOffset } from '../lib/paging';
 import { spec } from '../spec';
 
 export let listServices = SlateTool.create(spec, {
@@ -20,7 +21,7 @@ export let listServices = SlateTool.create(spec, {
         .describe('Number of services to return (max 100, default 20)'),
       offset: z.number().optional().describe('Start index for pagination'),
       sort: z
-        .enum(['name', 'updatedAt', 'insertedAt', 'createdAt'])
+        .enum(['name', 'updatedAt', 'insertedAt', 'createdAt', 'isExternal'])
         .optional()
         .describe('Field to sort by'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort order')
@@ -38,7 +39,12 @@ export let listServices = SlateTool.create(spec, {
           isExternal: z.boolean().optional().describe('Whether the service is external')
         })
       ),
-      totalCount: z.number().describe('Number of services returned')
+      totalCount: z.number().describe('Number of services returned'),
+      hasMore: z.boolean().describe('Whether another page of services is available'),
+      nextOffset: z
+        .number()
+        .optional()
+        .describe('Offset to pass to fetch the next page, when more services are available')
     })
   )
   .handleInvocation(async ctx => {
@@ -49,6 +55,7 @@ export let listServices = SlateTool.create(spec, {
 
     let response = await client.listServices(ctx.input);
     let data = response.data ?? [];
+    let nextOffset = getNextNumericOffset(response.paging);
 
     let services = data.map((s: any) => ({
       serviceId: s.id,
@@ -62,7 +69,9 @@ export let listServices = SlateTool.create(spec, {
     return {
       output: {
         services,
-        totalCount: services.length
+        totalCount: services.length,
+        hasMore: nextOffset !== undefined,
+        nextOffset
       },
       message: `Found **${services.length}** services.`
     };

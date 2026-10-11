@@ -187,7 +187,7 @@ export class OpsGenieClient {
     identifier: string,
     identifierType: string = 'id',
     params: {
-      offset?: number;
+      offset?: string;
       limit?: number;
       order?: string;
       direction?: string;
@@ -226,6 +226,7 @@ export class OpsGenieClient {
       tags: string;
       user?: string;
       source?: string;
+      note?: string;
     }
   ) {
     let response = await this.http.delete(
@@ -348,8 +349,67 @@ export class OpsGenieClient {
     return response.data;
   }
 
+  async addDetailsToAlert(
+    identifier: string,
+    identifierType: string,
+    data: {
+      details: Record<string, string>;
+      user?: string;
+      source?: string;
+      note?: string;
+    }
+  ) {
+    let response = await this.http.post(
+      `/v2/alerts/${encodeURIComponent(identifier)}/details`,
+      data,
+      {
+        params: { identifierType }
+      }
+    );
+    return response.data;
+  }
+
+  async removeDetailsFromAlert(
+    identifier: string,
+    identifierType: string,
+    params: {
+      keys: string;
+      user?: string;
+      source?: string;
+      note?: string;
+    }
+  ) {
+    let response = await this.http.delete(
+      `/v2/alerts/${encodeURIComponent(identifier)}/details`,
+      {
+        params: { identifierType, ...params }
+      }
+    );
+    return response.data;
+  }
+
+  async executeAlertCustomAction(
+    identifier: string,
+    identifierType: string,
+    action: string,
+    data: {
+      user?: string;
+      source?: string;
+      note?: string;
+    } = {}
+  ) {
+    let response = await this.http.post(
+      `/v2/alerts/${encodeURIComponent(identifier)}/actions/${encodeURIComponent(action)}`,
+      data,
+      {
+        params: { identifierType }
+      }
+    );
+    return response.data;
+  }
+
   async getAlertRequestStatus(requestId: string) {
-    let response = await this.http.get(`/v2/alerts/requests/${requestId}`);
+    let response = await this.http.get(`/v2/alerts/requests/${encodeURIComponent(requestId)}`);
     return response.data;
   }
 
@@ -374,13 +434,13 @@ export class OpsGenieClient {
   async createIncident(data: {
     message: string;
     description?: string;
-    responders?: Array<{ type: string; id?: string }>;
+    responders?: Array<{ type: string; id?: string; name?: string; username?: string }>;
     tags?: string[];
     details?: Record<string, string>;
     priority?: string;
     note?: string;
-    impactedServices?: Array<{ id: string }>;
-    statusPageEntry?: { title: string; detail: string };
+    impactedServices?: string[];
+    statusPageEntry?: { title: string; detail?: string };
     notifyStakeholders?: boolean;
   }) {
     let response = await this.http.post('/v1/incidents/create', data);
@@ -441,6 +501,93 @@ export class OpsGenieClient {
     return response.data;
   }
 
+  async reopenIncident(
+    identifier: string,
+    identifierType: string = 'id',
+    data: {
+      note?: string;
+    } = {}
+  ) {
+    let response = await this.http.post(
+      `/v1/incidents/${encodeURIComponent(identifier)}/reopen`,
+      data,
+      {
+        params: { identifierType }
+      }
+    );
+    return response.data;
+  }
+
+  async addResponderToIncident(
+    identifier: string,
+    identifierType: string,
+    data: {
+      responder: Array<{ type: string; id?: string; name?: string; username?: string }>;
+      note?: string;
+    }
+  ) {
+    let response = await this.http.post(
+      `/v1/incidents/${encodeURIComponent(identifier)}/responders`,
+      data,
+      {
+        params: { identifierType }
+      }
+    );
+    return response.data;
+  }
+
+  async addTagsToIncident(
+    identifier: string,
+    identifierType: string,
+    data: {
+      tags: string[];
+      note?: string;
+    }
+  ) {
+    let response = await this.http.post(
+      `/v1/incidents/${encodeURIComponent(identifier)}/tags`,
+      data,
+      {
+        params: { identifierType }
+      }
+    );
+    return response.data;
+  }
+
+  async removeTagsFromIncident(
+    identifier: string,
+    identifierType: string,
+    params: {
+      tags: string;
+      note?: string;
+    }
+  ) {
+    let response = await this.http.delete(
+      `/v1/incidents/${encodeURIComponent(identifier)}/tags`,
+      {
+        params: { identifierType, ...params }
+      }
+    );
+    return response.data;
+  }
+
+  async updateIncidentPriority(
+    identifier: string,
+    identifierType: string,
+    data: {
+      priority: string;
+    }
+  ) {
+    let response = await this.http.put(
+      `/v1/incidents/${encodeURIComponent(identifier)}/priority`,
+      data,
+      {
+        params: { identifierType }
+      }
+    );
+    return response.data;
+  }
+
   async deleteIncident(identifier: string, identifierType: string = 'id') {
     let response = await this.http.delete(`/v1/incidents/${encodeURIComponent(identifier)}`, {
       params: { identifierType }
@@ -466,7 +613,9 @@ export class OpsGenieClient {
   }
 
   async getIncidentRequestStatus(requestId: string) {
-    let response = await this.http.get(`/v1/incidents/requests/${requestId}`);
+    let response = await this.http.get(
+      `/v1/incidents/requests/${encodeURIComponent(requestId)}`
+    );
     return response.data;
   }
 
@@ -484,7 +633,7 @@ export class OpsGenieClient {
       endDate?: string;
       type: string;
       length?: number;
-      participants: Array<{ type: string; id?: string; username?: string }>;
+      participants: Array<{ type: string; id?: string; username?: string; name?: string }>;
       timeRestriction?: any;
     }>;
   }) {
@@ -519,7 +668,7 @@ export class OpsGenieClient {
         endDate?: string;
         type: string;
         length?: number;
-        participants: Array<{ type: string; id?: string; username?: string }>;
+        participants: Array<{ type: string; id?: string; username?: string; name?: string }>;
         timeRestriction?: any;
       }>;
     }
@@ -660,7 +809,7 @@ export class OpsGenieClient {
       endDate?: string;
       type: string;
       length?: number;
-      participants: Array<{ type: string; id?: string; username?: string }>;
+      participants: Array<{ type: string; id?: string; username?: string; name?: string }>;
       timeRestriction?: any;
     }
   ) {
@@ -713,7 +862,7 @@ export class OpsGenieClient {
     rules: Array<{
       condition: string;
       notifyType: string;
-      delay: { timeAmount: number; timeUnit: string };
+      delay: { timeAmount: number; timeUnit?: string };
       recipient: { type: string; id?: string; username?: string; name?: string };
     }>;
     ownerTeam?: { id?: string; name?: string };
@@ -749,7 +898,7 @@ export class OpsGenieClient {
       rules?: Array<{
         condition: string;
         notifyType: string;
-        delay: { timeAmount: number; timeUnit: string };
+        delay: { timeAmount: number; timeUnit?: string };
         recipient: { type: string; id?: string; username?: string; name?: string };
       }>;
       ownerTeam?: { id?: string; name?: string };
@@ -829,6 +978,38 @@ export class OpsGenieClient {
     return response.data;
   }
 
+  async addTeamMember(
+    teamIdentifier: string,
+    teamIdentifierType: string,
+    data: {
+      user: { id?: string; username?: string };
+      role?: string;
+    }
+  ) {
+    let response = await this.http.post(
+      `/v2/teams/${encodeURIComponent(teamIdentifier)}/members`,
+      data,
+      {
+        params: { teamIdentifierType }
+      }
+    );
+    return response.data;
+  }
+
+  async removeTeamMember(
+    teamIdentifier: string,
+    teamIdentifierType: string,
+    memberIdentifier: string
+  ) {
+    let response = await this.http.delete(
+      `/v2/teams/${encodeURIComponent(teamIdentifier)}/members/${encodeURIComponent(memberIdentifier)}`,
+      {
+        params: { teamIdentifierType }
+      }
+    );
+    return response.data;
+  }
+
   // ─── Users ──────────────────────────────────────────────────
 
   async createUser(data: {
@@ -845,7 +1026,7 @@ export class OpsGenieClient {
     };
     tags?: string[];
     details?: Record<string, string[]>;
-    timezone?: string;
+    timeZone?: string;
     locale?: string;
     invitationDisabled?: boolean;
   }) {
@@ -889,12 +1070,12 @@ export class OpsGenieClient {
       };
       tags?: string[];
       details?: Record<string, string[]>;
-      timezone?: string;
+      timeZone?: string;
       locale?: string;
     }
   ) {
     let response = await this.http.patch(`/v2/users/${encodeURIComponent(identifier)}`, data);
-    return response.data.data;
+    return response.data;
   }
 
   async deleteUser(identifier: string) {
@@ -969,6 +1150,13 @@ export class OpsGenieClient {
   async deleteService(serviceId: string) {
     let response = await this.http.delete(`/v1/services/${encodeURIComponent(serviceId)}`);
     return response.data;
+  }
+
+  // ─── Account ────────────────────────────────────────────────
+
+  async getAccount() {
+    let response = await this.http.get('/v2/account');
+    return response.data.data;
   }
 
   // ─── Integrations ──────────────────────────────────────────

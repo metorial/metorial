@@ -7,9 +7,9 @@ import { spec } from '../spec';
 export let manageProduct = SlateTool.create(spec, {
   name: 'Manage Product',
   key: 'manage_product',
-  description: `Create or update a product in Drip's catalog via the Shopper Activity API. Product data enables automations like price drop notifications.`,
+  description: `Create, update or delete a product in Drip's catalog via the Shopper Activity API. Product data enables automations like price drop notifications.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -25,7 +25,9 @@ export let manageProduct = SlateTool.create(spec, {
         .describe('ISO currency code; defaults to USD at the provider.'),
       occurredAt: z.string().optional().describe('ISO-8601 activity timestamp.'),
       provider: z.string().describe('Ecommerce provider identifier.'),
-      action: z.enum(['created', 'updated']).describe('Product action.'),
+      action: z
+        .enum(['created', 'updated', 'deleted'])
+        .describe('Product action. Use deleted to remove the product from the catalog.'),
       productId: z.string().describe('Unique product identifier.'),
       name: z.string().describe('Product name.'),
       price: z
@@ -34,6 +36,7 @@ export let manageProduct = SlateTool.create(spec, {
         .describe(
           'Product price in currency units. Required by the current Product Activity API.'
         ),
+      sku: z.string().optional().describe('Product SKU.'),
       brand: z.string().optional().describe('Product brand.'),
       categories: z.array(z.string()).optional().describe('Product categories.'),
       inventory: z.number().optional().describe('Inventory count.'),
@@ -71,6 +74,7 @@ export let manageProduct = SlateTool.create(spec, {
     if (ctx.input.currencyCode !== undefined) product.currency = ctx.input.currencyCode;
     if (ctx.input.occurredAt !== undefined) product.occurred_at = ctx.input.occurredAt;
     if (ctx.input.price !== undefined) product.price = ctx.input.price;
+    if (ctx.input.sku) product.sku = ctx.input.sku;
     if (ctx.input.brand) product.brand = ctx.input.brand;
     if (ctx.input.categories) product.categories = ctx.input.categories;
     if (ctx.input.inventory !== undefined) product.inventory = ctx.input.inventory;

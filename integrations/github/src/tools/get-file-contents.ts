@@ -1,4 +1,5 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { Buffer } from 'node:buffer';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubClient } from '../lib/client';
 import { spec } from '../spec';
@@ -66,31 +67,52 @@ export let getFileContents = SlateTool.create(spec, {
       };
     }
 
+    let filePath: string = content.path ?? ctx.input.path.replace(/^\/+/, '');
     let hasContent = content.encoding === 'base64' && typeof content.content === 'string';
-    let attachments = hasContent
-      ? [
-          createBase64Attachment(
-            content.content.replace(/\s/g, ''),
-            'application/octet-stream'
-          )
-        ]
-      : [];
+    let attached = false;
+    if (hasContent) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: Uint8Array.from(Buffer.from(content.content.replace(/\s/g, ''), 'base64')),
+        mimeType: 'application/octet-stream'
+      });
+      attached = true;
+    } else if (
+      content.type === 'file' &&
+      (typeof content.size !== 'number' || content.size <= 100 * 1024 * 1024)
+    ) {
+      // Files between 1 MB and 100 MB come back without inline content; the raw media type
+      // serves them directly: https://docs.github.com/en/rest/repos/contents#get-repository-content
+      await ctx.addAttachment({
+        type: 'url',
+        url: `${client.getApiBaseUrl()}/repos/${encodeURIComponent(ctx.input.owner)}/${encodeURIComponent(ctx.input.repo)}/contents/${filePath
+          .split('/')
+          .map(segment => encodeURIComponent(segment))
+          .join('/')}`,
+        mimeType: 'application/octet-stream',
+        headers: {
+          Authorization: `Bearer ${ctx.auth.token}`,
+          Accept: 'application/vnd.github.raw+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        },
+        ...(selectedRef ? { query: { ref: selectedRef } } : {})
+      });
+      attached = true;
+    }
 
     return {
       output: {
         type: content.type ?? 'file',
-        path: content.path ?? ctx.input.path.replace(/^\/+/, ''),
+        path: filePath,
         ref: selectedRef ?? null,
         sha: content.sha ?? null,
         size: content.size ?? null,
         htmlUrl: content.html_url ?? null,
         downloadUrl: content.download_url ?? null
       },
-      attachments,
-      message:
-        attachments.length > 0
-          ? `Retrieved \`${content.path}\` (${content.size ?? 0} bytes) from **${ctx.input.owner}/${ctx.input.repo}**.`
-          : `Retrieved metadata for \`${content.path}\` from **${ctx.input.owner}/${ctx.input.repo}**; use the download URL for content not returned by the Contents API.`
+      message: attached
+        ? `Retrieved \`${filePath}\` (${content.size ?? 0} bytes) from **${ctx.input.owner}/${ctx.input.repo}** as a downloadable file.`
+        : `Retrieved metadata for \`${filePath}\` from **${ctx.input.owner}/${ctx.input.repo}**; this entry has no downloadable file content.`
     };
   })
   .build();

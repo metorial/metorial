@@ -2,6 +2,7 @@ import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from './lib/client';
 import { gumroadApiError, gumroadServiceError } from './lib/errors';
+import { gumroadScope } from './lib/scopes';
 
 let getGumroadProfile = async (token: string) => {
   let client = new GumroadClient({ token });
@@ -12,7 +13,7 @@ let getGumroadProfile = async (token: string) => {
       id: user.user_id || user.id,
       email: user.email,
       name: user.name || user.display_name,
-      imageUrl: user.profile_url
+      imageUrl: user.profile_picture_url
     }
   };
 };
@@ -28,42 +29,61 @@ export let auth = SlateAuth.create()
     name: 'OAuth',
     key: 'oauth',
 
+    docs: [
+      {
+        type: 'docs.auth.oauth',
+        name: 'Create a Gumroad API application',
+        url: 'https://gumroad.com/help/article/280-create-application-api'
+      },
+      {
+        type: 'docs.auth.oauth_scopes',
+        name: 'Gumroad API scopes',
+        url: 'https://gumroad.com/api#api-scopes'
+      }
+    ],
+
     scopes: [
       {
         title: 'View Profile',
-        description: 'Read public profile and product information',
-        scope: 'view_profile'
+        description: 'Read your public profile information and products',
+        scope: gumroadScope.viewProfile
       },
       {
         title: 'Edit Products',
         description:
-          'Create and manage products, offer codes, variants, custom fields, and files',
-        scope: 'edit_products'
+          'Create and manage products, variants, offer codes, custom fields, and license keys',
+        scope: gumroadScope.editProducts
       },
       {
         title: 'View Sales',
-        description: 'View sales data, subscribers, and transaction information',
-        scope: 'view_sales'
+        description: 'Read sales, subscribers, and product sales counts',
+        scope: gumroadScope.viewSales
       },
       {
         title: 'Edit Sales',
-        description: 'Refund sales and resend purchase receipts',
-        scope: 'edit_sales'
+        description:
+          'Refund sales, revoke or restore buyer access, and resend purchase receipts',
+        scope: gumroadScope.editSales
       },
       {
         title: 'Mark Sales as Shipped',
-        description: 'Mark sales as shipped with tracking information',
-        scope: 'mark_sales_as_shipped'
+        description: 'Mark physical product sales as shipped',
+        scope: gumroadScope.markSalesAsShipped
       },
       {
         title: 'View Payouts',
-        description: 'View payout information',
-        scope: 'view_payouts'
+        description: 'Read payout information',
+        scope: gumroadScope.viewPayouts
       },
       {
         title: 'View Tax Data',
-        description: 'View annual earnings and tax data',
-        scope: 'view_tax_data'
+        description: 'Read the annual earnings summary',
+        scope: gumroadScope.viewTaxData
+      },
+      {
+        title: 'Edit Emails',
+        description: 'Create, schedule, send, and delete audience emails',
+        scope: gumroadScope.editEmails
       }
     ],
 
@@ -102,10 +122,16 @@ export let auth = SlateAuth.create()
         throw gumroadServiceError('Gumroad OAuth did not return an access token.');
       }
 
+      let grantedScope = response.data?.scope;
+
       return {
         output: {
           token
-        }
+        },
+        scopes:
+          typeof grantedScope === 'string' && grantedScope.trim()
+            ? grantedScope.trim().split(/\s+/)
+            : undefined
       };
     },
 
@@ -121,7 +147,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Personal access token generated from Gumroad Advanced Settings')
+        .describe(
+          'Personal access token generated from a Gumroad application in Advanced Settings. It has the scopes of that application; applications created before June 2026 cannot manage audience emails.'
+        )
     }),
 
     getOutput: async ctx => {

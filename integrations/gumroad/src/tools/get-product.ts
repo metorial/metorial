@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 import { mapProduct, productSchema } from './product-utils';
 
@@ -12,6 +13,7 @@ export let getProduct = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(gumroadActionScopes.read)
   .input(
     z.object({
       productId: z.string().describe('The product ID to retrieve')

@@ -42,63 +42,37 @@ export let manageRoles = SlateTool.create(spec, {
 })
   .scopes(discordActionScopes.manageRoles)
   .input(
-    z.discriminatedUnion('action', [
-      z.object({
-        action: z.literal('list'),
-        guildId: z.string().describe('Guild (server) ID')
-      }),
-      z.object({
-        action: z.literal('create'),
-        guildId: z.string().describe('Guild (server) ID'),
-        name: z.string().describe('Name for the new role'),
-        permissions: z.string().optional().describe('Permission bitfield as string'),
-        color: z
-          .number()
-          .optional()
-          .describe('Role color as integer (e.g., 16711680 for red)'),
-        hoist: z
-          .boolean()
-          .optional()
-          .describe('Whether the role should be displayed separately in the sidebar'),
-        mentionable: z
-          .boolean()
-          .optional()
-          .describe('Whether the role can be mentioned by anyone')
-      }),
-      z.object({
-        action: z.literal('update'),
-        guildId: z.string().describe('Guild (server) ID'),
-        roleId: z.string().describe('ID of the role to update'),
-        name: z.string().optional().describe('New role name'),
-        permissions: z.string().optional().describe('New permission bitfield as string'),
-        color: z.number().optional().describe('New role color as integer'),
-        hoist: z
-          .boolean()
-          .optional()
-          .describe('Whether the role should be displayed separately in the sidebar'),
-        mentionable: z
-          .boolean()
-          .optional()
-          .describe('Whether the role can be mentioned by anyone')
-      }),
-      z.object({
-        action: z.literal('delete'),
-        guildId: z.string().describe('Guild (server) ID'),
-        roleId: z.string().describe('ID of the role to delete')
-      }),
-      z.object({
-        action: z.literal('assign'),
-        guildId: z.string().describe('Guild (server) ID'),
-        userId: z.string().describe('ID of the member to assign the role to'),
-        roleId: z.string().describe('ID of the role to assign')
-      }),
-      z.object({
-        action: z.literal('remove'),
-        guildId: z.string().describe('Guild (server) ID'),
-        userId: z.string().describe('ID of the member to remove the role from'),
-        roleId: z.string().describe('ID of the role to remove')
-      })
-    ])
+    // One object schema (no top-level oneOf); per-action requirements are checked at runtime.
+    z.object({
+      action: z
+        .enum(['list', 'create', 'update', 'delete', 'assign', 'remove'])
+        .describe(
+          'list/create/update/delete manage guild roles; assign/remove add or take a role from a member'
+        ),
+      guildId: z.string().describe('Guild (server) ID'),
+      roleId: z
+        .string()
+        .optional()
+        .describe('Role ID (required for update, delete, assign, and remove)'),
+      userId: z
+        .string()
+        .optional()
+        .describe('ID of the member (required for assign and remove)'),
+      name: z
+        .string()
+        .optional()
+        .describe('Role name (required for create; optional for update)'),
+      permissions: z.string().optional().describe('Permission bitfield as string'),
+      color: z.number().optional().describe('Role color as integer (e.g., 16711680 for red)'),
+      hoist: z
+        .boolean()
+        .optional()
+        .describe('Whether the role should be displayed separately in the sidebar'),
+      mentionable: z
+        .boolean()
+        .optional()
+        .describe('Whether the role can be mentioned by anyone')
+    })
   )
   .output(
     z.object({
@@ -113,9 +87,20 @@ export let manageRoles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let input = ctx.input as any;
+    let input = ctx.input;
     let client = new DiscordClient({ token: ctx.auth.token, tokenType: ctx.auth.tokenType });
     let { action, guildId } = input;
+
+    let requireRoleId = () => {
+      if (!input.roleId)
+        throw discordServiceError(`roleId is required for the ${action} action`);
+      return input.roleId;
+    };
+    let requireUserId = () => {
+      if (!input.userId)
+        throw discordServiceError(`userId is required for the ${action} action`);
+      return input.userId;
+    };
 
     if (action === 'list') {
       let roles = await client.getGuildRoles(guildId);
@@ -127,6 +112,7 @@ export let manageRoles = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
+      if (!input.name) throw discordServiceError('name is required for the create action');
       let data: Record<string, any> = { name: input.name };
       if (input.permissions !== undefined) data.permissions = input.permissions;
       if (input.color !== undefined) data.color = input.color;
@@ -148,7 +134,7 @@ export let manageRoles = SlateTool.create(spec, {
       if (input.hoist !== undefined) data.hoist = input.hoist;
       if (input.mentionable !== undefined) data.mentionable = input.mentionable;
 
-      let role = await client.modifyGuildRole(guildId, input.roleId, data);
+      let role = await client.modifyGuildRole(guildId, requireRoleId(), data);
       return {
         output: { role: mapRoleToOutput(role) },
         message: `Updated role **${role.name}** in guild \`${guildId}\`.`
@@ -156,7 +142,7 @@ export let manageRoles = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteGuildRole(guildId, input.roleId);
+      await client.deleteGuildRole(guildId, requireRoleId());
       return {
         output: { success: true },
         message: `Deleted role \`${input.roleId}\` from guild \`${guildId}\`.`
@@ -164,7 +150,7 @@ export let manageRoles = SlateTool.create(spec, {
     }
 
     if (action === 'assign') {
-      await client.addGuildMemberRole(guildId, input.userId, input.roleId);
+      await client.addGuildMemberRole(guildId, requireUserId(), requireRoleId());
       return {
         output: { success: true },
         message: `Assigned role \`${input.roleId}\` to user \`${input.userId}\` in guild \`${guildId}\`.`
@@ -172,7 +158,7 @@ export let manageRoles = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      await client.removeGuildMemberRole(guildId, input.userId, input.roleId);
+      await client.removeGuildMemberRole(guildId, requireUserId(), requireRoleId());
       return {
         output: { success: true },
         message: `Removed role \`${input.roleId}\` from user \`${input.userId}\` in guild \`${guildId}\`.`

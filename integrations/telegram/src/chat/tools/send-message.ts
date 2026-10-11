@@ -14,7 +14,7 @@ export let chatSendMessage = contract
       throw ChatErrors.capabilityUnsupported({
         action,
         capability: 'message_send_ephemeral',
-        message: 'Telegram has no messages visible to only one chat member.'
+        message: 'Ephemeral Telegram messages are not supported by this connection.'
       });
     }
     rejectInlineAttachments(ctx.input, action);

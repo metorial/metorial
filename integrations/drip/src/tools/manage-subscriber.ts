@@ -69,7 +69,12 @@ export let manageSubscriber = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Whether the subscriber is a prospect for lead scoring.'),
-      baseLeadScore: z.number().optional().describe('Base lead score value.')
+      baseLeadScore: z.number().optional().describe('Base lead score value.'),
+      lifetimeValue: z
+        .number()
+        .int()
+        .optional()
+        .describe('Lifetime value in cents, e.g. 10000 for $100.')
     })
   )
   .output(
@@ -124,6 +129,8 @@ export let manageSubscriber = SlateTool.create(spec, {
     if (ctx.input.prospect !== undefined) subscriber.prospect = ctx.input.prospect;
     if (ctx.input.baseLeadScore !== undefined)
       subscriber.base_lead_score = ctx.input.baseLeadScore;
+    if (ctx.input.lifetimeValue !== undefined)
+      subscriber.lifetime_value = ctx.input.lifetimeValue;
 
     let result = await client.createOrUpdateSubscriber(subscriber);
     let sub = result.subscribers?.[0] ?? {};

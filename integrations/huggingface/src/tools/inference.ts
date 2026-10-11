@@ -132,6 +132,25 @@ export let textGenerationTool = SlateTool.create(spec, {
   })
   .build();
 
+let FILE_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'audio/flac': 'flac',
+  'audio/x-flac': 'flac',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/mpeg': 'mp3',
+  'audio/ogg': 'ogg',
+  'video/mp4': 'mp4'
+};
+
+let generatedFilename = (baseName: string, mimeType: string) => {
+  let extension = FILE_EXTENSIONS[mimeType];
+  return extension ? `${baseName}.${extension}` : baseName;
+};
+
 let getEmbeddingShape = (value: unknown): number[] => {
   let shape: number[] = [];
   let cursor = value;
@@ -212,7 +231,9 @@ export let runInferenceTool = SlateTool.create(spec, {
   description: `Run generic inference on any Hugging Face model. Supports a wide range of tasks: summarization, classification, NER, translation, embeddings, image classification, and more. Pass task-specific inputs and parameters.`,
   instructions: [
     "The exact input format depends on the model's task. Check the model card for expected inputs.",
-    'For text tasks, pass the text string as inputs. For image tasks, pass the image URL.'
+    'For text tasks, pass the text string as inputs. For image tasks, pass the image URL.',
+    'Requests are served by the HF Inference provider. Use chat_completion for LLM chat models, feature_extraction for embeddings, and text_to_image for image generation.',
+    'Tasks that produce media, such as text-to-speech or image-to-image, return the generated audio or image as a downloadable file and report its mimeType and size instead of result.'
   ],
   tags: {
     readOnly: true
@@ -243,7 +264,22 @@ export let runInferenceTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      result: z.any().describe('Inference result (format depends on model task)')
+      result: z
+        .any()
+        .optional()
+        .describe(
+          'Inference result (format depends on model task); omitted when the model returns a file'
+        ),
+      mimeType: z
+        .string()
+        .optional()
+        .describe(
+          'MIME type of the generated file when the model returns audio, an image, or other media'
+        ),
+      size: z
+        .number()
+        .optional()
+        .describe('Generated file size in bytes when a file is returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -253,12 +289,113 @@ export let runInferenceTool = SlateTool.create(spec, {
       modelId: ctx.input.modelId,
       inputs: ctx.input.inputs,
       parameters: ctx.input.parameters,
-      options: ctx.input.options
+      waitForModel: ctx.input.options?.waitForModel
+    });
+
+    if (result.type === 'file') {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(new Uint8Array(result.bytes), {
+          headers: { 'content-type': result.contentType }
+        }),
+        mimeType: result.contentType,
+        filename: generatedFilename('inference-output', result.contentType)
+      });
+
+      return {
+        output: { mimeType: result.contentType, size: result.bytes.byteLength },
+        message: `Completed inference using **${ctx.input.modelId}** and generated a downloadable ${result.contentType} file.`
+      };
+    }
+
+    return {
+      output: { result: result.data },
+      message: `Completed inference using **${ctx.input.modelId}**.`
+    };
+  })
+  .build();
+
+export let textToImageTool = SlateTool.create(spec, {
+  name: 'Text to Image',
+  key: 'text_to_image',
+  description: `Generate an image from a text prompt with a Hugging Face text-to-image model served by HF Inference. Returns the generated image as a downloadable file.`,
+  instructions: [
+    'Use a text-to-image model available on HF Inference, for example "stabilityai/stable-diffusion-3-medium-diffusers". Use search_models with filter "text-to-image" to discover models.'
+  ],
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      model: z
+        .string()
+        .describe(
+          'Text-to-image model ID (e.g. "stabilityai/stable-diffusion-3-medium-diffusers")'
+        ),
+      prompt: z.string().describe('Text prompt describing the image to generate'),
+      negativePrompt: z.string().optional().describe('What the image should not contain'),
+      width: z.number().int().positive().optional().describe('Output image width in pixels'),
+      height: z.number().int().positive().optional().describe('Output image height in pixels'),
+      numInferenceSteps: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Number of denoising steps; more steps are slower but usually higher quality'
+        ),
+      guidanceScale: z
+        .number()
+        .optional()
+        .describe(
+          'How closely the image should follow the prompt; very high values add artifacts'
+        ),
+      seed: z.number().int().optional().describe('Random seed for reproducible results')
+    })
+  )
+  .output(
+    z.object({
+      model: z.string().describe('Model used'),
+      mimeType: z.string().describe('MIME type of the generated image'),
+      size: z.number().describe('Image size in bytes')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new HubClient({ token: ctx.auth.token });
+
+    let parameters: Record<string, unknown> = {};
+    if (ctx.input.negativePrompt !== undefined)
+      parameters.negative_prompt = ctx.input.negativePrompt;
+    if (ctx.input.width !== undefined) parameters.width = ctx.input.width;
+    if (ctx.input.height !== undefined) parameters.height = ctx.input.height;
+    if (ctx.input.numInferenceSteps !== undefined)
+      parameters.num_inference_steps = ctx.input.numInferenceSteps;
+    if (ctx.input.guidanceScale !== undefined)
+      parameters.guidance_scale = ctx.input.guidanceScale;
+    if (ctx.input.seed !== undefined) parameters.seed = ctx.input.seed;
+
+    let image = await client.textToImage({
+      model: ctx.input.model,
+      prompt: ctx.input.prompt,
+      parameters
+    });
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(new Uint8Array(image.bytes), {
+        headers: { 'content-type': image.contentType }
+      }),
+      mimeType: image.contentType,
+      filename: generatedFilename('generated-image', image.contentType)
     });
 
     return {
-      output: { result },
-      message: `Completed inference using **${ctx.input.modelId}**.`
+      output: {
+        model: ctx.input.model,
+        mimeType: image.contentType,
+        size: image.bytes.byteLength
+      },
+      message: `Generated an image with **${ctx.input.model}**.`
     };
   })
   .build();

@@ -30,7 +30,13 @@ export let listAds = SlateTool.create(spec, {
           postId: z.string().optional(),
           campaignId: z.string().optional(),
           name: z.string().optional(),
-          status: z.string().optional(),
+          status: z.string().optional().describe('Configured status set by the advertiser.'),
+          effectiveStatus: z
+            .string()
+            .optional()
+            .describe(
+              'Calculated delivery status, such as PENDING_APPROVAL, PENDING_BILLING_INFO or REJECTED.'
+            ),
           headline: z.string().optional(),
           clickUrl: z.string().optional(),
           callToAction: z.string().optional(),

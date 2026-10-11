@@ -103,7 +103,12 @@ export let manageApplicationCommands = SlateTool.create(spec, {
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Application command action to perform'),
       scope: z.enum(['global', 'guild']).describe('Command scope'),
-      applicationId: z.string().describe('Discord application ID'),
+      applicationId: z
+        .string()
+        .optional()
+        .describe(
+          'Discord application ID. Defaults to the application of the connected bot token; required for OAuth connections.'
+        ),
       guildId: z.string().optional().describe('Guild ID, required when scope is guild'),
       commandId: z
         .string()
@@ -163,18 +168,24 @@ export let manageApplicationCommands = SlateTool.create(spec, {
     }
 
     let isGuildScope = input.scope === 'guild';
+    let applicationId = input.applicationId ?? ctx.auth.applicationId;
+    if (!applicationId) {
+      if (ctx.auth.tokenType === 'Bearer') {
+        throw discordServiceError('applicationId is required for OAuth connections');
+      }
+      // https://docs.discord.com/developers/resources/application#get-current-application
+      let application = await client.getCurrentApplication();
+      applicationId = String(application.id);
+    }
 
     if (input.action === 'list') {
       let commands = isGuildScope
         ? await client.getGuildApplicationCommands(
-            input.applicationId,
+            applicationId,
             input.guildId!,
             input.withLocalizations
           )
-        : await client.getGlobalApplicationCommands(
-            input.applicationId,
-            input.withLocalizations
-          );
+        : await client.getGlobalApplicationCommands(applicationId, input.withLocalizations);
 
       let mapped = commands.map(formatCommand);
       return {
@@ -190,11 +201,11 @@ export let manageApplicationCommands = SlateTool.create(spec, {
 
       let command = isGuildScope
         ? await client.getGuildApplicationCommand(
-            input.applicationId,
+            applicationId,
             input.guildId!,
             input.commandId
           )
-        : await client.getGlobalApplicationCommand(input.applicationId, input.commandId);
+        : await client.getGlobalApplicationCommand(applicationId, input.commandId);
 
       return {
         output: { command: formatCommand(command) },
@@ -214,12 +225,8 @@ export let manageApplicationCommands = SlateTool.create(spec, {
 
       let payload = buildCommandPayload(input);
       let command = isGuildScope
-        ? await client.createGuildApplicationCommand(
-            input.applicationId,
-            input.guildId!,
-            payload
-          )
-        : await client.createGlobalApplicationCommand(input.applicationId, payload);
+        ? await client.createGuildApplicationCommand(applicationId, input.guildId!, payload)
+        : await client.createGlobalApplicationCommand(applicationId, payload);
 
       return {
         output: { command: formatCommand(command) },
@@ -244,16 +251,12 @@ export let manageApplicationCommands = SlateTool.create(spec, {
 
       let command = isGuildScope
         ? await client.editGuildApplicationCommand(
-            input.applicationId,
+            applicationId,
             input.guildId!,
             input.commandId,
             payload
           )
-        : await client.editGlobalApplicationCommand(
-            input.applicationId,
-            input.commandId,
-            payload
-          );
+        : await client.editGlobalApplicationCommand(applicationId, input.commandId, payload);
 
       return {
         output: { command: formatCommand(command) },
@@ -267,12 +270,12 @@ export let manageApplicationCommands = SlateTool.create(spec, {
 
     if (isGuildScope) {
       await client.deleteGuildApplicationCommand(
-        input.applicationId,
+        applicationId,
         input.guildId!,
         input.commandId
       );
     } else {
-      await client.deleteGlobalApplicationCommand(input.applicationId, input.commandId);
+      await client.deleteGlobalApplicationCommand(applicationId, input.commandId);
     }
 
     return {

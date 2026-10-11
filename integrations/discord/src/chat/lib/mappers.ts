@@ -44,6 +44,9 @@ export let DISCORD_CHANNEL_TYPE_NAMES: Record<number, string> = {
   16: 'GUILD_MEDIA'
 };
 
+// https://docs.discord.com/developers/resources/message#message-object-message-types
+export let DISCORD_REPLY_MESSAGE_TYPE = 19;
+
 export let NON_MESSAGE_CHANNEL_TYPES = new Set([4, 14]);
 
 let VIEW_CHANNEL = 1n << 10n;
@@ -321,7 +324,11 @@ export let mapMessage = (
     .map(embed => mapUnfurl(embed, raw.id))
     .filter((unfurl): unfurl is LinkUnfurl => !!unfurl);
 
-  let referenceId = raw.message_reference?.message_id;
+  // Pins, crossposts, thread starters and forwards also carry message_reference;
+  // only a REPLY (type 19) answers another message.
+  // See "Message Reference Types": https://docs.discord.com/developers/resources/message
+  let referenceId =
+    raw.type === DISCORD_REPLY_MESSAGE_TYPE ? raw.message_reference?.message_id : undefined;
   let referenced = raw.referenced_message;
 
   return {

@@ -1,4 +1,4 @@
-# Slates Specification for Microsoft Teams
+# Microsoft Teams Specification
 
 ## Overview
 

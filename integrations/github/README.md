@@ -20,6 +20,10 @@ Create a new release for a GitHub repository with a tag, name, release notes, an
 
 Create a new GitHub repository for the authenticated user or within an organization. Supports initializing with a README, gitignore template, and license.
 
+### Delete Branch
+
+Delete a branch from a GitHub repository, for example after its pull request is merged. The default branch and protected branches cannot be deleted.
+
 ### Get Issue
 
 Retrieve detailed information about a specific issue, including its body, comments count, labels, assignees, and milestone.
@@ -47,6 +51,10 @@ List commits on a repository branch with filtering by SHA, path, author, or date
 ### List Issues
 
 List issues in a GitHub repository with filtering and sorting options. Filter by state, labels, assignee, milestone, and since date. Note: GitHub's API returns pull requests alongside issues — this tool filters them out.
+
+### List Milestones
+
+List milestones in a repository with their numbers, state, due dates, and issue counts. Use a milestone number to assign issues with Manage Issue.
 
 ### List Pull Requests
 

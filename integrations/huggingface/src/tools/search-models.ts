@@ -44,15 +44,20 @@ export let searchModelsTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter by pipeline task (e.g. "text-generation", "image-classification")'),
-      tags: z.array(z.string()).optional().describe('Filter by tags'),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe('Filter by tags; results must match every tag (e.g. ["license:mit"])'),
       sort: z
         .enum(['downloads', 'likes', 'lastModified', 'trending', 'createdAt'])
         .optional()
-        .describe('Sort field'),
+        .describe('Sort field (results are sorted in descending order by default)'),
       direction: z
         .enum(['-1', '1'])
         .optional()
-        .describe('Sort direction: -1 for descending, 1 for ascending'),
+        .describe(
+          'Sort direction: -1 for descending, 1 for ascending. Hugging Face only supports descending order for some sort fields, such as likes.'
+        ),
       limit: z
         .number()
         .optional()

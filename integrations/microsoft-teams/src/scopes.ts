@@ -13,6 +13,7 @@ export let microsoftTeamsScopes = {
   chatReadWrite: 'Chat.ReadWrite',
   channelMessageReadAll: 'ChannelMessage.Read.All',
   channelMessageSend: 'ChannelMessage.Send',
+  channelMessageReadWrite: 'ChannelMessage.ReadWrite',
   onlineMeetingsReadWrite: 'OnlineMeetings.ReadWrite',
   presenceReadAll: 'Presence.Read.All',
   teamMemberReadWriteAll: 'TeamMember.ReadWrite.All',
@@ -61,6 +62,13 @@ export let microsoftTeamsActionScopes = {
   listChats: chatRead,
   listChatMessages: chatRead,
   sendChatMessage: anyOf(microsoftTeamsScopes.chatReadWrite),
+  // Chat messages need Chat.ReadWrite; channel messages need ChannelMessage.ReadWrite.
+  // https://learn.microsoft.com/en-us/graph/api/chatmessage-update?view=graph-rest-1.0
+  manageMessage: anyOf(
+    microsoftTeamsScopes.chatReadWrite,
+    microsoftTeamsScopes.channelMessageReadWrite
+  ),
+  getCurrentUser: anyOf(microsoftTeamsScopes.userRead),
   manageMembers: anyOf(
     microsoftTeamsScopes.teamMemberReadWriteAll,
     microsoftTeamsScopes.channelMemberReadWriteAll

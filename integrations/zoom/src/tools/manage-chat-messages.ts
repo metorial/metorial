@@ -1,6 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { ZOOM_USER_AUTH_METHODS } from '../lib/authMethods';
+import { assertChatRecipient, describeChatRecipient } from '../lib/chatRecipient';
 import { ZoomClient } from '../lib/client';
 import { zoomServiceError } from '../lib/errors';
 import { spec } from '../spec';
@@ -17,18 +18,9 @@ let mapChatMessage = (message: any) => ({
   messageType: message.message_type,
   files: message.files,
   reactions: message.reactions,
-  replyMainMessageId: message.reply_main_message_id
+  replyMainMessageId: message.reply_main_message_id,
+  status: message.status
 });
-
-let assertRecipient = (toChannel?: string, toContact?: string) => {
-  if (!toChannel && !toContact) {
-    throw zoomServiceError('Provide either toChannel or toContact for chat message actions.');
-  }
-
-  if (toChannel && toContact) {
-    throw zoomServiceError('Provide only one chat recipient: toChannel or toContact.');
-  }
-};
 
 export let manageChatMessages = SlateTool.create(spec, {
   name: 'Manage Chat Messages',
@@ -70,7 +62,13 @@ export let manageChatMessages = SlateTool.create(spec, {
       includeDeletedAndEditedMessage: z
         .boolean()
         .optional()
-        .describe('Include deleted and edited messages when listing')
+        .describe('Include deleted and edited messages when listing'),
+      excludeChildMessage: z
+        .boolean()
+        .optional()
+        .describe(
+          'When listing, return only top-level messages and leave out thread replies. Use list_chat_thread_replies to read a thread.'
+        )
     })
   )
   .output(
@@ -91,7 +89,13 @@ export let manageChatMessages = SlateTool.create(spec, {
             messageType: z.string().optional().describe('Message type'),
             files: z.any().optional().describe('Attached files'),
             reactions: z.any().optional().describe('Message reactions'),
-            replyMainMessageId: z.string().optional().describe('Parent thread message ID')
+            replyMainMessageId: z.string().optional().describe('Parent thread message ID'),
+            status: z
+              .string()
+              .optional()
+              .describe(
+                'Message state as returned by Zoom (Normal, Edited, or Deleted), included when edited and deleted messages are requested'
+              )
           })
         )
         .optional()
@@ -109,7 +113,11 @@ export let manageChatMessages = SlateTool.create(spec, {
           messageType: z.string().optional().describe('Message type'),
           files: z.any().optional().describe('Attached files'),
           reactions: z.any().optional().describe('Message reactions'),
-          replyMainMessageId: z.string().optional().describe('Parent thread message ID')
+          replyMainMessageId: z.string().optional().describe('Parent thread message ID'),
+          status: z
+            .string()
+            .optional()
+            .describe('Message state as returned by Zoom (Normal, Edited, or Deleted)')
         })
         .optional()
         .describe('Message returned by get or update')
@@ -117,12 +125,10 @@ export let manageChatMessages = SlateTool.create(spec, {
   )
   .authMethods(ZOOM_USER_AUTH_METHODS)
   .handleInvocation(async ctx => {
-    assertRecipient(ctx.input.toChannel, ctx.input.toContact);
+    assertChatRecipient(ctx.input.toChannel, ctx.input.toContact, 'for chat message actions');
 
     let client = new ZoomClient(ctx.auth.token);
-    let recipient = ctx.input.toChannel
-      ? `channel ${ctx.input.toChannel}`
-      : `contact ${ctx.input.toContact}`;
+    let recipient = describeChatRecipient(ctx.input.toChannel, ctx.input.toContact);
 
     if (ctx.input.action === 'list') {
       let result = await client.listChatMessages(ctx.input.userId, {
@@ -133,7 +139,8 @@ export let manageChatMessages = SlateTool.create(spec, {
         to: ctx.input.to,
         pageSize: ctx.input.pageSize,
         nextPageToken: ctx.input.nextPageToken,
-        includeDeletedAndEditedMessage: ctx.input.includeDeletedAndEditedMessage
+        includeDeletedAndEditedMessage: ctx.input.includeDeletedAndEditedMessage,
+        excludeChildMessage: ctx.input.excludeChildMessage
       });
       let messages = (result.messages || []).map(mapChatMessage);
 

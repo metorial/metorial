@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import type { taskSchema } from '../lib/api-schemas';
 import { Client } from '../lib/client';
@@ -11,6 +11,8 @@ let taskOutputSchema = z.object({
   status: z.string().nullable().optional().describe('Task status'),
   currentState: z.string().nullable().optional().describe('Current task state'),
   dueDate: z.string().nullable().optional().describe('Due date'),
+  dueAt: z.string().nullable().optional().describe('Due date and time'),
+  remindAt: z.string().nullable().optional().describe('Reminder date and time'),
   description: z.string().nullable().optional().describe('Task description'),
   completed: z.boolean().nullable().optional().describe('Whether the task is completed'),
   completedAt: z.string().nullable().optional().describe('Completion timestamp'),
@@ -27,6 +29,8 @@ let mapTask = (raw: z.output<typeof taskSchema>) => ({
   status: undefined,
   currentState: raw.current_state,
   dueDate: raw.due_date,
+  dueAt: raw.due_at,
+  remindAt: raw.remind_at,
   description: raw.description,
   completed: raw.current_state == null ? undefined : raw.current_state === 'completed',
   completedAt: raw.completed_at,
@@ -46,7 +50,7 @@ let paginationOutputSchema = z.object({
 export let listTasks = SlateTool.create(spec, {
   name: 'List Tasks',
   key: 'list_tasks',
-  description: `List tasks in SalesLoft. Filter by person, task type, or current user assignment. Includes both cadence-generated tasks and manually created ones.`,
+  description: `List tasks in SalesLoft. Filter by person, account, task type, state, due interval, or current user assignment. Tasks created by cadence steps are not returned.`,
   tags: {
     readOnly: true
   }
@@ -58,11 +62,20 @@ export let listTasks = SlateTool.create(spec, {
       sortBy: z.string().optional().describe('Field to sort by'),
       sortDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction'),
       personId: z.number().optional().describe('Filter by associated person ID'),
+      accountId: z.number().optional().describe('Filter by associated account ID'),
       currentUser: z
         .boolean()
         .optional()
         .describe('Filter to tasks assigned to the current user'),
-      taskType: z.string().optional().describe('Filter by task type')
+      taskType: z.string().optional().describe('Filter by task type: call, email or general'),
+      currentState: z
+        .enum(['scheduled', 'completed'])
+        .optional()
+        .describe('Filter open (scheduled) or completed tasks'),
+      timeInterval: z
+        .enum(['overdue', 'today', 'tomorrow', 'this_week', 'next_week'])
+        .optional()
+        .describe('Filter tasks by due-date interval')
     })
   )
   .output(
@@ -108,6 +121,143 @@ export let getTask = SlateTool.create(spec, {
     return {
       output,
       message: `Fetched task **${output.subject || 'Untitled'}** (ID: ${output.taskId}).`
+    };
+  })
+  .build();
+
+let taskTypeSchema = z.enum(['call', 'email', 'general']);
+
+export let createTask = SlateTool.create(spec, {
+  name: 'Create Task',
+  key: 'create_task',
+  description: `Create a call, email or general to-do task for a person in Salesloft, assigned to the authenticated user unless another user is given.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      subject: z.string().describe('Task subject line'),
+      personId: z.number().describe('ID of the person the task is about'),
+      taskType: taskTypeSchema.describe('Task type'),
+      dueDate: z.string().describe('Due date in ISO-8601 date format (YYYY-MM-DD)'),
+      userId: z
+        .number()
+        .optional()
+        .describe('ID of the user assigned the task (defaults to the authenticated user)'),
+      remindAt: z.string().optional().describe('ISO-8601 datetime for the reminder'),
+      description: z.string().optional().describe('Task description'),
+      idempotencyKey: z
+        .string()
+        .optional()
+        .describe('Unique key that prevents duplicate tasks when a request is retried')
+    })
+  )
+  .output(taskOutputSchema)
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+
+    let body: Record<string, unknown> = {
+      subject: ctx.input.subject,
+      person_id: ctx.input.personId,
+      task_type: ctx.input.taskType,
+      due_date: ctx.input.dueDate
+    };
+    if (ctx.input.userId !== undefined) body.user_id = ctx.input.userId;
+    if (ctx.input.remindAt !== undefined) body.remind_at = ctx.input.remindAt;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.idempotencyKey !== undefined)
+      body.idempotency_key = ctx.input.idempotencyKey;
+
+    let task = await client.createTask(body);
+    let output = mapTask(task);
+
+    return {
+      output,
+      message: `Created ${output.taskType ?? ctx.input.taskType} task **${output.subject ?? ctx.input.subject}** (ID: ${output.taskId}).`
+    };
+  })
+  .build();
+
+export let updateTask = SlateTool.create(spec, {
+  name: 'Update Task',
+  key: 'update_task',
+  description: `Update a Salesloft task's subject, type, due date, reminder, assignee or description, or mark it completed. Completing a task cannot be undone through the API.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      taskId: z.number().describe('ID of the task to update'),
+      subject: z.string().optional().describe('Updated subject line'),
+      taskType: taskTypeSchema.optional().describe('Updated task type'),
+      dueDate: z.string().optional().describe('Updated due date (YYYY-MM-DD)'),
+      dueAt: z.string().optional().describe('Updated ISO-8601 due datetime'),
+      remindAt: z.string().optional().describe('Updated ISO-8601 reminder datetime'),
+      description: z.string().optional().describe('Updated description'),
+      userId: z.number().optional().describe('ID of the user to reassign the task to'),
+      currentState: z
+        .enum(['completed'])
+        .optional()
+        .describe('Set to completed to mark the task done')
+    })
+  )
+  .output(taskOutputSchema)
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+
+    let body: Record<string, unknown> = {};
+    if (ctx.input.subject !== undefined) body.subject = ctx.input.subject;
+    if (ctx.input.taskType !== undefined) body.task_type = ctx.input.taskType;
+    if (ctx.input.dueDate !== undefined) body.due_date = ctx.input.dueDate;
+    if (ctx.input.dueAt !== undefined) body.due_at = ctx.input.dueAt;
+    if (ctx.input.remindAt !== undefined) body.remind_at = ctx.input.remindAt;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
+    if (ctx.input.userId !== undefined) body.user_id = ctx.input.userId;
+    if (ctx.input.currentState !== undefined) body.current_state = ctx.input.currentState;
+    if (!Object.keys(body).length)
+      throw createApiServiceError('Provide at least one task field to update.');
+
+    let task = await client.updateTask(ctx.input.taskId, body);
+    let output = mapTask(task);
+
+    return {
+      output,
+      message: `Updated task **${output.subject || 'Untitled'}** (ID: ${output.taskId}${output.currentState ? `, state: ${output.currentState}` : ''}).`
+    };
+  })
+  .build();
+
+export let deleteTask = SlateTool.create(spec, {
+  name: 'Delete Task',
+  key: 'delete_task',
+  description: `Delete a Salesloft task. Restoration requires contacting Salesloft support.`,
+  tags: {
+    destructive: true,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      taskId: z.number().describe('ID of the task to delete')
+    })
+  )
+  .output(
+    z.object({
+      taskId: z.number().describe('ID of the deleted task'),
+      deleted: z.boolean().describe('Whether the deletion was successful')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    await client.deleteTask(ctx.input.taskId);
+
+    return {
+      output: { taskId: ctx.input.taskId, deleted: true },
+      message: `Deleted task ${ctx.input.taskId}.`
     };
   })
   .build();
