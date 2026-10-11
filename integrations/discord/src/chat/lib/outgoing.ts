@@ -1,112 +1,42 @@
-import { type AttachmentRef, ChatErrors, fetchAttachmentSource } from '@slates/adapter-chat';
-import type { DiscordUploadFile } from './client';
+import { type AttachmentRef, ChatErrors } from '@slates/adapter-chat';
 import type { DiscordFileReference } from './files';
-import type { DiscordApiMessage } from './types';
 
 // Discord caps a whole request at 25 MiB.
 export let DISCORD_MAX_REQUEST_BYTES = 25 * 1024 * 1024;
-
-export interface PreparedAttachments {
-  files: DiscordUploadFile[];
-  /** `clientReferenceId` for each new file, in upload order. */
-  references: (string | undefined)[];
-  /** Existing attachments to keep on an edit, as `{ id }` partial objects. */
-  kept: { id: string }[];
-}
 
 let isDiscordReference = (value: unknown): value is DiscordFileReference =>
   !!value &&
   typeof value === 'object' &&
   typeof (value as DiscordFileReference).attachmentId === 'string';
 
-let fetchPendingFile = async (
-  attachment: AttachmentRef,
+// Files are sent as their own messages through file upload.
+export let rejectInlineAttachments = (
+  attachments: AttachmentRef[] | undefined,
   action: string
-): Promise<DiscordUploadFile> => {
-  let source = attachment.sourceUrl;
-  if (!source) {
-    throw ChatErrors.inputInvalid({
-      action,
-      message: 'A pending attachment needs a sourceUrl to upload from.'
-    });
-  }
-
-  let fetched = await fetchAttachmentSource(source, {
+) => {
+  if (!attachments?.length) return;
+  throw ChatErrors.capabilityUnsupported({
     action,
-    maxBytes: DISCORD_MAX_REQUEST_BYTES,
-    field: 'sourceUrl'
+    capability: 'file_upload',
+    message:
+      'Discord sends each uploaded file as its own message. Upload files with metorial_chat$file.upload and send text separately.'
   });
-  return {
-    filename: attachment.name ?? 'file',
-    contentType: attachment.mimeType ?? fetched.contentType,
-    bytes: fetched.bytes
-  };
 };
 
-// Discord can't re-attach a file by id; completed files are only kept on their own message.
-export let prepareAttachments = async (
-  attachments: AttachmentRef[] | undefined,
-  options: { action: string; messageId?: string }
-): Promise<PreparedAttachments> => {
-  let prepared: PreparedAttachments = { files: [], references: [], kept: [] };
-
-  for (let attachment of attachments ?? []) {
-    if (attachment.status === 'pending') {
-      prepared.files.push(await fetchPendingFile(attachment, options.action));
-      prepared.references.push(attachment.clientReferenceId);
-      continue;
-    }
-
+// An edit can only keep files already on the message, as `{ id }` partial objects.
+export let keptAttachments = (
+  attachments: AttachmentRef[],
+  options: { action: string; messageId: string }
+) =>
+  attachments.map(attachment => {
     let reference = attachment.providerFileReference;
-    if (
-      options.messageId &&
-      isDiscordReference(reference) &&
-      reference.messageId === options.messageId
-    ) {
-      prepared.kept.push({ id: reference.attachmentId });
-      continue;
+    if (isDiscordReference(reference) && reference.messageId === options.messageId) {
+      return { id: reference.attachmentId };
     }
-
     throw ChatErrors.attachmentUnsupportedType({
       action: options.action,
       attachmentId: attachment.id,
-      message: options.messageId
-        ? 'Only attachments already on this message, or new uploads, can be included in an edit.'
-        : 'Discord cannot re-attach an existing file by reference; upload it again first.'
+      message:
+        'Only attachments already on this message can be kept in an edit. Upload new files with metorial_chat$file.upload.'
     });
-  }
-
-  let total = prepared.files.reduce((sum, file) => sum + file.bytes.byteLength, 0);
-  if (total > DISCORD_MAX_REQUEST_BYTES) {
-    throw ChatErrors.attachmentTooLarge({
-      action: options.action,
-      max: DISCORD_MAX_REQUEST_BYTES,
-      actual: total
-    });
-  }
-
-  return prepared;
-};
-
-// Matches new uploads to `clientReferenceId` by filename, then by request order.
-export let clientReferencesFor = (
-  raw: DiscordApiMessage,
-  prepared: PreparedAttachments
-): Map<string, string> => {
-  let result = new Map<string, string>();
-  let keptIds = new Set(prepared.kept.map(kept => kept.id));
-  let fresh = (raw.attachments ?? []).filter(attachment => !keptIds.has(attachment.id));
-  let unmatched = [...fresh];
-
-  prepared.files.forEach((file, index) => {
-    let reference = prepared.references[index];
-    let byName = unmatched.findIndex(attachment => attachment.filename === file.filename);
-    let position = byName >= 0 ? byName : 0;
-    let attachment = unmatched[position];
-    if (!attachment) return;
-    unmatched.splice(position, 1);
-    if (reference) result.set(attachment.id, reference);
   });
-
-  return result;
-};

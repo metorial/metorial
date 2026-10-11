@@ -12,7 +12,7 @@ import {
   EPHEMERAL_FLAG,
   InteractionCallbackType
 } from '../lib/interaction';
-import { clientReferencesFor, prepareAttachments } from '../lib/outgoing';
+import { rejectInlineAttachments } from '../lib/outgoing';
 import { renderDiscordBody } from '../lib/render';
 import type { DiscordApiMessage } from '../lib/types';
 
@@ -53,9 +53,9 @@ export let chatRespondToCommand = contract
           });
         }
 
+        rejectInlineAttachments(ctx.input.attachments, action);
         let rendered = renderDiscordBody(ctx.input, action);
-        let prepared = await prepareAttachments(ctx.input.attachments, { action });
-        if (!rendered.content && rendered.embeds.length === 0 && prepared.files.length === 0) {
+        if (!rendered.content && rendered.embeds.length === 0) {
           throw ChatErrors.contentEmpty({ action });
         }
 
@@ -73,20 +73,14 @@ export let chatRespondToCommand = contract
           await interaction.respond(
             token.interactionId,
             InteractionCallbackType.CHANNEL_MESSAGE_WITH_SOURCE,
-            { ...payload, ...(ephemeral ? { flags: EPHEMERAL_FLAG } : {}) },
-            prepared.files
+            { ...payload, ...(ephemeral ? { flags: EPHEMERAL_FLAG } : {}) }
           );
           raw = await interaction.getOriginal();
         } else {
-          raw = await interaction.editOriginal(payload, prepared.files);
+          raw = await interaction.editOriginal(payload);
         }
 
-        let result = buildMessageResult(
-          raw,
-          undefined,
-          identity,
-          clientReferencesFor(raw, prepared)
-        );
+        let result = buildMessageResult(raw, undefined, identity);
         return { message: result.message, channel: result.channel, raw };
       }
     );

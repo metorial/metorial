@@ -30,11 +30,16 @@ reference" API that is distinct from sending a message.
   expects it) in a subsequent `message.send` call, which posts exactly one
   message with the file attached.
 
-### Shape B -- no separate upload (e.g. Discord)
+### Shape B -- deferred upload (avoid; no current provider)
 
 The provider has no standalone "upload and get a reference back" concept.
 Files can only be attached as part of creating the message itself (e.g. a
 multipart body on the message-create call).
+
+Avoid this shape. The pending attachment carries the short-lived signed
+`fileUrl` until a later `message.send`, which may run after it expires. When
+a provider can send a file as its own message, use Shape C instead; Discord
+does this.
 
 - `file.upload`'s implementation for this shape is a **no-op**. It must
   never call any provider API and must never store anything or produce a
@@ -64,12 +69,14 @@ multipart body on the message-create call).
 - The message returned by `message.send` will then have that attachment
   finalized to `status: 'complete'` with a real `providerFileReference`.
 
-### Shape C -- upload IS a message (e.g. Telegram)
+### Shape C -- upload IS a message (e.g. Telegram, Discord)
 
 The provider has no way to attach a file to an existing or otherwise
 separate message at all. Sending a file (`sendDocument`, `sendPhoto`, ...)
 is itself a full message-send operation that creates a real,
-independently-addressable provider message.
+independently-addressable provider message. Providers that only accept
+files on message create (Discord multipart) also use this shape: the
+upload sends the file as its own message right away.
 
 - `file.upload`'s implementation should actually perform that provider call
   (i.e. create the real message).
@@ -117,11 +124,12 @@ Ask these in order:
 
 3. **Can files only be attached in the same API call that creates the
    message (no standalone upload endpoint)?**
-   Yes -> **Shape B**.
+   Yes -> **Shape C**: `file.upload` sends the file as its own message.
+   Do not defer the upload to `message.send` (Shape B); the signed
+   `fileUrl` is short-lived.
 
 If you answered "yes" to more than one, prefer the earliest applicable
-shape in the list above (C, then A, then B) since C and A are the most
-specific.
+shape in the list above (C, then A) since C and A are the most specific.
 
 ## Field reference
 
@@ -236,87 +244,6 @@ Subsequent `message.send` call, referencing the already-uploaded file:
 }
 ```
 
-### Shape B -- Discord
-
-`file.upload` call:
-
-```json
-{
-  "channelId": "1102938475610",
-  "filename": "diagram.png",
-  "mimeType": "image/png",
-  "fileUrl": "https://uploads.metorial.com/signed/f_2b7e...?exp=1755878400",
-  "fileSize": 93482,
-  "clientReferenceId": "upload-2"
-}
-```
-
-`file.upload` response -- a no-op, nothing was contacted or stored:
-
-```json
-{
-  "attachment": {
-    "type": "image",
-    "name": "diagram.png",
-    "mimeType": "image/png",
-    "size": 93482,
-    "status": "pending",
-    "sourceUrl": "https://uploads.metorial.com/signed/f_2b7e...?exp=1755878400",
-    "clientReferenceId": "upload-2"
-  }
-}
-```
-
-`message.send` call, passing the still-pending attachment through:
-
-```json
-{
-  "channelId": "1102938475610",
-  "parts": [{ "type": "markdown", "markdown": "Architecture diagram attached." }],
-  "attachments": [
-    {
-      "type": "image",
-      "name": "diagram.png",
-      "mimeType": "image/png",
-      "size": 93482,
-      "status": "pending",
-      "sourceUrl": "https://uploads.metorial.com/signed/f_2b7e...?exp=1755878400",
-      "clientReferenceId": "upload-2"
-    }
-  ]
-}
-```
-
-The Discord `message.send` implementation sees the `status: 'pending'`
-attachment, fetches `sourceUrl` itself, and sends it as multipart on the
-message-create call. Response -- exactly one message, attachment now
-finalized:
-
-```json
-{
-  "message": {
-    "id": "1102938999887766",
-    "channelId": "1102938475610",
-    "author": { "userId": "B02", "userName": "metorial-bot", "fullName": "Metorial", "type": "app", "isMe": true },
-    "body": {
-      "parts": [{ "type": "markdown", "markdown": "Architecture diagram attached." }],
-      "attachments": [
-        {
-          "type": "image",
-          "name": "diagram.png",
-          "mimeType": "image/png",
-          "size": 93482,
-          "status": "complete",
-          "providerFileReference": { "attachmentId": "1102938999887999" },
-          "clientReferenceId": "upload-2"
-        }
-      ]
-    },
-    "metadata": { "sentAt": "2026-01-22T14:05:00.000Z", "edited": false }
-  }
-}
-```
-
 ### Shape C -- Telegram
 
 `file.upload` call:
@@ -399,10 +326,9 @@ the adapter did not create itself.
 - **Never** populate `file.upload`'s `message` field unless your provider
   truly created a real, independently addressable message as a side effect
   of the upload (Shape C). For Shape A and Shape B, leave it undefined.
-- **Never** have a Shape B `file.upload` implementation contact the
-  provider or produce a `$attachments`/slate-hub-tracked artifact. Nothing
-  was actually stored at that point -- doing so would create an orphaned
-  resource that no message ever ends up referencing.
+- **Never** defer an upload by handing the provider, or a later
+  `message.send`, the signed `fileUrl`. It is short-lived; fetch the bytes
+  and upload them during `file.upload`.
 - **Never** invent new top-level fields on `attachmentRefSchema`,
   `uploadFile`'s input/output, or `messageSchema` without updating this
   document.

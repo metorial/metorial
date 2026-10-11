@@ -111,18 +111,14 @@ export interface DiscordMessagePayload {
 // `payload_json` plus `files[n]`; each new attachment's `id` must equal its `n`.
 export let buildDiscordMultipart = (
   payload: DiscordMessagePayload,
-  files: DiscordUploadFile[],
-  keptAttachments: Record<string, unknown>[] = []
+  files: DiscordUploadFile[]
 ) => {
   let form = new FormData();
-  let attachments = [
-    ...keptAttachments,
-    ...files.map((file, index) => ({
-      id: index,
-      filename: file.filename,
-      ...(file.description ? { description: file.description } : {})
-    }))
-  ];
+  let attachments = files.map((file, index) => ({
+    id: index,
+    filename: file.filename,
+    ...(file.description ? { description: file.description } : {})
+  }));
 
   form.append('payload_json', JSON.stringify({ ...payload, attachments }));
   files.forEach((file, index) => {
@@ -227,16 +223,10 @@ export class DiscordChatClient {
     channelId: string,
     messageId: string,
     payload: DiscordMessagePayload,
-    files: DiscordUploadFile[] = [],
-    keptAttachments?: Record<string, unknown>[]
+    keptAttachments?: { id: string }[]
   ): Promise<DiscordApiMessage> {
     let path = `/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}`;
-    let body =
-      files.length > 0
-        ? buildDiscordMultipart(payload, files, keptAttachments ?? [])
-        : keptAttachments
-          ? { ...payload, attachments: keptAttachments }
-          : payload;
+    let body = keptAttachments ? { ...payload, attachments: keptAttachments } : payload;
     return (await this.api.patch(path, body)).data;
   }
 
@@ -283,12 +273,8 @@ export class DiscordInteractionClient {
     return `/webhooks/${encodeURIComponent(this.applicationId)}/${encodeURIComponent(this.interactionToken)}`;
   }
 
-  async editOriginal(
-    payload: DiscordMessagePayload,
-    files: DiscordUploadFile[] = []
-  ): Promise<DiscordApiMessage> {
-    let body = files.length > 0 ? buildDiscordMultipart(payload, files) : payload;
-    return (await this.api.patch(`${this.basePath}/messages/@original`, body)).data;
+  async editOriginal(payload: DiscordMessagePayload): Promise<DiscordApiMessage> {
+    return (await this.api.patch(`${this.basePath}/messages/@original`, payload)).data;
   }
 
   async getOriginal(): Promise<DiscordApiMessage> {
@@ -298,17 +284,9 @@ export class DiscordInteractionClient {
   async respond(
     interactionId: string,
     type: number,
-    data: DiscordMessagePayload,
-    files: DiscordUploadFile[] = []
+    data: DiscordMessagePayload
   ): Promise<void> {
     let path = `/interactions/${encodeURIComponent(interactionId)}/${encodeURIComponent(this.interactionToken)}/callback`;
-    if (files.length > 0) {
-      let form = buildDiscordMultipart(data, files);
-      let payload = JSON.parse(String(form.get('payload_json')));
-      form.set('payload_json', JSON.stringify({ type, data: payload }));
-      await this.api.post(path, form);
-      return;
-    }
     await this.api.post(path, { type, data });
   }
 }

@@ -100,8 +100,8 @@ bot or open the bot gateway.
 | `dm.openSingle` | Native | Create DM |
 | `user.get` / `user.getAuthenticated` | Native (no workspace on the bot user; use `workspace.list`) | Get User |
 | `typing.start` | Native (about 10 seconds) | Trigger Typing Indicator |
-| `file.upload` | Upload happens with the message: returns a pending attachment, no API call | — |
-| Attachments on `message.send` / `edit` | Native multipart upload (25 MiB per request); edits keep listed files | Create/Edit Message |
+| `file.upload` | Native; sends the file as its own message (25 MiB) | Create Message |
+| Attachments on `message.send` / `edit` | Not supported on send (upload files separately); edits keep listed files already on the message | Edit Message |
 | `file.download` | Native; fresh signed CDN URL from the owning message, renewed before expiry | Get Channel Message |
 | `command.list` | Native (global, or server commands with `workspaceId`) | Get Application Commands |
 | `command.respond` | Native; edits the deferred (public) response. Ephemeral replies are rejected because Discord keeps the visibility chosen at deferral | Edit Original Interaction Response |

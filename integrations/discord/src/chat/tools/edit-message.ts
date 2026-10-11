@@ -6,7 +6,7 @@ import {
   resolveDiscordIdentity,
   runDiscordChatAction
 } from '../lib/context';
-import { clientReferencesFor, prepareAttachments } from '../lib/outgoing';
+import { keptAttachments } from '../lib/outgoing';
 import { renderDiscordBody } from '../lib/render';
 
 export let chatEditMessage = contract
@@ -19,18 +19,15 @@ export let chatEditMessage = contract
       { action, notFound: 'chat.message.not_found' },
       async client => {
         let rendered = renderDiscordBody(ctx.input, action);
-        let prepared = await prepareAttachments(ctx.input.attachments, {
-          action,
-          messageId: ctx.input.messageId
-        });
         // Omitting `attachments` keeps the message's files; sending it replaces the set.
-        let keep = ctx.input.attachments === undefined ? undefined : prepared.kept;
-        if (
-          !rendered.content &&
-          rendered.embeds.length === 0 &&
-          prepared.files.length === 0 &&
-          keep?.length === 0
-        ) {
+        let keep =
+          ctx.input.attachments === undefined
+            ? undefined
+            : keptAttachments(ctx.input.attachments, {
+                action,
+                messageId: ctx.input.messageId
+              });
+        if (!rendered.content && rendered.embeds.length === 0 && keep?.length === 0) {
           throw ChatErrors.contentEmpty({ action });
         }
 
@@ -43,15 +40,13 @@ export let chatEditMessage = contract
             embeds: rendered.embeds,
             allowed_mentions: rendered.allowed_mentions
           },
-          prepared.files,
           keep
         );
 
         return buildMessageResult(
           raw,
           await loadChannelSafe(client, raw.channel_id),
-          identity,
-          clientReferencesFor(raw, prepared)
+          identity
         );
       }
     );

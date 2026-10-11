@@ -6,7 +6,7 @@ import {
   resolveDiscordIdentity,
   runDiscordChatAction
 } from '../lib/context';
-import { clientReferencesFor, prepareAttachments } from '../lib/outgoing';
+import { rejectInlineAttachments } from '../lib/outgoing';
 import { renderDiscordBody } from '../lib/render';
 
 export let chatSendMessage = contract
@@ -27,31 +27,22 @@ export let chatSendMessage = contract
 
       // Threads are channels on Discord, so a thread id is the target channel.
       let targetChannelId = ctx.input.threadId ?? ctx.input.channelId;
+      rejectInlineAttachments(ctx.input.attachments, action);
       let rendered = renderDiscordBody(ctx.input, action);
-      let prepared = await prepareAttachments(ctx.input.attachments, { action });
-      if (!rendered.content && rendered.embeds.length === 0 && prepared.files.length === 0) {
+      if (!rendered.content && rendered.embeds.length === 0) {
         throw ChatErrors.contentEmpty({ action });
       }
 
       let replyId = ctx.input.reply?.id ?? ctx.input.reply?.reference?.id;
       let identity = await resolveDiscordIdentity(client, ctx.auth);
-      let raw = await client.createMessage(
-        targetChannelId,
-        {
-          ...(rendered.content ? { content: rendered.content } : {}),
-          ...(rendered.embeds.length > 0 ? { embeds: rendered.embeds } : {}),
-          allowed_mentions: rendered.allowed_mentions,
-          ...(replyId ? { message_reference: { message_id: replyId } } : {})
-        },
-        prepared.files
-      );
+      let raw = await client.createMessage(targetChannelId, {
+        ...(rendered.content ? { content: rendered.content } : {}),
+        ...(rendered.embeds.length > 0 ? { embeds: rendered.embeds } : {}),
+        allowed_mentions: rendered.allowed_mentions,
+        ...(replyId ? { message_reference: { message_id: replyId } } : {})
+      });
 
-      return buildMessageResult(
-        raw,
-        await loadChannelSafe(client, raw.channel_id),
-        identity,
-        clientReferencesFor(raw, prepared)
-      );
+      return buildMessageResult(raw, await loadChannelSafe(client, raw.channel_id), identity);
     });
 
     return { output, message: `Sent Discord message \`${output.message.id}\`.` };
