@@ -1,3 +1,4 @@
+import { ServiceError } from '@lowerdeck/error';
 import {
   AuthConfigSecretRedactor,
   buildApiServiceError,
@@ -17,8 +18,45 @@ export type PageOptions = {
   sortDirection?: string;
 };
 
+const SECRET_PLACEHOLDER = /\$\$MT\$secret\$authConfig\$[A-Za-z0-9_.]+(?:\$\$)?/g;
+
+// Drip documents error bodies as { errors: [{ code, attribute?, message? }] }, with a
+// top-level message for rate limits. Only these documented fields are surfaced.
+function dripErrorDetail(error: unknown) {
+  if (!isApiErrorRecord(error)) return undefined;
+  const data = isApiErrorRecord(error.data) ? error.data : undefined;
+  const baggage = data && isApiErrorRecord(data.baggage) ? data.baggage : undefined;
+  const body =
+    baggage?.response ?? (isApiErrorRecord(error.response) ? error.response.data : undefined);
+  if (!isApiErrorRecord(body)) return undefined;
+  const parts: string[] = [];
+  for (const item of Array.isArray(body.errors) ? body.errors.slice(0, 5) : []) {
+    if (!isApiErrorRecord(item)) continue;
+    const code = typeof item.code === 'string' && item.code ? item.code : undefined;
+    const message =
+      typeof item.message === 'string' && item.message ? item.message : undefined;
+    const attribute =
+      typeof item.attribute === 'string' && item.attribute ? item.attribute : undefined;
+    const text = [
+      attribute ? `${attribute}:` : undefined,
+      message ?? code,
+      message && code ? `(${code})` : undefined
+    ]
+      .filter(Boolean)
+      .join(' ');
+    if (text) parts.push(text);
+  }
+  if (!parts.length && typeof body.message === 'string' && body.message)
+    parts.push(body.message);
+  const text = parts.join('; ').replace(SECRET_PLACEHOLDER, '[redacted]').slice(0, 1000);
+  return text || undefined;
+}
+
 export function safeDripFailure(error: unknown) {
+  // Locally created validation/response errors carry no transport state; keep their message.
+  if (error instanceof ServiceError) return error;
   const details = isApiErrorRecord(error) && isApiErrorRecord(error.data) ? error.data : {};
+  const providerDetail = dripErrorDetail(error);
   const candidate = getApiErrorStatus(error) ?? details.upstreamStatus;
   const status =
     typeof candidate === 'number' &&
@@ -35,7 +73,8 @@ export function safeDripFailure(error: unknown) {
         : 'api_request_failed',
     parent: {},
     extractMessage: () =>
-      'Check authentication, account access, rate limits and request fields. Submitted values and transport details are omitted; a failed write may need independent readback before retrying.'
+      providerDetail ??
+      'Check authentication, account access, rate limits and request fields. Transport details are omitted; a failed write may need independent readback before retrying.'
   });
 }
 
@@ -112,9 +151,7 @@ export class Client {
 
   private clean(value: unknown): any {
     if (typeof value === 'string')
-      return this.redactor
-        .redactEmbedded(value)
-        .replace(/\$\$MT\$secret\$authConfig\$[A-Za-z0-9_.]+(?:\$\$)?/g, '[redacted]');
+      return this.redactor.redactEmbedded(value).replace(SECRET_PLACEHOLDER, '[redacted]');
     if (Array.isArray(value)) return value.map(item => this.clean(item));
     if (isApiErrorRecord(value))
       return Object.fromEntries(
@@ -124,11 +161,12 @@ export class Client {
   }
 
   private async request(
-    method: 'get' | 'post' | 'delete',
+    method: 'get' | 'post' | 'put' | 'patch' | 'delete',
     path: string,
     options: {
       data?: unknown;
-      params?: Record<string, unknown>;
+      params?: Record<string, unknown> | URLSearchParams;
+      contentType?: string;
       collection?: string;
       singleton?: boolean;
       strings?: boolean;
@@ -142,7 +180,8 @@ export class Client {
         method,
         url: path,
         data: options.data,
-        params: options.params
+        params: options.params,
+        ...(options.contentType ? { headers: { 'Content-Type': options.contentType } } : {})
       });
       if (options.noContent) {
         if (response.status !== 204)
@@ -166,18 +205,23 @@ export class Client {
         return {};
       }
       if (options.queued) {
+        // Single-record shopper routes return { request_id }; batch routes return { request_ids }.
+        const requestIds =
+          typeof response.data.request_id === 'string'
+            ? [response.data.request_id]
+            : response.data.request_ids;
         if (
           response.status !== 202 ||
-          !Array.isArray(response.data.request_ids) ||
-          response.data.request_ids.length !== 1 ||
-          response.data.request_ids.some(id => typeof id !== 'string' || !id)
+          !Array.isArray(requestIds) ||
+          requestIds.length !== 1 ||
+          requestIds.some(id => typeof id !== 'string' || !id)
         )
           throw createApiServiceError(
             'Drip did not return the queued request identifier; processing is unconfirmed.',
             { reason: 'invalid_api_response', upstreamStatus: response.status }
           );
         return {
-          request_ids: this.clean(response.data.request_ids),
+          request_ids: this.clean(requestIds),
           errors:
             response.data.errors === undefined
               ? undefined
@@ -239,7 +283,7 @@ export class Client {
       }
       return result;
     } catch (error) {
-      // Never pass transport state, including an existing ServiceError, to the shared builder.
+      // Rebuild transport failures from documented Drip error fields only; local ServiceErrors pass through.
       throw safeDripFailure(error);
     }
   }
@@ -380,6 +424,107 @@ export class Client {
       collection: 'broadcasts'
     });
   }
+  async fetchBroadcast(id: string) {
+    return this.request('get', this.scope(2, `/broadcasts/${pathId(id)}`), {
+      collection: 'broadcasts',
+      singleton: true
+    });
+  }
+  async createBroadcast(broadcast: DripRecord) {
+    return this.request('post', this.scope(2, '/broadcasts'), {
+      data: { broadcasts: [broadcast] },
+      collection: 'broadcasts',
+      singleton: true
+    });
+  }
+  async updateBroadcast(id: string, broadcast: DripRecord) {
+    return this.request('patch', this.scope(2, `/broadcasts/${pathId(id)}`), {
+      data: { broadcasts: [broadcast] },
+      collection: 'broadcasts',
+      singleton: true
+    });
+  }
+  async deleteBroadcast(id: string) {
+    return this.request('delete', this.scope(2, `/broadcasts/${pathId(id)}`), {
+      collection: 'broadcasts',
+      singleton: true
+    });
+  }
+  async sendBroadcastTest(id: string, body: DripRecord) {
+    return this.request('post', this.scope(2, `/broadcasts/${pathId(id)}/send_test`), {
+      data: body,
+      noContent: true
+    });
+  }
+  async fetchBroadcastAudience(id: string) {
+    const result = await this.request(
+      'get',
+      this.scope(2, `/broadcasts/${pathId(id)}/audience`)
+    );
+    if (!isApiErrorRecord(result.audience))
+      throw createApiServiceError('Drip returned no campaign audience.', {
+        reason: 'invalid_api_response'
+      });
+    return result;
+  }
+  async setBroadcastAudience(id: string, body: DripRecord) {
+    return this.request('put', this.scope(2, `/broadcasts/${pathId(id)}/audience`), {
+      data: body,
+      contentType: 'application/vnd.api+json',
+      collection: 'broadcasts',
+      singleton: true
+    });
+  }
+  async scheduleBroadcast(id: string, body: DripRecord) {
+    return this.request('post', this.scope(2, `/broadcasts/${pathId(id)}/schedule`), {
+      data: body,
+      contentType: 'application/vnd.api+json',
+      collection: 'broadcasts',
+      singleton: true
+    });
+  }
+  async unscheduleBroadcast(id: string) {
+    return this.request('post', this.scope(2, `/broadcasts/${pathId(id)}/unschedule`), {
+      collection: 'broadcasts',
+      singleton: true
+    });
+  }
+  async listSegments(params?: PageOptions & { query?: string }) {
+    return this.request('get', this.scope(2, '/segments'), {
+      params: { ...pagination(params, 100), ...pickDefined({ q: params?.query }) },
+      collection: 'segments'
+    });
+  }
+  async fetchSegment(id: string) {
+    return this.request('get', this.scope(2, `/segments/${pathId(id)}`), {
+      collection: 'segments',
+      singleton: true
+    });
+  }
+  async fetchEmailMetrics(params: {
+    startDate?: string;
+    endDate?: string;
+    broadcastIds?: string[];
+    workflowIds?: string[];
+  }) {
+    const query = new URLSearchParams();
+    if (params.startDate) query.set('start_date', params.startDate);
+    if (params.endDate) query.set('end_date', params.endDate);
+    for (const id of params.broadcastIds ?? []) query.append('broadcast_ids[]', id);
+    for (const id of params.workflowIds ?? []) query.append('workflow_ids[]', id);
+    const result = await this.request('get', this.scope(2, '/metrics/email'), {
+      params: query
+    });
+    if (
+      !isApiErrorRecord(result.summary) ||
+      !Array.isArray(result.emails) ||
+      result.emails.some(email => !isApiErrorRecord(email))
+    )
+      throw createApiServiceError('Drip returned an invalid email metrics report.', {
+        reason: 'invalid_api_response'
+      });
+    return result;
+  }
   async listWorkflows(params?: PageOptions) {
     return this.request('get', this.scope(2, '/workflows'), {
       params: pagination(params),
@@ -435,21 +580,22 @@ export class Client {
       strings: true
     });
   }
+  // The single-record route has the standard hourly limit; batch routes are limited to 50/hour.
   async createOrUpdateOrder(order: DripRecord) {
-    return this.request('post', this.scope(3, '/shopper_activity/order/batch'), {
-      data: { orders: [order] },
+    return this.request('post', this.scope(3, '/shopper_activity/order'), {
+      data: order,
       queued: true
     });
   }
   async createOrUpdateCart(cart: DripRecord) {
-    return this.request('post', this.scope(3, '/shopper_activity/cart/batch'), {
-      data: { carts: [cart] },
+    return this.request('post', this.scope(3, '/shopper_activity/cart'), {
+      data: cart,
       queued: true
     });
   }
   async createOrUpdateProduct(product: DripRecord) {
-    return this.request('post', this.scope(3, '/shopper_activity/product/batch'), {
-      data: { products: [product] },
+    return this.request('post', this.scope(3, '/shopper_activity/product'), {
+      data: product,
       queued: true
     });
   }

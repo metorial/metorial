@@ -32,10 +32,9 @@ export class DocsClient {
 
   // ─── Collections ────────────────────────────────────────────
 
-  async listCollections(siteId: string, params: { page?: number } = {}) {
-    let response = await this.http.get(`/collections`, {
-      params: { ...params, siteId }
-    });
+  // https://developer.helpscout.com/docs-api/collections/list/
+  async listCollections(params: { siteId?: string; page?: number } = {}) {
+    let response = await this.http.get('/collections', { params });
     return response.data;
   }
 
@@ -44,25 +43,31 @@ export class DocsClient {
     return response.data;
   }
 
+  // https://developer.helpscout.com/docs-api/collections/create/
   async createCollection(data: {
     siteId: string;
     name: string;
     visibility?: string;
     description?: string;
+    order?: number;
   }) {
-    let response = await this.http.post('/collections', data);
+    let response = await this.http.post('/collections', data, { params: { reload: true } });
     return response.data;
   }
 
+  // https://developer.helpscout.com/docs-api/collections/update/
   async updateCollection(
     collectionId: string,
     data: {
-      name?: string;
+      name: string;
       visibility?: string;
       description?: string;
+      order?: number;
     }
   ) {
-    let response = await this.http.put(`/collections/${collectionId}`, data);
+    let response = await this.http.put(`/collections/${collectionId}`, data, {
+      params: { reload: true }
+    });
     return response.data;
   }
 
@@ -72,6 +77,7 @@ export class DocsClient {
 
   // ─── Categories ─────────────────────────────────────────────
 
+  // https://developer.helpscout.com/docs-api/categories/list/
   async listCategories(collectionId: string, params: { page?: number } = {}) {
     let response = await this.http.get(`/collections/${collectionId}/categories`, { params });
     return response.data;
@@ -82,27 +88,32 @@ export class DocsClient {
     return response.data;
   }
 
-  async createCategory(
-    collectionId: string,
-    data: {
-      name: string;
-      description?: string;
-      order?: number;
-    }
-  ) {
-    let response = await this.http.post(`/collections/${collectionId}/categories`, data);
+  // https://developer.helpscout.com/docs-api/categories/create/
+  async createCategory(data: {
+    collectionId: string;
+    name: string;
+    slug?: string;
+    visibility?: string;
+    order?: number;
+  }) {
+    let response = await this.http.post('/categories', data, { params: { reload: true } });
     return response.data;
   }
 
+  // https://developer.helpscout.com/docs-api/categories/update/
   async updateCategory(
     categoryId: string,
     data: {
-      name?: string;
-      description?: string;
+      name: string;
+      slug?: string;
+      visibility?: string;
       order?: number;
+      defaultSort?: string;
     }
   ) {
-    let response = await this.http.put(`/categories/${categoryId}`, data);
+    let response = await this.http.put(`/categories/${categoryId}`, data, {
+      params: { reload: true }
+    });
     return response.data;
   }
 
@@ -112,15 +123,19 @@ export class DocsClient {
 
   // ─── Articles ───────────────────────────────────────────────
 
+  // Articles can be listed per collection or per category.
+  // https://developer.helpscout.com/docs-api/articles/list/
   async listArticles(
-    collectionId: string,
+    parent: { collectionId?: string; categoryId?: string },
     params: {
       page?: number;
       status?: string;
-      categoryId?: string;
     } = {}
   ) {
-    let response = await this.http.get(`/collections/${collectionId}/articles`, { params });
+    let path = parent.categoryId
+      ? `/categories/${parent.categoryId}/articles`
+      : `/collections/${parent.collectionId}/articles`;
+    let response = await this.http.get(path, { params });
     return response.data;
   }
 
@@ -129,31 +144,33 @@ export class DocsClient {
     return response.data;
   }
 
-  async createArticle(
-    collectionId: string,
-    data: {
-      name: string;
-      text: string;
-      categoryIds?: string[];
-      status?: string;
-      slug?: string;
-    }
-  ) {
-    let response = await this.http.post(`/collections/${collectionId}/articles`, data);
+  // https://developer.helpscout.com/docs-api/articles/create/
+  async createArticle(data: {
+    collectionId: string;
+    name: string;
+    text: string;
+    categories?: string[];
+    status?: string;
+    slug?: string;
+  }) {
+    let response = await this.http.post('/articles', data, { params: { reload: true } });
     return response.data;
   }
 
+  // https://developer.helpscout.com/docs-api/articles/update/
   async updateArticle(
     articleId: string,
     data: {
       name?: string;
       text?: string;
-      categoryIds?: string[];
+      categories?: string[];
       status?: string;
       slug?: string;
     }
   ) {
-    let response = await this.http.put(`/articles/${articleId}`, data);
+    let response = await this.http.put(`/articles/${articleId}`, data, {
+      params: { reload: true }
+    });
     return response.data;
   }
 
@@ -161,10 +178,12 @@ export class DocsClient {
     await this.http.delete(`/articles/${articleId}`);
   }
 
+  // https://developer.helpscout.com/docs-api/articles/search/
   async searchArticles(
     query: string,
     params: {
       collectionId?: string;
+      siteId?: string;
       page?: number;
       status?: string;
     } = {}

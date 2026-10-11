@@ -52,7 +52,11 @@ export let listPullRequests = SlateTool.create(spec, {
           htmlUrl: z.string().describe('URL to the PR on GitHub')
         })
       ),
-      totalCount: z.number().describe('Number of pull requests returned')
+      totalCount: z.number().describe('Number of pull requests returned'),
+      hasNextPage: z
+        .boolean()
+        .optional()
+        .describe('Whether GitHub reports another page; request page + 1 to continue')
     })
   )
   .handleInvocation(async ctx => {
@@ -60,7 +64,7 @@ export let listPullRequests = SlateTool.create(spec, {
       token: ctx.auth.token,
       instanceUrl: ctx.auth.instanceUrl
     });
-    let prs = await client.listPullRequests(ctx.input.owner, ctx.input.repo, {
+    let result = await client.listPullRequests(ctx.input.owner, ctx.input.repo, {
       state: ctx.input.state,
       head: ctx.input.head,
       base: ctx.input.base,
@@ -70,21 +74,25 @@ export let listPullRequests = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let pullRequests = prs.map((pr: any) => ({
+    let pullRequests = result.items.map((pr: any) => ({
       pullNumber: pr.number,
       title: pr.title,
       state: pr.state,
-      author: pr.user.login,
+      author: pr.user?.login ?? '',
       head: pr.head.ref,
       base: pr.base.ref,
-      draft: pr.draft,
+      draft: Boolean(pr.draft),
       createdAt: pr.created_at,
       updatedAt: pr.updated_at,
       htmlUrl: pr.html_url
     }));
 
     return {
-      output: { pullRequests, totalCount: pullRequests.length },
+      output: {
+        pullRequests,
+        totalCount: pullRequests.length,
+        hasNextPage: result.hasNextPage
+      },
       message: `Found **${pullRequests.length}** pull requests in **${ctx.input.owner}/${ctx.input.repo}** (state: ${ctx.input.state ?? 'open'}).`
     };
   })

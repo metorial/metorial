@@ -7,6 +7,7 @@ import { spec } from '../spec';
 let lineItemSchema = z.object({
   productId: z.string().optional().describe('Product ID.'),
   sku: z.string().optional().describe('SKU.'),
+  brand: z.string().optional().describe('Product brand, vendor or manufacturer.'),
   productVariantId: z
     .string()
     .optional()
@@ -23,7 +24,13 @@ let lineItemSchema = z.object({
 
 let addressSchema = z
   .object({
-    name: z.string().optional(),
+    label: z.string().optional().describe('Label describing the address, such as "Home".'),
+    name: z
+      .string()
+      .optional()
+      .describe(
+        'Full name. Not a documented Drip address field; prefer firstName and lastName.'
+      ),
     firstName: z.string().optional(),
     lastName: z.string().optional(),
     company: z.string().optional(),
@@ -66,6 +73,10 @@ export let manageOrder = SlateTool.create(spec, {
         .enum(['placed', 'updated', 'paid', 'fulfilled', 'refunded', 'canceled'])
         .describe('Order lifecycle action.'),
       orderId: z.string().describe('Unique order identifier from your system.'),
+      orderPublicId: z
+        .string()
+        .optional()
+        .describe('Customer-facing order number shown in Drip, such as "#5".'),
       grandTotal: z.number().optional().describe('Order grand total.'),
       totalDiscounts: z.number().optional().describe('Total discounts applied.'),
       totalTaxes: z.number().optional().describe('Total taxes.'),
@@ -110,6 +121,7 @@ export let manageOrder = SlateTool.create(spec, {
     if (ctx.input.totalFees !== undefined) order.total_fees = ctx.input.totalFees;
     if (ctx.input.totalShipping !== undefined) order.total_shipping = ctx.input.totalShipping;
     if (ctx.input.currencyCode) order.currency = ctx.input.currencyCode;
+    if (ctx.input.orderPublicId) order.order_public_id = ctx.input.orderPublicId;
     if (ctx.input.orderUrl) order.order_url = ctx.input.orderUrl;
     if (ctx.input.occurredAt) order.occurred_at = ctx.input.occurredAt;
     if (ctx.input.refundAmount !== undefined) order.refund_amount = ctx.input.refundAmount;
@@ -119,6 +131,7 @@ export let manageOrder = SlateTool.create(spec, {
         product_id: item.productId,
         product_variant_id: item.productVariantId ?? item.productId,
         sku: item.sku,
+        brand: item.brand,
         name: item.name,
         price: item.price,
         quantity: item.quantity,
@@ -130,6 +143,7 @@ export let manageOrder = SlateTool.create(spec, {
 
     if (ctx.input.billingAddress) {
       order.billing_address = {
+        label: ctx.input.billingAddress.label,
         name: ctx.input.billingAddress.name,
         first_name: ctx.input.billingAddress.firstName,
         last_name: ctx.input.billingAddress.lastName,
@@ -146,6 +160,7 @@ export let manageOrder = SlateTool.create(spec, {
 
     if (ctx.input.shippingAddress) {
       order.shipping_address = {
+        label: ctx.input.shippingAddress.label,
         name: ctx.input.shippingAddress.name,
         first_name: ctx.input.shippingAddress.firstName,
         last_name: ctx.input.shippingAddress.lastName,

@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { wordpressServiceError } from '../lib/errors';
-import { createClient, extractCategorySummary, extractTagSummary } from '../lib/helpers';
+import {
+  apiTypeFor,
+  createClient,
+  extractCategorySummary,
+  extractTagSummary
+} from '../lib/helpers';
 import { spec } from '../spec';
 
 let categoryOutputSchema = z.object({
@@ -43,9 +48,9 @@ export let listCategoriesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let categories = await client.listCategories(ctx.input);
-    let results = categories.map((c: any) => extractCategorySummary(c, ctx.config.apiType));
+    let results = categories.map((c: any) => extractCategorySummary(c, apiTypeFor(ctx.auth)));
     return {
       output: {
         categories: results,
@@ -78,9 +83,9 @@ export let createCategoryTool = SlateTool.create(spec, {
   )
   .output(categoryOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let category = await client.createCategory(ctx.input);
-    let result = extractCategorySummary(category, ctx.config.apiType);
+    let result = extractCategorySummary(category, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Created category **"${result.name}"** (ID: ${result.categoryId}).`
@@ -103,9 +108,9 @@ export let getCategoryTool = SlateTool.create(spec, {
   )
   .output(categoryOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let category = await client.getCategory(ctx.input.categoryId);
-    let result = extractCategorySummary(category, ctx.config.apiType);
+    let result = extractCategorySummary(category, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Retrieved category **"${result.name}"** (ID: ${result.categoryId}).`
@@ -141,9 +146,9 @@ export let updateCategoryTool = SlateTool.create(spec, {
       throw wordpressServiceError('Provide at least one category field to update.');
     }
 
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let category = await client.updateCategory(categoryId, updateData);
-    let result = extractCategorySummary(category, ctx.config.apiType);
+    let result = extractCategorySummary(category, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Updated category **"${result.name}"** (ID: ${result.categoryId}).`
@@ -172,7 +177,7 @@ export let deleteCategoryTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     await client.deleteCategory(ctx.input.categoryId);
     return {
       output: {
@@ -206,9 +211,9 @@ export let listTagsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let tagsList = await client.listTags(ctx.input);
-    let results = tagsList.map((t: any) => extractTagSummary(t, ctx.config.apiType));
+    let results = tagsList.map((t: any) => extractTagSummary(t, apiTypeFor(ctx.auth)));
     return {
       output: {
         tags: results,
@@ -237,9 +242,9 @@ export let createTagTool = SlateTool.create(spec, {
   )
   .output(tagOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let tag = await client.createTag(ctx.input);
-    let result = extractTagSummary(tag, ctx.config.apiType);
+    let result = extractTagSummary(tag, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Created tag **"${result.name}"** (ID: ${result.tagId}).`
@@ -262,9 +267,9 @@ export let getTagTool = SlateTool.create(spec, {
   )
   .output(tagOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let tag = await client.getTag(ctx.input.tagId);
-    let result = extractTagSummary(tag, ctx.config.apiType);
+    let result = extractTagSummary(tag, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Retrieved tag **"${result.name}"** (ID: ${result.tagId}).`
@@ -299,9 +304,9 @@ export let updateTagTool = SlateTool.create(spec, {
       throw wordpressServiceError('Provide at least one tag field to update.');
     }
 
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let tag = await client.updateTag(tagId, updateData);
-    let result = extractTagSummary(tag, ctx.config.apiType);
+    let result = extractTagSummary(tag, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Updated tag **"${result.name}"** (ID: ${result.tagId}).`
@@ -330,7 +335,7 @@ export let deleteTagTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     await client.deleteTag(ctx.input.tagId);
     return {
       output: {

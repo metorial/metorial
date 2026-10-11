@@ -2,13 +2,28 @@
 
 Manage Stripe customers, payments, recurring subscriptions, invoices, products, prices, refunds, disputes, payouts, coupons, and manual tax rates. Create Checkout and Billing Portal sessions and payment links. Inspect account identity, balances, and transaction history, and receive verified webhook events.
 
-Uses Stripe API `2026-08-26.dahlia`. Authenticate with an API key or Stripe Connect OAuth (`read_write`). Restricted API keys need permissions for the resources used; account identity requires account read access. The optional connected-account target applies the Stripe-Account header to tool calls.
+Uses Stripe API `2026-08-26.dahlia`. Authenticate with an API key, Stripe Apps OAuth, or existing Stripe Connect OAuth (`read_write`). Restricted API keys need permissions for the resources used; account identity requires account read access. The optional connected-account target applies the Stripe-Account header to tool calls.
 
 Subscription `pause`/`resume` control payment collection. Use returned subscription item IDs to update an existing item. Individual billing periods are returned for each item; the legacy summary is omitted for mixed periods.
 
 Checkout supports `expire`; payment links support `update` with `active=false`; invoices support `list_line_items` and draft `delete`. Promotion codes support get/update and deactivation. Prices are archived with update, and cannot be deleted.
 
 This integration does not currently expose Stripe Issuing, Treasury, Radar rules, file uploads, Connect transfers, or automatic tax calculation.
+
+## Stripe Apps OAuth
+
+For new public integrations, register a Stripe App with public distribution and
+OAuth API access. Set the client ID from the app's public OAuth link and use the
+app developer account's matching secret API key as the OAuth client secret.
+Restricted API keys cannot exchange or refresh tokens. Permissions are declared
+in the app manifest and approved during installation; they are not OAuth URL
+scopes. Public links work after publication (Stripe reviewers can use them before
+publication). External testing requires Stripe's separate external-test links.
+
+Access tokens expire after one hour. The connection stores the expiration and
+rotating refresh token; refresh tokens expire after one year without renewal.
+Both the token exchange and refresh use Stripe Apps endpoints. Existing Connect
+connections continue using their original endpoints and auth method.
 
 ## Events
 

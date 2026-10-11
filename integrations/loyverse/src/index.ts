@@ -17,6 +17,7 @@ import {
   deleteModifier,
   deleteSupplier,
   deleteTax,
+  getCustomer,
   getInventory,
   getItem,
   getMerchant,
@@ -33,6 +34,7 @@ import {
   listStores,
   listSuppliers,
   listTaxes,
+  listVariants,
   updateInventory
 } from './tools';
 export let provider = Slate.create({
@@ -40,9 +42,11 @@ export let provider = Slate.create({
   tools: [
     listItems,
     getItem,
+    listVariants,
     createOrUpdateItem,
     deleteItem,
     listCustomers,
+    getCustomer,
     createOrUpdateCustomer,
     deleteCustomer,
     listReceipts,

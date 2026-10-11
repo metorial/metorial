@@ -1,5 +1,8 @@
 import { createAxios } from '@slates/provider';
+import { isMessengerPagePermissionError } from '../chat/lib/errors';
+import { MESSENGER_DEFAULT_API_VERSION } from '../config';
 import { messengerApiError } from './errors';
+import { resolveMessengerConnectionPageId } from './routingMatcher';
 
 export interface ClientConfig {
   token: string;
@@ -11,6 +14,7 @@ export interface SendMessageOptions {
   recipientId: string;
   messagingType?: string;
   tag?: string;
+  replyToMessageId?: string;
 }
 
 export interface TextMessage extends SendMessageOptions {
@@ -95,6 +99,7 @@ export interface UploadedAttachment {
 
 export interface UserProfile {
   recipientId: string;
+  name?: string;
   firstName?: string;
   lastName?: string;
   profilePic?: string;
@@ -102,6 +107,41 @@ export interface UserProfile {
   timezone?: number;
   gender?: string;
 }
+
+export type SenderActionType = 'typing_on' | 'typing_off' | 'mark_seen' | 'react' | 'unreact';
+
+export interface MessengerConversation {
+  conversationId: string;
+  updatedTime?: string;
+  participants: Array<{ id: string; name?: string; email?: string }>;
+}
+
+export interface MessengerConversationMessage {
+  messageId: string;
+  createdTime?: string;
+  fromId?: string;
+  fromName?: string;
+  toIds: string[];
+  text?: string;
+  replyToMessageId?: string;
+  attachments: Array<{
+    attachmentId?: string;
+    name?: string;
+    mimeType?: string;
+    size?: number;
+  }>;
+}
+
+export interface MessengerResultPage<T> {
+  items: T[];
+  nextCursor?: string;
+}
+
+// https://developers.facebook.com/docs/graph-api/results (cursor-based pagination)
+let readNextCursor = (paging: any): string | undefined =>
+  paging?.next && typeof paging?.cursors?.after === 'string'
+    ? paging.cursors.after
+    : undefined;
 
 export class Client {
   private token: string;
@@ -132,6 +172,24 @@ export class Client {
     }
   }
 
+  // https://developers.facebook.com/documentation/business-messaging/messenger-platform/send-messages
+  private buildSendBody(options: SendMessageOptions, message: Record<string, unknown>) {
+    let body: Record<string, unknown> = {
+      recipient: { id: options.recipientId },
+      messaging_type: options.messagingType || 'RESPONSE',
+      message
+    };
+
+    if (options.tag) {
+      body.tag = options.tag;
+    }
+    if (options.replyToMessageId) {
+      body.reply_to = { mid: options.replyToMessageId };
+    }
+
+    return body;
+  }
+
   // ─── Sending Messages ───────────────────────────────────────
 
   async sendTextMessage(options: TextMessage): Promise<any> {
@@ -147,15 +205,7 @@ export class Client {
       }));
     }
 
-    let body: any = {
-      recipient: { id: options.recipientId },
-      message,
-      messaging_type: options.messagingType || 'RESPONSE'
-    };
-
-    if (options.tag) {
-      body.tag = options.tag;
-    }
+    let body = this.buildSendBody(options, message);
 
     return this.request('send text message', () => api.post(`/${this.pageId}/messages`, body));
   }
@@ -171,20 +221,12 @@ export class Client {
           is_reusable: options.isReusable || false
         };
 
-    let body: any = {
-      recipient: { id: options.recipientId },
-      message: {
-        attachment: {
-          type: options.attachmentType,
-          payload
-        }
-      },
-      messaging_type: options.messagingType || 'RESPONSE'
-    };
-
-    if (options.tag) {
-      body.tag = options.tag;
-    }
+    let body = this.buildSendBody(options, {
+      attachment: {
+        type: options.attachmentType,
+        payload
+      }
+    });
 
     return this.request('send attachment', () => api.post(`/${this.pageId}/messages`, body));
   }
@@ -192,20 +234,12 @@ export class Client {
   async sendImageAttachments(options: MultiImageMessage): Promise<any> {
     let api = this.createApi();
 
-    let body: any = {
-      recipient: { id: options.recipientId },
-      message: {
-        attachments: options.imageUrls.map(url => ({
-          type: 'image',
-          payload: { url }
-        }))
-      },
-      messaging_type: options.messagingType || 'RESPONSE'
-    };
-
-    if (options.tag) {
-      body.tag = options.tag;
-    }
+    let body = this.buildSendBody(options, {
+      attachments: options.imageUrls.map(url => ({
+        type: 'image',
+        payload: { url }
+      }))
+    });
 
     return this.request('send image attachments', () =>
       api.post(`/${this.pageId}/messages`, body)
@@ -249,34 +283,26 @@ export class Client {
   ): Promise<any> {
     let api = this.createApi();
 
-    let body: any = {
-      recipient: { id: options.recipientId },
-      message: {
-        attachment: {
-          type: 'template',
-          payload: {
-            template_type: 'generic',
-            elements: options.elements.map(el => ({
-              title: el.title,
-              subtitle: el.subtitle,
-              image_url: el.imageUrl,
-              default_action: el.defaultActionUrl
-                ? {
-                    type: 'web_url',
-                    url: el.defaultActionUrl
-                  }
-                : undefined,
-              buttons: el.buttons?.map(btn => this.formatButton(btn))
-            }))
-          }
+    let body = this.buildSendBody(options, {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'generic',
+          elements: options.elements.map(el => ({
+            title: el.title,
+            subtitle: el.subtitle,
+            image_url: el.imageUrl,
+            default_action: el.defaultActionUrl
+              ? {
+                  type: 'web_url',
+                  url: el.defaultActionUrl
+                }
+              : undefined,
+            buttons: el.buttons?.map(btn => this.formatButton(btn))
+          }))
         }
-      },
-      messaging_type: options.messagingType || 'RESPONSE'
-    };
-
-    if (options.tag) {
-      body.tag = options.tag;
-    }
+      }
+    });
 
     return this.request('send generic template', () =>
       api.post(`/${this.pageId}/messages`, body)
@@ -291,24 +317,16 @@ export class Client {
   ): Promise<any> {
     let api = this.createApi();
 
-    let body: any = {
-      recipient: { id: options.recipientId },
-      message: {
-        attachment: {
-          type: 'template',
-          payload: {
-            template_type: 'button',
-            text: options.text,
-            buttons: options.buttons.map(btn => this.formatButton(btn))
-          }
+    let body = this.buildSendBody(options, {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'button',
+          text: options.text,
+          buttons: options.buttons.map(btn => this.formatButton(btn))
         }
-      },
-      messaging_type: options.messagingType || 'RESPONSE'
-    };
-
-    if (options.tag) {
-      body.tag = options.tag;
-    }
+      }
+    });
 
     return this.request('send button template', () =>
       api.post(`/${this.pageId}/messages`, body)
@@ -339,23 +357,15 @@ export class Client {
       elementPayload.buttons = options.buttons.map(btn => this.formatButton(btn));
     }
 
-    let body: any = {
-      recipient: { id: options.recipientId },
-      message: {
-        attachment: {
-          type: 'template',
-          payload: {
-            template_type: 'media',
-            elements: [elementPayload]
-          }
+    let body = this.buildSendBody(options, {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'media',
+          elements: [elementPayload]
         }
-      },
-      messaging_type: options.messagingType || 'RESPONSE'
-    };
-
-    if (options.tag) {
-      body.tag = options.tag;
-    }
+      }
+    });
 
     return this.request('send media template', () =>
       api.post(`/${this.pageId}/messages`, body)
@@ -408,20 +418,12 @@ export class Client {
       payload.timestamp = options.timestamp;
     }
 
-    let body: any = {
-      recipient: { id: options.recipientId },
-      message: {
-        attachment: {
-          type: 'template',
-          payload
-        }
-      },
-      messaging_type: options.messagingType || 'RESPONSE'
-    };
-
-    if (options.tag) {
-      body.tag = options.tag;
-    }
+    let body = this.buildSendBody(options, {
+      attachment: {
+        type: 'template',
+        payload
+      }
+    });
 
     return this.request('send receipt template', () =>
       api.post(`/${this.pageId}/messages`, body)
@@ -447,16 +449,26 @@ export class Client {
 
   // ─── Sender Actions ─────────────────────────────────────────
 
+  // https://developers.facebook.com/documentation/business-messaging/messenger-platform/send-messages/sender-actions
   async sendSenderAction(
     recipientId: string,
-    action: 'typing_on' | 'typing_off' | 'mark_seen'
+    action: SenderActionType,
+    payload?: { messageId: string; reaction?: string }
   ): Promise<any> {
     let api = this.createApi();
 
     return this.request('send sender action', () =>
       api.post(`/${this.pageId}/messages`, {
         recipient: { id: recipientId },
-        sender_action: action
+        sender_action: action,
+        ...(payload
+          ? {
+              payload: {
+                message_id: payload.messageId,
+                ...(payload.reaction ? { reaction: payload.reaction } : {})
+              }
+            }
+          : {})
       })
     );
   }
@@ -466,17 +478,14 @@ export class Client {
   async getUserProfile(recipientId: string, fields?: string[]): Promise<UserProfile> {
     let api = this.createApi();
 
-    let profileFields = fields || [
-      'first_name',
-      'last_name',
-      'profile_pic',
-      'locale',
-      'timezone',
-      'gender'
-    ];
+    // locale, timezone, and gender need extra Page permissions, so they are opt-in.
+    // https://developers.facebook.com/documentation/business-messaging/messenger-platform/identity/user-profile
+    let profileFields = fields?.length
+      ? fields
+      : ['name', 'first_name', 'last_name', 'profile_pic'];
 
     let data = await this.request<any>('get user profile', () =>
-      api.get(`/${recipientId}`, {
+      api.get(`/${encodeURIComponent(recipientId)}`, {
         params: {
           fields: profileFields.join(',')
         }
@@ -484,6 +493,7 @@ export class Client {
     );
     return {
       recipientId,
+      name: data.name,
       firstName: data.first_name,
       lastName: data.last_name,
       profilePic: data.profile_pic,
@@ -538,10 +548,19 @@ export class Client {
     }
 
     if (settings.iceBreakers !== undefined) {
-      payload.ice_breakers = settings.iceBreakers.map(ib => ({
-        question: ib.question,
-        payload: ib.payload
-      }));
+      // Localized format; the flat question list is deprecated.
+      // https://developers.facebook.com/documentation/business-messaging/messenger-platform/reference/messenger-profile-api/ice-breakers
+      payload.ice_breakers = settings.iceBreakers.length
+        ? [
+            {
+              locale: 'default',
+              call_to_actions: settings.iceBreakers.map(ib => ({
+                question: ib.question,
+                payload: ib.payload
+              }))
+            }
+          ]
+        : [];
     }
 
     if (settings.whitelistedDomains !== undefined) {
@@ -637,18 +656,53 @@ export class Client {
     );
   }
 
-  async getThreadOwner(recipientId: string): Promise<{ ownerAppId?: string; raw: any }> {
+  async releaseThreadControl(recipientId: string, metadata?: string): Promise<any> {
+    let api = this.createApi();
+
+    let body: any = {
+      recipient: { id: recipientId }
+    };
+
+    if (metadata) {
+      body.metadata = metadata;
+    }
+
+    return this.request('release thread control', () =>
+      api.post(`/${this.pageId}/release_thread_control`, body)
+    );
+  }
+
+  async extendThreadControl(recipientId: string, durationSeconds: number): Promise<any> {
+    let api = this.createApi();
+
+    return this.request('extend thread control', () =>
+      api.post(`/${this.pageId}/extend_thread_control`, {
+        recipient: { id: recipientId },
+        duration: durationSeconds
+      })
+    );
+  }
+
+  // https://developers.facebook.com/documentation/business-messaging/messenger-platform/conversation-routing
+  async getThreadOwner(
+    recipientId: string
+  ): Promise<{ ownerAppId?: string; expiration?: number; raw: any }> {
     let api = this.createApi();
     let response = await this.request<any>('get thread owner', () =>
       api.get(`/${this.pageId}/thread_owner`, {
         params: {
-          recipient: JSON.stringify({ id: recipientId })
+          recipient: recipientId
         }
       })
     );
 
+    let owner = response?.data?.[0]?.thread_owner;
+    let appId = owner?.app_id;
+    let expiration = Number(owner?.expiration);
+
     return {
-      ownerAppId: response.data?.[0]?.thread_owner?.app_id,
+      ownerAppId: appId !== undefined && appId !== null ? String(appId) : undefined,
+      expiration: Number.isFinite(expiration) && expiration > 0 ? expiration : undefined,
       raw: response
     };
   }
@@ -661,4 +715,124 @@ export class Client {
 
     return response.data || [];
   }
+
+  // ─── Page ──────────────────────────────────────────────────
+
+  // Messaging-only Page tokens cannot read Page details, so the Page falls back to its id.
+  async getPage(): Promise<{
+    pageId: string;
+    name?: string;
+    link?: string;
+    pictureUrl?: string;
+    detailsAvailable: boolean;
+  }> {
+    let api = this.createApi();
+    let data = await this.request<any>('get Page', async () => {
+      try {
+        return await api.get(`/${this.pageId}`, {
+          params: { fields: 'id,name,link,picture' }
+        });
+      } catch (error) {
+        if (this.pageId !== 'me' && isMessengerPagePermissionError(error)) {
+          return { data: { id: this.pageId, detailsUnavailable: true } };
+        }
+        throw error;
+      }
+    });
+
+    return {
+      pageId: String(data?.id ?? this.pageId),
+      name: data?.name,
+      link: data?.link,
+      pictureUrl: data?.picture?.data?.url,
+      detailsAvailable: !data?.detailsUnavailable
+    };
+  }
+
+  // ─── Conversations ─────────────────────────────────────────
+
+  // https://developers.facebook.com/docs/graph-api/reference/page/conversations/
+  async listConversations(options: {
+    userId?: string;
+    limit?: number;
+    after?: string;
+  }): Promise<MessengerResultPage<MessengerConversation>> {
+    let api = this.createApi();
+    let response = await this.request<any>('list conversations', () =>
+      api.get(`/${this.pageId}/conversations`, {
+        params: {
+          platform: 'messenger',
+          fields: 'id,updated_time,participants',
+          ...(options.userId ? { user_id: options.userId } : {}),
+          ...(options.limit ? { limit: options.limit } : {}),
+          ...(options.after ? { after: options.after } : {})
+        }
+      })
+    );
+
+    let items = (Array.isArray(response?.data) ? response.data : []).map(
+      (conversation: any): MessengerConversation => ({
+        conversationId: String(conversation.id),
+        updatedTime: conversation.updated_time,
+        participants: (conversation.participants?.data ?? []).map((participant: any) => ({
+          id: String(participant.id),
+          name: participant.name,
+          email: participant.email
+        }))
+      })
+    );
+
+    return { items, nextCursor: readNextCursor(response?.paging) };
+  }
+
+  // https://developers.facebook.com/docs/graph-api/reference/message/
+  async listConversationMessages(options: {
+    conversationId: string;
+    limit?: number;
+    after?: string;
+  }): Promise<MessengerResultPage<MessengerConversationMessage>> {
+    let api = this.createApi();
+    let response = await this.request<any>('list conversation messages', () =>
+      api.get(`/${encodeURIComponent(options.conversationId)}/messages`, {
+        params: {
+          fields:
+            'id,created_time,from,to,message,reply_to,attachments{id,name,mime_type,size}',
+          ...(options.limit ? { limit: options.limit } : {}),
+          ...(options.after ? { after: options.after } : {})
+        }
+      })
+    );
+
+    let items = (Array.isArray(response?.data) ? response.data : []).map(
+      (message: any): MessengerConversationMessage => ({
+        messageId: String(message.id),
+        createdTime: message.created_time,
+        fromId: message.from?.id !== undefined ? String(message.from.id) : undefined,
+        fromName: message.from?.name,
+        toIds: (message.to?.data ?? []).map((recipient: any) => String(recipient.id)),
+        text:
+          typeof message.message === 'string' && message.message ? message.message : undefined,
+        replyToMessageId: message.reply_to?.mid,
+        attachments: (message.attachments?.data ?? []).map((attachment: any) => ({
+          attachmentId: attachment.id !== undefined ? String(attachment.id) : undefined,
+          name: attachment.name,
+          mimeType: attachment.mime_type,
+          size: typeof attachment.size === 'number' ? attachment.size : undefined
+        }))
+      })
+    );
+
+    return { items, nextCursor: readNextCursor(response?.paging) };
+  }
 }
+
+export let createMessengerClient = (ctx: {
+  auth: { token: string; pageId?: string };
+  config: { pageId?: string; apiVersion?: string };
+}) =>
+  new Client({
+    token: ctx.auth.token,
+    // A Page access token resolves `me` to its own Page.
+    pageId: resolveMessengerConnectionPageId(ctx.auth, ctx.config) ?? 'me',
+    apiVersion: ctx.config.apiVersion || MESSENGER_DEFAULT_API_VERSION
+  });

@@ -8,7 +8,9 @@ export let deleteMessageTool = SlateTool.create(spec, {
   key: 'delete_message',
   description: `Delete a message from a chat. The bot can delete its own messages in any chat, and can delete other users' messages in groups/supergroups if it has the appropriate admin permissions.`,
   constraints: [
-    'Messages can only be deleted within 48 hours of being sent in groups (no limit for bot own messages in private chats).'
+    'A message can only be deleted if it was sent less than 48 hours ago.',
+    'Service messages about supergroup, channel, or forum topic creation cannot be deleted.',
+    "Deleting other users' messages in supergroups and channels requires the can_delete_messages administrator right."
   ],
   tags: {
     destructive: true,

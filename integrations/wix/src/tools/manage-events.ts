@@ -10,8 +10,9 @@ export let manageEvents = SlateTool.create(spec, {
 Use **action** to specify the operation: \`list\` or \`get\`.
 Events include details like title, description, location, scheduling, RSVP/ticketing info, and status.`,
   instructions: [
-    'Events can be filtered by status: SCHEDULED, STARTED, ENDED, CANCELED.',
-    'Use the fieldset parameter to control which event properties are returned for better performance.'
+    'Events can be filtered by status: UPCOMING, STARTED, ENDED, CANCELED, DRAFT (drafts also need includeDrafts).',
+    'Use fieldset to include extra event properties, for example DETAILS, TEXTS, REGISTRATION, or URLS.',
+    'Filter and sort by fields such as title, slug, createdDate, or dateAndTimeSettings.startDate.'
   ],
   tags: { destructive: false, readOnly: true }
 })
@@ -35,8 +36,14 @@ Events include details like title, description, location, scheduling, RSVP/ticke
       fieldset: z
         .array(z.string())
         .optional()
-        .describe('Fields to include in response for list (e.g., FULL, DETAILS, TEXTS)'),
-      limit: z.number().optional().describe('Max items to return (default 50)'),
+        .describe(
+          'Extra field sets to include (DETAILS, TEXTS, REGISTRATION, URLS, FORM, DASHBOARD, FEED, ONLINE_CONFERENCING_SESSION, SEO_SETTINGS, AGENDA, CATEGORIES)'
+        ),
+      includeDrafts: z
+        .boolean()
+        .optional()
+        .describe('Whether to include draft events (for list)'),
+      limit: z.number().optional().describe('Max items to return (default 50, max 1000)'),
       offset: z.number().optional().describe('Number of items to skip')
     })
   )
@@ -52,11 +59,14 @@ Events include details like title, description, location, scheduling, RSVP/ticke
 
     switch (ctx.input.action) {
       case 'list': {
+        // Wix Query Events returns no events unless paging.limit is greater than 0.
         let result = await client.queryEvents({
           filter: ctx.input.filter,
           sort: ctx.input.sort,
-          paging: { limit: ctx.input.limit, offset: ctx.input.offset },
-          fieldset: ctx.input.fieldset
+          limit: ctx.input.limit ?? 50,
+          offset: ctx.input.offset,
+          fields: ctx.input.fieldset,
+          includeDrafts: ctx.input.includeDrafts
         });
         let events = result.events || [];
         return {
@@ -67,7 +77,7 @@ Events include details like title, description, location, scheduling, RSVP/ticke
       case 'get': {
         if (!ctx.input.eventId)
           throw createApiServiceError('eventId is required for get action');
-        let result = await client.getEvent(ctx.input.eventId);
+        let result = await client.getEvent(ctx.input.eventId, ctx.input.fieldset);
         return {
           output: { event: result.event },
           message: `Retrieved event **${result.event?.title || ctx.input.eventId}**`

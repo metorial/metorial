@@ -255,7 +255,7 @@ export class Client {
         'prospector_engagement_score'
       ]),
       domain: p?.domain,
-      name: p?.name,
+      name: p?.name === undefined ? undefined : [p.name],
       'updated_at[gte]': p?.updatedAtGte
     });
   }
@@ -399,8 +399,11 @@ export class Client {
   async listTasks(
     p?: PaginationParams & {
       personId?: number;
+      accountId?: number;
       currentUser?: boolean;
       taskType?: string;
+      currentState?: 'scheduled' | 'completed';
+      timeInterval?: 'overdue' | 'today' | 'tomorrow' | 'this_week' | 'next_week';
       updatedAtGte?: string;
     }
   ) {
@@ -415,13 +418,25 @@ export class Client {
         'salesloft.prioritizers/rhythm'
       ]),
       person_id: p?.personId === undefined ? undefined : [p.personId],
+      account_id: p?.accountId === undefined ? undefined : [p.accountId],
       user_id: p?.currentUser ? [(await this.getMe()).id] : undefined,
       task_type: p?.taskType === undefined ? undefined : [p.taskType],
+      current_state: p?.currentState === undefined ? undefined : [p.currentState],
+      time_interval_filter: p?.timeInterval,
       'updated_at[gte]': p?.updatedAtGte
     });
   }
   getTask(value: number) {
     return this.one(taskSchema, 'GET', `/tasks/${this.identifier(value)}`);
+  }
+  createTask(data: Data) {
+    return this.one(taskSchema, 'POST', '/tasks', { data });
+  }
+  updateTask(value: number, data: Data) {
+    return this.one(taskSchema, 'PUT', `/tasks/${this.identifier(value)}`, { data });
+  }
+  deleteTask(value: number) {
+    return this.request('DELETE', `/tasks/${this.identifier(value)}`);
   }
   listNotes(
     p?: PaginationParams & { personId?: number; accountId?: number; updatedAtGte?: string }

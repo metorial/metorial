@@ -33,11 +33,15 @@ export let manageWorkflow = SlateTool.create(spec, {
       subscriberEmail: z
         .string()
         .optional()
-        .describe('Subscriber email. Required for start_subscriber.'),
+        .describe(
+          'Subscriber email. start_subscriber and remove_subscriber need subscriberEmail or subscriberId.'
+        ),
       subscriberId: z
         .string()
         .optional()
-        .describe('Subscriber ID. Required for remove_subscriber.'),
+        .describe(
+          'Drip subscriber ID. start_subscriber and remove_subscriber need subscriberEmail or subscriberId. When both are given, start_subscriber uses the email and remove_subscriber uses the ID.'
+        ),
       customFields: z
         .record(z.string(), z.any())
         .optional()
@@ -148,12 +152,16 @@ export let manageWorkflow = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'start_subscriber') {
-      if (!ctx.input.subscriberEmail) {
+      if (!ctx.input.subscriberEmail && !ctx.input.subscriberId) {
         throw createApiServiceError(
-          'subscriberEmail is required to start a subscriber on a workflow.'
+          'subscriberEmail or subscriberId is required to start a subscriber on a workflow.',
+          { reason: 'invalid_input' }
         );
       }
-      let sub: Record<string, any> = { email: ctx.input.subscriberEmail };
+      // Email keeps precedence, as before subscriberId was supported.
+      let sub: Record<string, any> = ctx.input.subscriberEmail
+        ? { email: ctx.input.subscriberEmail }
+        : { id: ctx.input.subscriberId };
       if (ctx.input.customFields) sub.custom_fields = ctx.input.customFields;
       if (ctx.input.tags) sub.tags = ctx.input.tags;
       await client.startOnWorkflow(ctx.input.workflowId, sub);
@@ -165,12 +173,14 @@ export let manageWorkflow = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'remove_subscriber') {
-      if (!ctx.input.subscriberId) {
+      let subscriber = ctx.input.subscriberId || ctx.input.subscriberEmail;
+      if (!subscriber) {
         throw createApiServiceError(
-          'subscriberId is required to remove a subscriber from a workflow.'
+          'subscriberId or subscriberEmail is required to remove a subscriber from a workflow.',
+          { reason: 'invalid_input' }
         );
       }
-      await client.removeFromWorkflow(ctx.input.workflowId, ctx.input.subscriberId);
+      await client.removeFromWorkflow(ctx.input.workflowId, subscriber);
       return {
         output: { removed: true },
         message:

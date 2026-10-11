@@ -1,5 +1,45 @@
-import { createAxios } from 'slates';
+import { createAxios, getResponseHeaderValue } from 'slates';
 import { withHelpScoutErrorHandling } from './errors';
+
+let API_BASE_URL = 'https://api.helpscout.net/v2';
+
+export type HelpScoutCustomerRef = { email?: string; id?: number };
+
+export type HelpScoutThreadAttachment = {
+  fileName: string;
+  mimeType: string;
+  data: string;
+};
+
+export type HelpScoutPatchOperation = {
+  op: string;
+  path: string;
+  value?: unknown;
+};
+
+type ReportParams = {
+  start: string;
+  end: string;
+  previousStart?: string;
+  previousEnd?: string;
+  mailboxes?: string;
+  tags?: string;
+  types?: string;
+  folders?: string;
+  officeHours?: boolean;
+};
+
+// Help Scout returns the new entity id in the Resource-ID header and the
+// entity URL in the Location header.
+// https://developer.helpscout.com/mailbox-api/endpoints/conversations/create/
+let getCreatedResourceId = (headers: unknown): string | undefined => {
+  let resourceId = getResponseHeaderValue(headers, 'resource-id');
+  if (resourceId) return resourceId;
+
+  let location = getResponseHeaderValue(headers, 'location');
+  let match = location?.match(/\/(\d+)(?:[/?#]|$)/);
+  return match?.[1];
+};
 
 export class HelpScoutClient {
   private http: ReturnType<typeof createAxios>;
@@ -7,7 +47,7 @@ export class HelpScoutClient {
   constructor(token: string) {
     this.http = withHelpScoutErrorHandling(
       createAxios({
-        baseURL: 'https://api.helpscout.net/v2',
+        baseURL: API_BASE_URL,
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -19,49 +59,37 @@ export class HelpScoutClient {
 
   // ─── Conversations ──────────────────────────────────────────
 
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/list/
   async listConversations(
     params: {
       mailbox?: number;
+      folder?: number;
       status?: string;
       tag?: string;
       assignedTo?: number;
       modifiedSince?: string;
+      number?: number;
       sortField?: string;
       sortOrder?: string;
       page?: number;
       query?: string;
     } = {}
   ) {
-    if (params.query) {
-      let response = await this.http.get('/conversations', {
-        params: {
-          query: params.query,
-          page: params.page,
-          sortField: params.sortField,
-          sortOrder: params.sortOrder
-        }
-      });
-      return response.data;
-    }
-
-    let queryParts: string[] = [];
-    if (params.mailbox) queryParts.push(`mailbox:${params.mailbox}`);
-    if (params.status) queryParts.push(`status:${params.status}`);
-    if (params.tag) queryParts.push(`tag:"${params.tag}"`);
-    if (params.assignedTo) queryParts.push(`assigned:${params.assignedTo}`);
-    if (params.modifiedSince) queryParts.push(`modifiedSince:${params.modifiedSince}`);
-
-    let requestParams: Record<string, any> = {
-      page: params.page,
-      sortField: params.sortField,
-      sortOrder: params.sortOrder
-    };
-
-    if (queryParts.length > 0) {
-      requestParams.query = `(${queryParts.join(' AND ')})`;
-    }
-
-    let response = await this.http.get('/conversations', { params: requestParams });
+    let response = await this.http.get('/conversations', {
+      params: {
+        mailbox: params.mailbox,
+        folder: params.folder,
+        status: params.status,
+        tag: params.tag,
+        assigned_to: params.assignedTo,
+        modifiedSince: params.modifiedSince,
+        number: params.number,
+        query: params.query,
+        sortField: params.sortField,
+        sortOrder: params.sortOrder,
+        page: params.page
+      }
+    });
     return response.data;
   }
 
@@ -74,11 +102,11 @@ export class HelpScoutClient {
     subject: string;
     type: string;
     mailboxId: number;
-    customer: { email?: string; id?: number };
+    customer: HelpScoutCustomerRef;
     threads: Array<{
       type: string;
       text: string;
-      customer?: { email?: string; id?: number };
+      customer?: HelpScoutCustomerRef;
     }>;
     tags?: string[];
     status?: string;
@@ -98,46 +126,28 @@ export class HelpScoutClient {
     if (data.assignTo !== undefined) body.assignTo = data.assignTo;
 
     let response = await this.http.post('/conversations', body);
-    let location = response.headers?.['resource-id'] ?? response.headers?.location;
-    return { conversationId: location };
+    return {
+      conversationId: getCreatedResourceId(response.headers),
+      webUrl: getResponseHeaderValue(response.headers, 'web-location')
+    };
   }
 
-  async updateConversation(
-    conversationId: number,
-    operations: Array<{
-      op: string;
-      path: string;
-      value?: any;
-    }>
-  ) {
-    let body = operations.length === 1 ? operations[0] : operations;
-    await this.http.patch(`/conversations/${conversationId}`, body, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+  // The update endpoint accepts one JSON Patch operation per request.
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/update/
+  async patchConversation(conversationId: number, operation: HelpScoutPatchOperation) {
+    await this.http.patch(`/conversations/${conversationId}`, operation);
   }
 
   async deleteConversation(conversationId: number) {
     await this.http.delete(`/conversations/${conversationId}`);
   }
 
-  async updateConversationStatus(conversationId: number, status: string) {
-    await this.updateConversation(conversationId, [
-      { op: 'replace', path: '/status', value: status }
-    ]);
-  }
-
-  async assignConversation(conversationId: number, assignTo: number | null) {
-    await this.updateConversation(conversationId, [
-      assignTo === null
-        ? { op: 'remove', path: '/assignTo' }
-        : { op: 'replace', path: '/assignTo', value: assignTo }
-    ]);
-  }
-
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/tags/update/
   async updateConversationTags(conversationId: number, tags: string[]) {
     await this.http.put(`/conversations/${conversationId}/tags`, { tags });
   }
 
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/custom_fields/update/
   async updateConversationCustomFields(
     conversationId: number,
     fields: Array<{ id: number; value: string }>
@@ -147,112 +157,168 @@ export class HelpScoutClient {
 
   // ─── Threads ─────────────────────────────────────────────────
 
-  async listThreads(conversationId: number) {
-    let response = await this.http.get(`/conversations/${conversationId}/threads`);
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/threads/list/
+  async listThreads(conversationId: number, params: { page?: number } = {}) {
+    let response = await this.http.get(`/conversations/${conversationId}/threads`, {
+      params
+    });
     return response.data;
   }
 
+  async listAllThreads(conversationId: number, maxPages = 10) {
+    let threads: any[] = [];
+    let page = 1;
+    let totalPages = 1;
+
+    do {
+      let data = await this.listThreads(conversationId, { page });
+      threads.push(...(data?._embedded?.threads ?? []));
+      totalPages = Number(data?.page?.totalPages ?? 1) || 1;
+      page++;
+    } while (page <= totalPages && page <= maxPages);
+
+    return threads;
+  }
+
+  // Thread attachments are only exposed through each thread's
+  // `_embedded.attachments`, so scan the conversation's threads for the metadata.
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/threads/list/
+  async findThreadAttachment(conversationId: number, attachmentId: number, maxPages = 50) {
+    let page = 1;
+    let totalPages = 1;
+
+    do {
+      let data = await this.listThreads(conversationId, { page });
+      for (let thread of data?._embedded?.threads ?? []) {
+        let attachment = (thread?._embedded?.attachments ?? []).find(
+          (candidate: any) => Number(candidate?.id) === attachmentId
+        );
+        if (attachment) return { threadId: thread.id as number, attachment };
+      }
+      totalPages = Number(data?.page?.totalPages ?? 1) || 1;
+      page++;
+    } while (page <= totalPages && page <= maxPages);
+
+    return undefined;
+  }
+
+  // Returns the raw file bytes with the original Content-Type and
+  // Content-Disposition when requested with the account's bearer token.
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/attachments/get-attachment-file/
+  getAttachmentFileUrl(conversationId: number, attachmentId: number) {
+    return `${API_BASE_URL}/conversations/${conversationId}/attachments/${attachmentId}/file`;
+  }
+
+  private async createThread(
+    conversationId: number,
+    endpoint: 'reply' | 'notes' | 'phones' | 'chats',
+    body: Record<string, unknown>
+  ) {
+    let response = await this.http.post(`/conversations/${conversationId}/${endpoint}`, body);
+    return { threadId: getCreatedResourceId(response.headers) };
+  }
+
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/threads/reply/
   async createReply(
     conversationId: number,
     data: {
       text: string;
-      customer: { email?: string; id?: number };
+      customer: HelpScoutCustomerRef;
       draft?: boolean;
       status?: string;
-      attachments?: Array<{ fileName: string; mimeType: string; data: string }>;
+      assignTo?: number;
+      cc?: string[];
+      bcc?: string[];
+      attachments?: HelpScoutThreadAttachment[];
     }
   ) {
-    await this.http.post(`/conversations/${conversationId}/reply`, {
+    return await this.createThread(conversationId, 'reply', {
       text: data.text,
       customer: data.customer,
       draft: data.draft ?? false,
+      status: data.status,
+      assignTo: data.assignTo,
+      cc: data.cc,
+      bcc: data.bcc,
+      attachments: data.attachments
+    });
+  }
+
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/threads/note/
+  async createNote(
+    conversationId: number,
+    data: {
+      text: string;
+      status?: string;
+      attachments?: HelpScoutThreadAttachment[];
+    }
+  ) {
+    return await this.createThread(conversationId, 'notes', {
+      text: data.text,
       status: data.status,
       attachments: data.attachments
     });
   }
 
-  async createNote(
-    conversationId: number,
-    data: {
-      text: string;
-      attachments?: Array<{ fileName: string; mimeType: string; data: string }>;
-    }
-  ) {
-    await this.http.post(`/conversations/${conversationId}/notes`, {
-      text: data.text,
-      attachments: data.attachments
-    });
-  }
-
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/threads/phone/
   async createPhoneThread(
     conversationId: number,
     data: {
       text: string;
-      customer: { email?: string; id?: number };
+      customer: HelpScoutCustomerRef;
+      attachments?: HelpScoutThreadAttachment[];
     }
   ) {
-    await this.http.post(`/conversations/${conversationId}/phones`, {
+    return await this.createThread(conversationId, 'phones', {
       text: data.text,
-      customer: data.customer
+      customer: data.customer,
+      attachments: data.attachments
     });
   }
 
+  // https://developer.helpscout.com/mailbox-api/endpoints/conversations/threads/chat/
   async createChatThread(
     conversationId: number,
     data: {
       text: string;
-      customer: { email?: string; id?: number };
+      customer: HelpScoutCustomerRef;
+      attachments?: HelpScoutThreadAttachment[];
     }
   ) {
-    await this.http.post(`/conversations/${conversationId}/chats`, {
+    return await this.createThread(conversationId, 'chats', {
       text: data.text,
-      customer: data.customer
+      customer: data.customer,
+      attachments: data.attachments
     });
   }
 
   // ─── Customers ──────────────────────────────────────────────
 
+  // https://developer.helpscout.com/mailbox-api/endpoints/customers/list/
   async listCustomers(
     params: {
       mailbox?: number;
       firstName?: string;
       lastName?: string;
-      email?: string;
+      modifiedSince?: string;
       query?: string;
       page?: number;
       sortField?: string;
       sortOrder?: string;
     } = {}
   ) {
-    if (params.query) {
-      let response = await this.http.get('/customers', {
-        params: {
-          query: params.query,
-          page: params.page,
-          sortField: params.sortField,
-          sortOrder: params.sortOrder
-        }
-      });
-      return response.data;
-    }
-
-    let queryParts: string[] = [];
-    if (params.firstName) queryParts.push(`firstName:"${params.firstName}"`);
-    if (params.lastName) queryParts.push(`lastName:"${params.lastName}"`);
-    if (params.email) queryParts.push(`email:"${params.email}"`);
-    if (params.mailbox) queryParts.push(`mailbox:${params.mailbox}`);
-
-    let requestParams: Record<string, any> = {
-      page: params.page,
-      sortField: params.sortField,
-      sortOrder: params.sortOrder
-    };
-
-    if (queryParts.length > 0) {
-      requestParams.query = `(${queryParts.join(' AND ')})`;
-    }
-
-    let response = await this.http.get('/customers', { params: requestParams });
+    let response = await this.http.get('/customers', {
+      params: {
+        mailbox: params.mailbox,
+        firstName: params.firstName,
+        lastName: params.lastName,
+        modifiedSince: params.modifiedSince,
+        query: params.query,
+        page: params.page,
+        sortField: params.sortField,
+        sortOrder: params.sortOrder
+      }
+    });
     return response.data;
   }
 
@@ -261,30 +327,30 @@ export class HelpScoutClient {
     return response.data;
   }
 
+  // https://developer.helpscout.com/mailbox-api/endpoints/customers/create/
   async createCustomer(data: {
     firstName?: string;
     lastName?: string;
     emails?: Array<{ type: string; value: string }>;
     phones?: Array<{ type: string; value: string }>;
     organization?: string;
+    organizationId?: number;
     jobTitle?: string;
     background?: string;
   }) {
     let response = await this.http.post('/customers', data);
-    let location = response.headers?.['resource-id'] ?? response.headers?.location;
-    return { customerId: location };
+    return { customerId: getCreatedResourceId(response.headers) };
   }
 
-  async updateCustomer(
-    customerId: number,
-    data: {
-      firstName?: string;
-      lastName?: string;
-      organization?: string;
-      jobTitle?: string;
-      background?: string;
-    }
-  ) {
+  // JSON Patch update; PUT would overwrite every omitted field with null.
+  // https://developer.helpscout.com/mailbox-api/endpoints/customers/update/
+  async patchCustomer(customerId: number, operations: HelpScoutPatchOperation[]) {
+    await this.http.patch(`/customers/${customerId}`, operations);
+  }
+
+  // Full overwrite of the customer entity; omitted fields are cleared.
+  // https://developer.helpscout.com/mailbox-api/endpoints/customers/overwrite/
+  async overwriteCustomer(customerId: number, data: Record<string, unknown>) {
     await this.http.put(`/customers/${customerId}`, data);
   }
 
@@ -292,25 +358,10 @@ export class HelpScoutClient {
     await this.http.delete(`/customers/${customerId}`);
   }
 
-  async createCustomerEmail(customerId: number, email: { type: string; value: string }) {
-    await this.http.post(`/customers/${customerId}/emails`, email);
-  }
-
-  async deleteCustomerEmail(customerId: number, emailId: number) {
-    await this.http.delete(`/customers/${customerId}/emails/${emailId}`);
-  }
-
-  async createCustomerPhone(customerId: number, phone: { type: string; value: string }) {
-    await this.http.post(`/customers/${customerId}/phones`, phone);
-  }
-
-  async deleteCustomerPhone(customerId: number, phoneId: number) {
-    await this.http.delete(`/customers/${customerId}/phones/${phoneId}`);
-  }
-
   // ─── Organizations ─────────────────────────────────────────
 
-  async listOrganizations(params: { page?: number } = {}) {
+  // https://developer.helpscout.com/mailbox-api/endpoints/organizations/list/
+  async listOrganizations(params: { page?: number; sort?: string } = {}) {
     let response = await this.http.get('/organizations', { params });
     return response.data;
   }
@@ -320,13 +371,15 @@ export class HelpScoutClient {
     return response.data;
   }
 
-  async createOrganization(data: { name: string }) {
+  // https://developer.helpscout.com/mailbox-api/endpoints/organizations/create/
+  async createOrganization(data: Record<string, unknown>) {
     let response = await this.http.post('/organizations', data);
-    let location = response.headers?.['resource-id'] ?? response.headers?.location;
-    return { organizationId: location };
+    return { organizationId: getCreatedResourceId(response.headers) };
   }
 
-  async updateOrganization(organizationId: number, data: { name?: string }) {
+  // Full replacement: omitted fields are cleared by Help Scout.
+  // https://developer.helpscout.com/mailbox-api/endpoints/organizations/update/
+  async replaceOrganization(organizationId: number, data: Record<string, unknown>) {
     await this.http.put(`/organizations/${organizationId}`, data);
   }
 
@@ -358,21 +411,18 @@ export class HelpScoutClient {
 
   // ─── Tags ───────────────────────────────────────────────────
 
+  // Help Scout exposes only list and get for tags; tags are created by applying
+  // them to a conversation.
+  // https://developer.helpscout.com/mailbox-api/endpoints/tags/list/
   async listTags(params: { page?: number } = {}) {
     let response = await this.http.get('/tags', { params });
     return response.data;
   }
 
-  async createTag(name: string) {
-    await this.http.post('/tags', { name });
-  }
-
-  async updateTag(tagId: number, name: string) {
-    await this.http.put(`/tags/${tagId}`, { name });
-  }
-
-  async deleteTag(tagId: number) {
-    await this.http.delete(`/tags/${tagId}`);
+  // https://developer.helpscout.com/mailbox-api/endpoints/tags/get/
+  async getTag(tagId: number) {
+    let response = await this.http.get(`/tags/${tagId}`);
+    return response.data;
   }
 
   // ─── Teams ──────────────────────────────────────────────────
@@ -389,7 +439,8 @@ export class HelpScoutClient {
 
   // ─── Users ──────────────────────────────────────────────────
 
-  async listUsers(params: { page?: number } = {}) {
+  // https://developer.helpscout.com/mailbox-api/endpoints/users/list/
+  async listUsers(params: { page?: number; email?: string; mailbox?: number } = {}) {
     let response = await this.http.get('/users', { params });
     return response.data;
   }
@@ -406,123 +457,48 @@ export class HelpScoutClient {
 
   // ─── Workflows ──────────────────────────────────────────────
 
-  async listWorkflows(params: { page?: number } = {}) {
+  // https://developer.helpscout.com/mailbox-api/endpoints/workflows/list/
+  async listWorkflows(params: { page?: number; mailboxId?: number; type?: string } = {}) {
     let response = await this.http.get('/workflows', { params });
     return response.data;
   }
 
-  async activateWorkflow(workflowId: number) {
-    await this.http.patch(`/workflows/${workflowId}/activate`);
+  // https://developer.helpscout.com/mailbox-api/endpoints/workflows/update/
+  async updateWorkflowStatus(workflowId: number, status: 'active' | 'inactive') {
+    await this.http.patch(`/workflows/${workflowId}`, {
+      op: 'replace',
+      path: '/status',
+      value: status
+    });
   }
 
-  async deactivateWorkflow(workflowId: number) {
-    await this.http.patch(`/workflows/${workflowId}/deactivate`);
-  }
-
+  // https://developer.helpscout.com/mailbox-api/endpoints/workflows/run/
   async runWorkflowOnConversations(workflowId: number, conversationIds: number[]) {
     await this.http.post(`/workflows/${workflowId}/run`, { conversationIds });
   }
 
-  // ─── Webhooks ───────────────────────────────────────────────
-
-  async listWebhooks(params: { page?: number } = {}) {
-    let response = await this.http.get('/webhooks', { params });
-    return response.data;
-  }
-
-  async getWebhook(webhookId: number) {
-    let response = await this.http.get(`/webhooks/${webhookId}`);
-    return response.data;
-  }
-
-  async createWebhook(data: {
-    url: string;
-    events: string[];
-    secret: string;
-    payloadVersion?: string;
-  }) {
-    let response = await this.http.post('/webhooks', {
-      url: data.url,
-      events: data.events,
-      secret: data.secret,
-      payloadVersion: data.payloadVersion ?? 'V2'
-    });
-    let location = response.headers?.['resource-id'] ?? response.headers?.location;
-    return { webhookId: location };
-  }
-
-  async updateWebhook(
-    webhookId: number,
-    data: {
-      url?: string;
-      events?: string[];
-      secret?: string;
-    }
-  ) {
-    await this.http.put(`/webhooks/${webhookId}`, data);
-  }
-
-  async deleteWebhook(webhookId: number) {
-    await this.http.delete(`/webhooks/${webhookId}`);
-  }
-
   // ─── Reports ────────────────────────────────────────────────
 
-  async getCompanyReport(params: {
-    start: string;
-    end: string;
-    previousStart?: string;
-    previousEnd?: string;
-    mailboxes?: string;
-    tags?: string;
-    types?: string;
-    folders?: string;
-  }) {
-    let response = await this.http.get('/reports/company', { params });
-    return response.data;
-  }
-
-  async getConversationsReport(params: {
-    start: string;
-    end: string;
-    previousStart?: string;
-    previousEnd?: string;
-    mailboxes?: string;
-    tags?: string;
-    types?: string;
-    folders?: string;
-  }) {
-    let response = await this.http.get('/reports/conversations', { params });
-    return response.data;
-  }
-
-  async getHappinessReport(params: {
-    start: string;
-    end: string;
-    previousStart?: string;
-    previousEnd?: string;
-    mailboxes?: string;
-    tags?: string;
-    types?: string;
-    folders?: string;
-  }) {
-    let response = await this.http.get('/reports/happiness', { params });
-    return response.data;
-  }
-
-  // ─── Satisfaction Ratings ───────────────────────────────────
-
-  async listSatisfactionRatings(
-    params: {
-      mailbox?: number;
-      start?: string;
-      end?: string;
-      page?: number;
-      sortField?: string;
-      sortOrder?: string;
-    } = {}
+  // https://developer.helpscout.com/mailbox-api/endpoints/reports/company/reports-company-overall/
+  async getReport(
+    reportType: 'company' | 'conversations' | 'happiness' | 'productivity',
+    params: ReportParams
   ) {
-    let response = await this.http.get('/ratings', { params });
+    let response = await this.http.get(`/reports/${reportType}`, { params });
+    return response.data;
+  }
+
+  // https://developer.helpscout.com/mailbox-api/endpoints/reports/happiness/reports-happiness-ratings/
+  async listHappinessRatings(params: {
+    start: string;
+    end: string;
+    mailboxes?: string;
+    rating?: string;
+    page?: number;
+    sortField?: string;
+    sortOrder?: string;
+  }) {
+    let response = await this.http.get('/reports/happiness/ratings', { params });
     return response.data;
   }
 }

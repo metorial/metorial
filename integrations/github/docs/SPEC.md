@@ -8,10 +8,11 @@ GitHub is a cloud-based platform for version control and collaboration using Git
 
 - `create_repository` creates a repository in the authenticated user's account unless
   `organization` is provided. `private` defaults to `true`; pass `false` explicitly to
-  create a public repository. `autoInit` initializes the repository with a README.
+  create a public repository. `autoInit` initializes the repository with a README, and
+  `gitignoreTemplate` / `licenseTemplate` apply GitHub's .gitignore and license templates.
 - `merge_pull_request` accepts the optional snake-case fields `commit_title`,
-  `commit_message`, and `merge_method`. Supported merge methods are `merge`, `squash`,
-  and `rebase`.
+  `commit_message`, `merge_method`, and `sha`. Supported merge methods are `merge`,
+  `squash`, and `rebase`; `sha` makes GitHub refuse the merge if the head has moved.
 - `list_issues` uses GraphQL cursor pagination. Pass `pageInfo.endCursor` from one
   response as `after` to fetch the next page. `state` accepts `OPEN` or `CLOSED` and
   returns both states when omitted. Labels are supplied as an array. Custom issue
@@ -30,7 +31,14 @@ GitHub is a cloud-based platform for version control and collaboration using Git
 - `search` covers organizations through GitHub's user-search endpoint: use type
   `users` with the `type:org` qualifier.
 - `create_branch` creates a branch from `from_branch`, or from the repository's
-  default branch when the source is omitted.
+  default branch when the source is omitted. `delete_branch` deletes a branch ref,
+  such as a merged pull request's head branch; GitHub rejects deleting the default
+  branch and protected branches.
+- `list_milestones` lists repository milestones with the `milestoneNumber` values
+  `manage_issue` accepts as `milestone`.
+- REST page-based list tools (`list_pull_requests`, `list_branches`, `list_commits`,
+  `list_repositories`, `list_milestones`) report `hasNextPage` from GitHub's `Link`
+  header; request `page + 1` to continue.
 - `push_files` writes multiple plain-text files atomically in one commit through the
   Git tree, commit, and ref APIs. If the requested branch is absent, it is created
   from the default branch.

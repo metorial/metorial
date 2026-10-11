@@ -89,7 +89,13 @@ export let manageCampaign = SlateTool.create(spec, {
       campaignId: z.string().optional(),
       name: z.string().optional(),
       objective: z.string().optional(),
-      status: z.string().optional(),
+      status: z.string().optional().describe('Configured status set by the advertiser.'),
+      effectiveStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Calculated delivery status, such as PENDING_APPROVAL, PENDING_BILLING_INFO or REJECTED.'
+        ),
       budgetCents: z.number().optional(),
       budgetType: z.string().optional(),
       raw: z.any().optional()

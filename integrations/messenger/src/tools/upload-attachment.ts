@@ -1,6 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createMessengerClient } from '../lib/client';
 import { messengerServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
@@ -14,6 +14,10 @@ export let uploadAttachment = SlateTool.create(spec, {
   instructions: [
     'Use this for media that will be sent repeatedly, or for media templates that require an attachment ID.',
     'The attachmentUrl must be publicly reachable over HTTPS so Meta can fetch it.'
+  ],
+  constraints: [
+    'Attachment IDs expire after 90 days and can only be used by the Page that uploaded them.',
+    'Images fetched from a URL are limited to 8 MB; other files to 25 MB. Videos must be fetchable within 75 seconds.'
   ],
   tags: {
     destructive: false,
@@ -43,11 +47,7 @@ export let uploadAttachment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      pageId: ctx.config.pageId,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = createMessengerClient(ctx);
 
     let attachment = await client.uploadAttachment({
       attachmentType: ctx.input.attachmentType,

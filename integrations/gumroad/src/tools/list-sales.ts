@@ -1,27 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
+import { mapSaleSummary, saleSummaryFields } from './sale-utils';
 
 let saleSchema = z.object({
-  saleId: z.string().describe('Unique sale ID'),
-  email: z.string().optional().describe('Buyer email address'),
-  sellerEmail: z.string().optional().describe('Seller email address'),
-  productId: z.string().optional().describe('Product ID'),
-  productName: z.string().optional().describe('Product name'),
-  priceCents: z.number().optional().describe('Sale price in cents'),
-  currency: z.string().optional().describe('Currency code'),
-  quantity: z.number().optional().describe('Quantity purchased'),
-  refunded: z.boolean().optional().describe('Whether the sale was refunded'),
-  disputed: z.boolean().optional().describe('Whether the sale is disputed'),
-  createdAt: z.string().optional().describe('Sale creation timestamp'),
-  orderNumber: z.number().optional().describe('Order number')
+  ...saleSummaryFields,
+  licenseKey: z.string().optional().describe('License key if applicable')
 });
 
 export let listSales = SlateTool.create(spec, {
   name: 'List Sales',
   key: 'list_sales',
-  description: `Retrieve sales from your Gumroad account with optional filtering by date range, buyer email, buyer name, license key, product, or order ID. Returns up to 10 sales per page with cursor-based pagination.`,
+  description: `Retrieve sales from your Gumroad account with optional filtering by date range, buyer email, buyer name, license key, product, or order ID. Results are paginated with a cursor.`,
   instructions: [
     'Use after/before dates in YYYY-MM-DD format.',
     'Use pageKey from a previous response to get the next page of results.'
@@ -30,6 +22,7 @@ export let listSales = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(gumroadActionScopes.viewSales)
   .input(
     z.object({
       after: z.string().optional().describe('Only return sales after this date (YYYY-MM-DD)'),
@@ -66,18 +59,8 @@ export let listSales = SlateTool.create(spec, {
     });
 
     let mapped = result.sales.map((s: any) => ({
-      saleId: s.id,
-      email: s.email || undefined,
-      sellerEmail: s.seller_email || undefined,
-      productId: s.product_id || undefined,
-      productName: s.product_name || undefined,
-      priceCents: s.price,
-      currency: s.currency,
-      quantity: s.quantity,
-      refunded: s.refunded,
-      disputed: s.disputed,
-      createdAt: s.created_at || undefined,
-      orderNumber: s.order_number || undefined
+      ...mapSaleSummary(s),
+      licenseKey: s.license_key || undefined
     }));
 
     return {

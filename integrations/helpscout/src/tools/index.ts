@@ -1,6 +1,7 @@
 export * from './add-thread';
 export * from './create-conversation';
 export * from './delete-conversation';
+export * from './download-conversation-attachment';
 export * from './get-conversation';
 export * from './get-report';
 export * from './list-conversations';

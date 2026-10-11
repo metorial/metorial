@@ -7,6 +7,7 @@ import { listSpaceEvents } from './list-space-events';
 import { manageMessage } from './manage-message';
 import { manageReaction } from './manage-reaction';
 import { manageSpace } from './manage-space';
+import { listMembers, manageMembership } from './memberships';
 import { getSpaceReadState, getThreadReadState, updateSpaceReadState } from './read-state';
 import { searchConversations } from './search-conversations';
 import { searchMessages } from './search-messages';
@@ -28,11 +29,13 @@ export {
   getSpaceReadState,
   getThreadReadState,
   listCustomEmojis,
+  listMembers,
   listMessages,
   listSectionItems,
   listSections,
   listSpaceEvents,
   manageCustomEmoji,
+  manageMembership,
   manageMessage,
   manageReaction,
   manageSection,
@@ -72,5 +75,7 @@ export let tools = [
   listCustomEmojis,
   getCustomEmoji,
   manageCustomEmoji,
-  searchSpacesAdmin
+  searchSpacesAdmin,
+  listMembers,
+  manageMembership
 ];

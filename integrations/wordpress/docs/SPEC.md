@@ -1,6 +1,4 @@
-Now I have comprehensive information. Let me also clarify the distinction between WordPress.com API and self-hosted WordPress REST API for the specification.
-
-# Slates Specification for WordPress
+# WordPress Integration Specification
 
 ## Overview
 
@@ -21,7 +19,7 @@ All authenticated requests to the WordPress.com REST API require an OAuth2 acces
 **Authorization Code Flow (recommended for production):**
 
 1. Redirect users to the authorization endpoint:
-   `https://public-api.wordpress.com/oauth2/authorize?client_id={ID}&redirect_uri={URI}&response_type=code&scope={SCOPES}&state={STATE}`
+   `https://public-api.wordpress.com/oauth2/authorize?client_id={ID}&redirect_uri={URI}&response_type=code&state={STATE}`
 2. When users authorize your app, WordPress.com redirects them back to your app with an authorization code. You exchange this code for an access token using your client secret.
 3. Token exchange endpoint: `POST https://public-api.wordpress.com/oauth2/token` with parameters: `client_id`, `client_secret`, `code`, `grant_type=authorization_code`, `redirect_uri`.
 4. Include the token in the Authorization header: `Authorization: Bearer your_token_here`.
@@ -34,12 +32,18 @@ All authenticated requests to the WordPress.com REST API require an OAuth2 acces
 
 - POST to `https://public-api.wordpress.com/oauth2/token` with `grant_type=password`, `username`, `password`, `client_id`, `client_secret`. Only works with your own credentials.
 
-**Available OAuth2 Scopes:**
-`users`, `sites`, `posts`, `comments`, `taxonomy`, `follow`, `sharing`, `freshly-pressed`, `notifications`, `insights`, `read`, `stats`, `media`, `menus`, `batch`, `videos`. Special scopes: `global` (comprehensive access across all sites) and `auth` (limited to `/me/` endpoint for identity verification).
+**Token scope** ([docs](https://developer.wordpress.com/docs/oauth2/)):
+
+- No `scope` parameter (default): a single-blog token with full access to the blog the user selects on the consent screen. The token response includes `access_token`, `blog_id`, `blog_url`, and `token_type`. Store the token with its blog ID and URL.
+- Endpoint-group scopes (`users`, `sites`, `posts`, `comments`, `taxonomy`, `follow`, `sharing`, `freshly-pressed`, `notifications`, `insights`, `read`, `stats`, `media`, `menus`, `batch`, `videos`), space-separated, narrow the single-blog token to those REST API endpoint groups. Site settings (`/sites/$site/settings`) is not in any requestable endpoint group.
+- Special values `global` (every site the user has, plus account-wide WordPress.com services; omit `blog`) and `auth` (`/me` endpoints only). Do not combine either with any other scope.
+- Authorization-code tokens do not expire, and WordPress.com has no refresh grant. Only implicit-flow tokens expire, after two weeks.
+
+**This integration** requests the default single-blog token (no `scope` parameter). It stores `blog_id` and `blog_url` from the token response, and every WordPress.com tool calls `/rest/v1.1/sites/{blog_id}/...`. It does not use `global`, because tools act on a single site, or endpoint-group scopes, because site settings would be unreachable. It stores no refresh token or expiry.
 
 **Optional parameters:**
 
-- `blog`: Specific blog URL or ID to limit access to a single site.
+- `blog`: Preselects a blog URL or ID. If it is omitted, or the user cannot manage it, the user picks a blog on the consent screen.
 - `state`: Recommended for CSRF protection.
 
 **Token Validation:**
@@ -53,6 +57,7 @@ As of WordPress 5.6, WordPress has shipped with Application Passwords, which can
 - The credentials can be passed along to REST API requests served over HTTPS using Basic Auth. Use the WordPress username and the generated Application Password as the Basic Auth credentials.
 - Example: `Authorization: Basic base64(username:application_password)`
 - The REST API base URL is `https://{your-site}/wp-json/wp/v2/`.
+- This integration collects the site URL together with the username and application password. When you connect, it checks them with `GET /wp-json/wp/v2/users/me`.
 
 ### Self-Hosted WordPress — Cookie Authentication
 

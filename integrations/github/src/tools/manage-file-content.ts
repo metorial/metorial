@@ -1,4 +1,5 @@
-import { SlateTool } from 'slates';
+import { Buffer } from 'node:buffer';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +8,7 @@ export let manageFileContent = SlateTool.create(spec, {
   name: 'Manage File Content',
   key: 'manage_file_content',
   description: `Read, create, update, or delete a file in a GitHub repository.
-- **read**: Retrieve file contents (decoded from Base64).
+- **read**: Retrieve a text file's contents (decoded from Base64 as UTF-8).
 - **write**: Create or update a file. Provide Base64-encoded content and a commit message.
 - **delete**: Delete a file. Requires the file's current SHA and a commit message.`,
   instructions: [
@@ -54,10 +55,19 @@ export let manageFileContent = SlateTool.create(spec, {
 
     if (action === 'read') {
       let file = await client.getContent(owner, repo, path, ctx.input.ref);
+      if (Array.isArray(file) || file?.type !== 'file') {
+        throw createApiServiceError(
+          `"${path}" is ${Array.isArray(file) ? 'a directory' : `a ${file?.type ?? 'non-file'} entry`}, not a file. Use get_file_contents to list directories.`,
+          { reason: 'github_file_content_not_a_file' }
+        );
+      }
 
+      // The Contents API returns Base64 (with line breaks) for files up to 1 MB and an empty
+      // content with encoding "none" for 1-100 MB files:
+      // https://docs.github.com/en/rest/repos/contents#get-repository-content
       let content: string | undefined;
-      if (file.content && file.encoding === 'base64') {
-        content = atob(file.content);
+      if (typeof file.content === 'string' && file.encoding === 'base64') {
+        content = Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8');
       }
 
       return {
@@ -68,13 +78,19 @@ export let manageFileContent = SlateTool.create(spec, {
           size: file.size,
           htmlUrl: file.html_url
         },
-        message: `Read file **${file.path}** (${file.size} bytes) from **${owner}/${repo}**.`
+        message:
+          content === undefined
+            ? `File **${file.path}** (${file.size} bytes) in **${owner}/${repo}** is too large for inline content; use get_file_contents to download it.`
+            : `Read file **${file.path}** (${file.size} bytes) from **${owner}/${repo}**.`
       };
     }
 
     if (action === 'write') {
       if (!ctx.input.content || !ctx.input.commitMessage) {
-        throw new Error('content and commitMessage are required for write operations.');
+        throw createApiServiceError(
+          'content and commitMessage are required for write operations.',
+          { reason: 'github_file_write_fields_required' }
+        );
       }
 
       let result = await client.createOrUpdateFile(owner, repo, path, {
@@ -97,7 +113,12 @@ export let manageFileContent = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.sha || !ctx.input.commitMessage) {
-        throw new Error('sha and commitMessage are required for delete operations.');
+        throw createApiServiceError(
+          'sha and commitMessage are required for delete operations.',
+          {
+            reason: 'github_file_delete_fields_required'
+          }
+        );
       }
 
       let result = await client.deleteFile(owner, repo, path, {
@@ -115,6 +136,8 @@ export let manageFileContent = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`, {
+      reason: 'github_file_action_unsupported'
+    });
   })
   .build();

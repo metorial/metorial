@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient, extractMediaSummary } from '../lib/helpers';
+import { apiTypeFor, createClient, extractMediaSummary } from '../lib/helpers';
 import { spec } from '../spec';
 
 let mediaOutputSchema = z.object({
@@ -46,9 +46,9 @@ export let uploadMediaTool = SlateTool.create(spec, {
   )
   .output(mediaOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let media = await client.uploadMedia(ctx.input);
-    let result = extractMediaSummary(media, ctx.config.apiType);
+    let result = extractMediaSummary(media, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Uploaded media **"${result.title || ctx.input.fileName}"** (ID: ${result.mediaId}). [View](${result.url})`
@@ -82,9 +82,9 @@ export let listMediaTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let media = await client.listMedia(ctx.input);
-    let results = media.map((m: any) => extractMediaSummary(m, ctx.config.apiType));
+    let results = media.map((m: any) => extractMediaSummary(m, apiTypeFor(ctx.auth)));
     return {
       output: {
         media: results,
@@ -110,9 +110,9 @@ export let getMediaTool = SlateTool.create(spec, {
   )
   .output(mediaOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let media = await client.getMedia(ctx.input.mediaId);
-    let result = extractMediaSummary(media, ctx.config.apiType);
+    let result = extractMediaSummary(media, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Retrieved media **"${result.title}"** (${result.mimeType}). [View](${result.url})`
@@ -141,9 +141,9 @@ export let updateMediaTool = SlateTool.create(spec, {
   .output(mediaOutputSchema)
   .handleInvocation(async ctx => {
     let { mediaId, ...updateData } = ctx.input;
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let media = await client.updateMedia(mediaId, updateData);
-    let result = extractMediaSummary(media, ctx.config.apiType);
+    let result = extractMediaSummary(media, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Updated media **"${result.title}"** (ID: ${result.mediaId}).`
@@ -172,7 +172,7 @@ export let deleteMediaTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     await client.deleteMedia(ctx.input.mediaId);
     return {
       output: {

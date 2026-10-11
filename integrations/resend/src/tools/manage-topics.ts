@@ -1,7 +1,9 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+
+let topicVisibilitySchema = z.enum(['public', 'private']);
 
 let topicOutputSchema = z.object({
   topicId: z.string().describe('Topic ID.'),
@@ -31,7 +33,14 @@ export let createTopic = SlateTool.create(spec, {
       defaultSubscription: z
         .enum(['opt_in', 'opt_out'])
         .optional()
-        .describe('Default subscription status for new contacts.')
+        .describe(
+          'Default subscription status for new contacts. Required by Resend and cannot be changed after creation.'
+        ),
+      visibility: topicVisibilitySchema
+        .optional()
+        .describe(
+          'Visibility on the unsubscribe page: public shows the topic to all contacts, private only to opted-in contacts. Defaults to private.'
+        )
     })
   )
   .output(
@@ -40,11 +49,18 @@ export let createTopic = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.defaultSubscription) {
+      throw createApiServiceError(
+        'defaultSubscription is required to create a topic. Use opt_in or opt_out.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let result = await client.createTopic({
       name: ctx.input.name,
       description: ctx.input.description,
-      defaultSubscription: ctx.input.defaultSubscription
+      defaultSubscription: ctx.input.defaultSubscription,
+      visibility: ctx.input.visibility
     });
 
     return {
@@ -89,7 +105,7 @@ export let getTopic = SlateTool.create(spec, {
 export let updateTopic = SlateTool.create(spec, {
   name: 'Update Topic',
   key: 'update_topic',
-  description: `Update a Resend topic name or description.`,
+  description: `Update a Resend topic name, description, or unsubscribe-page visibility. The default subscription cannot be changed.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -99,7 +115,10 @@ export let updateTopic = SlateTool.create(spec, {
     z.object({
       topicId: z.string().describe('Topic ID.'),
       name: z.string().optional().describe('Updated topic name.'),
-      description: z.string().optional().describe('Updated topic description.')
+      description: z.string().optional().describe('Updated topic description.'),
+      visibility: topicVisibilitySchema
+        .optional()
+        .describe('Updated visibility on the unsubscribe page.')
     })
   )
   .output(
@@ -111,7 +130,8 @@ export let updateTopic = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.updateTopic(ctx.input.topicId, {
       name: ctx.input.name,
-      description: ctx.input.description
+      description: ctx.input.description,
+      visibility: ctx.input.visibility
     });
 
     return {

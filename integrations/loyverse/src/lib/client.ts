@@ -1,6 +1,76 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios, isApiErrorRecord } from 'slates';
 
 let BASE_URL = 'https://api.loyverse.com/v1.0';
+
+type ListParams = {
+  limit?: number;
+  cursor?: string;
+};
+
+type DateRangeParams = {
+  createdAtMin?: string;
+  createdAtMax?: string;
+  updatedAtMin?: string;
+  updatedAtMax?: string;
+};
+
+// Loyverse returns `{ errors: [{ code, details, field }] }` for failed requests.
+// https://developer.loyverse.com/docs/#section/Handling-errors
+let describeLoyverseErrors = (data: unknown) => {
+  if (!isApiErrorRecord(data) || !Array.isArray(data.errors)) {
+    return undefined;
+  }
+
+  let parts: string[] = [];
+  let code: string | undefined;
+
+  for (let entry of data.errors) {
+    if (!isApiErrorRecord(entry)) continue;
+
+    let entryCode = typeof entry.code === 'string' ? entry.code : undefined;
+    let details = typeof entry.details === 'string' ? entry.details : undefined;
+    let field = typeof entry.field === 'string' ? entry.field : undefined;
+
+    code ??= entryCode;
+
+    let text = [entryCode, details].filter(Boolean).join(': ');
+    if (field) text = `${text}${text ? ' ' : ''}(field: ${field})`;
+    if (text) parts.push(text);
+  }
+
+  if (parts.length === 0) return undefined;
+
+  return { message: `Loyverse API error: ${parts.join('; ')}`, code };
+};
+
+let requireId = (value: string | undefined, label: string) => {
+  let trimmed = value?.trim();
+  if (!trimmed) {
+    throw createApiServiceError(`${label} is required.`, { reason: 'invalid_input' });
+  }
+  if (trimmed === '.' || trimmed === '..') {
+    throw createApiServiceError(`${label} must not be a relative path segment.`, {
+      reason: 'invalid_input'
+    });
+  }
+  return encodeURIComponent(trimmed);
+};
+
+export let joinIds = (...values: (string | string[] | undefined)[]) => {
+  let ids = values
+    .flatMap(value => (Array.isArray(value) ? value : value ? [value] : []))
+    .map(value => value.trim())
+    .filter(Boolean);
+
+  return ids.length > 0 ? Array.from(new Set(ids)).join(',') : undefined;
+};
+
+let dateParams = (params?: DateRangeParams) => ({
+  created_at_min: params?.createdAtMin,
+  created_at_max: params?.createdAtMax,
+  updated_at_min: params?.updatedAtMin,
+  updated_at_max: params?.updatedAtMax
+});
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
@@ -11,6 +81,21 @@ export class Client {
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json'
+      },
+      errorMapping: {
+        mapAxiosError: (error, inferred) => {
+          let described = describeLoyverseErrors(error.response?.data);
+          if (!described) return inferred;
+
+          return {
+            ...inferred,
+            message: described.message,
+            upstream: {
+              ...inferred.upstream,
+              code: described.code ?? inferred.upstream?.code
+            }
+          };
+        }
       }
     });
   }
@@ -24,19 +109,19 @@ export class Client {
 
   // ── Items ─────────────────────────────────────────────────
 
-  async listItems(params?: {
-    limit?: number;
-    cursor?: string;
-    updatedAtMin?: string;
-    updatedAtMax?: string;
-    showDeleted?: boolean;
-  }): Promise<any> {
+  async listItems(
+    params?: ListParams &
+      DateRangeParams & {
+        itemIds?: string;
+        showDeleted?: boolean;
+      }
+  ): Promise<any> {
     let response = await this.axios.get('/items', {
       params: {
+        items_ids: params?.itemIds,
         limit: params?.limit,
         cursor: params?.cursor,
-        updated_at_min: params?.updatedAtMin,
-        updated_at_max: params?.updatedAtMax,
+        ...dateParams(params),
         show_deleted: params?.showDeleted
       }
     });
@@ -44,72 +129,48 @@ export class Client {
   }
 
   async getItem(itemId: string): Promise<any> {
-    let response = await this.axios.get(`/items/${itemId}`);
+    let response = await this.axios.get(`/items/${requireId(itemId, 'Item ID')}`);
     return response.data;
   }
 
-  async createItem(data: any): Promise<any> {
+  async createOrUpdateItem(data: any): Promise<any> {
     let response = await this.axios.post('/items', data);
     return response.data;
   }
 
-  async deleteItem(itemId: string): Promise<void> {
-    await this.axios.delete(`/items/${itemId}`);
-  }
-
-  async uploadItemImage(
-    itemId: string,
-    imageData: Buffer | string,
-    contentType: string
-  ): Promise<any> {
-    let response = await this.axios.post(`/items/${itemId}/image`, imageData, {
-      headers: { 'Content-Type': contentType }
-    });
+  async deleteItem(itemId: string): Promise<any> {
+    let response = await this.axios.delete(`/items/${requireId(itemId, 'Item ID')}`);
     return response.data;
-  }
-
-  async deleteItemImage(itemId: string): Promise<void> {
-    await this.axios.delete(`/items/${itemId}/image`);
   }
 
   // ── Variants ──────────────────────────────────────────────
 
-  async listVariants(params?: {
-    limit?: number;
-    cursor?: string;
-    itemId?: string;
-  }): Promise<any> {
+  async listVariants(
+    params?: ListParams &
+      DateRangeParams & {
+        variantIds?: string;
+        itemIds?: string;
+        sku?: string;
+        showDeleted?: boolean;
+      }
+  ): Promise<any> {
     let response = await this.axios.get('/variants', {
       params: {
+        variants_ids: params?.variantIds,
+        items_ids: params?.itemIds,
+        sku: params?.sku,
         limit: params?.limit,
         cursor: params?.cursor,
-        item_id: params?.itemId
+        ...dateParams(params),
+        show_deleted: params?.showDeleted
       }
     });
     return response.data;
   }
 
-  async getVariant(variantId: string): Promise<any> {
-    let response = await this.axios.get(`/variants/${variantId}`);
-    return response.data;
-  }
-
-  async createOrUpdateVariant(data: any): Promise<any> {
-    let response = await this.axios.post('/variants', data);
-    return response.data;
-  }
-
-  async deleteVariant(variantId: string): Promise<void> {
-    await this.axios.delete(`/variants/${variantId}`);
-  }
-
   // ── Categories ────────────────────────────────────────────
 
-  async listCategories(params?: {
-    limit?: number;
-    cursor?: string;
-    showDeleted?: boolean;
-  }): Promise<any> {
+  async listCategories(params?: ListParams & { showDeleted?: boolean }): Promise<any> {
     let response = await this.axios.get('/categories', {
       params: {
         limit: params?.limit,
@@ -121,7 +182,7 @@ export class Client {
   }
 
   async getCategory(categoryId: string): Promise<any> {
-    let response = await this.axios.get(`/categories/${categoryId}`);
+    let response = await this.axios.get(`/categories/${requireId(categoryId, 'Category ID')}`);
     return response.data;
   }
 
@@ -130,24 +191,28 @@ export class Client {
     return response.data;
   }
 
-  async deleteCategory(categoryId: string): Promise<void> {
-    await this.axios.delete(`/categories/${categoryId}`);
+  async deleteCategory(categoryId: string): Promise<any> {
+    let response = await this.axios.delete(
+      `/categories/${requireId(categoryId, 'Category ID')}`
+    );
+    return response.data;
   }
 
   // ── Modifiers ─────────────────────────────────────────────
 
-  async listModifiers(params?: { limit?: number; cursor?: string }): Promise<any> {
+  async listModifiers(params?: ListParams & { showDeleted?: boolean }): Promise<any> {
     let response = await this.axios.get('/modifiers', {
       params: {
         limit: params?.limit,
-        cursor: params?.cursor
+        cursor: params?.cursor,
+        show_deleted: params?.showDeleted
       }
     });
     return response.data;
   }
 
   async getModifier(modifierId: string): Promise<any> {
-    let response = await this.axios.get(`/modifiers/${modifierId}`);
+    let response = await this.axios.get(`/modifiers/${requireId(modifierId, 'Modifier ID')}`);
     return response.data;
   }
 
@@ -156,33 +221,30 @@ export class Client {
     return response.data;
   }
 
-  async deleteModifier(modifierId: string): Promise<void> {
-    await this.axios.delete(`/modifiers/${modifierId}`);
+  async deleteModifier(modifierId: string): Promise<any> {
+    let response = await this.axios.delete(
+      `/modifiers/${requireId(modifierId, 'Modifier ID')}`
+    );
+    return response.data;
   }
 
   // ── Customers ─────────────────────────────────────────────
 
-  async listCustomers(params?: {
-    limit?: number;
-    cursor?: string;
-    email?: string;
-    phoneNumber?: string;
-    createdAtMin?: string;
-    createdAtMax?: string;
-    updatedAtMin?: string;
-    updatedAtMax?: string;
-    showDeleted?: boolean;
-  }): Promise<any> {
+  async listCustomers(
+    params?: ListParams &
+      DateRangeParams & {
+        customerIds?: string;
+        email?: string;
+        showDeleted?: boolean;
+      }
+  ): Promise<any> {
     let response = await this.axios.get('/customers', {
       params: {
+        customer_ids: params?.customerIds,
+        email: params?.email,
         limit: params?.limit,
         cursor: params?.cursor,
-        email: params?.email,
-        phone_number: params?.phoneNumber,
-        created_at_min: params?.createdAtMin,
-        created_at_max: params?.createdAtMax,
-        updated_at_min: params?.updatedAtMin,
-        updated_at_max: params?.updatedAtMax,
+        ...dateParams(params),
         show_deleted: params?.showDeleted
       }
     });
@@ -190,7 +252,7 @@ export class Client {
   }
 
   async getCustomer(customerId: string): Promise<any> {
-    let response = await this.axios.get(`/customers/${customerId}`);
+    let response = await this.axios.get(`/customers/${requireId(customerId, 'Customer ID')}`);
     return response.data;
   }
 
@@ -199,17 +261,16 @@ export class Client {
     return response.data;
   }
 
-  async deleteCustomer(customerId: string): Promise<void> {
-    await this.axios.delete(`/customers/${customerId}`);
+  async deleteCustomer(customerId: string): Promise<any> {
+    let response = await this.axios.delete(
+      `/customers/${requireId(customerId, 'Customer ID')}`
+    );
+    return response.data;
   }
 
   // ── Discounts ─────────────────────────────────────────────
 
-  async listDiscounts(params?: {
-    limit?: number;
-    cursor?: string;
-    showDeleted?: boolean;
-  }): Promise<any> {
+  async listDiscounts(params?: ListParams & { showDeleted?: boolean }): Promise<any> {
     let response = await this.axios.get('/discounts', {
       params: {
         limit: params?.limit,
@@ -221,7 +282,7 @@ export class Client {
   }
 
   async getDiscount(discountId: string): Promise<any> {
-    let response = await this.axios.get(`/discounts/${discountId}`);
+    let response = await this.axios.get(`/discounts/${requireId(discountId, 'Discount ID')}`);
     return response.data;
   }
 
@@ -230,17 +291,16 @@ export class Client {
     return response.data;
   }
 
-  async deleteDiscount(discountId: string): Promise<void> {
-    await this.axios.delete(`/discounts/${discountId}`);
+  async deleteDiscount(discountId: string): Promise<any> {
+    let response = await this.axios.delete(
+      `/discounts/${requireId(discountId, 'Discount ID')}`
+    );
+    return response.data;
   }
 
   // ── Taxes ─────────────────────────────────────────────────
 
-  async listTaxes(params?: {
-    limit?: number;
-    cursor?: string;
-    showDeleted?: boolean;
-  }): Promise<any> {
+  async listTaxes(params?: ListParams & { showDeleted?: boolean }): Promise<any> {
     let response = await this.axios.get('/taxes', {
       params: {
         limit: params?.limit,
@@ -252,7 +312,7 @@ export class Client {
   }
 
   async getTax(taxId: string): Promise<any> {
-    let response = await this.axios.get(`/taxes/${taxId}`);
+    let response = await this.axios.get(`/taxes/${requireId(taxId, 'Tax ID')}`);
     return response.data;
   }
 
@@ -261,59 +321,74 @@ export class Client {
     return response.data;
   }
 
-  async deleteTax(taxId: string): Promise<void> {
-    await this.axios.delete(`/taxes/${taxId}`);
+  async deleteTax(taxId: string): Promise<any> {
+    let response = await this.axios.delete(`/taxes/${requireId(taxId, 'Tax ID')}`);
+    return response.data;
   }
 
   // ── Inventory ─────────────────────────────────────────────
 
-  async getInventory(params?: {
-    limit?: number;
-    cursor?: string;
-    storeId?: string;
-    variantId?: string;
-  }): Promise<any> {
+  async getInventory(
+    params?: ListParams & {
+      storeIds?: string;
+      variantIds?: string;
+      updatedAtMin?: string;
+      updatedAtMax?: string;
+    }
+  ): Promise<any> {
     let response = await this.axios.get('/inventory', {
       params: {
+        store_ids: params?.storeIds,
+        variant_ids: params?.variantIds,
+        updated_at_min: params?.updatedAtMin,
+        updated_at_max: params?.updatedAtMax,
         limit: params?.limit,
-        cursor: params?.cursor,
-        store_id: params?.storeId,
-        variant_id: params?.variantId
+        cursor: params?.cursor
       }
     });
     return response.data;
   }
 
-  async updateInventory(data: any): Promise<any> {
+  async updateInventory(data: {
+    inventory_levels: { variant_id: string; store_id: string; stock_after: number }[];
+  }): Promise<any> {
     let response = await this.axios.post('/inventory', data);
     return response.data;
   }
 
   // ── Receipts ──────────────────────────────────────────────
 
-  async listReceipts(params?: {
-    limit?: number;
-    cursor?: string;
-    createdAtMin?: string;
-    createdAtMax?: string;
-    updatedAtMin?: string;
-    updatedAtMax?: string;
-  }): Promise<any> {
+  async listReceipts(
+    params?: ListParams &
+      DateRangeParams & {
+        receiptNumbers?: string;
+        sinceReceiptNumber?: string;
+        beforeReceiptNumber?: string;
+        storeId?: string;
+        order?: string;
+        source?: string;
+      }
+  ): Promise<any> {
     let response = await this.axios.get('/receipts', {
       params: {
+        receipt_numbers: params?.receiptNumbers,
+        since_receipt_number: params?.sinceReceiptNumber,
+        before_receipt_number: params?.beforeReceiptNumber,
+        store_id: params?.storeId,
+        order: params?.order,
+        source: params?.source,
         limit: params?.limit,
         cursor: params?.cursor,
-        created_at_min: params?.createdAtMin,
-        created_at_max: params?.createdAtMax,
-        updated_at_min: params?.updatedAtMin,
-        updated_at_max: params?.updatedAtMax
+        ...dateParams(params)
       }
     });
     return response.data;
   }
 
   async getReceipt(receiptNumber: string): Promise<any> {
-    let response = await this.axios.get(`/receipts/${receiptNumber}`);
+    let response = await this.axios.get(
+      `/receipts/${requireId(receiptNumber, 'Receipt number')}`
+    );
     return response.data;
   }
 
@@ -323,160 +398,100 @@ export class Client {
   }
 
   async createRefund(receiptNumber: string, data: any): Promise<any> {
-    let response = await this.axios.post(`/receipts/${receiptNumber}/refund`, data);
+    let response = await this.axios.post(
+      `/receipts/${requireId(receiptNumber, 'Receipt number')}/refund`,
+      data
+    );
     return response.data;
   }
 
   // ── Payment Types ─────────────────────────────────────────
 
-  async listPaymentTypes(params?: { limit?: number; cursor?: string }): Promise<any> {
+  async listPaymentTypes(params?: ListParams & { showDeleted?: boolean }): Promise<any> {
     let response = await this.axios.get('/payment_types', {
       params: {
         limit: params?.limit,
-        cursor: params?.cursor
+        cursor: params?.cursor,
+        show_deleted: params?.showDeleted
       }
     });
-    return response.data;
-  }
-
-  async getPaymentType(paymentTypeId: string): Promise<any> {
-    let response = await this.axios.get(`/payment_types/${paymentTypeId}`);
     return response.data;
   }
 
   // ── Employees ─────────────────────────────────────────────
 
-  async listEmployees(params?: { limit?: number; cursor?: string }): Promise<any> {
+  async listEmployees(params?: ListParams & { showDeleted?: boolean }): Promise<any> {
     let response = await this.axios.get('/employees', {
       params: {
         limit: params?.limit,
-        cursor: params?.cursor
+        cursor: params?.cursor,
+        show_deleted: params?.showDeleted
       }
     });
-    return response.data;
-  }
-
-  async getEmployee(employeeId: string): Promise<any> {
-    let response = await this.axios.get(`/employees/${employeeId}`);
     return response.data;
   }
 
   // ── Stores ────────────────────────────────────────────────
 
-  async listStores(params?: { limit?: number; cursor?: string }): Promise<any> {
+  async listStores(params?: ListParams & { showDeleted?: boolean }): Promise<any> {
     let response = await this.axios.get('/stores', {
       params: {
         limit: params?.limit,
-        cursor: params?.cursor
+        cursor: params?.cursor,
+        show_deleted: params?.showDeleted
       }
     });
-    return response.data;
-  }
-
-  async getStore(storeId: string): Promise<any> {
-    let response = await this.axios.get(`/stores/${storeId}`);
     return response.data;
   }
 
   // ── Shifts ────────────────────────────────────────────────
 
-  async listShifts(params?: {
-    limit?: number;
-    cursor?: string;
-    storeId?: string;
-    employeeId?: string;
-  }): Promise<any> {
+  async listShifts(
+    params?: ListParams & {
+      storeIds?: string;
+      createdAtMin?: string;
+      createdAtMax?: string;
+    }
+  ): Promise<any> {
     let response = await this.axios.get('/shifts', {
       params: {
+        store_ids: params?.storeIds,
+        created_at_min: params?.createdAtMin,
+        created_at_max: params?.createdAtMax,
         limit: params?.limit,
-        cursor: params?.cursor,
-        store_id: params?.storeId,
-        employee_id: params?.employeeId
+        cursor: params?.cursor
       }
     });
     return response.data;
-  }
-
-  async getShift(shiftId: string): Promise<any> {
-    let response = await this.axios.get(`/shifts/${shiftId}`);
-    return response.data;
-  }
-
-  // ── POS Devices ───────────────────────────────────────────
-
-  async listPosDevices(params?: {
-    limit?: number;
-    cursor?: string;
-    storeId?: string;
-  }): Promise<any> {
-    let response = await this.axios.get('/pos_devices', {
-      params: {
-        limit: params?.limit,
-        cursor: params?.cursor,
-        store_id: params?.storeId
-      }
-    });
-    return response.data;
-  }
-
-  async getPosDevice(posDeviceId: string): Promise<any> {
-    let response = await this.axios.get(`/pos_devices/${posDeviceId}`);
-    return response.data;
-  }
-
-  async createOrUpdatePosDevice(data: any): Promise<any> {
-    let response = await this.axios.post('/pos_devices', data);
-    return response.data;
-  }
-
-  async deletePosDevice(posDeviceId: string): Promise<void> {
-    await this.axios.delete(`/pos_devices/${posDeviceId}`);
   }
 
   // ── Suppliers ─────────────────────────────────────────────
 
-  async listSuppliers(params?: { limit?: number; cursor?: string }): Promise<any> {
-    let response = await this.axios.get('/suppliers', {
+  async listSuppliers(params?: ListParams & { showDeleted?: boolean }): Promise<any> {
+    let response = await this.axios.get('/suppliers/', {
       params: {
         limit: params?.limit,
-        cursor: params?.cursor
+        cursor: params?.cursor,
+        show_deleted: params?.showDeleted
       }
     });
     return response.data;
   }
 
   async getSupplier(supplierId: string): Promise<any> {
-    let response = await this.axios.get(`/suppliers/${supplierId}`);
+    let response = await this.axios.get(`/suppliers/${requireId(supplierId, 'Supplier ID')}`);
     return response.data;
   }
 
   async createOrUpdateSupplier(data: any): Promise<any> {
-    let response = await this.axios.post('/suppliers', data);
+    let response = await this.axios.post('/suppliers/', data);
     return response.data;
   }
 
-  async deleteSupplier(supplierId: string): Promise<void> {
-    await this.axios.delete(`/suppliers/${supplierId}`);
-  }
-
-  // ── Webhooks ──────────────────────────────────────────────
-
-  async listWebhooks(): Promise<any> {
-    let response = await this.axios.get('/webhooks/');
+  async deleteSupplier(supplierId: string): Promise<any> {
+    let response = await this.axios.delete(
+      `/suppliers/${requireId(supplierId, 'Supplier ID')}`
+    );
     return response.data;
-  }
-
-  async getWebhook(webhookId: string): Promise<any> {
-    let response = await this.axios.get(`/webhooks/${webhookId}`);
-    return response.data;
-  }
-
-  async createWebhook(data: { url: string; types: string[] }): Promise<any> {
-    let response = await this.axios.post('/webhooks/', data);
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string): Promise<void> {
-    await this.axios.delete(`/webhooks/${webhookId}`);
   }
 }

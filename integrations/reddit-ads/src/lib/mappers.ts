@@ -207,8 +207,13 @@ export const adGroupPayload = async (client: RedditAdsClient, input: Row) => {
   const targeting: Row = {};
   for (const [source, target, limit] of [
     ['targetSubreddits', 'communities', 1000],
+    ['excludedSubreddits', 'excluded_communities', 1000],
     ['targetInterests', 'interests', 200],
-    ['targetKeywords', 'keywords', 1000]
+    ['targetKeywords', 'keywords', 1000],
+    ['targetGeolocations', 'geolocations', 20000],
+    ['excludedGeolocations', 'excluded_geolocations', 20000],
+    ['targetCustomAudienceIds', 'custom_audience_ids', 1000],
+    ['excludedCustomAudienceIds', 'excluded_custom_audience_ids', 1000]
   ] as const)
     if (input[source] !== undefined) targeting[target] = strings(input[source], source, limit);
   if (input.placements !== undefined)
@@ -296,6 +301,15 @@ export const adPayload = async (client: RedditAdsClient, input: Row) => {
   }
   return payload;
 };
+export const customerListOrigins = [
+  'UNSPECIFIED',
+  'LIVE_RAMP',
+  'MPARTICLE',
+  'TEALIUM',
+  'OTHER',
+  'LIVE_RAMP_ADVERTISER_DIRECT',
+  'BOMBORA'
+] as const;
 export const audiencePayload = (input: Row) => {
   if (input.audienceId !== undefined)
     invalid(
@@ -324,22 +338,31 @@ export const audiencePayload = (input: Row) => {
           ? 'ENGAGEMENT_RETARGETING'
           : type
   };
-  if (type === 'CUSTOMER_LIST' && input.originClientId !== undefined)
-    payload.customer_list_config = {
-      origin_client_id: enumValue(
-        input.originClientId,
-        [
-          'UNSPECIFIED',
-          'LIVE_RAMP',
-          'MPARTICLE',
-          'TEALIUM',
-          'OTHER',
-          'LIVE_RAMP_ADVERTISER_DIRECT',
-          'BOMBORA'
-        ],
-        'originClientId'
-      )
-    };
+  if (type !== 'CUSTOMER_LIST' && input.customerListOrigin !== undefined)
+    invalid('customerListOrigin applies only to CUSTOMER_LIST audiences.');
+  if (type !== 'CUSTOMER_LIST' && input.originClientId !== undefined)
+    invalid('originClientId applies only to CUSTOMER_LIST audiences.');
+  if (type === 'CUSTOMER_LIST') {
+    if (
+      input.originClientId !== undefined &&
+      (customerListOrigins as readonly string[]).includes(input.originClientId as string)
+    )
+      invalid(
+        'originClientId is the client ID of the application that created the list, not its source. Pass source values such as LIVE_RAMP or OTHER as customerListOrigin.'
+      );
+    if (input.customerListOrigin !== undefined && input.originClientId === undefined)
+      invalid(
+        'Reddit requires originClientId whenever customer-list configuration is sent. Provide originClientId with customerListOrigin, or omit both.'
+      );
+    if (input.originClientId !== undefined)
+      payload.customer_list_config = pickDefined({
+        origin_client_id: text(input.originClientId, 'originClientId'),
+        origin:
+          input.customerListOrigin === undefined
+            ? undefined
+            : enumValue(input.customerListOrigin, customerListOrigins, 'customerListOrigin')
+      });
+  }
   if (type === 'WEBSITE') {
     const days = integer(input.lookbackWindowDays, 'lookbackWindowDays', 1);
     if (days > 90) invalid('Website lookbackWindowDays must be at most 90.');

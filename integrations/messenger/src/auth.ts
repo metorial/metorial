@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { MESSENGER_DEFAULT_API_VERSION } from './config';
 import { messengerOAuthError, messengerServiceError } from './lib/errors';
 
+let MAX_ACCOUNT_PAGES = 10;
+
 let graphRequest = async <T>(operation: string, run: () => Promise<{ data: T }>) => {
   try {
     let response = await run();
@@ -108,27 +110,39 @@ export let auth = SlateAuth.create()
         );
       }
 
-      // Get list of pages the user manages
-      let pagesResponse = await graphRequest<any>('list managed pages', () =>
-        graphApi.get('/me/accounts', {
-          params: { access_token: longLivedUserToken }
-        })
-      );
+      // List the managed Pages, following cursors until the requested Page is found.
+      // https://developers.facebook.com/docs/graph-api/reference/user/accounts/
+      let targetPageId = ctx.input.pageId?.trim() || undefined;
+      let pages: Array<{ id: string; name: string; access_token: string }> = [];
+      let after: string | undefined;
+      for (let pageIndex = 0; pageIndex < MAX_ACCOUNT_PAGES; pageIndex++) {
+        let pagesResponse = await graphRequest<any>('list managed pages', () =>
+          graphApi.get('/me/accounts', {
+            params: {
+              access_token: longLivedUserToken,
+              fields: 'id,name,access_token',
+              limit: 100,
+              ...(after ? { after } : {})
+            }
+          })
+        );
+        let batch = Array.isArray(pagesResponse?.data) ? pagesResponse.data : [];
+        pages.push(...batch);
 
-      let pages = pagesResponse.data as Array<{
-        id: string;
-        name: string;
-        access_token: string;
-      }>;
+        let nextAfter = pagesResponse?.paging?.next
+          ? pagesResponse?.paging?.cursors?.after
+          : undefined;
+        if (!targetPageId || pages.some(p => p.id === targetPageId) || !nextAfter) break;
+        after = nextAfter;
+      }
 
-      if (!pages || pages.length === 0) {
+      if (pages.length === 0) {
         throw messengerServiceError(
           'No Facebook Pages found. Please ensure you have admin access to at least one Page.'
         );
       }
 
       // Find the requested page or use the first one
-      let targetPageId = ctx.input.pageId;
       let page = targetPageId ? pages.find(p => p.id === targetPageId) : pages[0];
 
       if (!page) {
@@ -197,14 +211,45 @@ export let auth = SlateAuth.create()
 
     inputSchema: z.object({
       token: z.string().describe('A valid Facebook Page Access Token'),
-      pageId: z.string().optional().describe('The Facebook Page ID associated with this token')
+      pageId: z
+        .string()
+        .optional()
+        .describe(
+          'The Facebook Page ID associated with this token. Detected from the token when left empty.'
+        )
     }),
 
     getOutput: async ctx => {
+      let pageId = ctx.input.pageId?.trim() || undefined;
+
+      // A Page access token resolves `me` to its Page; webhook routing needs that id.
+      // Best-effort: tools still work through `me` when the lookup is refused.
+      if (!pageId) {
+        try {
+          let graphApi = createAxios({
+            baseURL: `https://graph.facebook.com/${MESSENGER_DEFAULT_API_VERSION}`
+          });
+          let response = await graphApi.get<{ id?: string | number }>('/me', {
+            params: { fields: 'id', access_token: ctx.input.token }
+          });
+          let id = response.data?.id;
+          if (id !== undefined && id !== null && String(id)) pageId = String(id);
+        } catch {
+          pageId = undefined;
+        }
+      }
+
+      // Without a Page id the connection has no routing matcher, so events would be dropped silently.
+      if (!pageId && !ctx.config?.pageId) {
+        throw messengerServiceError(
+          'Could not detect the Facebook Page for this token. Enter the Page ID and connect again.'
+        );
+      }
+
       return {
         output: {
           token: ctx.input.token,
-          pageId: ctx.input.pageId
+          pageId
         }
       };
     },

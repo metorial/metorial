@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let alertAction = SlateTool.create(spec, {
   name: 'Alert Action',
   key: 'alert_action',
-  description: `Perform an action on an existing alert: close, acknowledge, unacknowledge, snooze, assign ownership, escalate, add a note, add/remove tags, or delete. All mutating actions are processed asynchronously.`,
+  description: `Perform an action on an existing alert: close, acknowledge, unacknowledge, snooze, assign ownership, escalate, add a note, add/remove tags, add a responder, add/remove custom details, run a custom action, or delete. All mutating actions are processed asynchronously.`,
   instructions: [
     'Choose exactly one action to perform on the alert.',
     'For "snooze", provide snoozeEndTime as an ISO 8601 datetime.',
@@ -16,7 +16,11 @@ export let alertAction = SlateTool.create(spec, {
     'For "add_note", provide note text.',
     'For "add_tags", provide an array of tags to add.',
     'For "remove_tags", provide an array of tags to remove.',
-    'For "delete", use identifierType "id" or "tiny".'
+    'For "add_responder", provide responderType ("team" or "user") and responderId.',
+    'For "add_details", provide details as key-value pairs; for "remove_details", provide detailKeys.',
+    'For "execute_custom_action", provide customActionName matching one of the alert\'s actions.',
+    'For "delete", use identifierType "id" or "tiny".',
+    'Use get_alert_request_status with the returned requestId to confirm processing.'
   ]
 })
   .input(
@@ -37,7 +41,11 @@ export let alertAction = SlateTool.create(spec, {
           'add_note',
           'add_tags',
           'remove_tags',
-          'delete'
+          'delete',
+          'add_responder',
+          'add_details',
+          'remove_details',
+          'execute_custom_action'
         ])
         .describe('Action to perform on the alert'),
       note: z
@@ -66,7 +74,27 @@ export let alertAction = SlateTool.create(spec, {
       tags: z
         .array(z.string())
         .optional()
-        .describe('Tags to add or remove (for "add_tags" / "remove_tags" actions)')
+        .describe('Tags to add or remove (for "add_tags" / "remove_tags" actions)'),
+      responderType: z
+        .enum(['team', 'user'])
+        .optional()
+        .describe('Responder type (for "add_responder" action)'),
+      responderId: z
+        .string()
+        .optional()
+        .describe('Team or user ID to add as responder (for "add_responder" action)'),
+      details: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Custom properties to add (for "add_details" action)'),
+      detailKeys: z
+        .array(z.string())
+        .optional()
+        .describe('Custom property keys to remove (for "remove_details" action, max 10)'),
+      customActionName: z
+        .string()
+        .optional()
+        .describe('Name of the custom alert action to run (for "execute_custom_action")')
     })
   )
   .output(
@@ -157,8 +185,51 @@ export let alertAction = SlateTool.create(spec, {
         response = await client.removeTagsFromAlert(id, idType, {
           tags: ctx.input.tags.join(','),
           user: ctx.input.user,
-          source: ctx.input.source
+          source: ctx.input.source,
+          note: ctx.input.note
         });
+        break;
+      case 'add_responder':
+        if (!ctx.input.responderType || !ctx.input.responderId) {
+          throw opsgenieServiceError(
+            'responderType and responderId are required for the add_responder action.'
+          );
+        }
+        response = await client.addResponderToAlert(id, idType, {
+          responder: { type: ctx.input.responderType, id: ctx.input.responderId },
+          ...baseData
+        });
+        break;
+      case 'add_details':
+        if (!ctx.input.details || Object.keys(ctx.input.details).length === 0) {
+          throw opsgenieServiceError('details are required for the add_details action.');
+        }
+        response = await client.addDetailsToAlert(id, idType, {
+          details: { ...ctx.input.details },
+          ...baseData
+        });
+        break;
+      case 'remove_details':
+        if (!ctx.input.detailKeys || ctx.input.detailKeys.length === 0) {
+          throw opsgenieServiceError('detailKeys are required for the remove_details action.');
+        }
+        response = await client.removeDetailsFromAlert(id, idType, {
+          keys: ctx.input.detailKeys.join(','),
+          ...baseData
+        });
+        break;
+      case 'execute_custom_action':
+        if (!ctx.input.customActionName) {
+          throw opsgenieServiceError(
+            'customActionName is required for the execute_custom_action action.'
+          );
+        }
+        response = await client.executeAlertCustomAction(
+          id,
+          idType,
+          ctx.input.customActionName,
+          baseData
+        );
         break;
       case 'delete':
         if (idType === 'alias') {
@@ -173,8 +244,8 @@ export let alertAction = SlateTool.create(spec, {
 
     return {
       output: {
-        requestId: response.requestId ?? '',
-        result: response.result ?? 'Request will be processed'
+        requestId: response?.requestId ?? '',
+        result: response?.result ?? 'Request will be processed'
       },
       message: `Performed **${ctx.input.action}** on alert \`${ctx.input.alertIdentifier}\``
     };

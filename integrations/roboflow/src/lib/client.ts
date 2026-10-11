@@ -257,7 +257,8 @@ export class RoboflowClient {
     let response = await this.api.get(
       `/${encodeURIComponent(workspaceId)}/${this.projectSlug(projectId, workspaceId)}/${versionNumber}`,
       {
-        params: this.params()
+        // Status polling must bypass the server cache to observe generation and training progress.
+        params: this.params({ nocache: true })
       }
     );
     return response.data;
@@ -295,6 +296,7 @@ export class RoboflowClient {
       checkpoint?: string;
       modelType?: string;
       epochs?: number;
+      trainingCreditCap?: number;
     }
   ) {
     let response = await this.api.post(
@@ -303,6 +305,28 @@ export class RoboflowClient {
       {
         params: this.params({ nocache: true })
       }
+    );
+    return response.data;
+  }
+
+  async endTraining(
+    workspaceId: string,
+    projectId: string,
+    versionNumber: number,
+    mode: 'stop' | 'cancel'
+  ) {
+    let response = await this.api.post(
+      `/${encodeURIComponent(workspaceId)}/${this.projectSlug(projectId, workspaceId)}/${versionNumber}/train/${mode}`,
+      {},
+      { params: this.params() }
+    );
+    return response.data;
+  }
+
+  async listModels(workspaceId: string, projectId: string, group?: string) {
+    let response = await this.api.get(
+      `/${encodeURIComponent(workspaceId)}/${this.projectSlug(projectId, workspaceId)}/models`,
+      { params: this.params(group ? { group } : {}) }
     );
     return response.data;
   }

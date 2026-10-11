@@ -98,6 +98,8 @@ describe('GitHub tool registration', () => {
       'description',
       'private',
       'autoInit',
+      'gitignoreTemplate',
+      'licenseTemplate',
       'organization'
     ]);
     expect(createSchema.properties.private.default).toBe(true);
@@ -110,7 +112,8 @@ describe('GitHub tool registration', () => {
       'pullNumber',
       'commit_title',
       'commit_message',
-      'merge_method'
+      'merge_method',
+      'sha'
     ]);
     expect(mergeSchema.required).toEqual(['owner', 'repo', 'pullNumber']);
 

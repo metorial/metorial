@@ -1,4 +1,8 @@
-import { type CommandOptionDefinition, listCommands as contract } from '@slates/adapter-chat';
+import {
+  type CommandOptionDefinition,
+  listCommands as contract,
+  matchesChatQuery
+} from '@slates/adapter-chat';
 import { spec } from '../../spec';
 import { resolveApplicationId, runDiscordChatAction } from '../lib/context';
 import { decodeDiscordCursor, encodeDiscordCursor, offsetCursorSchema } from '../lib/cursors';
@@ -39,10 +43,9 @@ export let chatListCommands = contract
         );
         let applicationId = await resolveApplicationId(client, ctx.auth);
         let raw = await client.listApplicationCommands(applicationId, ctx.input.workspaceId);
-        let query = ctx.input.query?.trim().toLowerCase();
 
         let commands = raw
-          .filter(command => !query || String(command.name).toLowerCase().includes(query))
+          .filter(command => matchesChatQuery(ctx.input.query, [String(command.name)]))
           .map(command => ({
             name: String(command.name),
             description: command.description || undefined,

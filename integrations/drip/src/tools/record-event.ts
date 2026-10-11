@@ -27,7 +27,9 @@ export let recordEvent = SlateTool.create(spec, {
       properties: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Custom key-value properties to attach to the event.'),
+        .describe(
+          'Custom key-value properties to attach to the event. For a conversion, include its value in cents under the "value" key.'
+        ),
       occurredAt: z
         .string()
         .optional()

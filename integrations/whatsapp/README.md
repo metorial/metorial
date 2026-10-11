@@ -4,37 +4,57 @@ Send and receive WhatsApp messages at scale, including text, images, audio, vide
 
 ## Tools
 
-### Get Business Profile
+### Send Message
 
-Retrieve the WhatsApp Business profile information for your phone number, including description, address, email, websites, industry vertical, and profile picture.
-
-### Get Media URL
-
-Retrieve the download URL for a WhatsApp media file by its media ID. The returned URL is temporary (valid for ~5 minutes) and requires the access token to download. Use this to access media files received from incoming messages.
-
-### List Templates
-
-List message templates in your WhatsApp Business Account. Returns template names, statuses, categories, languages, and component definitions. Use pagination to browse through large template libraries.
-
-### Mark Message as Read
-
-Mark an incoming WhatsApp message as read. This sends a read receipt (blue checkmarks) to the sender and also opens the 24-hour customer service messaging window.
-
-### List Phone Numbers
-
-List all phone numbers associated with your WhatsApp Business Account, including their verified names, display numbers, quality ratings, and verification status.
+Send a WhatsApp message to a recipient. Supports **text**, **image**, **video**, **audio**, **document**, **location**, **contacts**, **sticker**, and **reaction** messages. Set `replyToMessageId` to send the message as a contextual reply that quotes an earlier message. Free-form messages require an open 24-hour customer service window; outside it, use Send Template Message.
 
 ### Send Interactive Message
 
-Send an interactive WhatsApp message with **reply buttons** or a **list menu**. Reply buttons allow up to 3 quick-reply options. List menus allow structured multi-section selection menus with up to 10 sections. Use these for structured user responses like surveys, menu selections, or quick actions.
-
-### Send Message
-
-Send a WhatsApp message to a recipient. Supports multiple message types: **text**, **image**, **video**, **audio**, **document**, **location**, **contacts**, **sticker**, and **reaction**. For text messages within the 24-hour customer service window, use this tool. For messages outside the window, use the Send Template Message tool instead.
+Send an interactive WhatsApp message with **reply buttons** (up to 3), a **list menu** (up to 10 rows across up to 10 sections), or a **call-to-action URL button**. Supports contextual replies. Requires an open customer service window.
 
 ### Send Template Message
 
-Send a pre-approved WhatsApp message template to a recipient. Templates can be sent **outside the 24-hour messaging window** and are required for business-initiated conversations. Templates must be created and approved in the Meta dashboard before use. Use the List Templates tool to find available templates.
+Send a pre-approved WhatsApp message template to a recipient. Templates can be sent **outside the 24-hour messaging window** and are required for business-initiated conversations. Supports positional (`{{1}}`) and named (`{{first_name}}`, via `parameterName`) parameters, media and location headers, and URL, quick-reply, and copy-code buttons.
+
+### List Templates
+
+List message templates in your WhatsApp Business Account with their IDs, statuses, categories, languages, parameter formats, rejection reasons, quality scores, and components. Filter by name, status, category, or language, and page with `nextCursor`.
+
+### Create Template
+
+Create a message template (MARKETING, UTILITY, or AUTHENTICATION) for Meta review, with positional or named variables and text, media, or location headers.
+
+### Update Template
+
+Edit an approved, rejected, or paused template by its ID, for example to fix a rejected template and resubmit it. The provided components replace all existing components.
+
+### Delete Template
+
+Delete a template by name (all languages) or, with a template ID, a single language version.
+
+### Get Media URL
+
+Retrieve a media file by its media ID as a downloadable file, together with its MIME type, size, and SHA256 hash. Use it for media received in incoming messages.
+
+### Delete Media
+
+Delete a media file from WhatsApp servers by its media ID.
+
+### Mark Message as Read
+
+Mark an incoming message (and earlier messages in the conversation) as read, optionally showing a typing indicator while you prepare a reply.
+
+### Get Business Profile / Update Business Profile
+
+Read or update the business profile for the configured phone number: about text, address, description, email, websites, industry vertical, and profile picture.
+
+### List Phone Numbers / Get Phone Number
+
+List the phone numbers in your WhatsApp Business Account, or read one, with verified names, display numbers, quality ratings, and verification status.
+
+### Register Phone Number
+
+Register a phone number for the Cloud API with its two-step verification PIN.
 
 ## Chat
 

@@ -271,7 +271,16 @@ export class GitHubPullRequestWritesApi {
     pullNumber: number;
     body?: string;
     event: ReviewEvent;
-    comments?: Array<{ path: string; position?: number; body: string }>;
+    commitId?: string;
+    comments?: Array<{
+      path: string;
+      position?: number;
+      body: string;
+      line?: number;
+      side?: DiffSide;
+      start_line?: number;
+      start_side?: DiffSide;
+    }>;
   }) {
     return await this.client.requestRest<GitHubRecord>({
       method: 'POST',
@@ -281,6 +290,7 @@ export class GitHubPullRequestWritesApi {
       body: {
         body: input.body,
         event: input.event,
+        ...(input.commitId ? { commit_id: input.commitId } : {}),
         comments: input.comments
       }
     });
@@ -315,7 +325,7 @@ export class GitHubPullRequestWritesApi {
       ) {
         repository(owner: $owner, name: $repo) {
           pullRequest(number: $pullNumber) {
-            reviews(first: 1, author: $author) {
+            reviews(first: 1, author: $author, states: [PENDING]) {
               nodes { id state url }
             }
           }

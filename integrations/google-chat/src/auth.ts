@@ -213,6 +213,10 @@ export let auth = SlateAuth.create()
         url: 'https://developers.google.com/workspace/chat/authenticate-authorize'
       }
     ],
+    // Production requests every scope listed here, so read-only and narrower variants
+    // (chat.messages.readonly, chat.messages.create, chat.messages.reactions,
+    // chat.spaces.readonly, chat.memberships.readonly) are omitted: the full scopes
+    // below cover them. Tool scope gates still accept those grants for older connections.
     scopes: [
       {
         title: 'Messages',
@@ -221,24 +225,9 @@ export let auth = SlateAuth.create()
         scope: googleChatScopes.messages
       },
       {
-        title: 'Messages (Read Only)',
-        description: 'View Google Chat messages.',
-        scope: googleChatScopes.messagesReadonly
-      },
-      {
-        title: 'Create Messages',
-        description: 'Create Google Chat messages without broader message access.',
-        scope: googleChatScopes.messagesCreate
-      },
-      {
         title: 'Spaces',
         description: 'Create Google Chat spaces and view or edit their metadata.',
         scope: googleChatScopes.spaces
-      },
-      {
-        title: 'Spaces (Read Only)',
-        description: 'View Google Chat spaces.',
-        scope: googleChatScopes.spacesReadonly
       },
       {
         title: 'Delete Spaces',
@@ -249,16 +238,6 @@ export let auth = SlateAuth.create()
         title: 'Memberships',
         description: 'View and manage Google Chat space memberships.',
         scope: googleChatScopes.memberships
-      },
-      {
-        title: 'Memberships (Read Only)',
-        description: 'View Google Chat space memberships.',
-        scope: googleChatScopes.membershipsReadonly
-      },
-      {
-        title: 'Message Reactions',
-        description: 'View, create, and delete reactions to Google Chat messages.',
-        scope: googleChatScopes.messageReactions
       },
       {
         title: 'Read State',

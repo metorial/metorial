@@ -1,36 +1,26 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { DiscordClient } from '../lib/client';
+import { discordServiceError } from '../lib/errors';
 import { discordActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
-let inputSchema = z.discriminatedUnion('action', [
-  z.object({
-    action: z.literal('add'),
-    channelId: z.string().describe('The ID of the channel containing the message'),
-    messageId: z.string().describe('The ID of the message to react to'),
-    emoji: z
-      .string()
-      .describe(
-        'The emoji to react with. Use a Unicode emoji character (e.g. "\ud83d\udc4d") or the format "name:id" for custom guild emojis (e.g. "myemoji:123456789")'
-      )
-  }),
-  z.object({
-    action: z.literal('remove'),
-    channelId: z.string().describe('The ID of the channel containing the message'),
-    messageId: z.string().describe('The ID of the message to remove your reaction from'),
-    emoji: z
-      .string()
-      .describe(
-        'The emoji to remove. Use a Unicode emoji character (e.g. "\ud83d\udc4d") or the format "name:id" for custom guild emojis (e.g. "myemoji:123456789")'
-      )
-  }),
-  z.object({
-    action: z.literal('remove_all'),
-    channelId: z.string().describe('The ID of the channel containing the message'),
-    messageId: z.string().describe('The ID of the message to remove all reactions from')
-  })
-]);
+// One object schema (no top-level oneOf); `emoji` is validated per action at runtime.
+let inputSchema = z.object({
+  action: z
+    .enum(['add', 'remove', 'remove_all'])
+    .describe(
+      'add: react; remove: remove your own reaction; remove_all: clear every reaction'
+    ),
+  channelId: z.string().describe('The ID of the channel containing the message'),
+  messageId: z.string().describe('The ID of the message'),
+  emoji: z
+    .string()
+    .optional()
+    .describe(
+      'Required for add and remove. A Unicode emoji character (e.g. "\ud83d\udc4d") or "name:id" for custom guild emojis (e.g. "myemoji:123456789")'
+    )
+});
 
 let outputSchema = z.object({
   success: z.boolean().describe('Whether the reaction operation completed successfully'),
@@ -60,30 +50,34 @@ export let manageReactions = SlateTool.create(spec, {
   .input(inputSchema)
   .output(outputSchema)
   .handleInvocation(async ctx => {
-    let input = ctx.input as any;
+    let input = ctx.input;
     let client = new DiscordClient({ token: ctx.auth.token, tokenType: ctx.auth.tokenType });
 
     let { action, channelId, messageId } = input;
+    let emoji = input.emoji?.trim();
+    if (action !== 'remove_all' && !emoji) {
+      throw discordServiceError(`emoji is required for the ${action} action`);
+    }
 
     if (action === 'add') {
-      await client.createReaction(channelId, messageId, input.emoji);
+      await client.createReaction(channelId, messageId, emoji!);
       return {
         output: {
           success: true,
           channelId,
           messageId
         },
-        message: `Added reaction ${input.emoji} to message \`${messageId}\` in channel \`${channelId}\`.`
+        message: `Added reaction ${emoji} to message \`${messageId}\` in channel \`${channelId}\`.`
       };
     } else if (action === 'remove') {
-      await client.deleteOwnReaction(channelId, messageId, input.emoji);
+      await client.deleteOwnReaction(channelId, messageId, emoji!);
       return {
         output: {
           success: true,
           channelId,
           messageId
         },
-        message: `Removed your reaction ${input.emoji} from message \`${messageId}\` in channel \`${channelId}\`.`
+        message: `Removed your reaction ${emoji} from message \`${messageId}\` in channel \`${channelId}\`.`
       };
     } else {
       await client.deleteAllReactions(channelId, messageId);

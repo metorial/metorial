@@ -1,15 +1,16 @@
 import { PostHogClient } from './client';
 import { postHogServiceError } from './errors';
+import type { PostHogRegion } from './urls';
 
 export let createClient = (
-  config: { region: string; instanceUrl?: string; projectId?: string },
-  auth: { token: string; projectToken?: string }
+  config: { projectId?: string },
+  auth: { token: string; projectToken?: string; region: PostHogRegion; instanceUrl?: string }
 ) => {
   return new PostHogClient({
     token: auth.token,
     projectToken: auth.projectToken,
-    region: config.region,
-    instanceUrl: config.instanceUrl,
+    region: auth.region,
+    instanceUrl: auth.instanceUrl,
     projectId: config.projectId
   });
 };

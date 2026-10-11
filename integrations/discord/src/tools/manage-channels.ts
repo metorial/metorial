@@ -1,6 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { DiscordClient } from '../lib/client';
+import { discordServiceError } from '../lib/errors';
 import { discordActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
@@ -55,69 +56,46 @@ let mapChannel = (ch: any) => ({
   parentId: ch.parent_id || null
 });
 
-let inputSchema = z.discriminatedUnion('action', [
-  z.object({
-    action: z.literal('list'),
-    guildId: z.string().describe('Guild ID to list channels for')
-  }),
-  z.object({
-    action: z.literal('get'),
-    channelId: z.string().describe('Channel ID to retrieve')
-  }),
-  z.object({
-    action: z.literal('create'),
-    guildId: z.string().describe('Guild ID to create the channel in'),
-    name: z.string().describe('Channel name'),
-    type: channelTypeEnum.optional().describe('Channel type (defaults to GUILD_TEXT)'),
-    topic: z.string().optional().describe('Channel topic (text-based channels)'),
-    bitrate: z.number().optional().describe('Bitrate in bits for voice channels (8000-96000)'),
-    userLimit: z
-      .number()
-      .optional()
-      .describe('User limit for voice channels (0-99, 0 means unlimited)'),
-    rateLimitPerUser: z
-      .number()
-      .optional()
-      .describe('Slowmode rate limit in seconds (0-21600)'),
-    position: z.number().optional().describe('Sorting position of the channel'),
-    permissionOverwrites: z
-      .array(permissionOverwriteSchema)
-      .optional()
-      .describe('Permission overwrites for the channel'),
-    parentId: z
-      .string()
-      .optional()
-      .describe('ID of the parent category to nest this channel under'),
-    nsfw: z.boolean().optional().describe('Whether the channel is NSFW')
-  }),
-  z.object({
-    action: z.literal('update'),
-    channelId: z.string().describe('Channel ID to update'),
-    name: z.string().optional().describe('New channel name'),
-    type: channelTypeEnum
-      .optional()
-      .describe('New channel type (limited conversions supported by Discord)'),
-    topic: z.string().optional().describe('New channel topic'),
-    bitrate: z.number().optional().describe('New bitrate for voice channels'),
-    userLimit: z.number().optional().describe('New user limit for voice channels'),
-    rateLimitPerUser: z.number().optional().describe('New slowmode rate limit in seconds'),
-    position: z.number().optional().describe('New sorting position'),
-    permissionOverwrites: z
-      .array(permissionOverwriteSchema)
-      .optional()
-      .describe('New permission overwrites (replaces existing)'),
-    parentId: z
-      .string()
-      .nullable()
-      .optional()
-      .describe('New parent category ID, or null to remove from category'),
-    nsfw: z.boolean().optional().describe('Whether the channel is NSFW')
-  }),
-  z.object({
-    action: z.literal('delete'),
-    channelId: z.string().describe('Channel ID to delete')
-  })
-]);
+// One object schema (no top-level oneOf); per-action requirements are checked at runtime.
+let inputSchema = z.object({
+  action: z
+    .enum(['list', 'get', 'create', 'update', 'delete'])
+    .describe('The channel action to perform'),
+  guildId: z.string().optional().describe('Guild ID (required for list and create)'),
+  channelId: z
+    .string()
+    .optional()
+    .describe('Channel ID (required for get, update, and delete)'),
+  name: z
+    .string()
+    .optional()
+    .describe('Channel name (required for create; optional for update)'),
+  type: channelTypeEnum
+    .optional()
+    .describe(
+      'Channel type for create (defaults to GUILD_TEXT); for update only limited conversions are supported by Discord'
+    ),
+  topic: z.string().optional().describe('Channel topic (text-based channels)'),
+  bitrate: z.number().optional().describe('Bitrate in bits for voice channels (8000-96000)'),
+  userLimit: z
+    .number()
+    .optional()
+    .describe('User limit for voice channels (0-99, 0 means unlimited)'),
+  rateLimitPerUser: z.number().optional().describe('Slowmode rate limit in seconds (0-21600)'),
+  position: z.number().optional().describe('Sorting position of the channel'),
+  permissionOverwrites: z
+    .array(permissionOverwriteSchema)
+    .optional()
+    .describe('Permission overwrites for the channel (replaces existing on update)'),
+  parentId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'ID of the parent category; null on update removes the channel from its category'
+    ),
+  nsfw: z.boolean().optional().describe('Whether the channel is NSFW')
+});
 
 let outputSchema = z.object({
   channel: channelOutputSchema
@@ -149,12 +127,24 @@ export let manageChannels = SlateTool.create(spec, {
   .input(inputSchema)
   .output(outputSchema)
   .handleInvocation(async ctx => {
-    let input = ctx.input as any;
+    let input = ctx.input;
     let client = new DiscordClient({ token: ctx.auth.token, tokenType: ctx.auth.tokenType });
     let { action } = input;
 
+    let requireGuildId = () => {
+      if (!input.guildId)
+        throw discordServiceError(`guildId is required for the ${action} action`);
+      return input.guildId;
+    };
+    let requireChannelId = () => {
+      if (!input.channelId) {
+        throw discordServiceError(`channelId is required for the ${action} action`);
+      }
+      return input.channelId;
+    };
+
     if (action === 'list') {
-      let { guildId } = input;
+      let guildId = requireGuildId();
       let channels = await client.getGuildChannels(guildId);
       let mapped = channels.map(mapChannel);
 
@@ -165,7 +155,7 @@ export let manageChannels = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      let { channelId } = input;
+      let channelId = requireChannelId();
       let channel = await client.getChannel(channelId);
 
       return {
@@ -175,8 +165,9 @@ export let manageChannels = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
+      let guildId = requireGuildId();
+      if (!input.name) throw discordServiceError('name is required for the create action');
       let {
-        guildId,
         name,
         type,
         topic,
@@ -211,8 +202,8 @@ export let manageChannels = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
+      let channelId = requireChannelId();
       let {
-        channelId,
         name,
         type,
         topic,
@@ -248,7 +239,7 @@ export let manageChannels = SlateTool.create(spec, {
     }
 
     // action === 'delete'
-    let { channelId } = input;
+    let channelId = requireChannelId();
     let channel = await client.getChannel(channelId);
     let channelName = channel.name;
     await client.deleteChannel(channelId);

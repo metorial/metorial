@@ -4,17 +4,25 @@ Deploy and manage web applications, databases, and infrastructure on Railway's c
 
 ## Tools
 
+### Get Current User
+
+Identify the connected credentials. Returns the user profile for account and OAuth tokens, the accessible workspaces (for use with List Projects and Create Project), and the project and environment for project tokens.
+
 ### Get Project
 
 Retrieve detailed information about a Railway project including its services and environments.
 
 ### List Projects
 
-List all Railway projects accessible to the authenticated user. Optionally filter by workspace. Returns project names, descriptions, and timestamps.
+List Railway projects accessible to the authenticated user, with cursor pagination. Optionally filter by workspace. Returns project names, descriptions, and timestamps.
 
 ### List Deployments
 
 List deployments for a service in a specific environment. Returns deployment status, URLs, and timestamps. Use this to check deployment history and current status.
+
+### Redeploy Deployment
+
+Redeploy an existing deployment and return the new deployment Railway created, optionally reusing the same image tag for image-based services.
 
 ### Get Domains
 
@@ -38,7 +46,7 @@ Retrieve environment variables for a project and environment. Optionally filter 
 
 ### List Volumes
 
-List all persistent storage volumes in a Railway project.
+List all persistent storage volumes in a Railway project. Provide an environment ID to also list that environment's volume instances.
 
 ## License
 

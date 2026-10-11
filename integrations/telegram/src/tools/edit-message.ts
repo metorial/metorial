@@ -1,12 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { getTelegramErrorDescription } from '../chat/lib/errors';
 import { TelegramClient } from '../lib/client';
 import { spec } from '../spec';
+
+let isNoTextToEdit = (error: unknown) =>
+  /no text in the message to edit/i.test(getTelegramErrorDescription(error) ?? '');
 
 export let editMessageTool = SlateTool.create(spec, {
   name: 'Edit Message',
   key: 'edit_message',
-  description: `Edit the text of a previously sent message. Works for messages sent by the bot in any chat, or inline messages. Provide either chatId + messageId, or inlineMessageId.`,
+  description: `Edit the text of a previously sent message, or the caption of a photo, video, audio, or document message. Works for messages sent by the bot in any chat, or inline messages. Provide either chatId + messageId, or inlineMessageId.`,
+  constraints: ['Text is limited to 4096 characters and media captions to 1024 characters.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -30,7 +35,7 @@ export let editMessageTool = SlateTool.create(spec, {
         .describe(
           'ID of the inline message to edit. Required if chatId/messageId are not provided.'
         ),
-      text: z.string().describe('New text content for the message'),
+      text: z.string().describe('New text, or the new caption for a media message'),
       parseMode: z
         .enum(['HTML', 'MarkdownV2', 'Markdown'])
         .optional()
@@ -47,15 +52,29 @@ export let editMessageTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TelegramClient(ctx.auth.token);
+    if (
+      !ctx.input.inlineMessageId &&
+      (!ctx.input.chatId || ctx.input.messageId === undefined)
+    ) {
+      throw createApiServiceError('Provide chatId and messageId, or inlineMessageId.');
+    }
 
-    let result = await client.editMessageText({
+    let client = new TelegramClient(ctx.auth.token);
+    let target = {
       chatId: ctx.input.chatId,
       messageId: ctx.input.messageId,
       inlineMessageId: ctx.input.inlineMessageId,
-      text: ctx.input.text,
       parseMode: ctx.input.parseMode
-    });
+    };
+
+    let result: any;
+    try {
+      result = await client.editMessageText({ ...target, text: ctx.input.text });
+    } catch (error) {
+      // Media messages carry a caption instead of text.
+      if (!isNoTextToEdit(error)) throw error;
+      result = await client.editMessageCaption({ ...target, caption: ctx.input.text });
+    }
 
     if (typeof result === 'boolean') {
       return {
@@ -74,7 +93,7 @@ export let editMessageTool = SlateTool.create(spec, {
       output: {
         messageId: result.message_id,
         chatId: String(result.chat.id),
-        text: result.text,
+        text: result.text ?? result.caption,
         date: result.date,
         editDate: result.edit_date
       },

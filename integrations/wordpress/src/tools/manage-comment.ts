@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient, extractCommentSummary } from '../lib/helpers';
+import { apiTypeFor, createClient, extractCommentSummary } from '../lib/helpers';
 import { spec } from '../spec';
 
 let commentOutputSchema = z.object({
@@ -9,7 +9,11 @@ let commentOutputSchema = z.object({
   authorName: z.string().describe('Comment author display name'),
   authorEmail: z.string().describe('Comment author email'),
   content: z.string().describe('Comment content (HTML)'),
-  status: z.string().describe('Comment status (approved, hold, spam, trash)'),
+  status: z
+    .string()
+    .describe(
+      'Comment status (approved, spam, trash, or held for moderation: "unapproved" on WordPress.com, "hold" on self-hosted sites)'
+    ),
   date: z.string().describe('Comment date'),
   parentCommentId: z.string().describe('ID of the parent comment (0 if top-level)'),
   type: z.string().describe('Comment type')
@@ -26,10 +30,18 @@ export let listCommentsTool = SlateTool.create(spec, {
   .input(
     z.object({
       postId: z.string().optional().describe('Filter comments by post ID'),
-      status: z.string().optional().describe('Filter by status (approved, hold, spam, trash)'),
+      status: z
+        .string()
+        .optional()
+        .describe(
+          'Filter by status: approved (default), hold (awaiting moderation), spam, trash, or all'
+        ),
       perPage: z.number().optional().describe('Number of comments per page (default: 20)'),
       page: z.number().optional().describe('Page number for pagination'),
-      search: z.string().optional().describe('Search term to filter comments')
+      search: z
+        .string()
+        .optional()
+        .describe('Search term to filter comments (self-hosted sites only)')
     })
   )
   .output(
@@ -39,15 +51,40 @@ export let listCommentsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let comments = await client.listComments(ctx.input);
-    let results = comments.map((c: any) => extractCommentSummary(c, ctx.config.apiType));
+    let results = comments.map((c: any) => extractCommentSummary(c, apiTypeFor(ctx.auth)));
     return {
       output: {
         comments: results,
         count: results.length
       },
       message: `Found **${results.length}** comment(s)${ctx.input.postId ? ` on post ${ctx.input.postId}` : ''}.`
+    };
+  })
+  .build();
+
+export let getCommentTool = SlateTool.create(spec, {
+  name: 'Get Comment',
+  key: 'get_comment',
+  description: `Retrieve a single comment by its ID, including its post, author, content, status, and parent comment.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      commentId: z.string().describe('ID of the comment to retrieve')
+    })
+  )
+  .output(commentOutputSchema)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.auth);
+    let comment = await client.getComment(ctx.input.commentId);
+    let result = extractCommentSummary(comment, apiTypeFor(ctx.auth));
+    return {
+      output: result,
+      message: `Retrieved comment **${result.commentId}** on post ${result.postId} (\`${result.status}\`).`
     };
   })
   .build();
@@ -78,9 +115,9 @@ export let createCommentTool = SlateTool.create(spec, {
   )
   .output(commentOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let comment = await client.createComment(ctx.input);
-    let result = extractCommentSummary(comment, ctx.config.apiType);
+    let result = extractCommentSummary(comment, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Created comment on post **${result.postId}**${ctx.input.parentCommentId ? ` (reply to comment ${ctx.input.parentCommentId})` : ''}.`
@@ -91,7 +128,7 @@ export let createCommentTool = SlateTool.create(spec, {
 export let moderateCommentTool = SlateTool.create(spec, {
   name: 'Moderate Comment',
   key: 'moderate_comment',
-  description: `Moderate a comment by updating its status (approve, hold, spam, or trash) or editing its content.`,
+  description: `Moderate a comment by updating its status (approve, hold for moderation, spam, or trash) or editing its content.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -109,12 +146,12 @@ export let moderateCommentTool = SlateTool.create(spec, {
   )
   .output(commentOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let comment = await client.updateComment(ctx.input.commentId, {
       status: ctx.input.status,
       content: ctx.input.content
     });
-    let result = extractCommentSummary(comment, ctx.config.apiType);
+    let result = extractCommentSummary(comment, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Moderated comment **${result.commentId}**${ctx.input.status ? ` → status: \`${ctx.input.status}\`` : ''}.`
@@ -143,7 +180,7 @@ export let deleteCommentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     await client.deleteComment(ctx.input.commentId);
     return {
       output: {

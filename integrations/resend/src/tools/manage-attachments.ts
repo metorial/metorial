@@ -1,6 +1,11 @@
-import { createApiServiceError, createBase64Attachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  getEmailAttachmentMetadata,
+  getRefreshAt,
+  type ResendFileReference
+} from '../lib/files';
 import { spec } from '../spec';
 
 let attachmentOutputSchema = z.object({
@@ -10,7 +15,12 @@ let attachmentOutputSchema = z.object({
   contentDisposition: z.string().optional().nullable().describe('Content disposition.'),
   contentId: z.string().optional().nullable().describe('Content ID for inline attachments.'),
   size: z.number().optional().describe('File size in bytes.'),
-  expiresAt: z.string().optional().describe('When the signed download URL expires.')
+  expiresAt: z
+    .string()
+    .optional()
+    .describe(
+      "When Resend's temporary download link for this attachment expires. Download Email Attachment always provides a current file."
+    )
 });
 
 let mapAttachment = (attachment: any) => ({
@@ -26,7 +36,7 @@ let mapAttachment = (attachment: any) => ({
 export let listEmailAttachments = SlateTool.create(spec, {
   name: 'List Email Attachments',
   key: 'list_email_attachments',
-  description: `List attachments for a sent or received Resend email. Use Download Email Attachment to fetch file contents as a Slate attachment.`,
+  description: `List attachments for a sent or received Resend email. Use Download Email Attachment to get one attachment as a downloadable file.`,
   tags: {
     readOnly: true
   }
@@ -67,7 +77,7 @@ export let listEmailAttachments = SlateTool.create(spec, {
 export let downloadEmailAttachment = SlateTool.create(spec, {
   name: 'Download Email Attachment',
   key: 'download_email_attachment',
-  description: `Download one sent or received Resend email attachment. File bytes are returned through Slate attachments, not inline output.`,
+  description: `Download one sent or received Resend email attachment as a downloadable file. The output contains the attachment metadata; use List Email Attachments to find attachment IDs.`,
   tags: {
     readOnly: true
   }
@@ -85,35 +95,50 @@ export let downloadEmailAttachment = SlateTool.create(spec, {
     z.object({
       attachmentId: z.string().describe('Attachment ID.'),
       filename: z.string().optional().describe('Filename.'),
-      contentType: z.string().describe('MIME type of the returned attachment.'),
-      size: z.number().describe('Downloaded attachment size in bytes.'),
-      attachmentCount: z.number().describe('Number of Slate attachments returned.')
+      contentType: z.string().describe('MIME type of the attachment.'),
+      contentDisposition: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Content disposition, such as inline or attachment.'),
+      contentId: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Content ID for inline attachments.'),
+      size: z.number().optional().describe('Attachment size in bytes.')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let metadata =
-      ctx.input.source === 'sent'
-        ? await client.getEmailAttachment(ctx.input.emailId, ctx.input.attachmentId)
-        : await client.getReceivedEmailAttachment(ctx.input.emailId, ctx.input.attachmentId);
+    let reference: ResendFileReference = {
+      type: 'email_attachment',
+      source: ctx.input.source,
+      emailId: ctx.input.emailId,
+      attachmentId: ctx.input.attachmentId
+    };
+    let metadata = await getEmailAttachmentMetadata(client, reference);
+    let contentType = metadata.content_type ?? 'application/octet-stream';
 
-    if (!metadata.download_url) {
-      throw createApiServiceError('Resend did not return a download URL for this attachment.');
-    }
-
-    let downloaded = await client.downloadAttachment(metadata.download_url);
-    let contentType = metadata.content_type ?? downloaded.contentType;
+    await ctx.addAttachment({
+      type: 'url',
+      url: metadata.download_url,
+      mimeType: contentType,
+      filename: metadata.filename,
+      refreshReference: reference,
+      refreshAt: getRefreshAt(metadata.expires_at)
+    });
 
     return {
       output: {
         attachmentId: metadata.id,
         filename: metadata.filename,
         contentType,
-        size: downloaded.size,
-        attachmentCount: 1
+        contentDisposition: metadata.content_disposition,
+        contentId: metadata.content_id,
+        size: metadata.size
       },
-      attachments: [createBase64Attachment(downloaded.contentBase64, contentType)],
-      message: `Downloaded attachment \`${metadata.id}\` as a Slate attachment.`
+      message: `Prepared attachment **${metadata.filename ?? metadata.id}** for download.`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient, extractPostSummary } from '../lib/helpers';
+import { apiTypeFor, createClient, extractPostSummary } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listPostsTool = SlateTool.create(spec, {
@@ -75,9 +75,9 @@ export let listPostsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let posts = await client.listPosts(ctx.input);
-    let results = posts.map((p: any) => extractPostSummary(p, ctx.config.apiType));
+    let results = posts.map((p: any) => extractPostSummary(p, apiTypeFor(ctx.auth)));
     return {
       output: {
         posts: results,
@@ -120,12 +120,12 @@ export let getPostTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let post = await client.getPost(ctx.input.postId);
-    let summary = extractPostSummary(post, ctx.config.apiType);
+    let summary = extractPostSummary(post, apiTypeFor(ctx.auth));
 
     let content = '';
-    if (ctx.config.apiType === 'wpcom') {
+    if (apiTypeFor(ctx.auth) === 'wpcom') {
       content = post.content || '';
     } else {
       content = post.content?.rendered || post.content || '';

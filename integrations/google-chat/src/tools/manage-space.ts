@@ -99,7 +99,7 @@ let buildSpaceBody = (input: ManageSpaceInput) => ({
     : {})
 });
 
-let resolveInitialGroupName = (group: string) => {
+export let resolveInitialGroupName = (group: string) => {
   let groupName = resolveGoogleChatGroupName(group);
   if (groupName.slice('groups/'.length).includes('@')) {
     throw googleChatValidationError(

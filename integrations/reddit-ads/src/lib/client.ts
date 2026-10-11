@@ -79,7 +79,10 @@ export class RedditAdsClient {
           'configured_status',
           'effective_status',
           'ad_account_id',
-          'role'
+          'role',
+          'type',
+          'source',
+          'query'
         ].includes(key) ||
         this.redactor.redactEmbedded(value) !== value
       )
@@ -108,15 +111,15 @@ export class RedditAdsClient {
     if (![200, 201].includes(response.status)) unexpected();
     return row(sanitize(response.data, this.redactor));
   }
-  async page(path: string, input: Row = {}, params: Row = {}, data?: Row) {
-    if (input.pageSize !== undefined) integer(input.pageSize, 'pageSize', 1);
-    if (
-      typeof input.pageSize === 'number' &&
-      input.pageSize > (path === '/me/businesses' ? 700 : 1000)
-    )
-      invalid(
-        `pageSize exceeds the limit for this endpoint (${path === '/me/businesses' ? 700 : 1000}).`
-      );
+  async page(
+    path: string,
+    input: Row = {},
+    params: Row = {},
+    data?: Row,
+    max = path === '/me/businesses' ? 700 : 1000
+  ) {
+    if (input.pageSize !== undefined && integer(input.pageSize, 'pageSize', 1) > max)
+      invalid(`pageSize exceeds the limit for this endpoint (${max}).`);
     const envelope = await this.request(
       data === undefined ? 'GET' : 'POST',
       path,
@@ -237,6 +240,26 @@ export class RedditAdsClient {
   }
   pixels(input: Row) {
     return this.page(`/ad_accounts/${this.account()}/pixels`, input);
+  }
+  profiles(input: Row) {
+    return this.page(`/ad_accounts/${this.account()}/profiles`, input, {}, undefined, 100);
+  }
+  posts(profileId: string, input: Row) {
+    return this.page(
+      `/profiles/${id(profileId, 'Profile ID')}/structured_posts`,
+      input,
+      { type: input.postType, source: input.source },
+      undefined,
+      100
+    );
+  }
+  communities(input: Row) {
+    return this.page('/targeting/communities/search', input, { query: input.query });
+  }
+  async taxonomy(path: '/targeting/interests' | '/targeting/geolocations', params: Row = {}) {
+    const envelope = await this.request('GET', path, undefined, params);
+    if (!Array.isArray(envelope.data)) unexpected();
+    return (envelope.data as unknown[]).map(row);
   }
   funds(input: Row = {}) {
     return this.page(`/ad_accounts/${this.account()}/funding_instruments`, input);

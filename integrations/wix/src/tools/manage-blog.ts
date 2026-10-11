@@ -12,7 +12,7 @@ Blog posts include title, content (rich text), categories, tags, SEO settings, a
   instructions: [
     'New blog content must be created as a draft first, then published using the "publish_draft" action.',
     'For third-party apps creating drafts, memberId is required.',
-    'Content should be provided as rich text.'
+    'Content should be provided as a Wix rich content (Ricos) object in richContent.'
   ],
   tags: { destructive: false, readOnly: false }
 })
@@ -33,11 +33,16 @@ Blog posts include title, content (rich text), categories, tags, SEO settings, a
         .string()
         .optional()
         .describe('Draft post ID (for update_draft, publish_draft)'),
-      title: z.string().optional().describe('Post title (for create_draft/update_draft)'),
+      title: z
+        .string()
+        .optional()
+        .describe('Post title (required for create_draft; optional for update_draft)'),
       richContent: z
         .any()
         .optional()
-        .describe('Rich text content object (for create_draft/update_draft)'),
+        .describe(
+          'Post body as a Wix Ricos rich content object, e.g. {"nodes": [{"type": "PARAGRAPH", "id": "p1", "nodes": [{"type": "TEXT", "id": "", "nodes": [], "textData": {"text": "Hello", "decorations": []}}], "paragraphData": {}}]} (for create_draft/update_draft)'
+        ),
       excerpt: z
         .string()
         .optional()
@@ -45,27 +50,37 @@ Blog posts include title, content (rich text), categories, tags, SEO settings, a
       featured: z
         .boolean()
         .optional()
-        .describe('Whether the post is featured (for create_draft/update_draft)'),
+        .describe(
+          'Whether the post is featured (for create_draft/update_draft); for list_posts, return only featured posts'
+        ),
       categoryIds: z
         .array(z.string())
         .optional()
-        .describe('Category IDs to assign (for create_draft/update_draft)'),
+        .describe(
+          'Category IDs to assign (for create_draft/update_draft) or to filter by (for list_posts)'
+        ),
       tagIds: z
         .array(z.string())
         .optional()
-        .describe('Tag IDs to assign (for create_draft/update_draft)'),
+        .describe(
+          'Tag IDs to assign (for create_draft/update_draft) or to filter by (for list_posts)'
+        ),
       memberId: z
         .string()
         .optional()
         .describe('Member ID of the post author (required for third-party apps)'),
-      language: z.string().optional().describe('Post language code, e.g. "en"'),
-      limit: z.number().optional().describe('Max items to return (default 50)'),
+      language: z
+        .string()
+        .optional()
+        .describe('Post language code, e.g. "en" (for create_draft, or to filter lists)'),
+      limit: z.number().optional().describe('Max items to return (default 50, max 100)'),
       offset: z.number().optional().describe('Number of items to skip')
     })
   )
   .output(
     z.object({
       post: z.any().optional().describe('Single post data'),
+      postId: z.string().optional().describe('ID of the published post (for publish_draft)'),
       draftPost: z.any().optional().describe('Single draft post data'),
       posts: z.array(z.any()).optional().describe('List of posts'),
       draftPosts: z.array(z.any()).optional().describe('List of draft posts'),
@@ -78,9 +93,12 @@ Blog posts include title, content (rich text), categories, tags, SEO settings, a
     switch (ctx.input.action) {
       case 'list_posts': {
         let result = await client.listPosts({
-          paging: { limit: ctx.input.limit, offset: ctx.input.offset },
+          limit: ctx.input.limit,
+          offset: ctx.input.offset,
           categoryIds: ctx.input.categoryIds,
-          featured: ctx.input.featured
+          tagIds: ctx.input.tagIds,
+          featured: ctx.input.featured,
+          language: ctx.input.language
         });
         let posts = result.posts || [];
         return {
@@ -99,7 +117,9 @@ Blog posts include title, content (rich text), categories, tags, SEO settings, a
       }
       case 'list_drafts': {
         let result = await client.listDraftPosts({
-          paging: { limit: ctx.input.limit, offset: ctx.input.offset }
+          limit: ctx.input.limit,
+          offset: ctx.input.offset,
+          language: ctx.input.language
         });
         let draftPosts = result.draftPosts || [];
         return {
@@ -108,6 +128,8 @@ Blog posts include title, content (rich text), categories, tags, SEO settings, a
         };
       }
       case 'create_draft': {
+        if (!ctx.input.title)
+          throw createApiServiceError('title is required for create_draft action');
         let draftPost: Record<string, any> = {};
         if (ctx.input.title) draftPost.title = ctx.input.title;
         if (ctx.input.richContent) draftPost.richContent = ctx.input.richContent;
@@ -144,8 +166,8 @@ Blog posts include title, content (rich text), categories, tags, SEO settings, a
           throw createApiServiceError('draftPostId is required for publish_draft action');
         let result = await client.publishDraftPost(ctx.input.draftPostId);
         return {
-          output: { post: result.post },
-          message: `Published draft post **${ctx.input.draftPostId}** as a live blog post`
+          output: { postId: result.postId },
+          message: `Published draft post **${ctx.input.draftPostId}** as live blog post **${result.postId}**`
         };
       }
     }

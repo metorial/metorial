@@ -100,7 +100,9 @@ export let manageIssue = SlateTool.create(spec, {
         .number()
         .nullable()
         .optional()
-        .describe('Milestone number to set, or null to remove during update'),
+        .describe(
+          'Milestone number to set, or null to remove during update. Call list_milestones to discover milestone numbers.'
+        ),
       type: z
         .string()
         .optional()

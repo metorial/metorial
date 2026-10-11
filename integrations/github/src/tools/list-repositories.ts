@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubClient } from '../lib/client';
 import { spec } from '../spec';
@@ -21,9 +21,11 @@ Supports filtering by type, sorting, and pagination.`,
           'Organization name. If omitted, lists repositories for the authenticated user.'
         ),
       type: z
-        .enum(['all', 'owner', 'public', 'private', 'member'])
+        .enum(['all', 'owner', 'public', 'private', 'member', 'forks', 'sources'])
         .optional()
-        .describe('Filter by repository type'),
+        .describe(
+          'Filter by repository type. Without org: all, owner, public, private, or member. With org: all, public, private, forks, sources, or member.'
+        ),
       sort: z
         .enum(['created', 'updated', 'pushed', 'full_name'])
         .optional()
@@ -51,7 +53,11 @@ Supports filtering by type, sorting, and pagination.`,
           updatedAt: z.string().describe('Last update timestamp')
         })
       ),
-      totalCount: z.number().describe('Number of repositories returned')
+      totalCount: z.number().describe('Number of repositories returned'),
+      hasNextPage: z
+        .boolean()
+        .optional()
+        .describe('Whether GitHub reports another page; request page + 1 to continue')
     })
   )
   .handleInvocation(async ctx => {
@@ -60,9 +66,17 @@ Supports filtering by type, sorting, and pagination.`,
       instanceUrl: ctx.auth.instanceUrl
     });
 
-    let repos: any[];
+    let type = ctx.input.type;
+    if (!ctx.input.org && (type === 'forks' || type === 'sources')) {
+      throw createApiServiceError(
+        `type "${type}" is only supported when listing organization repositories; provide org.`,
+        { reason: 'github_list_repositories_type_invalid' }
+      );
+    }
+
+    let result: { items: any[]; hasNextPage: boolean };
     if (ctx.input.org) {
-      repos = await client.listOrgRepos(ctx.input.org, {
+      result = await client.listOrgRepos(ctx.input.org, {
         type: ctx.input.type,
         sort: ctx.input.sort,
         direction: ctx.input.direction,
@@ -70,7 +84,7 @@ Supports filtering by type, sorting, and pagination.`,
         page: ctx.input.page
       });
     } else {
-      repos = await client.listRepositories({
+      result = await client.listRepositories({
         type: ctx.input.type,
         sort: ctx.input.sort,
         direction: ctx.input.direction,
@@ -79,11 +93,11 @@ Supports filtering by type, sorting, and pagination.`,
       });
     }
 
-    let repositories = repos.map((r: any) => ({
+    let repositories = result.items.map((r: any) => ({
       repositoryId: r.id,
       name: r.name,
       fullName: r.full_name,
-      owner: r.owner.login,
+      owner: r.owner?.login ?? '',
       private: r.private,
       description: r.description,
       htmlUrl: r.html_url,
@@ -97,7 +111,8 @@ Supports filtering by type, sorting, and pagination.`,
     return {
       output: {
         repositories,
-        totalCount: repositories.length
+        totalCount: repositories.length,
+        hasNextPage: result.hasNextPage
       },
       message: `Found **${repositories.length}** repositories${ctx.input.org ? ` in org **${ctx.input.org}**` : ''}.`
     };

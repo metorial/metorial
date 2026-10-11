@@ -11,7 +11,7 @@ export let manageAd = SlateTool.create(spec, {
   description:
     'Create or update a Standard ad. Creation requires an explicit status; ACTIVE may enable advertising spend. ARCHIVED/DELETED are retained states, not history erasure. Current API constraints and account ownership are checked before writing.',
   instructions: [
-    'Supply an existing postId for creation. Creative text, media and call-to-action changes must be performed through the provider’s creative workflow, not this endpoint.'
+    'Supply an existing postId for creation; find one with list_posts. Creative text, media and call-to-action changes must be performed through the provider’s creative workflow, not this endpoint.'
   ],
   tags: {
     destructive: true
@@ -24,7 +24,7 @@ export let manageAd = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Existing creative post ID created in Ads Manager; required for creation. Direct headline/body/media fields are unsupported by the current Ad endpoint.'
+          'Existing creative post ID (t3_...) from list_posts; required for creation. Direct headline/body/media fields are unsupported by the current Ad endpoint.'
         ),
       adId: z.string().optional().describe('Ad ID to update; omit to create a new ad'),
       adGroupId: z
@@ -90,7 +90,13 @@ export let manageAd = SlateTool.create(spec, {
       postId: z.string().optional(),
       name: z.string().optional(),
       headline: z.string().optional(),
-      status: z.string().optional(),
+      status: z.string().optional().describe('Configured status set by the advertiser.'),
+      effectiveStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Calculated delivery status, such as PENDING_APPROVAL, PENDING_BILLING_INFO or REJECTED.'
+        ),
       callToAction: z.string().optional(),
       raw: z.any().optional()
     })

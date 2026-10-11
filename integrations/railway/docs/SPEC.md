@@ -1,4 +1,4 @@
-Now let me get more details on the webhook events and the scopes list:# Slates Specification for Railway
+# Railway Specification
 
 ## Overview
 

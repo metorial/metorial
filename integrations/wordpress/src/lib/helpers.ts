@@ -1,14 +1,45 @@
 import { WordPressClient } from './client';
+import { wordpressServiceError } from './errors';
 
-export let createClient = (
-  config: { siteUrl: string; apiType: 'wpcom' | 'selfhosted' },
-  auth: { token: string; authMethod: 'oauth' | 'application_password' }
-) => {
+export type WordPressApiType = 'wpcom' | 'selfhosted';
+
+export type WordPressAuthOutput = {
+  token: string;
+  authMethod: 'oauth' | 'application_password';
+  siteUrl: string;
+  blogId?: string;
+};
+
+// WordPress.com OAuth tokens call the WordPress.com REST API; application
+// passwords call the site's own wp/v2 REST API.
+export let apiTypeFor = (auth: Pick<WordPressAuthOutput, 'authMethod'>): WordPressApiType =>
+  auth.authMethod === 'oauth' ? 'wpcom' : 'selfhosted';
+
+export let createClient = (auth: WordPressAuthOutput) => {
+  if (auth.authMethod === 'oauth') {
+    if (!auth.blogId) {
+      throw wordpressServiceError(
+        'The WordPress.com connection is missing its authorized site. Reconnect WordPress.com and select a site.'
+      );
+    }
+
+    return new WordPressClient({
+      authMethod: 'oauth',
+      token: auth.token,
+      blogId: auth.blogId
+    });
+  }
+
+  if (!auth.siteUrl) {
+    throw wordpressServiceError(
+      'The application password connection is missing its site URL. Reconnect with the site URL.'
+    );
+  }
+
   return new WordPressClient({
-    siteUrl: config.siteUrl,
-    apiType: config.apiType,
+    authMethod: 'application_password',
     token: auth.token,
-    authMethod: auth.authMethod
+    siteUrl: auth.siteUrl
   });
 };
 

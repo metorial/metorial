@@ -1,8 +1,8 @@
-# Slates Specification for Resend
+# Resend Integration Specification
 
 ## Overview
 
-Resend is an email API platform for sending transactional and marketing emails. It allows you to send, receive, and manage emails programmatically through an API. It provides domain, contact property, contact, segment, topic, broadcast, automation, event, template, log, API key, and webhook APIs.
+Resend is an email API platform for sending transactional and marketing emails. It allows you to send, receive, and manage emails programmatically through an API. It provides domain, contact property, contact, segment, topic, broadcast, automation, event, template, suppression, log, API key, and webhook APIs.
 
 ## Authentication
 
@@ -18,15 +18,15 @@ API keys are prefixed with `re_` and are shown only once at creation time.
 
 ### Email Sending
 
-Send transactional emails with HTML, plain text, or published Resend templates. Supports specifying recipients (to, cc, bcc), attachments, reply-to addresses, custom headers, and metadata tags. Includes idempotency key support to ensure the same email request is processed only once. Emails can be scheduled, updated, or cancelled before delivery. Batch sending allows sending multiple emails in a single API call.
+Send transactional emails with HTML, plain text, or published Resend templates. Supports specifying recipients (to, cc, bcc), attachments (including inline images), reply-to addresses, custom headers, metadata tags, and topic scoping. Includes idempotency key support to ensure the same email request is processed only once. Emails can be scheduled, updated, or cancelled before delivery. Batch sending allows sending multiple emails in a single API call.
 
 ### Email Receiving
 
-List sent and inbound emails on verified domains. Received and sent email attachments can be listed and downloaded; downloaded file contents are returned as Slate attachments.
+List sent and inbound emails on verified domains. Received and sent email attachments can be listed and downloaded as files, and the original message of a received email can be downloaded as an `.eml` file.
 
 ### Domain Management
 
-Register and verify custom sending domains with automatic DNS record configuration (DKIM, SPF, DMARC). Domains can be created, verified, updated, listed, and deleted. Open and click tracking can be configured per domain.
+Register and verify custom sending domains with automatic DNS record configuration (DKIM, SPF, DMARC). Domains can be created, verified, updated, listed, and deleted. Open and click tracking, a custom tracking subdomain, TLS, and sending/receiving capabilities can be configured per domain.
 
 ### Contacts, Segments, and Topics
 
@@ -40,11 +40,11 @@ Contact properties define typed custom fields for contacts. Properties can be cr
 
 ### Broadcasts
 
-Broadcasts provide tools for managing contacts and sending personalized broadcasts to them. Broadcasts can be drafted, updated, sent immediately, or scheduled for future delivery. Broadcasts also handle unsubscribe flows automatically.
+Broadcasts provide tools for managing contacts and sending personalized broadcasts to them. Broadcasts can be drafted, updated, sent immediately, scheduled for future delivery, or canceled while scheduled or queued. Broadcasts also handle unsubscribe flows automatically.
 
 ### Templates
 
-Create and manage reusable email templates. Templates can be created, retrieved, updated, deleted, published, and duplicated through the API.
+Create and manage reusable email templates with typed variables and fallback values. Templates can be created, retrieved, updated, deleted, published, and duplicated through the API.
 
 ### Topics
 
@@ -52,11 +52,15 @@ Topics allow you to scope broadcast sending to specific categories. When you sen
 
 ### Automations
 
-Automations define graph-based email sequences. Automations can be created, updated, retrieved, listed, stopped, deleted, and inspected through automation run records.
+Automations define graph-based email sequences, including conditional and wait-for-event branches. Automations can be created, updated, retrieved, listed, stopped, deleted, and inspected through automation run records.
 
 ### Events
 
 Events define and trigger named automation inputs. Events can be created with a flat payload schema, sent to a contact ID or email address, retrieved, listed, updated, and deleted.
+
+### Suppressions
+
+Resend does not deliver to addresses on the suppression list, which are added automatically after hard bounces or spam complaints, or manually. Addresses can be suppressed manually, and suppressions can be listed (optionally by origin), looked up by ID or email address, and removed.
 
 ### API Key Management
 
@@ -64,7 +68,7 @@ Create, list, and delete API keys programmatically. Keys can be scoped to specif
 
 ### Logs
 
-List recent account logs and retrieve individual log entries for email and account activity.
+List recent API request logs (endpoint, method, response status, user agent) and retrieve individual log entries with their request and response bodies.
 
 ### Webhook Management
 
@@ -76,7 +80,7 @@ Resend supports webhooks that deliver real-time notifications via HTTP POST with
 
 ### Email Events
 
-Supported event types include: `email.sent`, `email.delivered`, `email.delivery_delayed`, `email.complained`, `email.bounced`, `email.opened`, `email.clicked`, `email.received`, `email.failed`.
+Supported event types include: `email.sent`, `email.scheduled`, `email.delivered`, `email.delivery_delayed`, `email.complained`, `email.bounced`, `email.opened`, `email.clicked`, `email.received`, `email.failed`, `email.suppressed`.
 
 - **email.sent** — Occurs whenever the API request was successful and Resend will attempt to deliver the message to the recipient's mail server.
 - **email.delivered** — Resend successfully delivered the email to the recipient's mail server.

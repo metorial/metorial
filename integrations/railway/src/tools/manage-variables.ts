@@ -51,7 +51,7 @@ export let getVariablesTool = SlateTool.create(spec, {
 export let setVariablesTool = SlateTool.create(spec, {
   name: 'Set Variables',
   key: 'set_variables',
-  description: `Create or update one or more environment variables for a service. Provide variables as key-value pairs. Existing variables with the same name will be overwritten. Use **replaceAll** to remove all existing variables and set only the provided ones.`,
+  description: `Create or update one or more environment variables for a service, or shared variables for an environment when serviceId is omitted. Provide variables as key-value pairs. Existing variables with the same name will be overwritten. Use **replaceAll** to remove all existing variables and set only the provided ones.`,
   instructions: [
     'To set a single variable, pass it in the "variables" object.',
     'To set multiple variables at once, pass all of them in the "variables" object.',
@@ -65,7 +65,10 @@ export let setVariablesTool = SlateTool.create(spec, {
     z.object({
       projectId: z.string().describe('ID of the project'),
       environmentId: z.string().describe('ID of the environment'),
-      serviceId: z.string().describe('ID of the service'),
+      serviceId: z
+        .string()
+        .optional()
+        .describe('ID of the service. Omit to set shared variables for the environment.'),
       variables: z
         .record(z.string(), z.string())
         .describe('Key-value map of variables to set'),
@@ -73,7 +76,11 @@ export let setVariablesTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .default(false)
-        .describe('If true, replaces all existing variables with the provided set')
+        .describe('If true, replaces all existing variables with the provided set'),
+      skipDeploys: z
+        .boolean()
+        .optional()
+        .describe('If true, do not trigger redeploys of affected services after the change')
     })
   )
   .output(
@@ -94,7 +101,8 @@ export let setVariablesTool = SlateTool.create(spec, {
       environmentId: ctx.input.environmentId,
       serviceId: ctx.input.serviceId,
       variables: ctx.input.variables,
-      replace: ctx.input.replaceAll || undefined
+      replace: ctx.input.replaceAll || undefined,
+      skipDeploys: ctx.input.skipDeploys
     });
 
     return {
@@ -107,7 +115,7 @@ export let setVariablesTool = SlateTool.create(spec, {
 export let deleteVariableTool = SlateTool.create(spec, {
   name: 'Delete Variable',
   key: 'delete_variable',
-  description: `Delete a specific environment variable from a service in a given environment.`,
+  description: `Delete a specific environment variable from a service in a given environment, or a shared environment variable when serviceId is omitted.`,
   tags: {
     destructive: true
   }
@@ -116,7 +124,10 @@ export let deleteVariableTool = SlateTool.create(spec, {
     z.object({
       projectId: z.string().describe('ID of the project'),
       environmentId: z.string().describe('ID of the environment'),
-      serviceId: z.string().describe('ID of the service'),
+      serviceId: z
+        .string()
+        .optional()
+        .describe('ID of the service. Omit to delete a shared environment variable.'),
       name: z.string().describe('Name of the variable to delete')
     })
   )

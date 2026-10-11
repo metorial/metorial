@@ -14,18 +14,32 @@ let escalationRuleSchema = z.object({
   delay: z
     .object({
       timeAmount: z.number().describe('Delay amount'),
-      timeUnit: z.enum(['minutes', 'hours', 'days']).describe('Delay unit')
+      timeUnit: z
+        .enum(['minutes', 'hours', 'days'])
+        .optional()
+        .describe('Delay unit. Defaults to minutes; hours and days are converted to minutes')
     })
     .describe('Delay before notifying'),
   recipient: z
     .object({
-      type: z.enum(['team', 'user', 'schedule', 'escalation']).describe('Recipient type'),
+      type: z
+        .enum(['team', 'user', 'schedule', 'escalation'])
+        .describe(
+          'Recipient type. Opsgenie escalation rules support user, schedule, and team'
+        ),
       id: z.string().optional().describe('Recipient ID'),
       username: z.string().optional().describe('Username (for user type)'),
       name: z.string().optional().describe('Name (for team, schedule types)')
     })
     .describe('Who to notify')
 });
+
+// Opsgenie escalation rule delays only accept `timeAmount` in minutes.
+let MINUTES_PER_UNIT: Record<string, number> = {
+  minutes: 1,
+  hours: 60,
+  days: 1440
+};
 
 let repeatSchema = z
   .object({
@@ -93,6 +107,14 @@ export let manageEscalation = SlateTool.create(spec, {
         ? { name: ctx.input.ownerTeamName }
         : undefined;
 
+    let rules = ctx.input.rules?.map(rule => ({
+      ...rule,
+      delay: {
+        timeAmount:
+          rule.delay.timeAmount * (MINUTES_PER_UNIT[rule.delay.timeUnit ?? 'minutes'] ?? 1)
+      }
+    }));
+
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.name) {
@@ -104,7 +126,7 @@ export let manageEscalation = SlateTool.create(spec, {
         let escalation = await client.createEscalation({
           name: ctx.input.name,
           description: ctx.input.description,
-          rules: ctx.input.rules,
+          rules: rules ?? [],
           ownerTeam,
           repeat: ctx.input.repeat ?? undefined
         });
@@ -129,7 +151,7 @@ export let manageEscalation = SlateTool.create(spec, {
           {
             name: ctx.input.name,
             description: ctx.input.description,
-            rules: ctx.input.rules,
+            rules,
             ownerTeam,
             repeat: ctx.input.repeat ?? undefined
           }

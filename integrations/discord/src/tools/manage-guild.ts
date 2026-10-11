@@ -41,7 +41,7 @@ export let manageGuild = SlateTool.create(spec, {
       withCounts: z
         .boolean()
         .optional()
-        .describe('Include approximate member and presence counts (for get action)'),
+        .describe('Include approximate member counts (for get and list actions)'),
       limit: z
         .number()
         .optional()
@@ -126,7 +126,8 @@ export let manageGuild = SlateTool.create(spec, {
       let results = await client.listCurrentUserGuilds(
         ctx.input.limit,
         ctx.input.before,
-        ctx.input.after
+        ctx.input.after,
+        ctx.input.withCounts
       );
 
       let guilds = results.map((g: any) => ({

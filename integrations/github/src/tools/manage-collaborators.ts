@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubClient } from '../lib/client';
 import { spec } from '../spec';
@@ -68,7 +68,11 @@ export let manageCollaborators = SlateTool.create(spec, {
       };
     }
 
-    if (!username) throw new Error('username is required for add/remove actions.');
+    if (!username) {
+      throw createApiServiceError('username is required for add/remove actions.', {
+        reason: 'github_collaborator_username_required'
+      });
+    }
 
     if (action === 'add') {
       await client.addCollaborator(owner, repo, username, ctx.input.permission);
@@ -86,6 +90,8 @@ export let manageCollaborators = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`, {
+      reason: 'github_collaborator_action_unsupported'
+    });
   })
   .build();

@@ -60,7 +60,10 @@ export let manageVariables = SlateTool.create(spec, {
         .array(z.number())
         .optional()
         .describe('Repository IDs for "selected" visibility org variables'),
-      perPage: z.number().optional().describe('Results per page'),
+      perPage: z
+        .number()
+        .optional()
+        .describe('Results per page (default 30); values above 30 are capped at 30'),
       page: z.number().optional().describe('Page number')
     })
   )
@@ -68,6 +71,7 @@ export let manageVariables = SlateTool.create(spec, {
     z.object({
       variables: z.array(variableSchema).optional().describe('List of variables'),
       totalCount: z.number().optional().describe('Total number of variables'),
+      nextPage: z.number().optional().describe('Next page number, when more variables exist'),
       variable: variableSchema.optional().describe('Single variable'),
       created: z.boolean().optional().describe('Whether the variable was created'),
       updated: z.boolean().optional().describe('Whether the variable was updated'),
@@ -90,12 +94,14 @@ export let manageVariables = SlateTool.create(spec, {
       environmentName,
       variableName,
       variableValue,
-      perPage,
+      perPage: requestedPerPage,
       page
     } = ctx.input;
+    // GitHub caps variable pages at 30; nextPage still reaches the remaining items.
+    let perPage = requestedPerPage === undefined ? undefined : Math.min(requestedPerPage, 30);
 
     if (action === 'list') {
-      let data: { total_count: number; variables: Variable[] };
+      let data: { total_count: number; variables: Variable[]; nextPage?: number };
       if (scope === 'org') {
         if (!org) throw createApiServiceError('org is required for org scope.');
         data = await client.listOrgVariables(org, { perPage, page });
@@ -118,7 +124,7 @@ export let manageVariables = SlateTool.create(spec, {
         visibility: v.visibility
       }));
       return {
-        output: { variables, totalCount: data.total_count },
+        output: { variables, totalCount: data.total_count, nextPage: data.nextPage },
         message: `Found **${data.total_count}** ${scope}-level variables.`
       };
     }

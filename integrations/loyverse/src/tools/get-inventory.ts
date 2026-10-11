@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
 import { spec } from '../spec';
 
 let inventoryLevelSchema = z.object({
@@ -13,7 +13,7 @@ let inventoryLevelSchema = z.object({
 export let getInventory = SlateTool.create(spec, {
   name: 'Get Inventory',
   key: 'get_inventory',
-  description: `Retrieve inventory (stock) levels for item variants across store locations. Filter by store or variant to check specific stock levels. Use this endpoint instead of the Items endpoint to get stock information.`,
+  description: `Retrieve inventory (stock) levels for item variants across store locations. Filter by stores, variants, or update time to check specific stock levels. Use this instead of the item tools to get stock information.`,
   tags: { readOnly: true }
 })
   .input(
@@ -25,8 +25,18 @@ export let getInventory = SlateTool.create(spec, {
         .optional()
         .describe('Number of inventory records to return (1-250, default 50)'),
       cursor: z.string().optional().describe('Pagination cursor'),
-      storeId: z.string().optional().describe('Filter by store ID'),
-      variantId: z.string().optional().describe('Filter by variant ID')
+      storeId: z.string().optional().describe('Filter by a single store ID'),
+      variantId: z.string().optional().describe('Filter by a single variant ID'),
+      storeIds: z.array(z.string()).optional().describe('Filter by several store IDs'),
+      variantIds: z.array(z.string()).optional().describe('Filter by several variant IDs'),
+      updatedAtMin: z
+        .string()
+        .optional()
+        .describe('Only return levels updated at or after this ISO 8601 UTC timestamp'),
+      updatedAtMax: z
+        .string()
+        .optional()
+        .describe('Only return levels updated at or before this ISO 8601 UTC timestamp')
     })
   )
   .output(
@@ -40,8 +50,10 @@ export let getInventory = SlateTool.create(spec, {
     let result = await client.getInventory({
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
-      storeId: ctx.input.storeId,
-      variantId: ctx.input.variantId
+      storeIds: joinIds(ctx.input.storeId, ctx.input.storeIds),
+      variantIds: joinIds(ctx.input.variantId, ctx.input.variantIds),
+      updatedAtMin: ctx.input.updatedAtMin,
+      updatedAtMax: ctx.input.updatedAtMax
     });
 
     let inventoryLevels = (result.inventory_levels ?? []).map((il: any) => ({

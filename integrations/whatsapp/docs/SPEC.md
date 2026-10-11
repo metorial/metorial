@@ -58,6 +58,8 @@ Message templates ensure that business-initiated communication follows WhatsApp 
 - Three categories: Marketing, Utility, and Authentication. Marketing templates can be used for awareness or sales purposes, while utility templates are often used for user action follow-ups. Authentication templates are primarily used to verify a person's identity.
 - Template formats include: text and rich media, carousel (multiple products in a swipeable format), limited-time offer, coupon code, and flow templates.
 - Templates support headers (text or media), body with dynamic variables, footers, and buttons.
+- Template variables use either positional (`{{1}}`) or named (`{{first_name}}`) parameters, set with `parameter_format` at creation; named parameters are sent with `parameter_name`.
+- Approved, rejected, or paused templates can be edited by template ID; edits replace all components and go back through review.
 - Templates must be submitted for Meta's approval before use. Most templates are reviewed by a machine learning assisted process and approved in minutes. Some that require human review can take up to 48 hours.
 
 ### Media Management

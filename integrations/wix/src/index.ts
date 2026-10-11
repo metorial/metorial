@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   getCatalogVersion,
   getSiteProperties,
+  listDataCollections,
   manageBlog,
   manageBookings,
   manageCollections,
@@ -29,6 +30,7 @@ export let provider = Slate.create({
     getCatalogVersion,
     getSiteProperties,
     manageDataItems,
+    listDataCollections,
     managePricingPlans,
     manageMembers,
     manageMedia,

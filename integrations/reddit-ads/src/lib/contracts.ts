@@ -139,7 +139,12 @@ export const resourceOutput = (
   )
     unexpected();
   const status = optionalText(value.configured_status) ?? optionalText(value.status);
-  const common = { name: optionalText(value.name), status, raw: value };
+  const common = {
+    name: optionalText(value.name),
+    status,
+    effectiveStatus: optionalText(value.effective_status),
+    raw: value
+  };
   if (kind === 'campaign')
     return pickDefined({
       ...common,

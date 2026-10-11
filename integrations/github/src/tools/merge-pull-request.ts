@@ -21,7 +21,13 @@ export let mergePullRequest = SlateTool.create(spec, {
       merge_method: z
         .enum(['merge', 'squash', 'rebase'])
         .optional()
-        .describe('Merge method (default: merge)')
+        .describe('Merge method (default: merge)'),
+      sha: z
+        .string()
+        .optional()
+        .describe(
+          'Expected head commit SHA; GitHub refuses the merge if the pull request head has moved'
+        )
     })
   )
   .output(
@@ -43,7 +49,8 @@ export let mergePullRequest = SlateTool.create(spec, {
       {
         commitTitle: ctx.input.commit_title,
         commitMessage: ctx.input.commit_message,
-        mergeMethod: ctx.input.merge_method
+        mergeMethod: ctx.input.merge_method,
+        sha: ctx.input.sha
       }
     );
 

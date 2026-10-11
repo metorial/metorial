@@ -39,6 +39,8 @@ export interface WorkflowRun {
 export interface Job {
   id: number;
   run_id: number;
+  run_attempt?: number;
+  html_url?: string | null;
   name: string;
   status: string;
   conclusion: string | null;
@@ -108,9 +110,9 @@ export interface Cache {
   size_in_bytes?: number;
 }
 export interface SelectedActions {
-  github_owned_allowed: boolean;
-  verified_allowed: boolean;
-  patterns_allowed: string[];
+  github_owned_allowed?: boolean;
+  verified_allowed?: boolean;
+  patterns_allowed?: string[];
 }
 export interface PendingDeployment {
   environment: { id: number; name: string; html_url: string };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
@@ -48,6 +48,10 @@ export let manageMembers = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of members (for list action)'),
+      membershipId: z
+        .string()
+        .optional()
+        .describe('Membership ID of the added member (for add action); use it to remove them'),
       success: z.boolean().describe('Whether the operation succeeded')
     })
   )
@@ -74,7 +78,11 @@ export let manageMembers = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'add') {
-      if (!ctx.input.userId) throw new Error('userId is required for add action');
+      if (!ctx.input.userId) {
+        throw createApiServiceError('userId is required for the add action.', {
+          reason: 'microsoft_teams_member_user_id_missing'
+        });
+      }
 
       let body: any = {
         '@odata.type': '#microsoft.graph.aadUserConversationMember',
@@ -82,21 +90,26 @@ export let manageMembers = SlateTool.create(spec, {
         'user@odata.bind': `https://graph.microsoft.com/v1.0/users('${ctx.input.userId}')`
       };
 
-      if (ctx.input.channelId) {
-        await client.addChannelMember(ctx.input.teamId, ctx.input.channelId, body);
-      } else {
-        await client.addTeamMember(ctx.input.teamId, body);
-      }
+      let added = ctx.input.channelId
+        ? await client.addChannelMember(ctx.input.teamId, ctx.input.channelId, body)
+        : await client.addTeamMember(ctx.input.teamId, body);
 
       return {
-        output: { success: true },
+        output: {
+          ...(typeof added?.id === 'string' ? { membershipId: added.id } : {}),
+          success: true
+        },
         message: `Member added successfully with role **${ctx.input.role}**.`
       };
     }
 
     if (ctx.input.action === 'remove') {
-      if (!ctx.input.membershipId)
-        throw new Error('membershipId is required for remove action');
+      if (!ctx.input.membershipId) {
+        throw createApiServiceError(
+          'membershipId is required for the remove action. Use the list action to find it.',
+          { reason: 'microsoft_teams_membership_id_missing' }
+        );
+      }
 
       if (ctx.input.channelId) {
         await client.removeChannelMember(
@@ -114,6 +127,8 @@ export let manageMembers = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`, {
+      reason: 'microsoft_teams_action_invalid'
+    });
   })
   .build();

@@ -2,7 +2,8 @@ import {
   ChatErrors,
   getAuthenticatedUser as getAuthenticatedUserContract,
   getWorkspace as getWorkspaceContract,
-  listWorkspaces as listWorkspacesContract
+  listWorkspaces as listWorkspacesContract,
+  matchesChatQuery
 } from '@slates/adapter-chat';
 import { BOT_FRAMEWORK_AUTH_METHOD_KEY } from '../../lib/botFramework';
 import { spec } from '../../spec';
@@ -15,11 +16,7 @@ export let chatListWorkspaces = listWorkspacesContract
   .handleInvocation(async ctx => {
     let identity = requireTeamsBotIdentity(ctx.auth, listWorkspacesContract.key);
     let workspace = mapTeamsWorkspace(identity.appId, identity.botName);
-    let query = ctx.input.query?.trim().toLowerCase();
-    let matches =
-      !query ||
-      workspace.id.toLowerCase().includes(query) ||
-      (workspace.name ?? '').toLowerCase().includes(query);
+    let matches = matchesChatQuery(ctx.input.query, [workspace.id, workspace.name]);
     let workspaces = ctx.input.cursor || !matches ? [] : [workspace];
     return {
       output: { workspaces, raw: { appId: identity.appId } },

@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsClient } from '../lib/docs-client';
 import { helpscoutServiceError } from '../lib/errors';
+import { docsListInfo } from '../lib/pagination';
 import { spec } from '../spec';
 
 export let manageDocs = SlateTool.create(spec, {
@@ -36,21 +37,39 @@ export let manageDocs = SlateTool.create(spec, {
           'search_articles'
         ])
         .describe('Action to perform'),
-      siteId: z.string().optional().describe('Site ID (for listing collections)'),
-      collectionId: z.string().optional().describe('Collection ID'),
-      categoryId: z.string().optional().describe('Category ID'),
+      siteId: z
+        .string()
+        .optional()
+        .describe(
+          'Site ID (required for create_collection; optional filter for list_collections and search_articles). Use list_sites to discover IDs.'
+        ),
+      collectionId: z
+        .string()
+        .optional()
+        .describe(
+          'Collection ID (required for get/update/delete_collection, list/create_category, create_article, and list_articles unless categoryId is given)'
+        ),
+      categoryId: z
+        .string()
+        .optional()
+        .describe(
+          'Category ID (required for update/delete_category; list_articles uses it to list the articles in that category)'
+        ),
       articleId: z.string().optional().describe('Article ID'),
       name: z.string().optional().describe('Name/title for create or update'),
       text: z.string().optional().describe('Article body text (HTML)'),
-      description: z.string().optional().describe('Description for collection or category'),
+      description: z
+        .string()
+        .optional()
+        .describe('Collection description (up to 45 characters)'),
       visibility: z
         .enum(['public', 'private'])
         .optional()
-        .describe('Visibility for collections'),
+        .describe('Visibility for collections and categories'),
       status: z.enum(['published', 'notpublished']).optional().describe('Article status'),
-      slug: z.string().optional().describe('Article URL slug'),
+      slug: z.string().optional().describe('URL slug for articles and categories'),
       categoryIds: z.array(z.string()).optional().describe('Category IDs for article'),
-      order: z.number().optional().describe('Sort order for categories'),
+      order: z.number().optional().describe('Display order for collections and categories'),
       query: z.string().optional().describe('Search query (for search_articles)'),
       page: z.number().optional().describe('Page number')
     })
@@ -115,6 +134,20 @@ export let manageDocs = SlateTool.create(spec, {
           visibility: z.string().optional()
         })
         .optional(),
+      category: z
+        .object({
+          categoryId: z.string(),
+          name: z.string(),
+          collectionId: z.string().optional()
+        })
+        .optional()
+        .describe('Single category (create_category, update_category)'),
+      totalCount: z
+        .number()
+        .optional()
+        .describe('Total matching items (list and search actions)'),
+      currentPage: z.number().optional().describe('Current page (list and search actions)'),
+      totalPages: z.number().optional().describe('Total pages (list and search actions)'),
       success: z.boolean()
     })
   )
@@ -130,29 +163,33 @@ export let manageDocs = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'list_sites': {
         let data = await client.listSites({ page: ctx.input.page });
-        let sites = (data?.sites?.items ?? data?.items ?? []).map((s: any) => ({
+        let { items, ...page } = docsListInfo(data, 'sites');
+        let sites = items.map((s: any) => ({
           siteId: s.id,
           title: s.title,
           subDomain: s.subDomain
         }));
         return {
-          output: { sites, success: true },
-          message: `Found **${sites.length}** Docs sites.`
+          output: { sites, ...page, success: true },
+          message: `Found **${page.totalCount}** Docs sites.`
         };
       }
 
       case 'list_collections': {
-        if (!ctx.input.siteId) throw helpscoutServiceError('Site ID is required');
-        let data = await client.listCollections(ctx.input.siteId, { page: ctx.input.page });
-        let collections = (data?.collections?.items ?? data?.items ?? []).map((c: any) => ({
+        let data = await client.listCollections({
+          siteId: ctx.input.siteId,
+          page: ctx.input.page
+        });
+        let { items, ...page } = docsListInfo(data, 'collections');
+        let collections = items.map((c: any) => ({
           collectionId: c.id,
           name: c.name,
           visibility: c.visibility,
           articleCount: c.articleCount
         }));
         return {
-          output: { collections, success: true },
-          message: `Found **${collections.length}** collections.`
+          output: { collections, ...page, success: true },
+          message: `Found **${page.totalCount}** collections.`
         };
       }
 
@@ -176,15 +213,16 @@ export let manageDocs = SlateTool.create(spec, {
           siteId: ctx.input.siteId,
           name: ctx.input.name,
           visibility: ctx.input.visibility,
-          description: ctx.input.description
+          description: ctx.input.description,
+          order: ctx.input.order
         });
         let c = data?.collection ?? data;
         return {
           output: {
             collection: {
               collectionId: c?.id ?? '',
-              name: ctx.input.name,
-              visibility: ctx.input.visibility
+              name: c?.name ?? ctx.input.name,
+              visibility: c?.visibility ?? ctx.input.visibility
             },
             success: true
           },
@@ -194,13 +232,27 @@ export let manageDocs = SlateTool.create(spec, {
 
       case 'update_collection': {
         if (!ctx.input.collectionId) throw helpscoutServiceError('Collection ID is required');
-        await client.updateCollection(ctx.input.collectionId, {
-          name: ctx.input.name,
-          visibility: ctx.input.visibility,
-          description: ctx.input.description
+        // PUT requires name and resets omitted visibility to public, so merge
+        // the requested changes into the current collection.
+        // https://developer.helpscout.com/docs-api/collections/update/
+        let currentData = await client.getCollection(ctx.input.collectionId);
+        let current = currentData?.collection ?? currentData ?? {};
+        let data = await client.updateCollection(ctx.input.collectionId, {
+          name: ctx.input.name ?? current.name,
+          visibility: ctx.input.visibility ?? current.visibility,
+          description: ctx.input.description ?? current.description ?? undefined,
+          order: ctx.input.order ?? current.order
         });
+        let c = data?.collection ?? {};
         return {
-          output: { success: true },
+          output: {
+            collection: {
+              collectionId: c.id ?? ctx.input.collectionId,
+              name: c.name ?? ctx.input.name ?? current.name,
+              visibility: c.visibility ?? ctx.input.visibility ?? current.visibility
+            },
+            success: true
+          },
           message: `Updated collection **#${ctx.input.collectionId}**.`
         };
       }
@@ -219,41 +271,68 @@ export let manageDocs = SlateTool.create(spec, {
         let data = await client.listCategories(ctx.input.collectionId, {
           page: ctx.input.page
         });
-        let categories = (data?.categories?.items ?? data?.items ?? []).map((c: any) => ({
+        let { items, ...page } = docsListInfo(data, 'categories');
+        let categories = items.map((c: any) => ({
           categoryId: c.id,
           name: c.name,
           articleCount: c.articleCount,
           order: c.order
         }));
         return {
-          output: { categories, success: true },
-          message: `Found **${categories.length}** categories.`
+          output: { categories, ...page, success: true },
+          message: `Found **${page.totalCount}** categories.`
         };
       }
 
       case 'create_category': {
         if (!ctx.input.collectionId || !ctx.input.name)
           throw helpscoutServiceError('Collection ID and name are required');
-        await client.createCategory(ctx.input.collectionId, {
+        let data = await client.createCategory({
+          collectionId: ctx.input.collectionId,
           name: ctx.input.name,
-          description: ctx.input.description,
+          slug: ctx.input.slug,
+          visibility: ctx.input.visibility,
           order: ctx.input.order
         });
+        let c = data?.category ?? data ?? {};
         return {
-          output: { success: true },
+          output: {
+            category: c.id
+              ? {
+                  categoryId: c.id,
+                  name: c.name ?? ctx.input.name,
+                  collectionId: c.collectionId ?? ctx.input.collectionId
+                }
+              : undefined,
+            success: true
+          },
           message: `Created category **"${ctx.input.name}"**.`
         };
       }
 
       case 'update_category': {
         if (!ctx.input.categoryId) throw helpscoutServiceError('Category ID is required');
-        await client.updateCategory(ctx.input.categoryId, {
-          name: ctx.input.name,
-          description: ctx.input.description,
-          order: ctx.input.order
+        // PUT requires name, so merge the requested changes into the current category.
+        // https://developer.helpscout.com/docs-api/categories/update/
+        let currentData = await client.getCategory(ctx.input.categoryId);
+        let current = currentData?.category ?? currentData ?? {};
+        let data = await client.updateCategory(ctx.input.categoryId, {
+          name: ctx.input.name ?? current.name,
+          slug: ctx.input.slug ?? current.slug ?? undefined,
+          visibility: ctx.input.visibility ?? current.visibility ?? undefined,
+          order: ctx.input.order ?? current.order,
+          defaultSort: current.defaultSort ?? undefined
         });
+        let c = data?.category ?? {};
         return {
-          output: { success: true },
+          output: {
+            category: {
+              categoryId: c.id ?? ctx.input.categoryId,
+              name: c.name ?? ctx.input.name ?? current.name,
+              collectionId: c.collectionId ?? current.collectionId
+            },
+            success: true
+          },
           message: `Updated category **#${ctx.input.categoryId}**.`
         };
       }
@@ -268,13 +347,18 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'list_articles': {
-        if (!ctx.input.collectionId) throw helpscoutServiceError('Collection ID is required');
-        let data = await client.listArticles(ctx.input.collectionId, {
-          page: ctx.input.page,
-          status: ctx.input.status,
-          categoryId: ctx.input.categoryId
-        });
-        let articles = (data?.articles?.items ?? data?.items ?? []).map((a: any) => ({
+        if (!ctx.input.collectionId && !ctx.input.categoryId) {
+          throw helpscoutServiceError('Collection ID or category ID is required');
+        }
+        let data = await client.listArticles(
+          { collectionId: ctx.input.collectionId, categoryId: ctx.input.categoryId },
+          {
+            page: ctx.input.page,
+            status: ctx.input.status
+          }
+        );
+        let { items, ...page } = docsListInfo(data, 'articles');
+        let articles = items.map((a: any) => ({
           articleId: a.id,
           name: a.name,
           status: a.status,
@@ -282,8 +366,8 @@ export let manageDocs = SlateTool.create(spec, {
           publicUrl: a.publicUrl
         }));
         return {
-          output: { articles, success: true },
-          message: `Found **${articles.length}** articles.`
+          output: { articles, ...page, success: true },
+          message: `Found **${page.totalCount}** articles.`
         };
       }
 
@@ -312,10 +396,11 @@ export let manageDocs = SlateTool.create(spec, {
         if (!ctx.input.collectionId || !ctx.input.name || !ctx.input.text) {
           throw helpscoutServiceError('Collection ID, name, and text are required');
         }
-        let data = await client.createArticle(ctx.input.collectionId, {
+        let data = await client.createArticle({
+          collectionId: ctx.input.collectionId,
           name: ctx.input.name,
           text: ctx.input.text,
-          categoryIds: ctx.input.categoryIds,
+          categories: ctx.input.categoryIds,
           status: ctx.input.status,
           slug: ctx.input.slug
         });
@@ -324,8 +409,11 @@ export let manageDocs = SlateTool.create(spec, {
           output: {
             article: {
               articleId: a?.id ?? '',
-              name: ctx.input.name,
-              status: ctx.input.status
+              name: a?.name ?? ctx.input.name,
+              status: a?.status ?? ctx.input.status,
+              slug: a?.slug,
+              publicUrl: a?.publicUrl,
+              categories: a?.categories
             },
             success: true
           },
@@ -335,15 +423,28 @@ export let manageDocs = SlateTool.create(spec, {
 
       case 'update_article': {
         if (!ctx.input.articleId) throw helpscoutServiceError('Article ID is required');
-        await client.updateArticle(ctx.input.articleId, {
+        let data = await client.updateArticle(ctx.input.articleId, {
           name: ctx.input.name,
           text: ctx.input.text,
-          categoryIds: ctx.input.categoryIds,
+          categories: ctx.input.categoryIds,
           status: ctx.input.status,
           slug: ctx.input.slug
         });
+        let a = data?.article;
         return {
-          output: { success: true },
+          output: {
+            article: a?.id
+              ? {
+                  articleId: a.id,
+                  name: a.name,
+                  status: a.status,
+                  slug: a.slug,
+                  publicUrl: a.publicUrl,
+                  categories: a.categories
+                }
+              : undefined,
+            success: true
+          },
           message: `Updated article **#${ctx.input.articleId}**.`
         };
       }
@@ -361,24 +462,26 @@ export let manageDocs = SlateTool.create(spec, {
         if (!ctx.input.query) throw helpscoutServiceError('Search query is required');
         let data = await client.searchArticles(ctx.input.query, {
           collectionId: ctx.input.collectionId,
+          siteId: ctx.input.siteId,
           page: ctx.input.page,
           status: ctx.input.status
         });
-        let articles = (data?.articles?.items ?? data?.items ?? []).map((a: any) => ({
+        let { items, ...page } = docsListInfo(data, 'articles');
+        let articles = items.map((a: any) => ({
           articleId: a.id,
           name: a.name,
           status: a.status,
           slug: a.slug,
-          publicUrl: a.publicUrl
+          publicUrl: a.url ?? a.publicUrl
         }));
         return {
-          output: { articles, success: true },
-          message: `Found **${articles.length}** articles matching "${ctx.input.query}".`
+          output: { articles, ...page, success: true },
+          message: `Found **${page.totalCount}** articles matching "${ctx.input.query}".`
         };
       }
 
       default:
-        return { output: { success: false }, message: 'Unknown action.' };
+        throw helpscoutServiceError(`Unsupported knowledge base action: ${ctx.input.action}`);
     }
   })
   .build();

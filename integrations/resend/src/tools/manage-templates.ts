@@ -3,6 +3,36 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let templateVariableInputSchema = z.object({
+  key: z
+    .string()
+    .describe(
+      'Variable key used in the template as {{{KEY}}}. Reserved: FIRST_NAME, LAST_NAME, EMAIL, RESEND_UNSUBSCRIBE_URL, contact, this.'
+    ),
+  type: z.enum(['string', 'number']).describe('Variable type.'),
+  fallbackValue: z
+    .union([z.string(), z.number()])
+    .optional()
+    .describe(
+      'Fallback value matching the variable type. Without one, the value must be supplied when sending.'
+    )
+});
+
+let templateVariablesInputSchema = z
+  .array(templateVariableInputSchema)
+  .describe('Variables used in the template HTML (max 50).');
+
+let templateVariableOutputSchema = z.object({
+  variableId: z.string().optional().describe('Variable ID.'),
+  key: z.string().describe('Variable key.'),
+  type: z.string().optional().describe('Variable type.'),
+  fallbackValue: z
+    .union([z.string(), z.number()])
+    .optional()
+    .nullable()
+    .describe('Fallback value.')
+});
+
 let templateOutputSchema = z.object({
   templateId: z.string().describe('ID of the template.'),
   name: z.string().optional().describe('Template name.'),
@@ -10,9 +40,24 @@ let templateOutputSchema = z.object({
   status: z.string().optional().describe('Template status (draft or published).'),
   from: z.string().optional().nullable().describe('Default sender address.'),
   subject: z.string().optional().nullable().describe('Default subject.'),
-  replyTo: z.string().optional().nullable().describe('Default reply-to address.'),
+  replyTo: z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .nullable()
+    .describe('Default reply-to address(es).'),
   html: z.string().optional().nullable().describe('HTML content.'),
   text: z.string().optional().nullable().describe('Plain text content.'),
+  variables: z
+    .array(templateVariableOutputSchema)
+    .optional()
+    .nullable()
+    .describe('Variables declared on the template.'),
+  currentVersionId: z.string().optional().nullable().describe('Current version ID.'),
+  hasUnpublishedVersions: z
+    .boolean()
+    .optional()
+    .describe('Whether the template has changes that are not published yet.'),
+  publishedAt: z.string().optional().nullable().describe('Last publish timestamp.'),
   createdAt: z.string().optional().describe('Creation timestamp.'),
   updatedAt: z.string().optional().describe('Last update timestamp.')
 });
@@ -37,7 +82,12 @@ export let createTemplate = SlateTool.create(spec, {
         .union([z.string(), z.array(z.string())])
         .optional()
         .describe('Default reply-to address(es).'),
-      text: z.string().optional().describe('Plain text version.')
+      text: z.string().optional().describe('Plain text version.'),
+      variables: templateVariablesInputSchema
+        .optional()
+        .describe(
+          'Variables used in the template HTML (max 50). Declare every {{{KEY}}} placeholder here.'
+        )
     })
   )
   .output(
@@ -54,7 +104,8 @@ export let createTemplate = SlateTool.create(spec, {
       from: ctx.input.from,
       subject: ctx.input.subject,
       replyTo: ctx.input.replyTo,
-      text: ctx.input.text
+      text: ctx.input.text,
+      variables: ctx.input.variables
     });
 
     return {
@@ -93,6 +144,15 @@ export let getTemplate = SlateTool.create(spec, {
         replyTo: t.reply_to,
         html: t.html,
         text: t.text,
+        variables: t.variables?.map((variable: any) => ({
+          variableId: variable.id,
+          key: variable.key,
+          type: variable.type,
+          fallbackValue: variable.fallback_value
+        })),
+        currentVersionId: t.current_version_id,
+        hasUnpublishedVersions: t.has_unpublished_versions,
+        publishedAt: t.published_at,
         createdAt: t.created_at,
         updatedAt: t.updated_at
       },
@@ -112,7 +172,7 @@ export let updateTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      templateId: z.string().describe('ID of the template to update.'),
+      templateId: z.string().describe('ID or alias of the template to update.'),
       name: z.string().optional().describe('Updated name.'),
       html: z.string().optional().describe('Updated HTML content.'),
       alias: z.string().optional().describe('Updated alias.'),
@@ -122,7 +182,10 @@ export let updateTemplate = SlateTool.create(spec, {
         .union([z.string(), z.array(z.string())])
         .optional()
         .describe('Updated reply-to address(es).'),
-      text: z.string().optional().describe('Updated plain text content.')
+      text: z.string().optional().describe('Updated plain text content.'),
+      variables: templateVariablesInputSchema
+        .optional()
+        .describe('Updated list of variables used in the template HTML (max 50).')
     })
   )
   .output(
@@ -139,7 +202,8 @@ export let updateTemplate = SlateTool.create(spec, {
       from: ctx.input.from,
       subject: ctx.input.subject,
       replyTo: ctx.input.replyTo,
-      text: ctx.input.text
+      text: ctx.input.text,
+      variables: ctx.input.variables
     });
 
     return {
@@ -173,6 +237,7 @@ export let listTemplates = SlateTool.create(spec, {
             name: z.string().describe('Template name.'),
             alias: z.string().optional().nullable().describe('Template alias.'),
             status: z.string().describe('Status (draft or published).'),
+            publishedAt: z.string().optional().nullable().describe('Last publish timestamp.'),
             createdAt: z.string().optional().describe('Creation timestamp.'),
             updatedAt: z.string().optional().describe('Last update timestamp.')
           })
@@ -194,6 +259,7 @@ export let listTemplates = SlateTool.create(spec, {
       name: t.name,
       alias: t.alias,
       status: t.status,
+      publishedAt: t.published_at,
       createdAt: t.created_at,
       updatedAt: t.updated_at
     }));
@@ -249,7 +315,7 @@ export let duplicateTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      templateId: z.string().describe('Template ID to duplicate.')
+      templateId: z.string().describe('Template ID or alias to duplicate.')
     })
   )
   .output(

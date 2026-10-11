@@ -8,7 +8,7 @@ export let manageCollections = SlateTool.create(spec, {
   key: 'manage_collections',
   description: `Query and retrieve product collections from a Wix Store.
 Use **action** to specify the operation: \`list\` or \`get\`.
-Collections are groups of products (categories) used to organize a store catalog.`,
+Collections are groups of products used to organize a Catalog V1 store. Catalog V3 stores organize products with categories instead.`,
   tags: { destructive: false, readOnly: true }
 })
   .input(
@@ -18,7 +18,7 @@ Collections are groups of products (categories) used to organize a store catalog
       filter: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Filter object for list action'),
+        .describe('Filter object for list action, e.g. {"name": "Summer"}'),
       sort: z
         .array(
           z.object({
@@ -28,7 +28,7 @@ Collections are groups of products (categories) used to organize a store catalog
         )
         .optional()
         .describe('Sort specification'),
-      limit: z.number().optional().describe('Max items to return (default 100)'),
+      limit: z.number().optional().describe('Max items to return (max 100)'),
       offset: z.number().optional().describe('Number of items to skip')
     })
   )
@@ -47,7 +47,8 @@ Collections are groups of products (categories) used to organize a store catalog
         let result = await client.queryCollections({
           filter: ctx.input.filter,
           sort: ctx.input.sort,
-          paging: { limit: ctx.input.limit, offset: ctx.input.offset }
+          limit: ctx.input.limit,
+          offset: ctx.input.offset
         });
         let collections = result.collections || [];
         return {

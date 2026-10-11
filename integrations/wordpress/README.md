@@ -2,6 +2,13 @@
 
 Create, read, update, and delete WordPress posts and pages. Manage media library items, comments, categories, tags, site users, site metadata, editable site settings, content search, and WordPress.com site statistics. Supports WordPress.com hosted sites via OAuth and self-hosted WordPress sites via application passwords.
 
+## Authentication
+
+- **WordPress.com OAuth**: on the WordPress.com consent screen, pick the site to connect. The connection gets full access to that one site (WordPress.com or Jetpack-connected), and every tool works against it. No other sites or account-wide WordPress.com services are included. WordPress.com tokens from this flow do not expire, and there is no refresh step. To switch sites, reconnect.
+- **Application Password**: enter the self-hosted site URL, a WordPress username, and an application password created under Users → Edit User → Application Passwords. The credentials are checked against the site when you connect. Site statistics are available only on WordPress.com connections.
+
+The connection itself identifies the site, so no separate site configuration is needed.
+
 ## Tools
 
 ### List Posts
@@ -28,6 +35,10 @@ Permanently delete a blog post.
 
 Retrieve pages with filtering and pagination.
 
+### Get Page
+
+Retrieve a single page by ID, including full content and parent page.
+
 ### Create Page
 
 Create a draft or published page.
@@ -43,6 +54,10 @@ Permanently delete a page.
 ### List Comments
 
 Retrieve comments from the site. Can filter by post ID, status, and search term.
+
+### Get Comment
+
+Retrieve a single comment by ID.
 
 ### Create Comment
 

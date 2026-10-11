@@ -26,7 +26,11 @@ let contactInfoSchema = z
       .array(
         z.object({
           phone: z.string(),
-          tag: z.enum(['MAIN', 'HOME', 'WORK', 'MOBILE', 'UNTAGGED']).optional(),
+          tag: z.enum(['MAIN', 'HOME', 'WORK', 'MOBILE', 'FAX', 'UNTAGGED']).optional(),
+          countryCode: z
+            .string()
+            .optional()
+            .describe('ISO-3166 alpha-2 country code of the phone number, e.g. "US"'),
           primary: z.boolean().optional()
         })
       )
@@ -43,9 +47,17 @@ let contactInfoSchema = z
                   number: z.string().optional()
                 })
                 .optional(),
+              addressLine: z
+                .string()
+                .optional()
+                .describe('Free-text main address line; use instead of streetAddress'),
+              addressLine2: z.string().optional().describe('Apartment, suite, or floor'),
               city: z.string().optional(),
-              subdivision: z.string().optional(),
-              country: z.string().optional(),
+              subdivision: z
+                .string()
+                .optional()
+                .describe('ISO 3166-2 subdivision code, e.g. "US-NY"'),
+              country: z.string().optional().describe('ISO-3166 alpha-2 country code'),
               postalCode: z.string().optional()
             })
             .optional(),
@@ -58,9 +70,22 @@ let contactInfoSchema = z
     jobTitle: z.string().optional().describe('Job title'),
     birthdate: z.string().optional().describe('Birthdate in YYYY-MM-DD format'),
     locale: z.string().optional().describe('Locale code, e.g. "en-US"'),
-    labelKeys: z.array(z.string()).optional().describe('Label keys to assign')
+    labelKeys: z.array(z.string()).optional().describe('Existing label keys to assign')
   })
   .describe('Contact information');
+
+type ContactInfoInput = z.infer<typeof contactInfoSchema>;
+
+// Contacts v4 wraps list fields in { items: [...] } objects.
+let toWixContactInfo = (info: ContactInfoInput) => {
+  let { emails, phones, addresses, labelKeys, ...rest } = info;
+  let result: Record<string, any> = { ...rest };
+  if (emails) result.emails = { items: emails };
+  if (phones) result.phones = { items: phones };
+  if (addresses) result.addresses = { items: addresses };
+  if (labelKeys) result.labelKeys = { items: labelKeys };
+  return result;
+};
 
 export let manageContacts = SlateTool.create(spec, {
   name: 'Manage Contacts',
@@ -69,7 +94,7 @@ export let manageContacts = SlateTool.create(spec, {
 Use **action** to specify the operation: \`get\`, \`list\`, \`create\`, \`update\`, or \`delete\`.
 Contacts include name, emails, phones, addresses, company info, and custom labels.`,
   instructions: [
-    'For "update", you must include the contact revision number to prevent overwriting concurrent changes.',
+    'For "update", you must include the contact revision number (from get or list) to prevent overwriting concurrent changes.',
     "You cannot update a member's primary email via Contacts API; use the Members API instead."
   ],
   tags: { destructive: false, readOnly: false }
@@ -90,10 +115,24 @@ Contacts include name, emails, phones, addresses, company info, and custom label
         .number()
         .optional()
         .describe('Contact revision number (required for update)'),
+      allowDuplicates: z
+        .boolean()
+        .optional()
+        .describe(
+          'Allow an email or phone already used by another contact (for create/update)'
+        ),
+      search: z
+        .string()
+        .optional()
+        .describe(
+          'Exact-match text search on first name, last name, email, or phone (for list)'
+        ),
       filter: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Filter object for list action'),
+        .describe(
+          'Filter object for list action, e.g. {"info.name.last": {"$startsWith": "Sm"}}'
+        ),
       sort: z
         .array(
           z.object({
@@ -131,7 +170,9 @@ Contacts include name, emails, phones, addresses, company info, and custom label
         let result = await client.queryContacts({
           filter: ctx.input.filter,
           sort: ctx.input.sort,
-          paging: { limit: ctx.input.limit, offset: ctx.input.offset }
+          limit: ctx.input.limit,
+          offset: ctx.input.offset,
+          search: ctx.input.search
         });
         let contacts = result.contacts || [];
         return {
@@ -142,7 +183,10 @@ Contacts include name, emails, phones, addresses, company info, and custom label
       case 'create': {
         if (!ctx.input.contactInfo)
           throw createApiServiceError('contactInfo is required for create action');
-        let result = await client.createContact(ctx.input.contactInfo);
+        let result = await client.createContact(
+          toWixContactInfo(ctx.input.contactInfo),
+          ctx.input.allowDuplicates
+        );
         return {
           output: { contact: result.contact },
           message: `Created contact **${result.contact?.info?.name?.first || ''} ${result.contact?.info?.name?.last || ''}** (ID: ${result.contact?.id})`
@@ -158,7 +202,8 @@ Contacts include name, emails, phones, addresses, company info, and custom label
         let result = await client.updateContact(
           ctx.input.contactId,
           ctx.input.revision,
-          ctx.input.contactInfo
+          toWixContactInfo(ctx.input.contactInfo),
+          ctx.input.allowDuplicates
         );
         return {
           output: { contact: result.contact },

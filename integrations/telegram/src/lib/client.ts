@@ -30,6 +30,18 @@ export class TelegramClient {
     return response.data.result;
   }
 
+  // ---- Updates ----
+
+  // Short polling only; allowed_updates is left unset so the bot's saved filter is unchanged.
+  async getUpdates(params: { offset?: number; limit?: number }): Promise<any[]> {
+    let response = await this.axios.post('/getUpdates', {
+      offset: params.offset,
+      limit: params.limit,
+      timeout: 0
+    });
+    return response.data.result;
+  }
+
   // ---- Messages ----
 
   async sendMessage(params: {
@@ -336,7 +348,7 @@ export class TelegramClient {
     isAnonymous?: boolean;
     type?: string;
     allowsMultipleAnswers?: boolean;
-    correctOptionId?: number;
+    correctOptionIds?: number[];
     explanation?: string;
     openPeriod?: number;
     closeDate?: number;
@@ -350,7 +362,7 @@ export class TelegramClient {
       is_anonymous: params.isAnonymous,
       type: params.type,
       allows_multiple_answers: params.allowsMultipleAnswers,
-      correct_option_id: params.correctOptionId,
+      correct_option_ids: params.correctOptionIds,
       explanation: params.explanation,
       open_period: params.openPeriod,
       close_date: params.closeDate,
@@ -505,14 +517,16 @@ export class TelegramClient {
   }
 
   async editMessageCaption(params: {
-    chatId: string | number;
-    messageId: number;
+    chatId?: string | number;
+    messageId?: number;
+    inlineMessageId?: string;
     caption: string;
     parseMode?: string;
   }): Promise<any> {
     let response = await this.axios.post('/editMessageCaption', {
       chat_id: params.chatId,
       message_id: params.messageId,
+      inline_message_id: params.inlineMessageId,
       caption: params.caption,
       parse_mode: params.parseMode
     });

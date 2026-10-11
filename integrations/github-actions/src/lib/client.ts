@@ -73,6 +73,8 @@ const jobSchema = z
   .object({
     id: numberId,
     run_id: numberId,
+    run_attempt: z.number().optional(),
+    html_url: z.string().nullish(),
     name: z.string(),
     status: z.string(),
     conclusion: z.string().nullable(),
@@ -152,10 +154,11 @@ const responseSchemas = {
     default_workflow_permissions: z.string(),
     can_approve_pull_request_reviews: z.boolean()
   }),
+  // GitHub documents every selected-actions property as optional.
   selectedActions: z.object({
-    github_owned_allowed: z.boolean(),
-    verified_allowed: z.boolean(),
-    patterns_allowed: z.array(z.string())
+    github_owned_allowed: z.boolean().optional(),
+    verified_allowed: z.boolean().optional(),
+    patterns_allowed: z.array(z.string()).optional()
   }),
   pendingDeployments: z.array(
     z.object({
@@ -168,6 +171,26 @@ const responseSchemas = {
   dispatch: z.object({ workflow_run_id: numberId, run_url: z.string(), html_url: z.string() }),
   usage: z.object({ billable: recordSchema })
 };
+
+// GitHub paginates list endpoints with a Link header; rel="next" is authoritative even
+// when total_count exceeds the 1,000-result cap that applies to filtered run searches.
+const nextPageFromLink = (headers: unknown) => {
+  const next = getResponseHeaderValue(headers, 'link')
+    ?.split(',')
+    .find(part => /;\s*rel="?next"?/.test(part))
+    ?.match(/<([^>]+)>/)?.[1];
+  if (!next) return undefined;
+  try {
+    const page = Number(new URL(next).searchParams.get('page'));
+    return Number.isSafeInteger(page) && page > 0 ? page : undefined;
+  } catch {
+    return undefined;
+  }
+};
+const withNextPage = <T extends object>(response: { data: T; headers: unknown }) => ({
+  ...response.data,
+  nextPage: nextPageFromLink(response.headers)
+});
 
 export const githubHeaders = {
   Accept: 'application/vnd.github+json',
@@ -255,7 +278,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.workflows);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getWorkflow(owner: string, repo: string, workflowId: number | string) {
@@ -347,7 +370,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.runs);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getWorkflowRun(owner: string, repo: string, runId: number) {
@@ -364,21 +387,45 @@ export class GitHubActionsClient {
     );
   }
 
-  async rerunWorkflowRun(owner: string, repo: string, runId: number) {
+  async forceCancelWorkflowRun(owner: string, repo: string, runId: number) {
     await this.http.post(
-      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/rerun`
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/force-cancel`
     );
   }
 
-  async rerunFailedJobs(owner: string, repo: string, runId: number) {
+  async rerunWorkflowRun(
+    owner: string,
+    repo: string,
+    runId: number,
+    enableDebugLogging?: boolean
+  ) {
     await this.http.post(
-      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/rerun-failed-jobs`
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/rerun`,
+      { enable_debug_logging: enableDebugLogging }
     );
   }
 
-  async rerunWorkflowJob(owner: string, repo: string, jobId: number) {
+  async rerunFailedJobs(
+    owner: string,
+    repo: string,
+    runId: number,
+    enableDebugLogging?: boolean
+  ) {
     await this.http.post(
-      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/jobs/${jobId}/rerun`
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/runs/${runId}/rerun-failed-jobs`,
+      { enable_debug_logging: enableDebugLogging }
+    );
+  }
+
+  async rerunWorkflowJob(
+    owner: string,
+    repo: string,
+    jobId: number,
+    enableDebugLogging?: boolean
+  ) {
+    await this.http.post(
+      `/repos/${encodePathSegment(owner)}/${encodePathSegment(repo)}/actions/jobs/${jobId}/rerun`,
+      { enable_debug_logging: enableDebugLogging }
     );
   }
 
@@ -464,7 +511,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.jobs);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getJob(owner: string, repo: string, jobId: number) {
@@ -501,7 +548,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.artifacts);
-    return response.data;
+    return withNextPage(response);
   }
 
   async listArtifactsForRun(
@@ -525,7 +572,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.artifacts);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getArtifact(owner: string, repo: string, artifactId: number) {
@@ -565,7 +612,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.secrets);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getRepoSecret(owner: string, repo: string, secretName: string) {
@@ -619,7 +666,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.secrets);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getOrgSecret(org: string, secretName: string) {
@@ -628,6 +675,16 @@ export class GitHubActionsClient {
     );
     this.validateResponse(response.data, responseSchemas.secret);
     return response.data;
+  }
+
+  async findOrgSecret(org: string, secretName: string) {
+    try {
+      return await this.getOrgSecret(org, secretName);
+    } catch (error) {
+      if ((error as { data?: { upstreamStatus?: unknown } }).data?.upstreamStatus === 404)
+        return undefined;
+      throw error;
+    }
   }
 
   async getOrgPublicKey(org: string) {
@@ -683,7 +740,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.secrets);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getEnvironmentPublicKey(owner: string, repo: string, environmentName: string) {
@@ -739,7 +796,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.variables);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getRepoVariable(owner: string, repo: string, variableName: string) {
@@ -792,7 +849,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.variables);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getOrgVariable(org: string, variableName: string) {
@@ -864,7 +921,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.variables);
-    return response.data;
+    return withNextPage(response);
   }
 
   async createEnvironmentVariable(
@@ -936,7 +993,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.caches);
-    return response.data;
+    return withNextPage(response);
   }
 
   async deleteCacheByKey(owner: string, repo: string, key: string, ref?: string) {
@@ -974,7 +1031,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.runners);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getRepoRunner(owner: string, repo: string, runnerId: number) {
@@ -1058,7 +1115,7 @@ export class GitHubActionsClient {
       }
     );
     this.validateResponse(response.data, responseSchemas.runners);
-    return response.data;
+    return withNextPage(response);
   }
 
   async getOrgRunner(org: string, runnerId: number) {

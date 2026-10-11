@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
 import { gumroadServiceError } from '../lib/errors';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
 let variantCategorySchema = z.object({
@@ -13,18 +14,33 @@ let variantCategorySchema = z.object({
         variantId: z.string().describe('Unique variant ID'),
         name: z.string().describe('Variant name'),
         priceDifferenceCents: z.number().optional().describe('Price adjustment in cents'),
-        maxPurchaseCount: z.number().optional().describe('Maximum purchases (0 = unlimited)')
+        maxPurchaseCount: z
+          .number()
+          .optional()
+          .describe('Maximum purchases. Absent when inventory is unlimited.')
       })
     )
     .optional()
-    .describe('Variants within this category')
+    .describe('Variants within this category, when included by Gumroad')
 });
 
 let variantSchema = z.object({
   variantId: z.string().describe('Unique variant ID'),
   name: z.string().describe('Variant name'),
+  description: z.string().optional().describe('Variant description'),
   priceDifferenceCents: z.number().optional().describe('Price adjustment in cents'),
-  maxPurchaseCount: z.number().optional().describe('Maximum purchases (0 = unlimited)')
+  maxPurchaseCount: z
+    .number()
+    .optional()
+    .describe('Maximum purchases. Absent when inventory is unlimited.')
+});
+
+let mapVariant = (v: any) => ({
+  variantId: v.id,
+  name: v.name || '',
+  description: v.description || undefined,
+  priceDifferenceCents: v.price_difference_cents ?? undefined,
+  maxPurchaseCount: v.max_purchase_count ?? undefined
 });
 
 export let manageVariants = SlateTool.create(spec, {
@@ -33,13 +49,15 @@ export let manageVariants = SlateTool.create(spec, {
   description: `Manage variant categories and individual variants on a Gumroad product. Variant categories group product options (e.g., "Tier", "Format"), and each category contains individual variants (e.g., "Basic", "Premium").`,
   instructions: [
     'First create a variant category, then add variants to it.',
-    'Use "list_categories" to see all categories and their variants.',
+    'Use "list_categories" to get variant category IDs, then "list_variants" with a variantCategoryId to see its variants.',
+    'Omit maxPurchaseCount on create_variant for unlimited inventory; a value of 0 makes the variant sold out.',
     'Provide variantCategoryId when working with individual variants.'
   ],
   tags: {
     destructive: false
   }
 })
+  .scopes(gumroadActionScopes.editProducts)
   .input(
     z.object({
       action: z
@@ -80,7 +98,9 @@ export let manageVariants = SlateTool.create(spec, {
       maxPurchaseCount: z
         .number()
         .optional()
-        .describe('Maximum purchases, 0 = unlimited (for create_variant, update_variant)')
+        .describe(
+          'Maximum purchases (for create_variant, update_variant). Omit on create_variant for unlimited inventory; omitting on update keeps the current limit.'
+        )
     })
   )
   .output(
@@ -106,12 +126,7 @@ export let manageVariants = SlateTool.create(spec, {
       let mapped = categories.map((c: any) => ({
         variantCategoryId: c.id,
         title: c.title || '',
-        variants: (c.variants || []).map((v: any) => ({
-          variantId: v.id,
-          name: v.name || '',
-          priceDifferenceCents: v.price_difference_cents,
-          maxPurchaseCount: v.max_purchase_count
-        }))
+        variants: Array.isArray(c.variants) ? c.variants.map(mapVariant) : undefined
       }));
       return {
         output: { variantCategories: mapped },
@@ -171,12 +186,7 @@ export let manageVariants = SlateTool.create(spec, {
       if (!variantCategoryId)
         throw gumroadServiceError('variantCategoryId is required for list_variants.');
       let variants = await client.listVariants(productId, variantCategoryId);
-      let mapped = variants.map((v: any) => ({
-        variantId: v.id,
-        name: v.name || '',
-        priceDifferenceCents: v.price_difference_cents,
-        maxPurchaseCount: v.max_purchase_count
-      }));
+      let mapped = variants.map(mapVariant);
       return {
         output: { variants: mapped },
         message: `Found **${mapped.length}** variant(s).`
@@ -193,14 +203,7 @@ export let manageVariants = SlateTool.create(spec, {
         maxPurchaseCount: ctx.input.maxPurchaseCount
       });
       return {
-        output: {
-          variant: {
-            variantId: v.id,
-            name: v.name || '',
-            priceDifferenceCents: v.price_difference_cents,
-            maxPurchaseCount: v.max_purchase_count
-          }
-        },
+        output: { variant: mapVariant(v) },
         message: `Created variant **${v.name}**.`
       };
     }
@@ -209,20 +212,22 @@ export let manageVariants = SlateTool.create(spec, {
       if (!variantCategoryId)
         throw gumroadServiceError('variantCategoryId is required for update_variant.');
       if (!variantId) throw gumroadServiceError('variantId is required for update_variant.');
+      if (
+        ctx.input.name === undefined &&
+        ctx.input.priceDifferenceCents === undefined &&
+        ctx.input.maxPurchaseCount === undefined
+      ) {
+        throw gumroadServiceError(
+          'Provide name, priceDifferenceCents, or maxPurchaseCount for update_variant.'
+        );
+      }
       let v = await client.updateVariant(productId, variantCategoryId, variantId, {
         name: ctx.input.name,
         priceDifferenceCents: ctx.input.priceDifferenceCents,
         maxPurchaseCount: ctx.input.maxPurchaseCount
       });
       return {
-        output: {
-          variant: {
-            variantId: v.id,
-            name: v.name || '',
-            priceDifferenceCents: v.price_difference_cents,
-            maxPurchaseCount: v.max_purchase_count
-          }
-        },
+        output: { variant: mapVariant(v) },
         message: `Updated variant **${v.name}**.`
       };
     }

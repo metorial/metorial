@@ -1,6 +1,6 @@
 import { createAxios } from 'slates';
 import { postHogApiError, postHogServiceError } from './errors';
-import { getPrivateBaseUrl, getPublicBaseUrl } from './urls';
+import { getPrivateBaseUrl, getPublicBaseUrl, type PostHogRegion } from './urls';
 
 type JsonRecord = Record<string, any>;
 type QueryParams = Record<string, string>;
@@ -14,7 +14,7 @@ export class PostHogClient {
   constructor(config: {
     token: string;
     projectToken?: string;
-    region: string;
+    region: PostHogRegion;
     instanceUrl?: string;
     projectId?: string;
   }) {

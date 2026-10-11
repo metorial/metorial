@@ -1,29 +1,42 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pickWritable, requireForCreate } from '../lib/upsert';
 import { spec } from '../spec';
 
 let taxSchema = z.object({
   taxId: z.string().describe('Tax ID'),
   taxName: z.string().optional().describe('Tax name'),
-  taxType: z.string().optional().describe('Tax type (e.g., INCLUDED, ADDED)'),
+  taxType: z.string().optional().describe('Tax type (INCLUDED or ADDED)'),
   taxRate: z.number().optional().describe('Tax rate as a percentage'),
+  storeIds: z.array(z.string()).optional().describe('Stores where the tax is available'),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   deletedAt: z.string().nullable().optional()
 });
 
+let mapTax = (t: any) => ({
+  taxId: t.id,
+  taxName: t.name,
+  taxType: t.type,
+  taxRate: t.rate,
+  storeIds: t.stores ?? undefined,
+  createdAt: t.created_at,
+  updatedAt: t.updated_at,
+  deletedAt: t.deleted_at
+});
+
 export let listTaxes = SlateTool.create(spec, {
   name: 'List Taxes',
   key: 'list_taxes',
-  description: `Retrieve all tax configurations. Taxes can be applied to items and receipts.`,
+  description: `Retrieve tax configurations. Taxes can be applied to items and receipts.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
-      limit: z.number().min(1).max(250).optional(),
-      cursor: z.string().optional(),
-      showDeleted: z.boolean().optional()
+      limit: z.number().min(1).max(250).optional().describe('Number of taxes to return'),
+      cursor: z.string().optional().describe('Pagination cursor'),
+      showDeleted: z.boolean().optional().describe('Include deleted taxes')
     })
   )
   .output(
@@ -40,15 +53,7 @@ export let listTaxes = SlateTool.create(spec, {
       showDeleted: ctx.input.showDeleted
     });
 
-    let taxes = (result.taxes ?? []).map((t: any) => ({
-      taxId: t.id,
-      taxName: t.name,
-      taxType: t.type,
-      taxRate: t.rate,
-      createdAt: t.created_at,
-      updatedAt: t.updated_at,
-      deletedAt: t.deleted_at
-    }));
+    let taxes = (result.taxes ?? []).map(mapTax);
 
     return {
       output: { taxes, cursor: result.cursor },
@@ -60,42 +65,53 @@ export let listTaxes = SlateTool.create(spec, {
 export let createOrUpdateTax = SlateTool.create(spec, {
   name: 'Create or Update Tax',
   key: 'create_or_update_tax',
-  description: `Create a new tax rate or update an existing one. Taxes can be configured as included in or added to item prices.`
+  description: `Create a new tax rate or update an existing one. Taxes can be configured as included in or added to item prices. When updating, fields you omit keep their current values.`,
+  instructions: ['taxName, taxType, and taxRate are required when creating a tax.']
 })
   .input(
     z.object({
       taxId: z.string().optional().describe('Tax ID to update; omit to create'),
-      taxName: z.string().optional().describe('Tax name'),
+      taxName: z
+        .string()
+        .optional()
+        .describe('Tax name (required when creating, max 20 characters)'),
       taxType: z
         .enum(['INCLUDED', 'ADDED'])
         .optional()
         .describe('Whether tax is included in or added to item price'),
-      taxRate: z.number().optional().describe('Tax rate as a percentage')
+      taxRate: z
+        .number()
+        .optional()
+        .describe('Tax rate as a percentage between 0 and 100 (e.g., 5.255)'),
+      storeIds: z.array(z.string()).optional().describe('Stores where the tax is available')
     })
   )
   .output(taxSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    let input = ctx.input;
+    let isUpdate = !!input.taxId;
 
     let body: any = {};
-    if (ctx.input.taxId) body.id = ctx.input.taxId;
-    if (ctx.input.taxName !== undefined) body.name = ctx.input.taxName;
-    if (ctx.input.taxType !== undefined) body.type = ctx.input.taxType;
-    if (ctx.input.taxRate !== undefined) body.rate = ctx.input.taxRate;
+    if (isUpdate) {
+      let existing = await client.getTax(input.taxId!);
+      body = pickWritable(existing, ['name', 'type', 'rate', 'stores']);
+      body.id = input.taxId;
+    } else {
+      requireForCreate(input.taxName, 'taxName', 'tax');
+      requireForCreate(input.taxType, 'taxType', 'tax');
+      requireForCreate(input.taxRate, 'taxRate', 'tax');
+    }
+
+    if (input.taxName !== undefined) body.name = input.taxName;
+    if (input.taxType !== undefined) body.type = input.taxType;
+    if (input.taxRate !== undefined) body.rate = input.taxRate;
+    if (input.storeIds !== undefined) body.stores = input.storeIds;
 
     let result = await client.createOrUpdateTax(body);
-    let isUpdate = !!ctx.input.taxId;
 
     return {
-      output: {
-        taxId: result.id,
-        taxName: result.name,
-        taxType: result.type,
-        taxRate: result.rate,
-        createdAt: result.created_at,
-        updatedAt: result.updated_at,
-        deletedAt: result.deleted_at
-      },
+      output: mapTax(result),
       message: `${isUpdate ? 'Updated' : 'Created'} tax **${result.name}**.`
     };
   })

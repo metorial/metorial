@@ -2,9 +2,11 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
 import { gumroadServiceError } from '../lib/errors';
+import { gumroadActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
 let customFieldSchema = z.object({
+  customFieldId: z.string().optional().describe('Unique custom field ID'),
   name: z.string().describe('Custom field name'),
   required: z.boolean().optional().describe('Whether the field is required at checkout'),
   type: z.string().optional().describe('Field type')
@@ -16,12 +18,14 @@ export let manageCustomFields = SlateTool.create(spec, {
   description: `List, create, update, or delete custom fields on a Gumroad product. Custom fields collect additional buyer information at checkout (e.g., shipping address, size preference).`,
   instructions: [
     'Custom fields are identified by name, not by a separate ID.',
-    'When updating or deleting, use the field name as the identifier.'
+    'When updating or deleting, use the field name as the identifier.',
+    'Only the required flag can be changed with "update".'
   ],
   tags: {
     destructive: false
   }
 })
+  .scopes(gumroadActionScopes.editProducts)
   .input(
     z.object({
       action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform'),
@@ -30,7 +34,12 @@ export let manageCustomFields = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Custom field name (required for create, update, delete)'),
-      required: z.boolean().optional().describe('Whether the field is required at checkout')
+      required: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the field is required at checkout (for create; required for update)'
+        )
     })
   )
   .output(
@@ -52,6 +61,7 @@ export let manageCustomFields = SlateTool.create(spec, {
     if (action === 'list') {
       let fields = await client.listCustomFields(productId);
       let mapped = fields.map((f: any) => ({
+        customFieldId: f.id || undefined,
         name: f.name || '',
         required: f.required,
         type: f.type || undefined
@@ -71,6 +81,7 @@ export let manageCustomFields = SlateTool.create(spec, {
       return {
         output: {
           customField: {
+            customFieldId: field.id || undefined,
             name: field.name || name,
             required: field.required,
             type: field.type || undefined
@@ -82,12 +93,16 @@ export let manageCustomFields = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!name) throw gumroadServiceError('name is required for update action.');
+      if (ctx.input.required === undefined) {
+        throw gumroadServiceError('required is required for update action.');
+      }
       let field = await client.updateCustomField(productId, name, {
         required: ctx.input.required
       });
       return {
         output: {
           customField: {
+            customFieldId: field.id || undefined,
             name: field.name || name,
             required: field.required,
             type: field.type || undefined

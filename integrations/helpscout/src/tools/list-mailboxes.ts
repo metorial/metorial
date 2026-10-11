@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HelpScoutClient } from '../lib/client';
+import { halPageInfo } from '../lib/pagination';
 import { spec } from '../spec';
 
 export let listMailboxes = SlateTool.create(spec, {
   name: 'List Mailboxes',
   key: 'list_mailboxes',
-  description: `List all mailboxes (shared inboxes) in the Help Scout account. Optionally retrieve folders and custom fields for a specific mailbox.`,
+  description: `List all mailboxes (shared inboxes) in the Help Scout account. Optionally retrieve folders and custom fields (with dropdown option IDs) for a specific mailbox.`,
   tags: { readOnly: true }
 })
   .input(
@@ -57,13 +58,29 @@ export let listMailboxes = SlateTool.create(spec, {
                 name: z.string(),
                 type: z.string(),
                 required: z.boolean().optional(),
-                options: z.array(z.string()).optional()
+                systemType: z
+                  .string()
+                  .optional()
+                  .describe('Set for fields managed by Help Scout (topic, sentiment)'),
+                options: z
+                  .array(
+                    z.object({
+                      optionId: z.number().describe('Option ID to use as a dropdown value'),
+                      label: z.string().describe('Option label'),
+                      order: z.number().optional().describe('Display order')
+                    })
+                  )
+                  .optional()
+                  .describe('Dropdown options')
               })
             )
             .optional()
         })
         .optional()
-        .describe('Detailed mailbox info (when mailboxId is provided)')
+        .describe('Detailed mailbox info (when mailboxId is provided)'),
+      totalCount: z.number().optional().describe('Total mailboxes (list)'),
+      currentPage: z.number().optional().describe('Current page (list)'),
+      totalPages: z.number().optional().describe('Total pages (list)')
     })
   )
   .handleInvocation(async ctx => {
@@ -87,7 +104,14 @@ export let listMailboxes = SlateTool.create(spec, {
         name: f.name,
         type: f.type,
         required: f.required,
-        options: f.options ?? undefined
+        systemType: f.systemType ?? undefined,
+        options: Array.isArray(f.options)
+          ? f.options.map((o: any) => ({
+              optionId: o.id,
+              label: o.label,
+              order: o.order
+            }))
+          : undefined
       }));
 
       return {
@@ -117,9 +141,11 @@ export let listMailboxes = SlateTool.create(spec, {
       modifiedAt: m.updatedAt
     }));
 
+    let page = halPageInfo(data, mailboxes.length);
+
     return {
-      output: { mailboxes },
-      message: `Found **${mailboxes.length}** mailboxes.`
+      output: { mailboxes, ...page },
+      message: `Found **${page.totalCount}** mailboxes (page ${page.currentPage} of ${page.totalPages}).`
     };
   })
   .build();

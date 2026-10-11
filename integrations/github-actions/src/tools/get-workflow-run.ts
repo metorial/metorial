@@ -7,6 +7,8 @@ import { spec } from '../spec';
 
 const mapJob = (j: Job) => ({
   jobId: j.id,
+  runAttempt: j.run_attempt,
+  htmlUrl: j.html_url ?? null,
   name: j.name,
   status: j.status,
   conclusion: j.conclusion,
@@ -41,6 +43,12 @@ export let getWorkflowRun = SlateTool.create(spec, {
         .optional()
         .describe('Job results page (default 1); applies when includeJobs is true'),
       jobsPerPage: z.number().optional().describe('Jobs per page (1-100, default 30)'),
+      jobsFilter: z
+        .enum(['latest', 'all'])
+        .optional()
+        .describe(
+          'Which jobs to include when includeJobs is true: latest returns jobs from the most recent attempt (default); all returns jobs from every attempt'
+        ),
       includeJobs: z
         .boolean()
         .optional()
@@ -69,12 +77,17 @@ export let getWorkflowRun = SlateTool.create(spec, {
       runStartedAt: z.string().nullable().describe('When the run started executing'),
       actor: z.string().nullable().describe('User who triggered the run'),
       triggeringActor: z.string().nullable().describe('User whose action triggered the run'),
-      jobsTotalCount: z.number().optional().describe('Total jobs for the latest run attempt'),
+      jobsTotalCount: z
+        .number()
+        .optional()
+        .describe('Total jobs matching jobsFilter (latest attempt by default)'),
       jobsNextPage: z.number().optional().describe('Next jobs page, when more results exist'),
       jobs: z
         .array(
           z.object({
             jobId: z.number().describe('Job ID'),
+            runAttempt: z.number().optional().describe('Run attempt this job belongs to'),
+            htmlUrl: z.string().nullable().optional().describe('URL to the job on GitHub'),
             name: z.string().describe('Job name'),
             status: z.string().describe('Job status'),
             conclusion: z.string().nullable().describe('Job conclusion'),
@@ -113,11 +126,14 @@ export let getWorkflowRun = SlateTool.create(spec, {
         ctx.input.owner,
         ctx.input.repo,
         ctx.input.runId,
-        { page: ctx.input.jobsPage, perPage: ctx.input.jobsPerPage }
+        {
+          filter: ctx.input.jobsFilter,
+          page: ctx.input.jobsPage,
+          perPage: ctx.input.jobsPerPage
+        }
       );
       jobsTotalCount = jobsData.total_count;
-      const page = ctx.input.jobsPage ?? 1;
-      if (page * (ctx.input.jobsPerPage ?? 30) < jobsTotalCount) jobsNextPage = page + 1;
+      jobsNextPage = jobsData.nextPage;
       jobs = jobsData.jobs.map(mapJob);
     }
 
@@ -146,7 +162,7 @@ export let getWorkflowRun = SlateTool.create(spec, {
         jobsNextPage,
         jobs
       },
-      message: `Workflow run **#${run.run_number}** (${run.name}) is **${statusText}**.${jobs ? ` Includes ${jobs.length} jobs.` : ''}`
+      message: `Workflow run **#${run.run_number}** (${run.name ?? run.display_title}) is **${statusText}**.${jobs ? ` Includes ${jobs.length} jobs.` : ''}`
     };
   })
   .build();

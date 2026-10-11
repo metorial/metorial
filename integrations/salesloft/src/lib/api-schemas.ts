@@ -155,6 +155,8 @@ export const taskSchema = z.object({
   task_type: text,
   current_state: text,
   due_date: text,
+  due_at: text,
+  remind_at: text,
   description: text,
   completed_at: text,
   person: relation,

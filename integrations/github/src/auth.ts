@@ -1,9 +1,15 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 let outputSchema = z.object({
   token: z.string(),
   refreshToken: z.string().optional(),
+  expiresAt: z.string().optional(),
   instanceUrl: z.string()
 });
 
@@ -117,6 +123,33 @@ let scopes = [
   }
 ];
 
+// GitHub's token endpoint answers OAuth failures with HTTP 200 and an error body:
+// https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors
+// Expiring user tokens include expires_in and a refresh token:
+// https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens
+function parseGithubTokenResponse(
+  data: unknown,
+  operation: string,
+  previousRefreshToken?: string
+) {
+  let record = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+  if (typeof record.error === 'string' && record.error) {
+    let description =
+      typeof record.error_description === 'string' && record.error_description
+        ? `: ${record.error_description}`
+        : '';
+    throw createApiServiceError(
+      `GitHub OAuth ${operation} failed (${record.error})${description}`,
+      { reason: 'github_oauth_token_error' }
+    );
+  }
+  return normalizeOAuthTokenResponse(data, {
+    providerLabel: 'GitHub',
+    operation,
+    previousRefreshToken
+  });
+}
+
 function normalizeBaseUrl(url: string) {
   return url.replace(/\/+$/, '');
 }
@@ -197,12 +230,13 @@ function createGithubOauth(opts: {
         }
       );
 
-      let data = response.data;
+      let tokens = parseGithubTokenResponse(response.data, 'token exchange');
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
+          token: tokens.token,
+          ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
+          ...(tokens.expiresAt ? { expiresAt: tokens.expiresAt } : {}),
           instanceUrl: baseUrl
         }
       };
@@ -233,12 +267,17 @@ function createGithubOauth(opts: {
         }
       );
 
-      let data = response.data;
+      let tokens = parseGithubTokenResponse(
+        response.data,
+        'token refresh',
+        ctx.output.refreshToken
+      );
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
+          token: tokens.token,
+          ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
+          ...(tokens.expiresAt ? { expiresAt: tokens.expiresAt } : {}),
           instanceUrl: baseUrl
         }
       };

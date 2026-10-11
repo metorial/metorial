@@ -5,9 +5,11 @@ import {
   createAccount,
   createNote,
   createPerson,
+  createTask,
   deleteAccount,
   deleteNote,
   deletePerson,
+  deleteTask,
   getAccount,
   getCadence,
   getEmailTemplate,
@@ -29,7 +31,8 @@ import {
   removePersonFromCadence,
   updateAccount,
   updateNote,
-  updatePerson
+  updatePerson,
+  updateTask
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -58,6 +61,9 @@ export let provider = Slate.create({
     getEmailTemplate,
     listTasks,
     getTask,
+    createTask,
+    updateTask,
+    deleteTask,
     listUsers,
     getMe,
     getNote,

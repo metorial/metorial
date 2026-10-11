@@ -248,7 +248,7 @@ export let checkDomainAvailabilityTool = SlateTool.create(spec, {
 export let getDomainStatusTool = SlateTool.create(spec, {
   name: 'Get Domain Status',
   key: 'get_domain_status',
-  description: `Get DNS and certificate status for a Railway custom domain.`,
+  description: `Get DNS verification and certificate status for a Railway custom domain. Find custom domain IDs with Get Domains.`,
   tags: {
     readOnly: true
   }
@@ -261,6 +261,10 @@ export let getDomainStatusTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      domainId: z.string().describe('Custom domain ID'),
+      domain: z.string().describe('Custom domain name'),
+      verified: z.boolean().nullable().describe('Whether Railway has verified the domain'),
+      targetPort: z.number().nullable().describe('Target port on the service'),
       cdnProvider: z.string().nullable(),
       certificateStatus: z.string().nullable(),
       certificateStatusDetailed: z.string().nullable(),
@@ -279,7 +283,8 @@ export let getDomainStatusTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
-    let status = await client.getDomainStatus(ctx.input.domainId, ctx.input.projectId);
+    let customDomain = await client.getCustomDomain(ctx.input.domainId, ctx.input.projectId);
+    let status = customDomain.status ?? {};
     let dnsRecords = (status.dnsRecords || []).map((record: any) => ({
       hostlabel: record.hostlabel ?? null,
       requiredValue: record.requiredValue ?? null,
@@ -289,6 +294,10 @@ export let getDomainStatusTool = SlateTool.create(spec, {
 
     return {
       output: {
+        domainId: customDomain.id,
+        domain: customDomain.domain,
+        verified: status.verified ?? null,
+        targetPort: customDomain.targetPort ?? null,
         cdnProvider: status.cdnProvider ?? null,
         certificateStatus: status.certificateStatus ?? null,
         certificateStatusDetailed: status.certificateStatusDetailed ?? null,
@@ -297,7 +306,7 @@ export let getDomainStatusTool = SlateTool.create(spec, {
         certificateRetryable: status.certificateRetryable ?? null,
         dnsRecords
       },
-      message: `Domain certificate status: **${status.certificateStatus ?? 'unknown'}**.`
+      message: `Domain **${customDomain.domain}** certificate status: **${status.certificateStatus ?? 'unknown'}**.`
     };
   })
   .build();

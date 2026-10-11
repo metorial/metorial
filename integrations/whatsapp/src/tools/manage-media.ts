@@ -1,13 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getOfficialWhatsAppMediaUrl, getWhatsAppMediaUrlExpiry } from '../lib/media';
 import { spec } from '../spec';
 
 export let getMediaUrl = SlateTool.create(spec, {
   name: 'Get Media URL',
   key: 'get_media_url',
-  description: `Retrieve the download URL for a WhatsApp media file by its media ID. The returned URL is temporary (valid for ~5 minutes) and requires the access token to download.
-Use this to access media files received from incoming messages.`,
+  description: `Retrieve a WhatsApp media file by its media ID and provide it as a downloadable file, along with its MIME type, size, and SHA256 hash.
+Use this to access media files received from incoming messages (media IDs from incoming messages stay valid for 7 days; uploaded media for 30 days).`,
   tags: {
     destructive: false,
     readOnly: true
@@ -30,9 +31,6 @@ Use this to access media files received from incoming messages.`,
     })
   )
   .handleInvocation(async ctx => {
-    // TODO(chat adapter): when WhatsApp chat support is added, emit this as a URL
-    // attachment with a media-id refreshReference and register getFileUrlTool so the
-    // Hub refreshes the five-minute URL within the attachment's seven-day lifetime.
     let client = new Client({
       token: ctx.auth.token,
       phoneNumberId: ctx.config.phoneNumberId,
@@ -48,6 +46,20 @@ Use this to access media files received from incoming messages.`,
           ? Number(result.file_size)
           : undefined;
 
+    // https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media#download-media
+    // The URL needs the access token and expires after 5 minutes; the media ID reissues it.
+    let downloadUrl = getOfficialWhatsAppMediaUrl(result.url);
+    if (downloadUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: downloadUrl,
+        mimeType: result.mime_type,
+        headers: { Authorization: `Bearer ${ctx.auth.token}` },
+        refreshReference: { mediaId: result.id ?? ctx.input.mediaId },
+        refreshAt: getWhatsAppMediaUrlExpiry()
+      });
+    }
+
     return {
       output: {
         mediaId: result.id,
@@ -56,7 +68,9 @@ Use this to access media files received from incoming messages.`,
         sha256: result.sha256,
         fileSize: Number.isFinite(fileSize) ? fileSize : undefined
       },
-      message: `Retrieved media URL for \`${ctx.input.mediaId}\`. MIME type: **${result.mime_type ?? 'unknown'}**. URL is valid for ~5 minutes.`
+      message: downloadUrl
+        ? `Prepared media \`${ctx.input.mediaId}\` for download. MIME type: **${result.mime_type ?? 'unknown'}**.`
+        : `Retrieved media details for \`${ctx.input.mediaId}\`, but WhatsApp did not return an official download URL.`
     };
   })
   .build();

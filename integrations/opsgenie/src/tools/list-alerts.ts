@@ -1,12 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { getNextNumericOffset } from '../lib/paging';
 import { spec } from '../spec';
 
 export let listAlerts = SlateTool.create(spec, {
   name: 'List Alerts',
   key: 'list_alerts',
-  description: `List and search alerts in OpsGenie. Supports filtering by query, pagination, and sorting. Use the query parameter with OpsGenie search syntax (e.g., \`status=open\`, \`tag=critical\`, \`priority=P1\`).`,
+  description: `List and search alerts in OpsGenie. Supports filtering by query, pagination, and sorting. Use the query parameter with OpsGenie alert search syntax (e.g., \`status: open\`, \`tag: critical\`, \`priority: P1\`, \`status: open AND acknowledged: false\`).`,
+  instructions: [
+    'Search uses `field: value` pairs (not `field=value`), combined with AND/OR/NOT. Comparison operators <, <=, >, >= are supported for numeric/date fields.',
+    'When nextOffset is returned, pass it as offset to fetch the next page. offset + limit cannot exceed 20000.'
+  ],
   tags: {
     readOnly: true
   }
@@ -17,7 +22,7 @@ export let listAlerts = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Search query using OpsGenie search syntax (e.g., "status=open AND priority=P1")'
+          'Search query using OpsGenie alert search syntax (e.g., "status: open AND priority: P1")'
         ),
       offset: z.number().optional().describe('Start index for pagination (default 0)'),
       limit: z
@@ -79,7 +84,12 @@ export let listAlerts = SlateTool.create(spec, {
           source: z.string().optional().describe('Alert source')
         })
       ),
-      totalCount: z.number().describe('Number of alerts returned')
+      totalCount: z.number().describe('Number of alerts returned'),
+      hasMore: z.boolean().describe('Whether another page of alerts is available'),
+      nextOffset: z
+        .number()
+        .optional()
+        .describe('Offset to pass to fetch the next page, when more alerts are available')
     })
   )
   .handleInvocation(async ctx => {
@@ -90,6 +100,7 @@ export let listAlerts = SlateTool.create(spec, {
 
     let response = await client.listAlerts(ctx.input);
     let data = response.data ?? [];
+    let nextOffset = getNextNumericOffset(response.paging);
 
     let alerts = data.map((a: any) => ({
       alertId: a.id,
@@ -113,7 +124,9 @@ export let listAlerts = SlateTool.create(spec, {
     return {
       output: {
         alerts,
-        totalCount: alerts.length
+        totalCount: alerts.length,
+        hasMore: nextOffset !== undefined,
+        nextOffset
       },
       message: `Found **${alerts.length}** alerts${ctx.input.query ? ` matching "${ctx.input.query}"` : ''}.`
     };

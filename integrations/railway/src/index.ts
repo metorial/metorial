@@ -17,6 +17,7 @@ import {
   deleteTcpProxyTool,
   deleteVariableTool,
   deleteVolumeTool,
+  getCurrentUserTool,
   getDeploymentLogsTool,
   getDeploymentTool,
   getDomainStatusTool,
@@ -36,6 +37,7 @@ import {
   listRegionsTool,
   listVolumeBackupsTool,
   listVolumesTool,
+  redeployDeploymentTool,
   removeDeploymentTool,
   renameEnvironmentTool,
   restartDeploymentTool,
@@ -51,6 +53,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUserTool,
     listProjectsTool,
     getProjectTool,
     createProjectTool,
@@ -65,6 +68,7 @@ export let provider = Slate.create({
     listDeploymentsTool,
     getDeploymentTool,
     triggerDeploymentTool,
+    redeployDeploymentTool,
     rollbackDeploymentTool,
     cancelDeploymentTool,
     restartDeploymentTool,

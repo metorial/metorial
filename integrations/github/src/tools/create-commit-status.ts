@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GitHubClient } from '../lib/client';
 import { spec } from '../spec';
@@ -79,7 +79,11 @@ Also supports reading the combined status of all checks for a given ref.`,
       };
     }
 
-    if (!ctx.input.state) throw new Error('state is required for create action.');
+    if (!ctx.input.state) {
+      throw createApiServiceError('state is required for create action.', {
+        reason: 'github_commit_status_state_required'
+      });
+    }
 
     let status = await client.createCommitStatus(owner, repo, ref, {
       state: ctx.input.state,

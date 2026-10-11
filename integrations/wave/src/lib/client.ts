@@ -235,6 +235,40 @@ export interface MoneyTransactionCreateInput {
   lineItems: MoneyTransactionLineItemInput[];
 }
 
+export interface CustomerListFilters {
+  email?: string;
+}
+
+export interface AccountListFilters {
+  types?: string[];
+  subtypes?: string[];
+}
+
+export interface InvoiceListFilters {
+  customerId?: string;
+  status?: string;
+  invoiceDateStart?: string;
+  invoiceDateEnd?: string;
+  invoiceNumber?: string;
+  sort?: string;
+}
+
+export interface InvoicePaymentCreateInput {
+  invoiceId: string;
+  paymentAccountId: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: string;
+  exchangeRate?: number;
+  memo?: string;
+}
+
+const inputErrorSchema = z.object({
+  message: z.string().nullish(),
+  code: z.string().nullish(),
+  path: z.array(z.union([z.string(), z.number()]).transform(String)).nullish()
+});
+
 export const safeWaveError = (error: unknown, operation: string, secrets: string[] = []) => {
   const response = getApiErrorResponse(error);
   const data = isApiErrorRecord(error) && isApiErrorRecord(error.data) ? error.data : {};
@@ -406,8 +440,9 @@ export class WaveClient {
       payload
     );
     if (!result.didSucceed || result.inputErrors?.length)
-      invalid(
-        'Wave refused the mutation. Check supported fields, required values, permissions and resource state before retrying.'
+      this.refused(
+        'Wave refused the mutation. Check supported fields, required values, permissions and resource state before retrying.',
+        result.inputErrors
       );
     const data = this.parsed(schema, payload[dataKey]);
     if (identity !== undefined && data.id !== identity)
@@ -435,10 +470,28 @@ export class WaveClient {
       raw[field]
     );
     if (!result?.didSucceed || result.inputErrors?.length)
-      invalid(
-        'Wave did not acknowledge the requested mutation. Check permissions and state before retrying.'
+      this.refused(
+        'Wave did not acknowledge the requested mutation. Check permissions and state before retrying.',
+        result?.inputErrors
       );
     return { didSucceed: true, inputErrors: [], data: null };
+  }
+  // Surface Wave's documented InputError path/message/code so callers can correct the request.
+  private refused(summary: string, inputErrors: unknown[] | null | undefined): never {
+    const details = (inputErrors ?? []).slice(0, 5).flatMap(error => {
+      const parsed = inputErrorSchema.safeParse(error);
+      if (!parsed.success) return [];
+      const path = parsed.data.path?.filter(Boolean).join('.');
+      const message = parsed.data.message?.trim().slice(0, 300);
+      const code = parsed.data.code?.trim().slice(0, 100);
+      if (!path && !message && !code) return [];
+      return [
+        `${path ? `${path}: ` : ''}${message || 'invalid value'}${code ? ` (${code})` : ''}`
+      ];
+    });
+    return invalid(
+      details.length ? `${summary} Wave reported: ${details.join('; ')}` : summary
+    );
   }
   private input<T extends object>(input: T) {
     for (const [key, value] of Object.entries(input)) {
@@ -496,14 +549,26 @@ export class WaveClient {
       invalid('Wave returned a different resource or business identity.');
     return resource;
   }
-  listCustomers(businessId: string, page = 1, pageSize = 20) {
+  listCustomers(
+    businessId: string,
+    page = 1,
+    pageSize = 20,
+    filters: CustomerListFilters = {}
+  ) {
+    const variables: Record<string, unknown> = {};
+    const declared: [string, string][] = [];
+    if (filters.email !== undefined) {
+      variables.email = text(filters.email, 'customer email filter', 320);
+      declared.push(['email', 'String']);
+    }
     return this.list(
-      gql.LIST_CUSTOMERS_QUERY,
+      gql.businessConnectionQuery('customers', gql.CUSTOMER_FRAGMENT, declared),
       'customers',
       dto.customer,
       page,
       pageSize,
-      businessId
+      businessId,
+      variables
     );
   }
   createCustomer(input: CustomerCreateInput) {
@@ -532,14 +597,25 @@ export class WaveClient {
       id: text(id, 'customer ID')
     });
   }
-  listAccounts(businessId: string, page = 1, pageSize = 20) {
+  listAccounts(businessId: string, page = 1, pageSize = 20, filters: AccountListFilters = {}) {
+    const variables: Record<string, unknown> = {};
+    const declared: [string, string][] = [];
+    if (filters.types?.length) {
+      variables.types = filters.types;
+      declared.push(['types', '[AccountTypeValue!]']);
+    }
+    if (filters.subtypes?.length) {
+      variables.subtypes = filters.subtypes;
+      declared.push(['subtypes', '[AccountSubtypeValue!]']);
+    }
     return this.list(
-      gql.LIST_ACCOUNTS_QUERY,
+      gql.businessConnectionQuery('accounts', gql.ACCOUNT_FRAGMENT, declared),
       'accounts',
       dto.account,
       page,
       pageSize,
-      businessId
+      businessId,
+      variables
     );
   }
   createAccount(input: AccountCreateInput) {
@@ -669,15 +745,47 @@ export class WaveClient {
       id: text(id, 'sales tax ID')
     });
   }
-  listInvoices(businessId: string, page = 1, pageSize = 20, customerId?: string) {
+  listInvoices(businessId: string, page = 1, pageSize = 20, filters: InvoiceListFilters = {}) {
+    const variables: Record<string, unknown> = {};
+    const declared: [string, string][] = [];
+    if (filters.customerId !== undefined) {
+      variables.customerId = text(filters.customerId, 'customer ID');
+      declared.push(['customerId', 'ID']);
+    }
+    if (filters.status !== undefined) {
+      variables.status = filters.status;
+      declared.push(['status', 'InvoiceStatus']);
+    }
+    if (filters.invoiceDateStart !== undefined) {
+      variables.invoiceDateStart = date(filters.invoiceDateStart);
+      declared.push(['invoiceDateStart', 'Date']);
+    }
+    if (filters.invoiceDateEnd !== undefined) {
+      variables.invoiceDateEnd = date(filters.invoiceDateEnd);
+      declared.push(['invoiceDateEnd', 'Date']);
+    }
+    if (
+      filters.invoiceDateStart !== undefined &&
+      filters.invoiceDateEnd !== undefined &&
+      filters.invoiceDateStart > filters.invoiceDateEnd
+    )
+      invalid('invoiceDateStart must be on or before invoiceDateEnd.');
+    if (filters.invoiceNumber !== undefined) {
+      variables.invoiceNumber = text(filters.invoiceNumber, 'invoice number filter', 200);
+      declared.push(['invoiceNumber', 'String']);
+    }
+    if (filters.sort !== undefined) {
+      variables.sort = [filters.sort];
+      declared.push(['sort', '[InvoiceSort!]!']);
+    }
     return this.list(
-      customerId === undefined ? gql.LIST_INVOICES_QUERY : gql.LIST_INVOICES_BY_CUSTOMER_QUERY,
+      gql.businessConnectionQuery('invoices', gql.INVOICE_FRAGMENT, declared),
       'invoices',
       dto.invoice,
       page,
       pageSize,
       businessId,
-      customerId === undefined ? {} : { customerId: text(customerId, 'customer ID') }
+      variables
     );
   }
   private invoiceInput(input: InvoiceCreateInput | Omit<InvoicePatchInput, 'invoiceId'>) {
@@ -807,6 +915,37 @@ export class WaveClient {
       'invoice',
       dto.invoice
     );
+  }
+  async recordInvoicePayment(input: InvoicePaymentCreateInput) {
+    const invoiceId = text(input.invoiceId, 'invoice ID; call list_invoices');
+    const result = await this.mutation(
+      gql.RECORD_INVOICE_PAYMENT_MUTATION,
+      'invoicePaymentCreateManual',
+      {
+        invoiceId,
+        paymentAccountId: text(
+          input.paymentAccountId,
+          'payment account ID; call list_accounts with a CASH_AND_BANK subtype'
+        ),
+        amount: numericDecimal(input.amount, 'payment amount', 8, true),
+        paymentDate: date(input.paymentDate),
+        paymentMethod: input.paymentMethod,
+        exchangeRate: numericDecimal(
+          input.exchangeRate ?? 1,
+          'exchange rate',
+          undefined,
+          true
+        ),
+        ...(input.memo === undefined ? {} : { memo: input.memo })
+      },
+      'invoicePayment',
+      dto.invoicePayment
+    );
+    if (result.data.invoice !== undefined && result.data.invoice.id !== invoiceId)
+      invalid(
+        'Wave returned a payment for a different invoice. Read the intended invoice before any retry.'
+      );
+    return result;
   }
   async createMoneyTransaction(input: MoneyTransactionCreateInput) {
     text(input.description, 'description for the retained accounting entry');

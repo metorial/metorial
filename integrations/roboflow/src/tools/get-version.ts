@@ -55,6 +55,12 @@ export let getVersionTool = SlateTool.create(spec, {
         .optional()
         .describe('Whether the version is currently being generated'),
       progress: z.number().optional().describe('Generation progress (0-1)'),
+      trainingStatus: z
+        .string()
+        .optional()
+        .describe(
+          'Latest training job status reported for this version, such as running, finished, failed, or stopped'
+        ),
       model: z
         .object({
           modelId: z.string().optional().describe('Model identifier'),
@@ -83,6 +89,13 @@ export let getVersionTool = SlateTool.create(spec, {
     let version = data.version || data;
     let project = data.project || {};
     let model = version.model;
+    let train = version.train && typeof version.train === 'object' ? version.train : undefined;
+    let trainingStatus =
+      typeof train?.status === 'string'
+        ? train.status
+        : train?.results
+          ? 'finished'
+          : undefined;
 
     let modelOutput = model
       ? {
@@ -107,7 +120,8 @@ export let getVersionTool = SlateTool.create(spec, {
         preprocessing: version.preprocessing,
         augmentation: version.augmentation,
         isGenerating: version.generating || false,
-        progress: version.progress,
+        progress: finiteNumber(version.progress),
+        trainingStatus,
         model: modelOutput,
         exportFormats: Array.isArray(version.exports)
           ? version.exports
@@ -118,7 +132,7 @@ export let getVersionTool = SlateTool.create(spec, {
       },
       message: model
         ? `Version **${ctx.input.versionNumber}** has a trained model with mAP: **${model.map || 'N/A'}**, precision: **${model.precision || 'N/A'}**, recall: **${model.recall || 'N/A'}**.`
-        : `Version **${ctx.input.versionNumber}** has **${version.images || 0}** images. ${version.generating ? 'Currently generating...' : 'No model trained yet.'}`
+        : `Version **${ctx.input.versionNumber}** has **${version.images || 0}** images. ${version.generating ? 'Currently generating...' : trainingStatus ? `Training status: **${trainingStatus}**.` : 'No model trained yet.'}`
     };
   })
   .build();

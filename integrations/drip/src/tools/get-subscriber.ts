@@ -41,7 +41,19 @@ export let getSubscriber = SlateTool.create(spec, {
       leadScore: z.number().optional().describe('Current lead score.'),
       tags: z.array(z.string()).optional().describe('Applied tags.'),
       customFields: z.record(z.string(), z.any()).optional().describe('Custom fields.'),
-      createdAt: z.string().optional().describe('Creation timestamp.')
+      createdAt: z.string().optional().describe('Creation timestamp.'),
+      userId: z.string().optional().describe('Your system identifier for this person.'),
+      visitorUuid: z.string().optional().describe('Drip visitor UUID, when available.'),
+      deliverable: z
+        .boolean()
+        .optional()
+        .describe(
+          'False when Drip has marked the address undeliverable, e.g. after a bounce.'
+        ),
+      smsConsent: z.boolean().optional().describe('Whether SMS consent was granted.'),
+      euConsent: z.string().optional().describe('GDPR consent: granted, denied or unknown.'),
+      prospect: z.boolean().optional().describe('Whether the person is marked as a lead.'),
+      baseLeadScore: z.number().optional().describe('Starting lead score value.')
     })
   )
   .handleInvocation(async ctx => {
@@ -75,7 +87,14 @@ export let getSubscriber = SlateTool.create(spec, {
         leadScore: sub.lead_score,
         tags: sub.tags,
         customFields: sub.custom_fields,
-        createdAt: sub.created_at
+        createdAt: sub.created_at,
+        userId: sub.user_id === undefined ? undefined : String(sub.user_id),
+        visitorUuid: sub.visitor_uuid,
+        deliverable: sub.deliverable,
+        smsConsent: sub.sms_consent,
+        euConsent: sub.eu_consent,
+        prospect: sub.prospect,
+        baseLeadScore: sub.base_lead_score
       },
       message: `Fetched subscriber **${sub.email}** (ID: ${sub.id}).`
     };

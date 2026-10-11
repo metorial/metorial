@@ -1,21 +1,129 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TelegramClient } from '../lib/client';
 import { spec } from '../spec';
 
+let SUPPORTED_RESULT_TYPES = ['article', 'photo', 'document', 'video'];
+
 let inlineResultSchema = z.object({
-  type: z.string().describe('Type of result (e.g. "article", "photo", "video", "document")'),
-  resultId: z.string().describe('Unique identifier for this result (1-64 characters)'),
+  type: z
+    .string()
+    .describe(
+      'Type of result: "article", "photo", "document", or "video". Articles require title and messageText; documents and videos require title, url, and mimeType; photos and videos require a thumbnail (photos fall back to url).'
+    ),
+  resultId: z.string().describe('Unique identifier for this result (1-64 bytes)'),
   title: z.string().optional().describe('Title of the result'),
   description: z.string().optional().describe('Short description of the result'),
-  url: z.string().optional().describe('URL of the result (for articles, documents, etc.)'),
+  url: z
+    .string()
+    .optional()
+    .describe(
+      'Article link, or the media URL for photo (JPEG), document (PDF or ZIP), and video results'
+    ),
   thumbnailUrl: z.string().optional().describe('URL of the thumbnail for the result'),
-  messageText: z.string().optional().describe('Text to send when this result is selected'),
+  mimeType: z
+    .string()
+    .optional()
+    .describe(
+      'MIME type of the media URL: "application/pdf" or "application/zip" for documents (default "application/pdf"), "video/mp4" or "text/html" for videos'
+    ),
+  messageText: z
+    .string()
+    .optional()
+    .describe(
+      'For articles, the text sent when this result is selected. For photos, documents, and videos, the caption sent with the media.'
+    ),
   parseMode: z
     .enum(['HTML', 'MarkdownV2', 'Markdown'])
     .optional()
     .describe('Formatting for messageText')
 });
+
+type InlineResultInput = z.infer<typeof inlineResultSchema>;
+
+let requireResultField = (result: InlineResultInput, field: keyof InlineResultInput) => {
+  let value = result[field];
+  if (typeof value !== 'string' || !value) {
+    throw createApiServiceError(
+      `Inline result "${result.resultId}" of type "${result.type}" requires ${field}.`
+    );
+  }
+  return value;
+};
+
+// https://core.telegram.org/bots/api#inlinequeryresult
+let formatInlineResult = (r: InlineResultInput) => {
+  if (!SUPPORTED_RESULT_TYPES.includes(r.type)) {
+    throw createApiServiceError(
+      `Inline result type "${r.type}" is not supported. Use one of: ${SUPPORTED_RESULT_TYPES.join(', ')}.`
+    );
+  }
+
+  let base: Record<string, unknown> = {
+    type: r.type,
+    id: r.resultId,
+    title: r.title,
+    description: r.description
+  };
+  let caption = r.messageText
+    ? { caption: r.messageText, parse_mode: r.parseMode }
+    : undefined;
+
+  if (r.type === 'article') {
+    return {
+      ...base,
+      title: requireResultField(r, 'title'),
+      input_message_content: {
+        message_text: requireResultField(r, 'messageText'),
+        parse_mode: r.parseMode
+      },
+      url: r.url,
+      thumbnail_url: r.thumbnailUrl
+    };
+  }
+
+  if (r.type === 'photo') {
+    let photoUrl = requireResultField(r, 'url');
+    return {
+      ...base,
+      ...caption,
+      photo_url: photoUrl,
+      thumbnail_url: r.thumbnailUrl || photoUrl
+    };
+  }
+
+  if (r.type === 'document') {
+    let mimeType = r.mimeType ?? 'application/pdf';
+    if (mimeType !== 'application/pdf' && mimeType !== 'application/zip') {
+      throw createApiServiceError(
+        'Document inline results support only "application/pdf" or "application/zip".'
+      );
+    }
+    return {
+      ...base,
+      ...caption,
+      title: requireResultField(r, 'title'),
+      document_url: requireResultField(r, 'url'),
+      mime_type: mimeType,
+      thumbnail_url: r.thumbnailUrl
+    };
+  }
+
+  let mimeType = requireResultField(r, 'mimeType');
+  if (mimeType !== 'video/mp4' && mimeType !== 'text/html') {
+    throw createApiServiceError(
+      'Video inline results support only "video/mp4" or "text/html".'
+    );
+  }
+  return {
+    ...base,
+    ...caption,
+    title: requireResultField(r, 'title'),
+    video_url: requireResultField(r, 'url'),
+    mime_type: mimeType,
+    thumbnail_url: requireResultField(r, 'thumbnailUrl')
+  };
+};
 
 let inlineQueryButtonSchema = z
   .object({
@@ -54,7 +162,7 @@ export let answerInlineQueryTool = SlateTool.create(spec, {
   .input(
     z.object({
       inlineQueryId: z.string().describe('ID of the inline query to answer'),
-      results: z.array(inlineResultSchema).describe('Array of inline query results to show'),
+      results: z.array(inlineResultSchema).describe('Inline query results to show (up to 50)'),
       cacheTime: z
         .number()
         .optional()
@@ -74,31 +182,7 @@ export let answerInlineQueryTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new TelegramClient(ctx.auth.token);
 
-    let formattedResults = ctx.input.results.map(r => {
-      let base: any = {
-        type: r.type,
-        id: r.resultId,
-        title: r.title,
-        description: r.description
-      };
-
-      if (r.type === 'article') {
-        base.input_message_content = r.messageText
-          ? { message_text: r.messageText, parse_mode: r.parseMode }
-          : undefined;
-        base.url = r.url;
-        base.thumbnail_url = r.thumbnailUrl;
-      } else if (r.type === 'photo') {
-        base.photo_url = r.url;
-        base.thumbnail_url = r.thumbnailUrl || r.url;
-      } else if (r.type === 'document') {
-        base.document_url = r.url;
-        base.thumbnail_url = r.thumbnailUrl;
-        base.mime_type = 'application/pdf';
-      }
-
-      return base;
-    });
+    let formattedResults = ctx.input.results.map(formatInlineResult);
 
     let result = await client.answerInlineQuery({
       inlineQueryId: ctx.input.inlineQueryId,

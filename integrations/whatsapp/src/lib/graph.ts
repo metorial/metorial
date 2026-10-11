@@ -1,7 +1,7 @@
 import { createAxios } from 'slates';
 import { whatsappGraphErrorMapping } from './graphErrors';
 
-export let DEFAULT_WHATSAPP_API_VERSION = 'v21.0';
+export let DEFAULT_WHATSAPP_API_VERSION = 'v25.0';
 
 export interface WhatsAppGraphConfig {
   token: string;

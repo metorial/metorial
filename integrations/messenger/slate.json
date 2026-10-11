@@ -1,10 +1,12 @@
 {
   "name": "@meta/facebook-messenger",
-  "description": "Send and receive messages between Facebook Pages and users through Messenger. Create rich message templates including carousels, buttons, receipts, and media. Upload reusable media attachments for later sends. Manage Messenger profile settings such as greeting text, persistent menus, get started buttons, account linking, and ice breakers. Retrieve user profile information. Display typing indicators and read receipts. Handle and inspect conversation handover between bots and live agents. Supports a 24-hour messaging window with message tags for follow-up communications.",
+  "description": "Send and receive messages between Facebook Pages and users through Messenger. List conversations and read recent messages. Create rich message templates including carousels, buttons, receipts, and media. Upload reusable media attachments for later sends. Manage Messenger profile settings such as greeting text, persistent menus, get started buttons, account linking, and ice breakers. Retrieve user profile information. Display typing indicators, read receipts, and reactions. Handle and inspect conversation handover between bots and live agents. Supports the 24-hour standard messaging window and the human agent tag for later replies.",
   "categories": ["crm-and-sales-tools", "email-and-messaging", "news-and-media"],
   "skills": [
     "send messages to users",
     "receive user messages",
+    "list conversations",
+    "read conversation messages",
     "create message templates",
     "manage Messenger profile",
     "retrieve user profiles",
@@ -13,7 +15,8 @@
     "inspect thread ownership",
     "link user accounts",
     "upload reusable attachments",
-    "send media attachments"
+    "send media attachments",
+    "react to messages"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/meta.jpg"
 }

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HelpScoutClient } from '../lib/client';
+import { halPageInfo } from '../lib/pagination';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `List all users (agents/staff) in the Help Scout account. Optionally retrieve details for a specific user by ID or get the authenticated user's profile.`,
+  description: `List users (agents/staff) in the Help Scout account, optionally filtered by email or mailbox. Can also retrieve a specific user by ID or the authenticated user's profile (me).`,
   tags: { readOnly: true }
 })
   .input(
@@ -16,6 +17,11 @@ export let listUsers = SlateTool.create(spec, {
         .optional()
         .describe('Get a specific user by ID. Omit to list all users.'),
       me: z.boolean().optional().describe('If true, return the authenticated user profile'),
+      email: z.string().optional().describe('Filter the list by exact email address'),
+      mailboxId: z
+        .number()
+        .optional()
+        .describe('Filter the list to users with access to this mailbox ID'),
       page: z.number().optional().describe('Page number (1-based)')
     })
   )
@@ -48,7 +54,10 @@ export let listUsers = SlateTool.create(spec, {
           photoUrl: z.string().nullable().optional()
         })
         .optional()
-        .describe('Single user details')
+        .describe('Single user details'),
+      totalCount: z.number().optional().describe('Total users (list)'),
+      currentPage: z.number().optional().describe('Current page (list)'),
+      totalPages: z.number().optional().describe('Total pages (list)')
     })
   )
   .handleInvocation(async ctx => {
@@ -90,7 +99,11 @@ export let listUsers = SlateTool.create(spec, {
       };
     }
 
-    let data = await client.listUsers({ page: ctx.input.page });
+    let data = await client.listUsers({
+      page: ctx.input.page,
+      email: ctx.input.email,
+      mailbox: ctx.input.mailboxId
+    });
     let embedded = data?._embedded?.users ?? [];
     let users = embedded.map((u: any) => ({
       userId: u.id,
@@ -103,9 +116,11 @@ export let listUsers = SlateTool.create(spec, {
       photoUrl: u.photoUrl ?? null
     }));
 
+    let page = halPageInfo(data, users.length);
+
     return {
-      output: { users },
-      message: `Found **${users.length}** users.`
+      output: { users, ...page },
+      message: `Found **${page.totalCount}** users (page ${page.currentPage} of ${page.totalPages}).`
     };
   })
   .build();

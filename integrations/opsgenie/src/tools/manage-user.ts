@@ -12,7 +12,8 @@ export let manageUser = SlateTool.create(spec, {
     'To create: set action to "create" and provide username, fullName, and role.',
     'To update: set action to "update" and provide userIdentifier plus the fields to change.',
     'To delete: set action to "delete" and provide userIdentifier.',
-    'Role can be "Owner", "Admin", "User", or a custom role name.'
+    'Role can be "Admin", "User", or a custom role name.',
+    'Updates are rejected for accounts linked to Atlassian accounts.'
   ]
 })
   .input(
@@ -27,7 +28,7 @@ export let manageUser = SlateTool.create(spec, {
       role: z
         .string()
         .optional()
-        .describe('User role: Owner, Admin, User, or custom role (required for create)'),
+        .describe('User role: Admin, User, or a custom role name (required for create)'),
       timezone: z.string().optional().describe('User timezone (e.g., "America/New_York")'),
       locale: z.string().optional().describe('User locale (e.g., "en_US")'),
       tags: z.array(z.string()).optional().describe('User tags'),
@@ -61,15 +62,15 @@ export let manageUser = SlateTool.create(spec, {
           username: ctx.input.username,
           fullName: ctx.input.fullName,
           role: { name: ctx.input.role },
-          timezone: ctx.input.timezone,
+          timeZone: ctx.input.timezone,
           locale: ctx.input.locale,
           tags: ctx.input.tags,
           invitationDisabled: ctx.input.invitationDisabled
         });
         return {
           output: {
-            userId: user.id,
-            username: user.username ?? ctx.input.username,
+            userId: user?.id,
+            username: user?.username ?? ctx.input.username,
             result: 'User created successfully'
           },
           message: `Created user **${ctx.input.fullName}** (${ctx.input.username})`
@@ -83,16 +84,22 @@ export let manageUser = SlateTool.create(spec, {
         if (ctx.input.username !== undefined) updateData.username = ctx.input.username;
         if (ctx.input.fullName !== undefined) updateData.fullName = ctx.input.fullName;
         if (ctx.input.role !== undefined) updateData.role = { name: ctx.input.role };
-        if (ctx.input.timezone !== undefined) updateData.timezone = ctx.input.timezone;
+        if (ctx.input.timezone !== undefined) updateData.timeZone = ctx.input.timezone;
         if (ctx.input.locale !== undefined) updateData.locale = ctx.input.locale;
         if (ctx.input.tags !== undefined) updateData.tags = ctx.input.tags;
+
+        if (Object.keys(updateData).length === 0) {
+          throw opsgenieServiceError(
+            'Provide at least one field to update: username, fullName, role, timezone, locale, or tags.'
+          );
+        }
 
         let updated = await client.updateUser(ctx.input.userIdentifier, updateData);
         return {
           output: {
-            userId: updated.id ?? ctx.input.userIdentifier,
-            username: updated.username,
-            result: 'User updated successfully'
+            userId: updated?.data?.id ?? ctx.input.userIdentifier,
+            username: updated?.data?.username ?? ctx.input.username,
+            result: updated?.result ?? 'User updated successfully'
           },
           message: `Updated user \`${ctx.input.userIdentifier}\``
         };

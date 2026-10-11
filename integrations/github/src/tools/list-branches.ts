@@ -6,7 +6,8 @@ import { spec } from '../spec';
 export let listBranches = SlateTool.create(spec, {
   name: 'List Branches',
   key: 'list_branches',
-  description: 'List branches in a GitHub repository.',
+  description:
+    'List branches in a GitHub repository, optionally filtered to protected or unprotected branches.',
   tags: {
     readOnly: true
   }
@@ -15,6 +16,12 @@ export let listBranches = SlateTool.create(spec, {
     z.object({
       owner: z.string().describe('Repository owner'),
       repo: z.string().describe('Repository name'),
+      protected: z
+        .boolean()
+        .optional()
+        .describe(
+          'true returns only protected branches; false returns only unprotected branches; omit for all'
+        ),
       perPage: z
         .number()
         .min(1)
@@ -33,7 +40,11 @@ export let listBranches = SlateTool.create(spec, {
           protected: z.boolean().describe('Whether the branch is protected')
         })
       ),
-      totalCount: z.number().describe('Number of branches returned')
+      totalCount: z.number().describe('Number of branches returned'),
+      hasNextPage: z
+        .boolean()
+        .optional()
+        .describe('Whether GitHub reports another page; request page + 1 to continue')
     })
   )
   .handleInvocation(async ctx => {
@@ -41,19 +52,20 @@ export let listBranches = SlateTool.create(spec, {
       token: ctx.auth.token,
       instanceUrl: ctx.auth.instanceUrl
     });
-    let branches = await client.listBranches(ctx.input.owner, ctx.input.repo, {
+    let result = await client.listBranches(ctx.input.owner, ctx.input.repo, {
+      protected: ctx.input.protected,
       perPage: ctx.input.perPage,
       page: ctx.input.page
     });
 
-    let mapped = branches.map((b: any) => ({
+    let mapped = result.items.map((b: any) => ({
       name: b.name,
       sha: b.commit.sha,
       protected: b.protected
     }));
 
     return {
-      output: { branches: mapped, totalCount: mapped.length },
+      output: { branches: mapped, totalCount: mapped.length, hasNextPage: result.hasNextPage },
       message: `Found **${mapped.length}** branches in **${ctx.input.owner}/${ctx.input.repo}**.`
     };
   })

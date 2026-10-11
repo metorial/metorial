@@ -32,12 +32,14 @@ export class DiscordClient {
   async listCurrentUserGuilds(
     limit?: number,
     before?: string,
-    after?: string
+    after?: string,
+    withCounts?: boolean
   ): Promise<any[]> {
     let params: Record<string, string> = {};
     if (limit) params.limit = String(limit);
     if (before) params.before = before;
     if (after) params.after = after;
+    if (withCounts) params.with_counts = 'true';
     let response = await this.api.get('/users/@me/guilds', { params });
     return response.data;
   }
@@ -122,17 +124,27 @@ export class DiscordClient {
     });
   }
 
+  // https://docs.discord.com/developers/resources/message#pin-message (replaces /channels/{id}/pins)
   async pinMessage(channelId: string, messageId: string): Promise<void> {
-    await this.api.put(`/channels/${channelId}/pins/${messageId}`);
+    await this.api.put(`/channels/${channelId}/messages/pins/${messageId}`);
   }
 
   async unpinMessage(channelId: string, messageId: string): Promise<void> {
-    await this.api.delete(`/channels/${channelId}/pins/${messageId}`);
+    await this.api.delete(`/channels/${channelId}/messages/pins/${messageId}`);
   }
 
-  async getPinnedMessages(channelId: string): Promise<any[]> {
-    let response = await this.api.get(`/channels/${channelId}/pins`);
-    return response.data;
+  async getPinnedMessages(
+    channelId: string,
+    options?: { before?: string; limit?: number }
+  ): Promise<{ items: { pinned_at: string; message: any }[]; has_more: boolean }> {
+    let params: Record<string, string> = {};
+    if (options?.before) params.before = options.before;
+    if (options?.limit) params.limit = String(options.limit);
+    let response = await this.api.get(`/channels/${channelId}/messages/pins`, { params });
+    return {
+      items: response.data?.items ?? [],
+      has_more: response.data?.has_more === true
+    };
   }
 
   async crosspostMessage(channelId: string, messageId: string): Promise<any> {
@@ -286,6 +298,23 @@ export class DiscordClient {
   async listActiveThreads(guildId: string): Promise<any> {
     let response = await this.api.get(`/guilds/${guildId}/threads/active`);
     return response.data;
+  }
+
+  async listPublicArchivedThreads(
+    channelId: string,
+    options?: { before?: string; limit?: number }
+  ): Promise<any> {
+    let params: Record<string, string> = {};
+    if (options?.before) params.before = options.before;
+    if (options?.limit) params.limit = String(options.limit);
+    let response = await this.api.get(`/channels/${channelId}/threads/archived/public`, {
+      params
+    });
+    return response.data;
+  }
+
+  async addThreadMember(threadId: string, userId: string): Promise<void> {
+    await this.api.put(`/channels/${threadId}/thread-members/${userId}`);
   }
 
   // ── Webhooks ──
@@ -473,6 +502,17 @@ export class DiscordClient {
 
   async getUser(userId: string): Promise<any> {
     let response = await this.api.get(`/users/${userId}`);
+    return response.data;
+  }
+
+  // https://docs.discord.com/developers/resources/user#create-dm
+  async createDm(recipientId: string): Promise<any> {
+    let response = await this.api.post('/users/@me/channels', { recipient_id: recipientId });
+    return response.data;
+  }
+
+  async getCurrentApplication(): Promise<any> {
+    let response = await this.api.get('/applications/@me');
     return response.data;
   }
 

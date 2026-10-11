@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient, extractPostSummary } from '../lib/helpers';
+import { apiTypeFor, createClient, extractPostSummary } from '../lib/helpers';
 import { spec } from '../spec';
 
 let postOutputSchema = z.object({
@@ -72,9 +72,9 @@ export let createPostTool = SlateTool.create(spec, {
   )
   .output(postOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let post = await client.createPost(ctx.input);
-    let result = extractPostSummary(post, ctx.config.apiType);
+    let result = extractPostSummary(post, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Created post **"${result.title}"** with status \`${result.status}\`. [View post](${result.url})`
@@ -127,9 +127,9 @@ export let updatePostTool = SlateTool.create(spec, {
   .output(postOutputSchema)
   .handleInvocation(async ctx => {
     let { postId, ...updateData } = ctx.input;
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     let post = await client.updatePost(postId, updateData);
-    let result = extractPostSummary(post, ctx.config.apiType);
+    let result = extractPostSummary(post, apiTypeFor(ctx.auth));
     return {
       output: result,
       message: `Updated post **"${result.title}"** (ID: ${result.postId}). Status: \`${result.status}\`.`
@@ -158,7 +158,7 @@ export let deletePostTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.auth);
     await client.deletePost(ctx.input.postId);
     return {
       output: {

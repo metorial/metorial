@@ -15,7 +15,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('OpsGenie API key (Integration API key or Account-level API key)')
+        .describe(
+          'OpsGenie API key (API integration key or account-level API key). Select the matching US or EU instance in the configuration.'
+        )
     }),
 
     getOutput: async ctx => {
@@ -27,26 +29,32 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.opsgenie.com',
-        headers: {
-          Authorization: `GenieKey ${ctx.output.token}`
-        }
-      });
-
-      try {
-        let response = await http.get('/v2/account');
-        let account = response.data.data;
-        return {
-          profile: {
-            id: account.id ?? undefined,
-            name: account.name ?? undefined
+      // Auth callbacks run without the region config, and US keys are rejected by the EU API
+      // (and vice versa), so try both instances before giving up on a profile.
+      for (let baseURL of ['https://api.opsgenie.com', 'https://api.eu.opsgenie.com']) {
+        let http = createAxios({
+          baseURL,
+          headers: {
+            Authorization: `GenieKey ${ctx.output.token}`
           }
-        };
-      } catch {
-        return {
-          profile: {}
-        };
+        });
+
+        try {
+          let response = await http.get('/v2/account');
+          let account = response.data?.data ?? {};
+          return {
+            profile: {
+              id: account.id ?? account.name ?? undefined,
+              name: account.name ?? undefined
+            }
+          };
+        } catch {
+          // Try the next instance; account info also requires configuration access.
+        }
       }
+
+      return {
+        profile: {}
+      };
     }
   });

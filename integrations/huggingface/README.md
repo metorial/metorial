@@ -30,7 +30,7 @@ Permanently delete a model, dataset, or Space repository.
 
 ### Duplicate Repository
 
-Duplicate a Space repository to a new Space.
+Duplicate a Space, model, or dataset repository into a new repository.
 
 ### Get Repository Info
 
@@ -40,25 +40,29 @@ Get metadata for a model, dataset, or Space repository.
 
 Change a repository's public/private visibility.
 
+### List Repository Refs
+
+List the branches, tags, and optionally pull request refs of a repository.
+
 ### List Repository Files
 
-List files and directories in a Hugging Face repository at a path and revision.
+List files and directories in a Hugging Face repository at a path and revision, recursively or page by page.
 
 ### Get File Content
 
-Download repository file text as a Slate attachment with metadata.
+Download any repository file, including large model weights and files in private or gated repositories, as a downloadable file with its MIME type, size, and resolved commit.
 
 ### Upload File
 
-Upload or update a text file in a repository through the commit API.
+Upload or update a text file in a repository, committing directly or opening a pull request.
 
 ### Delete File
 
-Delete a repository file through the commit API.
+Delete a repository file, committing directly or opening a pull request.
 
 ### List Discussions
 
-List discussions and pull requests on a Hugging Face repository.
+List discussions and pull requests on a Hugging Face repository, filtered by type, status, author, or search text.
 
 ### Get Discussion
 
@@ -132,9 +136,13 @@ Generate text with a Hugging Face text-generation model.
 
 Generate embeddings for semantic search, RAG, clustering, and similarity workflows.
 
+### Text to Image
+
+Generate an image from a text prompt and return it as a downloadable image file.
+
 ### Run Inference
 
-Run generic inference on a Hugging Face model with task-specific inputs and parameters.
+Run generic inference on a Hugging Face model with task-specific inputs and parameters. Media outputs such as generated audio or images are returned as downloadable files.
 
 ## License
 

@@ -65,6 +65,7 @@ export let getEnvironmentTool = SlateTool.create(spec, {
       serviceInstances: z.array(
         z.object({
           serviceInstanceId: z.string().describe('Service instance ID'),
+          serviceId: z.string().describe('Service ID'),
           serviceName: z.string().describe('Service name in this environment'),
           latestDeploymentStatus: z.string().nullable().describe('Latest deployment status')
         })
@@ -82,6 +83,7 @@ export let getEnvironmentTool = SlateTool.create(spec, {
         createdAt: env.createdAt,
         serviceInstances: env.serviceInstances.map((si: any) => ({
           serviceInstanceId: si.id,
+          serviceId: si.serviceId,
           serviceName: si.serviceName,
           latestDeploymentStatus: si.latestDeployment?.status ?? null
         }))
@@ -212,7 +214,17 @@ export let getEnvironmentLogsTool = SlateTool.create(spec, {
     z.object({
       environmentId: z.string().describe('ID of the environment to retrieve logs for'),
       limit: z.number().optional().default(100).describe('Maximum number of log lines'),
-      filter: z.string().optional().describe('Optional Railway log filter expression')
+      filter: z.string().optional().describe('Optional Railway log filter expression'),
+      startDate: z
+        .string()
+        .optional()
+        .describe('Optional ISO 8601 timestamp; only return logs at or after this time'),
+      endDate: z
+        .string()
+        .optional()
+        .describe(
+          'Optional ISO 8601 timestamp; only return logs at or before this time (defaults to now when startDate is set)'
+        )
     })
   )
   .output(
@@ -231,7 +243,9 @@ export let getEnvironmentLogsTool = SlateTool.create(spec, {
     let logs = await client.getEnvironmentLogs({
       environmentId: ctx.input.environmentId,
       limit: ctx.input.limit,
-      filter: ctx.input.filter
+      filter: ctx.input.filter,
+      startDate: ctx.input.startDate,
+      endDate: ctx.input.endDate
     });
 
     let mapped = (logs || []).map((log: any) => ({

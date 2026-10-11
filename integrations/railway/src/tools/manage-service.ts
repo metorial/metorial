@@ -30,6 +30,8 @@ export let getServiceTool = SlateTool.create(spec, {
       createdAt: z.string().describe('Creation timestamp'),
       instance: z
         .object({
+          serviceInstanceId: z.string().nullable(),
+          environmentId: z.string().nullable(),
           serviceName: z.string().nullable(),
           startCommand: z.string().nullable(),
           buildCommand: z.string().nullable(),
@@ -38,6 +40,7 @@ export let getServiceTool = SlateTool.create(spec, {
           region: z.string().nullable(),
           numReplicas: z.number().nullable(),
           restartPolicyType: z.string().nullable(),
+          cronSchedule: z.string().nullable(),
           latestDeployment: z
             .object({
               deploymentId: z.string(),
@@ -58,6 +61,8 @@ export let getServiceTool = SlateTool.create(spec, {
     if (ctx.input.environmentId) {
       let inst = await client.getServiceInstance(ctx.input.serviceId, ctx.input.environmentId);
       instance = {
+        serviceInstanceId: inst.id ?? null,
+        environmentId: inst.environmentId ?? ctx.input.environmentId,
         serviceName: inst.serviceName ?? null,
         startCommand: inst.startCommand ?? null,
         buildCommand: inst.buildCommand ?? null,
@@ -66,6 +71,7 @@ export let getServiceTool = SlateTool.create(spec, {
         region: inst.region ?? null,
         numReplicas: inst.numReplicas ?? null,
         restartPolicyType: inst.restartPolicyType ?? null,
+        cronSchedule: inst.cronSchedule ?? null,
         latestDeployment: inst.latestDeployment
           ? {
               deploymentId: inst.latestDeployment.id,
@@ -106,7 +112,11 @@ export let createServiceTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('GitHub repository to connect (format: "owner/repo")'),
-      image: z.string().optional().describe('Docker image to deploy (e.g., "postgres:16")')
+      image: z.string().optional().describe('Docker image to deploy (e.g., "postgres:16")'),
+      branch: z
+        .string()
+        .optional()
+        .describe('Git branch to deploy from when connecting a GitHub repository')
     })
   )
   .output(
@@ -125,6 +135,10 @@ export let createServiceTool = SlateTool.create(spec, {
       );
     }
 
+    if (ctx.input.branch && !ctx.input.repo) {
+      throw railwayServiceError('branch can only be used together with repo.');
+    }
+
     if (ctx.input.repo) {
       source = { repo: ctx.input.repo };
     } else if (ctx.input.image) {
@@ -134,6 +148,7 @@ export let createServiceTool = SlateTool.create(spec, {
     let service = await client.createService({
       projectId: ctx.input.projectId,
       name: ctx.input.name,
+      branch: ctx.input.branch,
       source
     });
 
@@ -184,11 +199,29 @@ export let updateServiceTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
 
+    let environmentFields = [
+      'startCommand',
+      'buildCommand',
+      'rootDirectory',
+      'healthcheckPath',
+      'numReplicas',
+      'region',
+      'cronSchedule'
+    ] as const;
+    let providedEnvironmentFields = environmentFields.filter(
+      field => ctx.input[field] !== undefined
+    );
+    if (!ctx.input.environmentId && providedEnvironmentFields.length > 0) {
+      throw railwayServiceError(
+        `environmentId is required to update ${providedEnvironmentFields.join(', ')}. Call list_environments to find the environment ID.`
+      );
+    }
+
     let serviceMetaUpdate: { name?: string; icon?: string } = {};
     if (ctx.input.name) serviceMetaUpdate.name = ctx.input.name;
-    if (ctx.input.icon) serviceMetaUpdate.icon = ctx.input.icon;
+    if (ctx.input.icon !== undefined) serviceMetaUpdate.icon = ctx.input.icon;
 
-    let serviceName = ctx.input.name || ctx.input.serviceId;
+    let serviceName: string | undefined;
     let updated = false;
 
     if (Object.keys(serviceMetaUpdate).length > 0) {
@@ -227,6 +260,10 @@ export let updateServiceTool = SlateTool.create(spec, {
       throw railwayServiceError(
         'Provide at least one service metadata field or an environmentId with environment-specific settings to update.'
       );
+    }
+
+    if (serviceName === undefined) {
+      serviceName = (await client.getService(ctx.input.serviceId)).name as string;
     }
 
     return {

@@ -1,5 +1,6 @@
 export * from './delete-subscriber';
 export * from './get-current-user';
+export * from './get-email-metrics';
 export * from './get-subscriber';
 export * from './list-accounts';
 export * from './list-broadcasts';
@@ -8,7 +9,9 @@ export * from './list-conversions';
 export * from './list-custom-fields';
 export * from './list-event-actions';
 export * from './list-forms';
+export * from './list-segments';
 export * from './list-subscribers';
+export * from './manage-broadcast';
 export * from './manage-campaign';
 export * from './manage-cart';
 export * from './manage-order';

@@ -1,4 +1,4 @@
-import { createAxios, setIfDefined } from 'slates';
+import { createAxios, pickDefined, setIfDefined } from 'slates';
 import { gumroadApiError, gumroadServiceError } from './errors';
 
 type GumroadData = Record<string, any>;
@@ -144,17 +144,28 @@ export class GumroadClient {
     });
   }
 
-  async createProduct(params: ProductMutationParams): Promise<any> {
+  async createProduct(
+    params: ProductMutationParams,
+    options: { draft: boolean }
+  ): Promise<{ product: any; warning?: string }> {
     return this.request('create product', async () => {
-      let response = await this.axios.post('/products', buildProductBody(params));
-      return this.unwrap(response.data, 'create product').product;
+      let response = await this.axios.post('/products', {
+        ...buildProductBody(params),
+        draft: options.draft
+      });
+      let data = this.unwrap(response.data, 'create product');
+      return { product: data.product, warning: data.warning || undefined };
     });
   }
 
-  async updateProduct(productId: string, params: ProductMutationParams): Promise<any> {
+  async updateProduct(
+    productId: string,
+    params: ProductMutationParams
+  ): Promise<{ product: any; warning?: string }> {
     return this.request('update product', async () => {
       let response = await this.axios.put(`/products/${productId}`, buildProductBody(params));
-      return this.unwrap(response.data, 'update product').product;
+      let data = this.unwrap(response.data, 'update product');
+      return { product: data.product, warning: data.warning || undefined };
     });
   }
 
@@ -176,6 +187,27 @@ export class GumroadClient {
     return this.request('disable product', async () => {
       let response = await this.axios.put(`/products/${productId}/disable`);
       return this.unwrap(response.data, 'disable product').product;
+    });
+  }
+
+  async listProductReviews(
+    productId: string,
+    params?: { pageKey?: string }
+  ): Promise<{ reviews: any[]; nextPageKey?: string; nextPageUrl?: string }> {
+    return this.request('list product reviews', async () => {
+      let queryParams: Record<string, string> = {};
+      if (params?.pageKey) queryParams.page_key = params.pageKey;
+
+      let response = await this.axios.get(`/products/${productId}/reviews`, {
+        params: queryParams
+      });
+      let data = this.unwrap(response.data, 'list product reviews');
+
+      return {
+        reviews: data.product_reviews || [],
+        nextPageKey: data.next_page_key,
+        nextPageUrl: data.next_page_url
+      };
     });
   }
 
@@ -202,17 +234,22 @@ export class GumroadClient {
       amountOff: number;
       offerType?: string;
       maxPurchaseCount?: number;
+      minimumAmountCents?: number;
       universal?: boolean;
     }
   ): Promise<any> {
     return this.request('create offer code', async () => {
-      let response = await this.axios.post(`/products/${productId}/offer_codes`, {
+      let body: Record<string, unknown> = {
         name: params.name,
         amount_off: params.amountOff,
         offer_type: params.offerType || 'cents',
-        max_purchase_count: params.maxPurchaseCount ?? 0,
         universal: params.universal ? 'true' : 'false'
-      });
+      };
+      // Gumroad treats a missing max_purchase_count as unlimited; 0 makes the code unusable.
+      setIfDefined(body, 'max_purchase_count', params.maxPurchaseCount);
+      setIfDefined(body, 'minimum_amount_cents', params.minimumAmountCents);
+
+      let response = await this.axios.post(`/products/${productId}/offer_codes`, body);
       return this.unwrap(response.data, 'create offer code').offer_code;
     });
   }
@@ -222,14 +259,17 @@ export class GumroadClient {
     offerCodeId: string,
     params: {
       maxPurchaseCount?: number;
+      minimumAmountCents?: number;
     }
   ): Promise<any> {
     return this.request('update offer code', async () => {
+      let body: Record<string, unknown> = {};
+      setIfDefined(body, 'max_purchase_count', params.maxPurchaseCount);
+      setIfDefined(body, 'minimum_amount_cents', params.minimumAmountCents);
+
       let response = await this.axios.put(
         `/products/${productId}/offer_codes/${offerCodeId}`,
-        {
-          max_purchase_count: params.maxPurchaseCount
-        }
+        body
       );
       return this.unwrap(response.data, 'update offer code').offer_code;
     });
@@ -330,11 +370,12 @@ export class GumroadClient {
     return this.request('create variant', async () => {
       let response = await this.axios.post(
         `/products/${productId}/variant_categories/${variantCategoryId}/variants`,
-        {
+        pickDefined({
           name: params.name,
           price_difference_cents: params.priceDifferenceCents ?? 0,
-          max_purchase_count: params.maxPurchaseCount ?? 0
-        }
+          // Omitted means unlimited inventory; 0 would make the variant sold out.
+          max_purchase_count: params.maxPurchaseCount
+        })
       );
       return this.unwrap(response.data, 'create variant').variant;
     });
@@ -408,7 +449,7 @@ export class GumroadClient {
     productId: string,
     customFieldName: string,
     params: {
-      required?: boolean;
+      required: boolean;
     }
   ): Promise<any> {
     return this.request('update custom field', async () => {
@@ -488,6 +529,20 @@ export class GumroadClient {
 
       let response = await this.axios.put(`/sales/${saleId}/refund`, body);
       return this.unwrap(response.data, 'refund sale').sale;
+    });
+  }
+
+  async revokeSaleAccess(saleId: string): Promise<any> {
+    return this.request('revoke sale access', async () => {
+      let response = await this.axios.put(`/sales/${saleId}/revoke_access`);
+      return this.unwrap(response.data, 'revoke sale access').sale;
+    });
+  }
+
+  async undoRevokeSaleAccess(saleId: string): Promise<any> {
+    return this.request('restore sale access', async () => {
+      let response = await this.axios.put(`/sales/${saleId}/undo_revoke_access`);
+      return this.unwrap(response.data, 'restore sale access').sale;
     });
   }
 
@@ -663,6 +718,99 @@ export class GumroadClient {
         params: { year: String(year) }
       });
       return this.unwrap(response.data, 'get earnings');
+    });
+  }
+
+  // -- Audience Emails ---------------------------------------
+
+  async listEmails(params?: {
+    type?: string;
+    pageKey?: string;
+  }): Promise<{ emails: any[]; nextPageKey?: string; nextPageUrl?: string }> {
+    return this.request('list emails', async () => {
+      let response = await this.axios.get('/emails', {
+        params: pickDefined({ type: params?.type, page_key: params?.pageKey })
+      });
+      let data = this.unwrap(response.data, 'list emails');
+
+      return {
+        emails: data.emails || [],
+        nextPageKey: data.next_page_key,
+        nextPageUrl: data.next_page_url
+      };
+    });
+  }
+
+  async getEmail(emailId: string): Promise<any> {
+    return this.request('get email', async () => {
+      let response = await this.axios.get(`/emails/${encodeURIComponent(emailId)}`);
+      return this.unwrap(response.data, 'get email').email;
+    });
+  }
+
+  async createEmail(params: {
+    subject: string;
+    body: string;
+    audience: string;
+    productId?: string;
+  }): Promise<any> {
+    return this.request('create email', async () => {
+      let body: Record<string, unknown> = {
+        subject: params.subject,
+        body: params.body,
+        audience: params.audience
+      };
+      setIfDefined(body, 'product_id', params.productId);
+
+      let response = await this.axios.post('/emails', body);
+      return this.unwrap(response.data, 'create email').email;
+    });
+  }
+
+  async sendEmailPreview(
+    emailId: string
+  ): Promise<{ email: any; previewUrl?: string; message?: string }> {
+    return this.request('send email preview', async () => {
+      let response = await this.axios.post(`/emails/${encodeURIComponent(emailId)}/preview`);
+      let data = this.unwrap(response.data, 'send email preview');
+
+      return {
+        email: data.email,
+        previewUrl: data.preview_url || undefined,
+        message: data.message || undefined
+      };
+    });
+  }
+
+  async sendEmail(emailId: string): Promise<any> {
+    return this.request('send email', async () => {
+      let response = await this.axios.post(`/emails/${encodeURIComponent(emailId)}/send`);
+      return this.unwrap(response.data, 'send email').email;
+    });
+  }
+
+  async scheduleEmail(emailId: string, toBePublishedAt: string): Promise<any> {
+    return this.request('schedule email', async () => {
+      let response = await this.axios.post(`/emails/${encodeURIComponent(emailId)}/schedule`, {
+        to_be_published_at: toBePublishedAt
+      });
+      return this.unwrap(response.data, 'schedule email').email;
+    });
+  }
+
+  async unscheduleEmail(emailId: string): Promise<any> {
+    return this.request('unschedule email', async () => {
+      let response = await this.axios.post(
+        `/emails/${encodeURIComponent(emailId)}/unschedule`
+      );
+      return this.unwrap(response.data, 'unschedule email').email;
+    });
+  }
+
+  async deleteEmail(emailId: string): Promise<void> {
+    await this.request('delete email', async () => {
+      let response = await this.axios.delete(`/emails/${encodeURIComponent(emailId)}`);
+      this.unwrap(response.data, 'delete email');
     });
   }
 

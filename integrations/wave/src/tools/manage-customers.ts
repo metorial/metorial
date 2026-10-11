@@ -88,7 +88,7 @@ let mapCustomer = (c: Customer) => ({
 export let listCustomers = SlateTool.create(spec, {
   name: 'List Customers',
   key: 'list_customers',
-  description: `List customers for a specific Wave business. Supports pagination for businesses with many customers.`,
+  description: `List customers for a specific Wave business. Optionally find customers matching an email address. Supports pagination for businesses with many customers.`,
   tags: {
     readOnly: true
   }
@@ -101,6 +101,10 @@ export let listCustomers = SlateTool.create(spec, {
         .describe(
           'ID of the business to list customers for. Call list_businesses to discover a permitted business ID.'
         ),
+      email: z
+        .string()
+        .optional()
+        .describe('Only return customers matching this email address.'),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
       pageSize: z
         .number()
@@ -121,7 +125,8 @@ export let listCustomers = SlateTool.create(spec, {
     let result = await client.listCustomers(
       ctx.input.businessId,
       ctx.input.page ?? 1,
-      ctx.input.pageSize ?? 20
+      ctx.input.pageSize ?? 20,
+      { email: ctx.input.email }
     );
 
     return {

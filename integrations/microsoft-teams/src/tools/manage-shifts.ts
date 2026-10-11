@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
@@ -37,7 +37,12 @@ export let manageShifts = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Label/name for the shift activity (for create)'),
-      theme: z.string().optional().describe('Color theme for the shift display (for create)')
+      theme: z
+        .string()
+        .optional()
+        .describe(
+          'Color theme for the shift display (for create): white, blue, green, purple, pink, yellow, gray, darkBlue, darkGreen, darkPurple, darkPink, darkYellow. Defaults to blue.'
+        )
     })
   )
   .output(
@@ -87,6 +92,15 @@ export let manageShifts = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
+      let missing = (['userId', 'startDateTime', 'endDateTime'] as const).filter(
+        field => !ctx.input[field]
+      );
+      if (missing.length > 0) {
+        throw createApiServiceError(
+          `${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} required to create a shift.`,
+          { reason: 'microsoft_teams_shift_fields_missing' }
+        );
+      }
       let body: any = {
         userId: ctx.input.userId,
         sharedShift: {
@@ -116,7 +130,14 @@ export let manageShifts = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.shiftId) throw new Error('shiftId is required for delete');
+      if (!ctx.input.shiftId) {
+        throw createApiServiceError(
+          'shiftId is required for delete. Use the list action to find it.',
+          {
+            reason: 'microsoft_teams_shift_id_missing'
+          }
+        );
+      }
       await client.deleteShift(ctx.input.teamId, ctx.input.shiftId);
       return {
         output: { success: true },
@@ -124,6 +145,8 @@ export let manageShifts = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`, {
+      reason: 'microsoft_teams_action_invalid'
+    });
   })
   .build();

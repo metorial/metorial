@@ -2,13 +2,20 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
+import {
+  graphMessageOutputFields,
+  mapGraphMessage,
+  pageSizeInputSchema,
+  pageTokenInputSchema
+} from '../lib/messages';
 import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
+// https://learn.microsoft.com/en-us/graph/api/chat-list-messages?view=graph-rest-1.0
 export let listChatMessages = SlateTool.create(spec, {
   name: 'List Chat Messages',
   key: 'list_chat_messages',
-  description: `List recent messages in a specific chat. Returns message content, sender info, and timestamps.`,
+  description: `List recent messages in a specific chat, newest first. Returns message content, sender info, and timestamps. Results are paged; pass nextPageToken back as pageToken to continue.`,
   tags: {
     readOnly: true
   }
@@ -18,39 +25,34 @@ export let listChatMessages = SlateTool.create(spec, {
   .input(
     z.object({
       chatId: z.string().describe('ID of the chat'),
-      top: z.number().optional().describe('Maximum number of messages to return')
+      top: pageSizeInputSchema,
+      pageToken: pageTokenInputSchema
     })
   )
   .output(
     z.object({
-      messages: z.array(
-        z.object({
-          messageId: z.string().describe('Unique identifier of the message'),
-          content: z.string().nullable().describe('Message body content'),
-          contentType: z.string().optional().describe('Content type (text or html)'),
-          createdDateTime: z.string().describe('When the message was created'),
-          senderDisplayName: z.string().nullable().describe('Display name of the sender'),
-          senderUserId: z.string().nullable().describe('User ID of the sender')
-        })
-      )
+      messages: z.array(z.object(graphMessageOutputFields)),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Pass as pageToken to fetch the next page; absent on the last page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new GraphClient({ token: ctx.auth.token });
-    let messages = await client.listChatMessages(ctx.input.chatId, ctx.input.top);
+    let page = await client.listChatMessages(ctx.input.chatId, {
+      top: ctx.input.top,
+      pageToken: ctx.input.pageToken
+    });
 
-    let mapped = messages.map((m: any) => ({
-      messageId: m.id,
-      content: m.body?.content || null,
-      contentType: m.body?.contentType,
-      createdDateTime: m.createdDateTime,
-      senderDisplayName: m.from?.user?.displayName || null,
-      senderUserId: m.from?.user?.id || null
-    }));
+    let mapped = page.items.map(mapGraphMessage);
 
     return {
-      output: { messages: mapped },
-      message: `Found **${mapped.length}** messages in the chat.`
+      output: {
+        messages: mapped,
+        ...(page.nextPageToken ? { nextPageToken: page.nextPageToken } : {})
+      },
+      message: `Found **${mapped.length}** messages in the chat${page.nextPageToken ? ' (more available)' : ''}.`
     };
   })
   .build();

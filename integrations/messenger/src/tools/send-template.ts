@@ -1,7 +1,13 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createMessengerClient } from '../lib/client';
 import { messengerServiceError } from '../lib/errors';
+import {
+  messageTagSchema,
+  messagingTypeSchema,
+  replyToMessageIdSchema,
+  validateMessagingPolicy
+} from '../lib/messaging';
 import { spec } from '../spec';
 
 let isHttpsUrl = (value: string) => /^https:\/\//i.test(value);
@@ -52,16 +58,6 @@ let receiptItemSchema = z.object({
     .describe('Item image URL')
 });
 
-let validateMessagingPolicy = (messagingType: string, tag?: string) => {
-  if (messagingType === 'MESSAGE_TAG' && !tag) {
-    throw messengerServiceError('tag is required when messagingType is MESSAGE_TAG');
-  }
-
-  if (tag && messagingType !== 'MESSAGE_TAG') {
-    throw messengerServiceError('tag can only be used when messagingType is MESSAGE_TAG');
-  }
-};
-
 let validateButton = (button: { type: string; url?: string; payload?: string }) => {
   if (button.type === 'web_url' && !button.url) {
     throw messengerServiceError('url is required for web_url buttons');
@@ -97,7 +93,8 @@ Choose the appropriate templateType and provide the corresponding fields.`,
   constraints: [
     'Generic template: max 10 elements, each with up to 3 buttons.',
     'Button template: max 3 buttons.',
-    'Some templates may be restricted for EEA users.'
+    'Some templates may be restricted for EEA users.',
+    'Templates can only be sent within the standard messaging window, or with the HUMAN_AGENT tag within 7 days of the person’s last message.'
   ],
   tags: {
     destructive: false,
@@ -142,12 +139,12 @@ Choose the appropriate templateType and provide the corresponding fields.`,
         .refine(isHttpsUrl, 'mediaUrl must be an HTTPS URL')
         .optional()
         .describe(
-          'Facebook URL of the media (required for media templateType unless attachmentId is used)'
+          'Facebook URL of the media, such as a Page photo or video URL (required for media templateType unless attachmentId is used). Other hosts are not accepted; upload other media with Upload Attachment and pass attachmentId.'
         ),
       attachmentId: z
         .string()
         .optional()
-        .describe('Attachment ID of previously uploaded media (alternative to mediaUrl)'),
+        .describe('Reusable attachment ID from Upload Attachment (alternative to mediaUrl)'),
       mediaButtons: z
         .array(buttonSchema)
         .max(1)
@@ -185,19 +182,9 @@ Choose the appropriate templateType and provide the corresponding fields.`,
         .optional()
         .describe('Total cost (required for receipt templateType)'),
 
-      messagingType: z
-        .enum(['RESPONSE', 'UPDATE', 'MESSAGE_TAG'])
-        .default('RESPONSE')
-        .describe('The messaging type'),
-      tag: z
-        .enum([
-          'CONFIRMED_EVENT_UPDATE',
-          'POST_PURCHASE_UPDATE',
-          'ACCOUNT_UPDATE',
-          'HUMAN_AGENT'
-        ])
-        .optional()
-        .describe('Message tag for sending outside the 24-hour window')
+      replyToMessageId: replyToMessageIdSchema,
+      messagingType: messagingTypeSchema,
+      tag: messageTagSchema
     })
   )
   .output(
@@ -207,11 +194,7 @@ Choose the appropriate templateType and provide the corresponding fields.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      pageId: ctx.config.pageId,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = createMessengerClient(ctx);
 
     let result: any;
     let { input } = ctx;
@@ -229,7 +212,8 @@ Choose the appropriate templateType and provide the corresponding fields.`,
           recipientId: input.recipientId,
           elements: input.elements,
           messagingType: input.messagingType,
-          tag: input.tag
+          tag: input.tag,
+          replyToMessageId: input.replyToMessageId
         });
         break;
       }
@@ -244,7 +228,8 @@ Choose the appropriate templateType and provide the corresponding fields.`,
           text: input.text,
           buttons: input.buttons,
           messagingType: input.messagingType,
-          tag: input.tag
+          tag: input.tag,
+          replyToMessageId: input.replyToMessageId
         });
         break;
       }
@@ -266,7 +251,8 @@ Choose the appropriate templateType and provide the corresponding fields.`,
           attachmentId: input.attachmentId,
           buttons: input.mediaButtons,
           messagingType: input.messagingType,
-          tag: input.tag
+          tag: input.tag,
+          replyToMessageId: input.replyToMessageId
         });
         break;
       }
@@ -299,15 +285,22 @@ Choose the appropriate templateType and provide the corresponding fields.`,
           totalTax: input.totalTax,
           totalCost: input.totalCost,
           messagingType: input.messagingType,
-          tag: input.tag
+          tag: input.tag,
+          replyToMessageId: input.replyToMessageId
         });
         break;
       }
     }
 
+    if (!result?.message_id) {
+      throw messengerServiceError(
+        'Messenger accepted the template but did not return a message ID'
+      );
+    }
+
     return {
       output: {
-        recipientId: result.recipient_id,
+        recipientId: result.recipient_id ?? input.recipientId,
         messageId: result.message_id
       },
       message: `**${input.templateType}** template sent to user **${result.recipient_id}** (message ID: ${result.message_id}).`

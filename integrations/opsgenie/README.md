@@ -6,7 +6,7 @@ Create, manage, and resolve alerts and incidents with priority levels, responder
 
 ### Alert Action
 
-Perform an action on an existing alert: close, acknowledge, unacknowledge, snooze, assign ownership, escalate, add a note, add/remove tags, or delete. All mutating actions are processed asynchronously.
+Perform an action on an existing alert: close, acknowledge, unacknowledge, snooze, assign ownership, escalate, add a note, add/remove tags, add a responder, add/remove custom details, run a custom action, or delete. All mutating actions are processed asynchronously.
 
 ### Create Alert
 
@@ -15,6 +15,10 @@ Create a new alert in OpsGenie. Alerts are processed asynchronously — the retu
 ### Create Incident
 
 Create a new incident in OpsGenie. Incidents are higher-severity events that may impact services and require coordinated response. Only available on Standard and Enterprise plans.
+
+### Get Account
+
+Retrieve information about the connected OpsGenie account, including its name, user count, and subscription plan. Useful to confirm which account the API key belongs to.
 
 ### Get Alert
 
@@ -46,11 +50,19 @@ Retrieve detailed information about a specific user, including their role, timez
 
 ### Incident Action
 
-Perform an action on an existing incident: close, resolve, delete, or add a note. Only available on Standard and Enterprise plans.
+Perform an action on an existing incident: close, resolve, reopen, delete, add a note, add a responder, add/remove tags, or change priority. All actions are processed asynchronously. Only available on Standard and Enterprise plans.
+
+### List Alert Logs
+
+List the activity log of an alert: creation, notifications, acknowledgements, assignments, escalations, and other state changes. Useful for reconstructing an alert timeline. Supports cursor pagination.
+
+### List Alert Notes
+
+List the notes added to an alert, such as responder updates and investigation findings. Supports cursor pagination.
 
 ### List Alerts
 
-List and search alerts in OpsGenie. Supports filtering by query, pagination, and sorting. Use the query parameter with OpsGenie search syntax (e.g., \
+List and search alerts in OpsGenie. Supports filtering by query, pagination, and sorting. Use the query parameter with OpsGenie alert search syntax (e.g., `status: open`, `tag: critical`, `priority: P1`, `status: open AND acknowledged: false`).
 
 ### List Escalations
 
@@ -70,7 +82,7 @@ List services in the OpsGenie account. Supports filtering, pagination, and sorti
 
 ### List Teams
 
-List all teams in the OpsGenie account. Returns team names, descriptions, and member counts.
+List all teams in the OpsGenie account. Returns team IDs, names, and descriptions. Use get_team for members.
 
 ### List Users
 
@@ -94,7 +106,7 @@ Create, update, or delete a service. Services represent business services impact
 
 ### Manage Team
 
-Create, update, or delete a team. Teams are the organizational unit for on-call schedules, escalation policies, and alert routing. When updating members, note that the members list replaces the entire existing list.
+Create, update, or delete a team, or add/remove a single team member. Teams are the organizational unit for on-call schedules, escalation policies, and alert routing. When updating members, note that the members list replaces the entire existing list.
 
 ### Manage User
 

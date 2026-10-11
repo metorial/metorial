@@ -1,6 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAxios, normalizeOAuthTokenResponse, SlateAuth } from 'slates';
 import { z } from 'zod';
-import { huggingFaceApiError } from './lib/errors';
+import { huggingFaceApiError, huggingFaceServiceError } from './lib/errors';
 
 let hfAxios = createAxios({
   baseURL: 'https://huggingface.co'
@@ -9,7 +9,9 @@ let hfAxios = createAxios({
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      refreshToken: z.string().optional(),
+      expiresAt: z.string().optional()
     })
   )
   .addOauth({
@@ -64,11 +66,6 @@ export let auth = SlateAuth.create()
         scope: 'write-discussions'
       },
       {
-        title: 'Webhooks',
-        description: 'Manage repository webhooks',
-        scope: 'webhooks'
-      },
-      {
         title: 'Inference API',
         description: 'Make inference requests on behalf of the user',
         scope: 'inference-api'
@@ -107,9 +104,16 @@ export let auth = SlateAuth.create()
           }
         );
 
+        let tokens = normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Hugging Face',
+          operation: 'token exchange'
+        });
+
         return {
           output: {
-            token: response.data.access_token
+            token: tokens.token,
+            refreshToken: tokens.refreshToken,
+            expiresAt: tokens.expiresAt
           }
         };
       } catch (error) {
@@ -117,12 +121,59 @@ export let auth = SlateAuth.create()
       }
     },
 
-    handleTokenRefresh: async (ctx: any) => {
-      // Hugging Face OAuth tokens don't typically have refresh tokens
-      // Return existing output
-      return {
-        output: ctx.output
-      };
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      let refreshToken = ctx.output.refreshToken;
+      if (!refreshToken) {
+        let expired =
+          ctx.output.expiresAt !== undefined && Date.parse(ctx.output.expiresAt) <= Date.now();
+        if (expired) {
+          throw huggingFaceServiceError(
+            'The Hugging Face OAuth access token has expired and no refresh token is available. Reconnect the Hugging Face account.'
+          );
+        }
+
+        // Connections created without a refresh token keep their current access token.
+        return {
+          output: ctx.output
+        };
+      }
+
+      try {
+        let response = await hfAxios.post(
+          '/oauth/token',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          }).toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          }
+        );
+
+        let tokens = normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Hugging Face',
+          operation: 'token refresh',
+          previousRefreshToken: refreshToken
+        });
+
+        return {
+          output: {
+            token: tokens.token,
+            refreshToken: tokens.refreshToken,
+            expiresAt: tokens.expiresAt
+          }
+        };
+      } catch (error) {
+        throw huggingFaceApiError(error, 'refresh OAuth token');
+      }
     },
 
     getProfile: async (ctx: { output: { token: string }; input: any; scopes: string[] }) => {
@@ -143,8 +194,8 @@ export let auth = SlateAuth.create()
         profile: {
           id: data.id,
           name: data.fullname || data.name,
-          email: data.email,
-          imageUrl: data.avatarUrl,
+          email: data.email ?? undefined,
+          imageUrl: data.avatarUrl ?? undefined,
           username: data.name
         }
       };
@@ -185,8 +236,8 @@ export let auth = SlateAuth.create()
         profile: {
           id: data.id,
           name: data.fullname || data.name,
-          email: data.email,
-          imageUrl: data.avatarUrl,
+          email: data.email ?? undefined,
+          imageUrl: data.avatarUrl ?? undefined,
           username: data.name
         }
       };

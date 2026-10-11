@@ -10,7 +10,8 @@ export let createConversation = SlateTool.create(spec, {
   description: `Create a new support conversation in a mailbox. You must specify the customer (by email or ID), the mailbox, and at least one thread (the initial message). Optionally assign it to a user, add tags, or set status.`,
   instructions: [
     'The type should be "email" for standard email conversations, "chat" for live chat, or "phone" for phone conversations.',
-    'Thread type should be "customer" for a customer-initiated message or "reply" for an agent reply.'
+    'Thread type should be "customer" for a customer-initiated message or "reply" for an agent reply (a reply emails the customer unless the mailbox settings prevent it).',
+    'Call list_mailboxes to discover mailbox IDs and list_users or list_teams to discover assignee IDs.'
   ]
 })
   .input(
@@ -38,17 +39,19 @@ export let createConversation = SlateTool.create(spec, {
         .nullable()
         .optional()
         .describe(
-          'User ID to assign the conversation to. Use null to keep it explicitly unassigned.'
+          'User or team ID to assign the conversation to. Use null to keep it explicitly unassigned; omit to apply the mailbox default.'
         ),
       autoReply: z.boolean().optional().describe('Whether to send auto-reply to the customer')
     })
   )
   .output(
     z.object({
-      conversationId: z
+      conversationId: z.string().nullable().describe('ID of the created conversation'),
+      webUrl: z
         .string()
         .nullable()
-        .describe('ID of the created conversation (from response header)')
+        .optional()
+        .describe('Link that opens the conversation in the Help Scout web app')
     })
   )
   .handleInvocation(async ctx => {
@@ -76,7 +79,8 @@ export let createConversation = SlateTool.create(spec, {
         {
           type: ctx.input.threadType,
           text: ctx.input.message,
-          customer: ctx.input.threadType === 'customer' ? customer : undefined
+          // Both customer and reply threads require the customer reference.
+          customer
         }
       ],
       tags: ctx.input.tags,
@@ -87,9 +91,10 @@ export let createConversation = SlateTool.create(spec, {
 
     return {
       output: {
-        conversationId: result.conversationId ?? null
+        conversationId: result.conversationId ?? null,
+        webUrl: result.webUrl ?? null
       },
-      message: `Created conversation "${ctx.input.subject}" in mailbox ${ctx.input.mailboxId}.`
+      message: `Created conversation${result.conversationId ? ` **#${result.conversationId}**` : ''} "${ctx.input.subject}" in mailbox ${ctx.input.mailboxId}.`
     };
   })
   .build();

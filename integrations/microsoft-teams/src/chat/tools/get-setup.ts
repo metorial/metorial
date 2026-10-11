@@ -4,6 +4,7 @@ import { spec } from '../../spec';
 
 // https://learn.microsoft.com/en-us/microsoft-365/extensibility/schema/root-bots
 // https://learn.microsoft.com/en-us/microsoftteams/platform/agents-in-teams/enable-receive-all-chat-messages
+// https://learn.microsoft.com/en-us/microsoftteams/platform/build-apps-for-shared-private-channels
 let MANIFEST_VERSION = '1.30';
 let MANIFEST_SCHEMA = `https://developer.microsoft.com/json-schemas/teams/v${MANIFEST_VERSION}/MicrosoftTeams.schema.json`;
 let APP_ID_PLACEHOLDER = '00000000-0000-0000-0000-000000000000';
@@ -49,6 +50,8 @@ export let chatGetSetup = contract
       description: { short: truncate(description, 80), full: truncate(description, 4000) },
       icons: { color: 'color.png', outline: 'outline.png' },
       accentColor: '#4F52B2',
+      // Lets the bot be added to shared and private channels (manifest v1.25+).
+      supportsChannelFeatures: 'tier1',
       bots: [
         {
           botId: APP_ID_PLACEHOLDER,
@@ -122,7 +125,8 @@ export let chatGetSetup = contract
           ...warnings,
           'The manifest requests resource-specific consent to receive every channel and group chat message. Team and chat owners must consent at install time; without it, the bot receives only messages that @mention it.',
           'Teams sends reaction events only for reactions to messages the bot sent.',
-          'Bots cannot post in private channels, cannot send ephemeral messages, and cannot upload files to channels or chats.',
+          'The manifest enables shared and private channels; the bot only receives messages from channels where the app is added. Teams does not tell bots whether a channel is private, so channels are reported without a visibility type.',
+          'Bots cannot send ephemeral messages and cannot upload files to channels or chats.',
           'Commands are configured in the manifest and arrive as ordinary messages; Teams has no API to list them.',
           'Only the public Microsoft cloud (and GCC service URLs) is supported by this connection.'
         ]

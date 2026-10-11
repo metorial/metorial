@@ -1,13 +1,15 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createMessengerClient } from '../lib/client';
 import { messengerServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let isHttpsUrl = (value: string) => /^https:\/\//i.test(value);
 
 let menuActionSchema: z.ZodType<any> = z.object({
-  type: z.enum(['postback', 'web_url', 'nested']).describe('Action type'),
+  type: z
+    .enum(['postback', 'web_url', 'nested'])
+    .describe('Action type: postback or web_url. Nested submenus are no longer supported.'),
   title: z.string().max(30).describe('Menu item label'),
   payload: z
     .string()
@@ -34,8 +36,29 @@ let menuActionSchema: z.ZodType<any> = z.object({
     )
     .max(5)
     .optional()
-    .describe('Sub-menu items (only for nested type, max 5)')
+    .describe('Not supported: Messenger no longer displays nested submenus.')
 });
+
+// https://developers.facebook.com/documentation/business-messaging/messenger-platform/send-messages/persistent-menu
+// Menu items are web_url or postback only; nested submenus are rejected instead of dropped.
+let validateMenuAction = (action: {
+  type: string;
+  title: string;
+  url?: string;
+  payload?: string;
+}) => {
+  if (action.type === 'nested') {
+    throw messengerServiceError(
+      `Persistent menu item "${action.title}" uses a nested submenu, which Messenger no longer supports. Use postback or web_url items.`
+    );
+  }
+  if (action.type === 'web_url' && !action.url) {
+    throw messengerServiceError(`Persistent menu item "${action.title}" needs a url`);
+  }
+  if (action.type === 'postback' && !action.payload) {
+    throw messengerServiceError(`Persistent menu item "${action.title}" needs a payload`);
+  }
+};
 
 export let manageProfile = SlateTool.create(spec, {
   name: 'Manage Messenger Profile',
@@ -47,11 +70,13 @@ Provide only the fields you want to update — unspecified fields remain unchang
     'Use action "get" to retrieve current profile settings.',
     'Use action "delete" to remove specific profile fields.',
     'Greeting text supports {{user_first_name}}, {{user_last_name}}, and {{user_full_name}} personalization tokens.',
-    'The persistent menu supports up to 20 call-to-action items per locale.'
+    'The persistent menu supports up to 20 postback or web_url items per locale.',
+    'Ice breakers set here take precedence over the Get Started button.'
   ],
   constraints: [
-    'Persistent menu is limited to 20 call-to-action items per locale.',
-    'Ice breakers are limited to a small number of questions.',
+    'Persistent menu is limited to 20 call-to-action items per locale; nested submenus are not supported.',
+    'Ice breakers are limited to 4 questions and are set for the default locale.',
+    'Messenger allows 10 profile requests per 10 minutes for each Page.',
     'Some features may be unavailable for EEA users.'
   ],
   tags: {
@@ -135,7 +160,9 @@ Provide only the fields you want to update — unspecified fields remain unchang
         )
         .max(4)
         .optional()
-        .describe('Ice breaker questions shown to first-time users'),
+        .describe(
+          'Ice breaker questions shown to people starting a conversation (default locale). Setting them replaces existing ice breakers.'
+        ),
       whitelistedDomains: z
         .array(z.string().refine(isHttpsUrl, 'Whitelisted domains must be HTTPS URLs'))
         .max(10)
@@ -153,11 +180,7 @@ Provide only the fields you want to update — unspecified fields remain unchang
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      pageId: ctx.config.pageId,
-      apiVersion: ctx.config.apiVersion
-    });
+    let client = createMessengerClient(ctx);
 
     let { input } = ctx;
 
@@ -193,6 +216,12 @@ Provide only the fields you want to update — unspecified fields remain unchang
 
         if (!hasUpdates) {
           throw messengerServiceError('Provide at least one Messenger profile field to set');
+        }
+
+        for (let menu of input.persistentMenu ?? []) {
+          for (let action of menu.callToActions ?? []) {
+            validateMenuAction(action);
+          }
         }
 
         await client.setMessengerProfile({

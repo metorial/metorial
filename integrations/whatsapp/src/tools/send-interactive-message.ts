@@ -3,16 +3,22 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+// List rows are limited to 10 across all sections:
+// https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-list-messages
+let MAX_LIST_ROWS = 10;
+
 export let sendInteractiveMessage = SlateTool.create(spec, {
   name: 'Send Interactive Message',
   key: 'send_interactive_message',
-  description: `Send an interactive WhatsApp message with **reply buttons** or a **list menu**.
-Reply buttons allow up to 3 quick-reply options. List menus allow structured multi-section selection menus with up to 10 sections.
+  description: `Send an interactive WhatsApp message with **reply buttons**, a **list menu**, or a **call-to-action URL button**.
+Reply buttons allow up to 3 quick-reply options. List menus show up to 10 rows grouped into up to 10 sections. A call-to-action URL button opens a link in the recipient's browser.
 Use these for structured user responses like surveys, menu selections, or quick actions.`,
   instructions: [
-    'Reply buttons: max 3 buttons, each title max 20 characters',
-    'List menus: max 10 sections, row title max 24 chars, row description max 72 chars',
-    'Header text max 60 characters, body max 1024 characters, footer max 60 characters'
+    'Reply buttons: max 3 buttons, each title max 20 characters and unique; body max 1024 characters',
+    'List menus: max 10 sections and 10 rows in total, section and row titles max 24 characters, row description max 72 characters, list button text max 20 characters; body max 4096 characters',
+    'Call-to-action URL: ctaDisplayText (max 20 characters) and ctaUrl are required; body max 1024 characters',
+    'Header text max 60 characters, footer max 60 characters',
+    'Set replyToMessageId to quote an earlier message as a contextual reply'
   ],
   constraints: ['Can only be sent within the 24-hour customer service window'],
   tags: {
@@ -23,9 +29,15 @@ Use these for structured user responses like surveys, menu selections, or quick 
   .input(
     z.object({
       to: z.string().describe('Recipient phone number with country code'),
-      interactiveType: z.enum(['buttons', 'list']).describe('Type of interactive message'),
+      interactiveType: z
+        .enum(['buttons', 'list', 'cta_url'])
+        .describe(
+          'Type of interactive message: "buttons" (reply buttons), "list" (list menu), or "cta_url" (call-to-action URL button)'
+        ),
       headerText: z.string().optional().describe('Optional header text (max 60 characters)'),
-      body: z.string().describe('Message body text (max 1024 characters)'),
+      body: z
+        .string()
+        .describe('Message body text (max 1024 characters; max 4096 for list menus)'),
       footerText: z.string().optional().describe('Optional footer text (max 60 characters)'),
       buttons: z
         .array(
@@ -40,14 +52,16 @@ Use these for structured user responses like surveys, menu selections, or quick 
       listButtonText: z
         .string()
         .optional()
-        .describe('Text for the list menu button (required for "list" type)'),
+        .describe(
+          'Text for the list menu button (required for "list" type, max 20 characters)'
+        ),
       sections: z
         .array(
           z.object({
-            title: z.string().describe('Section title'),
+            title: z.string().describe('Section title (max 24 chars)'),
             rows: z.array(
               z.object({
-                rowId: z.string().describe('Unique row identifier'),
+                rowId: z.string().describe('Unique row identifier (max 200 chars)'),
                 title: z.string().describe('Row title (max 24 chars)'),
                 description: z.string().optional().describe('Row description (max 72 chars)')
               })
@@ -55,7 +69,24 @@ Use these for structured user responses like surveys, menu selections, or quick 
           })
         )
         .optional()
-        .describe('Required for "list" type. Max 10 sections')
+        .describe('Required for "list" type. Max 10 sections and 10 rows in total'),
+      ctaDisplayText: z
+        .string()
+        .optional()
+        .describe(
+          'Button label for "cta_url" type (required for "cta_url", max 20 characters)'
+        ),
+      ctaUrl: z
+        .string()
+        .optional()
+        .describe('URL opened when the button is tapped (required for "cta_url" type)'),
+      replyToMessageId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'Optional WhatsApp message ID (wamid) to quote, sending this message as a contextual reply'
+        )
     })
   )
   .output(
@@ -74,6 +105,7 @@ Use these for structured user responses like surveys, menu selections, or quick 
     });
 
     let result: any;
+    let { replyToMessageId } = ctx.input;
     let header = ctx.input.headerText
       ? { type: 'text', text: ctx.input.headerText }
       : undefined;
@@ -84,13 +116,17 @@ Use these for structured user responses like surveys, menu selections, or quick 
           'buttons field is required for interactive buttons messages'
         );
       }
-      result = await client.sendInteractiveButtonsMessage(ctx.input.to, {
-        header,
-        body: ctx.input.body,
-        footer: ctx.input.footerText,
-        buttons: ctx.input.buttons.map(b => ({ id: b.buttonId, title: b.title }))
-      });
-    } else {
+      result = await client.sendInteractiveButtonsMessage(
+        ctx.input.to,
+        {
+          header,
+          body: ctx.input.body,
+          footer: ctx.input.footerText,
+          buttons: ctx.input.buttons.map(b => ({ id: b.buttonId, title: b.title }))
+        },
+        replyToMessageId
+      );
+    } else if (ctx.input.interactiveType === 'list') {
       if (!ctx.input.sections || ctx.input.sections.length === 0) {
         throw createApiServiceError(
           'sections field is required for interactive list messages'
@@ -101,16 +137,47 @@ Use these for structured user responses like surveys, menu selections, or quick 
           'listButtonText is required for interactive list messages'
         );
       }
-      result = await client.sendInteractiveListMessage(ctx.input.to, {
-        header,
-        body: ctx.input.body,
-        footer: ctx.input.footerText,
-        buttonText: ctx.input.listButtonText,
-        sections: ctx.input.sections.map(s => ({
-          title: s.title,
-          rows: s.rows.map(r => ({ id: r.rowId, title: r.title, description: r.description }))
-        }))
-      });
+      let rowCount = ctx.input.sections.reduce((count, s) => count + s.rows.length, 0);
+      if (rowCount === 0 || rowCount > MAX_LIST_ROWS) {
+        throw createApiServiceError(
+          `Interactive list messages need between 1 and ${MAX_LIST_ROWS} rows across all sections; received ${rowCount}.`
+        );
+      }
+      result = await client.sendInteractiveListMessage(
+        ctx.input.to,
+        {
+          header,
+          body: ctx.input.body,
+          footer: ctx.input.footerText,
+          buttonText: ctx.input.listButtonText,
+          sections: ctx.input.sections.map(s => ({
+            title: s.title,
+            rows: s.rows.map(r => ({
+              id: r.rowId,
+              title: r.title,
+              description: r.description
+            }))
+          }))
+        },
+        replyToMessageId
+      );
+    } else {
+      if (!ctx.input.ctaDisplayText || !ctx.input.ctaUrl) {
+        throw createApiServiceError(
+          'ctaDisplayText and ctaUrl are required for call-to-action URL messages'
+        );
+      }
+      result = await client.sendInteractiveCtaUrlMessage(
+        ctx.input.to,
+        {
+          header,
+          body: ctx.input.body,
+          footer: ctx.input.footerText,
+          displayText: ctx.input.ctaDisplayText,
+          url: ctx.input.ctaUrl
+        },
+        replyToMessageId
+      );
     }
 
     let messageId = result?.messages?.[0]?.id ?? '';

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TelegramClient } from '../lib/client';
 import { spec } from '../spec';
@@ -36,7 +36,7 @@ export let pinMessageTool = SlateTool.create(spec, {
     let { chatId, action, messageId, disableNotification } = ctx.input;
 
     if (action === 'pin') {
-      if (!messageId) throw new Error('messageId is required for pin action');
+      if (!messageId) throw createApiServiceError('messageId is required for the pin action.');
       await client.pinChatMessage({ chatId, messageId, disableNotification });
       return {
         output: { success: true },

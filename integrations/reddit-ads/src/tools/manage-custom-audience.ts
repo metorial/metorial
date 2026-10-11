@@ -2,7 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/client';
 import { accountInput, invalid, resourceOutput } from '../lib/contracts';
-import { audiencePayload } from '../lib/mappers';
+import { audiencePayload, customerListOrigins } from '../lib/mappers';
 import { spec } from '../spec';
 
 export let manageCustomAudience = SlateTool.create(spec, {
@@ -21,17 +21,15 @@ export let manageCustomAudience = SlateTool.create(spec, {
     z.object({
       accountId: accountInput,
       originClientId: z
-        .enum([
-          'UNSPECIFIED',
-          'LIVE_RAMP',
-          'MPARTICLE',
-          'TEALIUM',
-          'OTHER',
-          'LIVE_RAMP_ADVERTISER_DIRECT',
-          'BOMBORA'
-        ])
+        .string()
         .optional()
-        .describe('Origin for customer-list ingestion.'),
+        .describe(
+          'CUSTOMER_LIST only: client ID of the application that created the list (mostly for third-party partners). Omit for an ordinary customer list.'
+        ),
+      customerListOrigin: z
+        .enum(customerListOrigins)
+        .optional()
+        .describe('CUSTOMER_LIST only: external source of the list. Requires originClientId.'),
       pixelId: z.string().optional().describe('Pixel required for WEBSITE audiences.'),
       trackingTypes: z
         .array(z.string())

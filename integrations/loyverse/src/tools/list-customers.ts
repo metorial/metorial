@@ -1,36 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, joinIds } from '../lib/client';
+import { customerSchema, mapCustomer, phoneMatches } from '../lib/customers';
 import { spec } from '../spec';
-
-let customerSchema = z.object({
-  customerId: z.string().describe('Unique customer ID'),
-  customerName: z.string().nullable().optional().describe('Full name'),
-  email: z.string().nullable().optional().describe('Email address'),
-  phoneNumber: z.string().nullable().optional().describe('Phone number'),
-  address: z.string().nullable().optional().describe('Street address'),
-  city: z.string().nullable().optional().describe('City'),
-  region: z.string().nullable().optional().describe('State/region'),
-  postalCode: z.string().nullable().optional().describe('Postal/ZIP code'),
-  countryCode: z.string().nullable().optional().describe('Country code'),
-  customerCode: z.string().nullable().optional().describe('Customer loyalty code'),
-  note: z.string().nullable().optional().describe('Customer note'),
-  totalMoneySpent: z.number().optional().describe('Total money spent'),
-  totalPoints: z.number().optional().describe('Loyalty points balance'),
-  permanentDeletionAt: z
-    .string()
-    .nullable()
-    .optional()
-    .describe('Scheduled permanent deletion timestamp'),
-  createdAt: z.string().optional().describe('Creation timestamp'),
-  updatedAt: z.string().optional().describe('Last update timestamp'),
-  deletedAt: z.string().nullable().optional().describe('Deletion timestamp')
-});
 
 export let listCustomers = SlateTool.create(spec, {
   name: 'List Customers',
   key: 'list_customers',
-  description: `Retrieve customer records from Loyverse. Supports filtering by email, phone number, and date ranges for syncing customer data. Returns paginated results.`,
+  description: `Retrieve customer records from Loyverse, newest first. Supports filtering by customer IDs, email, and created/updated date ranges for syncing customer data. Returns paginated results.`,
+  instructions: [
+    'Use email to look up a customer directly. Phone number matching is applied to the returned page only, so keep paging with the cursor if no match is found.'
+  ],
   tags: { readOnly: true }
 })
   .input(
@@ -42,25 +22,37 @@ export let listCustomers = SlateTool.create(spec, {
         .optional()
         .describe('Number of customers to return (1-250, default 50)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      customerIds: z
+        .array(z.string())
+        .optional()
+        .describe('Only return customers with these IDs'),
       email: z.string().optional().describe('Filter by exact email address'),
-      phoneNumber: z.string().optional().describe('Filter by exact phone number'),
+      phoneNumber: z
+        .string()
+        .optional()
+        .describe(
+          'Only keep customers whose phone number matches (digits compared); applied to the returned page'
+        ),
       createdAtMin: z
         .string()
         .optional()
-        .describe('Filter customers created at or after this ISO 8601 timestamp'),
+        .describe('Filter customers created at or after this ISO 8601 UTC timestamp'),
       createdAtMax: z
         .string()
         .optional()
-        .describe('Filter customers created at or before this ISO 8601 timestamp'),
+        .describe('Filter customers created at or before this ISO 8601 UTC timestamp'),
       updatedAtMin: z
         .string()
         .optional()
-        .describe('Filter customers updated at or after this ISO 8601 timestamp'),
+        .describe('Filter customers updated at or after this ISO 8601 UTC timestamp'),
       updatedAtMax: z
         .string()
         .optional()
-        .describe('Filter customers updated at or before this ISO 8601 timestamp'),
-      showDeleted: z.boolean().optional().describe('Include deleted customers')
+        .describe('Filter customers updated at or before this ISO 8601 UTC timestamp'),
+      showDeleted: z
+        .boolean()
+        .optional()
+        .describe('Include customers pending permanent deletion')
     })
   )
   .output(
@@ -74,8 +66,8 @@ export let listCustomers = SlateTool.create(spec, {
     let result = await client.listCustomers({
       limit: ctx.input.limit,
       cursor: ctx.input.cursor,
+      customerIds: joinIds(ctx.input.customerIds),
       email: ctx.input.email,
-      phoneNumber: ctx.input.phoneNumber,
       createdAtMin: ctx.input.createdAtMin,
       createdAtMax: ctx.input.createdAtMax,
       updatedAtMin: ctx.input.updatedAtMin,
@@ -83,25 +75,10 @@ export let listCustomers = SlateTool.create(spec, {
       showDeleted: ctx.input.showDeleted
     });
 
-    let customers = (result.customers ?? []).map((c: any) => ({
-      customerId: c.id,
-      customerName: c.name,
-      email: c.email,
-      phoneNumber: c.phone_number,
-      address: c.address,
-      city: c.city,
-      region: c.region,
-      postalCode: c.postal_code,
-      countryCode: c.country_code,
-      customerCode: c.customer_code,
-      note: c.note,
-      totalMoneySpent: c.total_money_spent,
-      totalPoints: c.total_points,
-      permanentDeletionAt: c.permanent_deletion_at,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at,
-      deletedAt: c.deleted_at
-    }));
+    let phoneNumber = ctx.input.phoneNumber;
+    let customers = (result.customers ?? [])
+      .filter((c: any) => !phoneNumber || phoneMatches(c.phone_number, phoneNumber))
+      .map(mapCustomer);
 
     return {
       output: { customers, cursor: result.cursor },

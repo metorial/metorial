@@ -30,7 +30,9 @@ const expectedToolIds = [
   'list_custom_emojis',
   'get_custom_emoji',
   'manage_custom_emoji',
-  'search_spaces_admin'
+  'search_spaces_admin',
+  'list_members',
+  'manage_membership'
 ] as const;
 
 describe('Google Chat MCP schema inventory', () => {

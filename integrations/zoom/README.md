@@ -58,7 +58,15 @@ Retrieve detailed information about a specific Zoom webinar by its ID.
 
 ### List Chat Channels
 
-List Zoom Team Chat channels the user belongs to. Returns channel names, IDs, and types for use with sending messages or managing channel membership.
+List Zoom Team Chat channels the user belongs to. Returns channel names, IDs, JIDs, and types for sending or reading messages and listing channel members.
+
+### List Chat Channel Members
+
+List the members of a Zoom Team Chat channel with their names, emails, user and member IDs, roles, and whether they are external. Use a contact's email, user ID, or member ID as the recipient of a direct message.
+
+### List Chat Thread Replies
+
+List the replies in a Zoom Team Chat thread, optionally with the thread's main message. Identify the thread by its main message ID and the channel or contact where it was posted.
 
 ### List Meetings
 
@@ -88,9 +96,13 @@ List, create, retrieve, update, or delete polls for a Zoom meeting.
 
 List, retrieve, update, or delete Zoom Team Chat messages in a channel or direct conversation.
 
+### React to Chat Message
+
+Add or remove an emoji reaction on a Zoom Team Chat message in a channel or direct conversation.
+
 ### Send Chat Message
 
-Send a Zoom Team Chat message to a channel or directly to a contact. Provide either a channel ID or contact email as the recipient.
+Send a Zoom Team Chat message to a channel or directly to a contact, optionally as a threaded reply. Provide either a channel ID or a contact (email, user ID, or member ID) as the recipient.
 
 ### Update Meeting
 

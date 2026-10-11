@@ -1,3 +1,4 @@
+export * from './get-current-user';
 export * from './get-project';
 export * from './list-projects';
 export * from './manage-deployment';

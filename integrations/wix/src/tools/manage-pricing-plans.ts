@@ -1,5 +1,6 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { getNextCursor } from '../lib/client';
 import { createWixClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -29,15 +30,23 @@ Uses the current Wix Pricing Plans V3 API.`,
         )
         .optional()
         .describe('Sort specification for list action'),
-      limit: z.number().optional().describe('Max items to return (default 50)'),
-      offset: z.number().optional().describe('Number of items to skip')
+      limit: z.number().optional().describe('Max items to return (max 100)'),
+      offset: z
+        .number()
+        .optional()
+        .describe('Not supported by Pricing Plans V3; use cursor instead.'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Cursor from a previous nextCursor to get the next page (for list)')
     })
   )
   .output(
     z.object({
       plan: z.any().optional().describe('Single pricing plan data'),
       plans: z.array(z.any()).optional().describe('List of pricing plans'),
-      totalResults: z.number().optional().describe('Total number of plans')
+      totalResults: z.number().optional().describe('Total number of plans'),
+      nextCursor: z.string().optional().describe('Cursor for the next page of plans')
     })
   )
   .handleInvocation(async ctx => {
@@ -45,14 +54,24 @@ Uses the current Wix Pricing Plans V3 API.`,
 
     switch (ctx.input.action) {
       case 'list': {
+        if (ctx.input.offset !== undefined) {
+          throw createApiServiceError(
+            'Pricing plan lists use cursor paging. Remove offset and pass cursor from nextCursor instead.'
+          );
+        }
         let result = await client.queryPricingPlans({
           filter: ctx.input.filter,
           sort: ctx.input.sort,
-          paging: { limit: ctx.input.limit, offset: ctx.input.offset }
+          limit: ctx.input.limit,
+          cursor: ctx.input.cursor
         });
         let plans = result.plans || [];
         return {
-          output: { plans, totalResults: result.pagingMetadata?.total },
+          output: {
+            plans,
+            totalResults: result.pagingMetadata?.total,
+            nextCursor: getNextCursor(result)
+          },
           message: `Found **${plans.length}** pricing plans`
         };
       }

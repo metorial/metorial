@@ -4,6 +4,7 @@ import {
   alertAction,
   createAlert,
   createIncident,
+  getAccount,
   getAlert,
   getAlertRequestStatus,
   getIncident,
@@ -12,6 +13,8 @@ import {
   getTeam,
   getUser,
   incidentAction,
+  listAlertLogs,
+  listAlertNotes,
   listAlerts,
   listEscalations,
   listIncidents,
@@ -35,6 +38,8 @@ export let provider = Slate.create({
     listAlerts,
     updateAlert,
     alertAction,
+    listAlertNotes,
+    listAlertLogs,
     getAlertRequestStatus,
     createIncident,
     getIncident,
@@ -54,7 +59,8 @@ export let provider = Slate.create({
     listUsers,
     getUser,
     manageService,
-    listServices
+    listServices,
+    getAccount
   ],
   triggers: []
 });

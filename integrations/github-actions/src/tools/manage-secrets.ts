@@ -62,7 +62,9 @@ export let manageSecrets = SlateTool.create(spec, {
       visibility: z
         .enum(['all', 'private', 'selected'])
         .optional()
-        .describe('Visibility for org secrets'),
+        .describe(
+          'Visibility for org secrets; when omitted, an existing secret keeps its visibility and a new secret is private'
+        ),
       selectedRepositoryIds: z
         .array(z.number())
         .optional()
@@ -75,6 +77,7 @@ export let manageSecrets = SlateTool.create(spec, {
     z.object({
       secrets: z.array(secretSchema).optional().describe('List of secrets'),
       totalCount: z.number().optional().describe('Total number of secrets'),
+      nextPage: z.number().optional().describe('Next page number, when more secrets exist'),
       secret: secretSchema.optional().describe('Single secret metadata'),
       publicKey: z
         .string()
@@ -118,7 +121,7 @@ export let manageSecrets = SlateTool.create(spec, {
     }
 
     if (action === 'list') {
-      let data: { total_count: number; secrets: Secret[] };
+      let data: { total_count: number; secrets: Secret[]; nextPage?: number };
       if (scope === 'org') {
         if (!org) throw createApiServiceError('org is required for org scope.');
         data = await client.listOrgSecrets(org, { perPage, page });
@@ -141,7 +144,7 @@ export let manageSecrets = SlateTool.create(spec, {
         visibility: s.visibility
       }));
       return {
-        output: { secrets, totalCount: data.total_count },
+        output: { secrets, totalCount: data.total_count, nextPage: data.nextPage },
         message: `Found **${data.total_count}** ${scope}-level secrets.`
       };
     }
@@ -183,10 +186,24 @@ export let manageSecrets = SlateTool.create(spec, {
       }
       if (scope === 'org') {
         if (!org) throw createApiServiceError('org is required.');
+        // GitHub requires visibility on every write; keep an existing secret's
+        // visibility instead of silently narrowing it to private.
+        let visibility = ctx.input.visibility;
+        if (!visibility) {
+          const existing = (await client.findOrgSecret(org, secretName))?.visibility;
+          visibility =
+            existing === 'all' || existing === 'selected' || existing === 'private'
+              ? existing
+              : 'private';
+        }
+        if (ctx.input.selectedRepositoryIds !== undefined && visibility !== 'selected')
+          throw createApiServiceError(
+            'selectedRepositoryIds can only be used with selected visibility.'
+          );
         await client.createOrUpdateOrgSecret(org, secretName, {
           encryptedValue: ctx.input.encryptedValue,
           keyId: ctx.input.keyId,
-          visibility: ctx.input.visibility ?? 'private',
+          visibility,
           selectedRepositoryIds: ctx.input.selectedRepositoryIds
         });
       } else if (scope === 'environment') {

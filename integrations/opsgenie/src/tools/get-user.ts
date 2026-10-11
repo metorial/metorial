@@ -21,7 +21,11 @@ export let getUser = SlateTool.create(spec, {
       includeSchedules: z
         .boolean()
         .optional()
-        .describe('Also fetch the schedules the user is part of')
+        .describe('Also fetch the schedules the user is part of'),
+      includeEscalations: z
+        .boolean()
+        .optional()
+        .describe('Also fetch the escalation policies the user is part of')
     })
   )
   .output(
@@ -53,7 +57,16 @@ export let getUser = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Schedules the user is part of')
+        .describe('Schedules the user is part of'),
+      escalations: z
+        .array(
+          z.object({
+            escalationId: z.string().describe('Escalation policy ID'),
+            name: z.string().describe('Escalation policy name')
+          })
+        )
+        .optional()
+        .describe('Escalation policies the user is part of')
     })
   )
   .handleInvocation(async ctx => {
@@ -66,6 +79,7 @@ export let getUser = SlateTool.create(spec, {
 
     let teams: any[] | undefined;
     let schedules: any[] | undefined;
+    let escalations: any[] | undefined;
 
     if (ctx.input.includeTeams) {
       let teamsData = await client.listUserTeams(ctx.input.userIdentifier);
@@ -83,6 +97,14 @@ export let getUser = SlateTool.create(spec, {
       }));
     }
 
+    if (ctx.input.includeEscalations) {
+      let escalationsData = await client.listUserEscalations(ctx.input.userIdentifier);
+      escalations = (escalationsData ?? []).map((e: any) => ({
+        escalationId: e.id,
+        name: e.name
+      }));
+    }
+
     return {
       output: {
         userId: user.id,
@@ -96,7 +118,8 @@ export let getUser = SlateTool.create(spec, {
         locale: user.locale,
         tags: user.tags,
         teams,
-        schedules
+        schedules,
+        escalations
       },
       message: `User **${user.fullName}** (${user.username}) — role: ${user.role?.name ?? user.role}`
     };

@@ -7,7 +7,18 @@ import { spec } from '../spec';
 
 let moneySchema = z
   .object({
-    value: z.string().optional().describe('Monetary amount as a string'),
+    value: z
+      .string()
+      .optional()
+      .describe(
+        'Display amount in the major currency unit; may include grouping separators such as "2,000.00".'
+      ),
+    minorUnitValue: z
+      .string()
+      .optional()
+      .describe(
+        'Exact amount in the minor currency unit, such as cents, as a decimal string.'
+      ),
     currency: z
       .object({
         code: z.string().optional(),
@@ -32,7 +43,9 @@ let invoiceLineItemSchema = z.object({
   taxes: z
     .array(
       z.object({
-        amount: z.object({ value: z.string().optional() }).optional(),
+        amount: z
+          .object({ value: z.string().optional(), minorUnitValue: z.string().optional() })
+          .optional(),
         salesTax: z
           .object({
             salesTaxId: z.string().optional(),
@@ -165,7 +178,7 @@ let lineItemInputSchema = z.object({
 export let listInvoices = SlateTool.create(spec, {
   name: 'List Invoices',
   key: 'list_invoices',
-  description: `List invoices for a Wave business with pagination. Optionally filter by a specific customer. Returns invoice details including status, amounts, customer, and line items.`,
+  description: `List invoices for a Wave business with pagination. Optionally filter by customer, status, invoice date range or invoice number, and choose a sort order. Returns invoice details including status, amounts, customer, and line items.`,
   tags: {
     readOnly: true
   }
@@ -179,8 +192,62 @@ export let listInvoices = SlateTool.create(spec, {
           'ID of the business to list invoices for. Call list_businesses to discover a permitted business ID.'
         ),
       customerId: z.string().optional().describe('Optional customer ID to filter invoices by'),
+      status: z
+        .enum([
+          'DRAFT',
+          'SAVED',
+          'SENT',
+          'VIEWED',
+          'UNPAID',
+          'PARTIAL',
+          'PAID',
+          'OVERPAID',
+          'OVERDUE'
+        ])
+        .optional()
+        .describe('Only return invoices with this status, such as OVERDUE or UNPAID.'),
+      invoiceDateStart: z
+        .string()
+        .optional()
+        .describe('Only return invoices dated on or after this date (YYYY-MM-DD).'),
+      invoiceDateEnd: z
+        .string()
+        .optional()
+        .describe('Only return invoices dated on or before this date (YYYY-MM-DD).'),
+      invoiceNumber: z
+        .string()
+        .optional()
+        .describe(
+          'Only return invoices whose number contains this text; "12" also matches 112 and 120.'
+        ),
+      sort: z
+        .enum([
+          'CREATED_AT_DESC',
+          'CREATED_AT_ASC',
+          'MODIFIED_AT_DESC',
+          'MODIFIED_AT_ASC',
+          'INVOICE_DATE_DESC',
+          'INVOICE_DATE_ASC',
+          'DUE_AT_DESC',
+          'DUE_AT_ASC',
+          'INVOICE_NUMBER_DESC',
+          'INVOICE_NUMBER_ASC',
+          'AMOUNT_DUE_DESC',
+          'AMOUNT_DUE_ASC',
+          'TOTAL_DESC',
+          'TOTAL_ASC',
+          'STATUS_DESC',
+          'STATUS_ASC',
+          'CUSTOMER_NAME_DESC',
+          'CUSTOMER_NAME_ASC'
+        ])
+        .optional()
+        .describe('Sort order (default: CREATED_AT_DESC).'),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
-      pageSize: z.number().optional().describe('Number of results per page (default: 20)')
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Number of results per page (default: 20, max: 100)')
     })
   )
   .output(
@@ -197,7 +264,14 @@ export let listInvoices = SlateTool.create(spec, {
       ctx.input.businessId,
       ctx.input.page ?? 1,
       ctx.input.pageSize ?? 20,
-      ctx.input.customerId
+      {
+        customerId: ctx.input.customerId,
+        status: ctx.input.status,
+        invoiceDateStart: ctx.input.invoiceDateStart,
+        invoiceDateEnd: ctx.input.invoiceDateEnd,
+        invoiceNumber: ctx.input.invoiceNumber,
+        sort: ctx.input.sort
+      }
     );
 
     return {

@@ -69,12 +69,54 @@ let mapAccount = (a: Account) => ({
   modifiedAt: undefined
 });
 
+// Documented AccountSubtypeValue enum values.
+const accountSubtypes = [
+  'CASH_AND_BANK',
+  'COST_OF_GOODS_SOLD',
+  'CREDIT_CARD',
+  'CUSTOMER_PREPAYMENTS_AND_CREDITS',
+  'DEPRECIATION_AND_AMORTIZATION',
+  'DISCOUNTS',
+  'DUE_FOR_PAYROLL',
+  'DUE_TO_YOU_AND_OTHER_OWNERS',
+  'EXPENSE',
+  'GAIN_ON_FOREIGN_EXCHANGE',
+  'INCOME',
+  'INVENTORY',
+  'LOANS',
+  'LOSS_ON_FOREIGN_EXCHANGE',
+  'MONEY_IN_TRANSIT',
+  'NON_RETAINED_EARNINGS',
+  'OTHER_CURRENT_ASSETS',
+  'OTHER_CURRENT_LIABILITY',
+  'OTHER_INCOME',
+  'OTHER_LONG_TERM_ASSETS',
+  'OTHER_LONG_TERM_LIABILITY',
+  'PAYABLE',
+  'PAYABLE_BILLS',
+  'PAYABLE_OTHER',
+  'PAYMENT_PROCESSING_FEES',
+  'PAYROLL_EXPENSES',
+  'PROPERTY_PLANT_EQUIPMENT',
+  'RECEIVABLE',
+  'RECEIVABLE_INVOICES',
+  'RECEIVABLE_OTHER',
+  'RETAINED_EARNINGS',
+  'SALES_TAX',
+  'SYSTEM_CUSTOMER_CREDITS',
+  'TRANSFERS',
+  'UNCATEGORIZED_EXPENSE',
+  'UNCATEGORIZED_INCOME',
+  'UNKNOWN_ACCOUNT',
+  'VENDOR_PREPAYMENTS_AND_CREDITS'
+] as const;
+
 // --- List Accounts ---
 
 export let listAccounts = SlateTool.create(spec, {
   name: 'List Accounts',
   key: 'list_accounts',
-  description: `List accounts in a business's chart of accounts. Returns all account types including assets, liabilities, equity, income, and expenses with their current balances.`,
+  description: `List active accounts in a business's chart of accounts with their current balances. Optionally filter by account types or subtypes, for example CASH_AND_BANK to find accounts that can receive invoice payments.`,
   tags: {
     readOnly: true
   }
@@ -86,6 +128,16 @@ export let listAccounts = SlateTool.create(spec, {
         .string()
         .describe(
           'ID of the business to list accounts for. Call list_businesses to discover a permitted business ID.'
+        ),
+      types: z
+        .array(z.enum(['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE']))
+        .optional()
+        .describe('Only return accounts of these types.'),
+      subtypes: z
+        .array(z.enum(accountSubtypes))
+        .optional()
+        .describe(
+          'Only return accounts with these subtypes, such as CASH_AND_BANK or CREDIT_CARD.'
         ),
       page: z.number().optional().describe('Page number (starts at 1, default: 1)'),
       pageSize: z.number().optional().describe('Number of results per page (default: 20)')
@@ -104,7 +156,8 @@ export let listAccounts = SlateTool.create(spec, {
     let result = await client.listAccounts(
       ctx.input.businessId,
       ctx.input.page ?? 1,
-      ctx.input.pageSize ?? 20
+      ctx.input.pageSize ?? 20,
+      { types: ctx.input.types, subtypes: ctx.input.subtypes }
     );
 
     return {

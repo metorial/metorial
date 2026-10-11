@@ -1,12 +1,8 @@
-Let me get the actual API documentation to confirm webhook event types and OAuth scopes.Now I have good information. Let me also check the integration platform triggers to confirm the full list of webhook event types, since the Ruby gem only lists 3 but Integrately listed more.
-
-Based on my research, here's the specification:
-
-# Slates Specification for Loyverse
+# Loyverse Specification
 
 ## Overview
 
-Loyverse is a cloud-based point-of-sale (POS) system for small and medium-sized businesses such as retail stores, cafes, and restaurants. It provides inventory management, sales processing, customer loyalty tracking, employee management, and business analytics. The API (base URL: `https://api.loyverse.com`) enables programmatic access to manage products, sales, customers, inventory, and more.
+Loyverse is a cloud-based point-of-sale (POS) system for small and medium-sized businesses such as retail stores, cafes, and restaurants. It provides inventory management, sales processing, customer loyalty tracking, employee management, and business analytics. The API (base URL: `https://api.loyverse.com/v1.0`, reference: https://developer.loyverse.com/docs/) enables programmatic access to manage products, sales, customers, inventory, and more.
 
 ## Authentication
 
@@ -25,45 +21,45 @@ A simple token-based method that provides unrestricted access to all API resourc
 This follows the OAuth 2.0 Authorization Code Flow. This method is intended for third-party applications that act on behalf of Loyverse users.
 
 - Create an account on the Loyverse Developer Portal and generate API credentials (Client ID and Client Secret).
-- **Authorization URL:** `https://cloud.loyverse.com/oauth/authorize`
-  - Required parameters: `client_id`, `redirect_uri`, `response_type=code`
-  - Optional: `scope` (e.g., `ITEMS_READ`, `STORES_READ`)
+- **Authorization URL:** `https://api.loyverse.com/oauth/authorize`
+  - Required parameters: `client_id`, `redirect_uri`, `response_type=code`, `scope` (space-separated, e.g., `ITEMS_READ STORES_READ`), `state`
 - **Token URL:** `https://api.loyverse.com/oauth/token`
   - Exchange the returned authorization code for an `access_token` and `refresh_token` via POST to `/oauth/token`.
   - Content-Type must be `application/x-www-form-urlencoded`.
 - OAuth 2.0 supports scoped access to resources (e.g., `ITEMS_READ`, `STORES_READ`), unlike Personal Access Tokens which grant full access.
-- The client will automatically refresh the access token when it expires using the refresh token.
+- Access tokens expire (`expires_in`, typically 12 hours) and are refreshed with `grant_type=refresh_token` at the same token URL.
 
 ## Features
 
 ### Item & Catalog Management
 
-Create, read, update, and delete items (products) in the catalog. Items support variants (e.g., sizes), SKUs, pricing, cost tracking, and images. Items can be organized into categories with names and colors. Modifiers (e.g., "Size" with options like Small/Medium/Large and price adjustments) can be created and assigned to items.
+Create, read, update, and delete items (products) in the catalog. Items support variants (e.g., sizes), SKUs, pricing, cost tracking, and images. Variants can be looked up directly, including by SKU, to get the variant IDs used by receipts and inventory. Items can be organized into categories with names and colors. Modifiers (e.g., "Size" with options like Small/Medium/Large and price adjustments) can be created and assigned to items.
 
-- Items can be filtered by update timestamp to retrieve recently changed products.
-- Receipts created via API can't have more than one payment type.
+- Items and variants can be filtered by created/updated timestamps to retrieve recently changed products.
+- Create and update requests are POST upserts: including an `id` updates the existing object.
 
 ### Inventory Management
 
-Track and update stock levels for item variants across multiple store locations. Inventory levels can be queried by variant or by store.
+Track and set stock levels for item variants across multiple store locations. Inventory levels can be queried by variants, stores, or update time; updates set the absolute stock (`stock_after`).
 
 - To get the stock of items, use the "Inventory" endpoint, not the "Items" endpoint.
 
 ### Sales & Receipts
 
-Create sales receipts and retrieve historical transaction data. Receipts include line items, payments, discounts, and tax information. Refund receipts can also be created for existing sales.
+Create sales receipts and retrieve historical transaction data. Receipts include line items, payments, discounts, and tax information. Refund receipts can also be created for existing sales by referencing the line item IDs of the original receipt.
 
+- Receipts created via API can't have more than one payment.
 - Refunds can only be created for receipts paid with a single payment type.
 - Refunds do not support receipts paid via integrated payments (e.g., SumUp, iZettle); those must be refunded through the POS app.
 - If a refund is created successfully, it will cause a restock of items specified in a refund receipt.
 
 ### Customer Management
 
-Create, read, update, and delete customer records. Customers can be looked up by email or phone number. Customer data includes name, email, phone, address, city, and postal code.
+Create, read, update, and delete customer records. Customers can be looked up by ID or email. Customer data includes name, email, phone, address, visit history, total spent, and loyalty points.
 
 ### Discount Management
 
-Create and manage discounts that can be applied to sales. Supports both percentage-based and fixed-amount discounts. Discounts can be configured to apply at the receipt level or item level.
+Create and manage discounts that can be applied to sales. Supported types are `FIXED_PERCENT`, `FIXED_AMOUNT`, `VARIABLE_PERCENT`, `VARIABLE_AMOUNT`, and `DISCOUNT_BY_POINTS`. Discounts can be applied at the receipt level or line-item level when creating receipts.
 
 ### Employee Management
 
@@ -81,17 +77,13 @@ Create and manage tax rates that can be applied to items and receipts.
 
 Retrieve the list of payment types configured for the account (e.g., cash, card).
 
-### POS Device Management
-
-Create, read, update, and delete POS device configurations.
-
 ### Supplier Management
 
 Create, read, update, and delete supplier records for inventory sourcing.
 
 ### Shift Management
 
-Access shift data including open/close times and associated employee information.
+Access closed shift data including open/close times, cash drawer totals, sales totals, and the employees who opened and closed each shift.
 
 ### Merchant Information
 
@@ -105,9 +97,11 @@ Only webhooks created via OAuth 2.0 will include the `X-Loyverse-Signature` head
 
 When creating a webhook, you specify a target URL and one or more event types to subscribe to.
 
+Supported event types (one per webhook): `receipts.update`, `items.update`, `inventory_levels.update`, `customers.update`, and `shifts.create`.
+
 ### Receipt Events
 
-Notifies when a new receipt (sale) is created or updated. Useful for syncing sales data to external accounting or analytics systems.
+Notifies when a receipt (sale or refund) is created or updated. Useful for syncing sales data to external accounting or analytics systems.
 
 ### Item Events
 
@@ -123,12 +117,4 @@ Notifies when a customer record is created, updated, or deleted. Useful for sync
 
 ### Shift Events
 
-Notifies when a shift is created (closed and synced to the Back Office). Useful for tracking employee work periods.
-
-### Employee Events
-
-Notifies when employee records are created or updated.
-
-### Store Events
-
-Notifies when store records are created or updated.
+Notifies when a closed shift is created. Useful for tracking cash register sessions.

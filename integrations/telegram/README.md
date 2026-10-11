@@ -18,11 +18,15 @@ Delete a message from a chat. The bot can delete its own messages in any chat, a
 
 ### Edit Message
 
-Edit the text of a previously sent message. Works for messages sent by the bot in any chat, or inline messages. Provide either chatId + messageId, or inlineMessageId.
+Edit the text of a previously sent message, or the caption of a photo, video, audio, or document message. Works for messages sent by the bot in any chat, or inline messages. Provide either chatId + messageId, or inlineMessageId.
 
 ### Forward Message
 
 Forward a message from one chat to another. The original sender attribution is preserved.
+
+### Get Bot Info
+
+Get the connected Telegram bot's identity and settings: its user ID, name, username, and whether it can join groups, read all group messages, and answer inline queries.
 
 ### Get Chat
 
@@ -31,6 +35,10 @@ Retrieve detailed information about a chat including its type, title, descriptio
 ### Get File
 
 Retrieve file information for a file shared in Telegram and provide it as a downloadable file. Use the file_id from a received message.
+
+### Get Updates
+
+Fetch recent incoming updates for the bot, such as messages, button presses, inline queries, and membership changes. Use it to find chat IDs, read messages sent to the bot, and get callback or inline query IDs to answer. Pass `offset` (the highest `updateId` plus one) to confirm processed updates. Unavailable while updates are delivered to a webhook, including when events are enabled for the connection.
 
 ### Manage Chat Member
 
@@ -54,7 +62,7 @@ Send a text message to a Telegram chat, group, supergroup, or channel. Supports 
 
 ### Send Poll
 
-Create and send a poll or quiz to a chat. Supports regular polls with optional multiple-answer mode, and quiz-mode polls with a single correct answer and explanation.
+Create and send a poll or quiz to a chat. Supports regular polls with optional multiple-answer mode, and quiz-mode polls with one or more correct answers and an explanation.
 
 ### Stop Poll
 
@@ -86,10 +94,11 @@ chat the bot belongs to is a channel in it.
 | Member joined / left | Native | Other members require the bot to be a chat administrator. |
 
 Not supported, because the Bot API offers no equivalent to a bot: reading, listing, or
-searching message history; ephemeral messages; read receipts; listing reactions,
-channels, threads, or channel members; opening direct messages; user lookup or search;
-responding to command interactions (reply with a normal message instead); and message
-deletion events.
+searching message history; read receipts; listing reactions, channels, threads, or
+channel members; opening direct messages; user lookup or search; responding to command
+interactions (reply with a normal message instead); and message deletion events.
+Ephemeral messages are not supported yet: Telegram offers them only in groups and
+supergroups, and outside a 15-second reply window only when the bot is an administrator.
 
 ### Receiving events
 
