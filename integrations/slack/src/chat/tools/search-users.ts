@@ -10,7 +10,11 @@ export let chatSearchUsers = contract
   .scopes(slackActionScopes.userInfo)
   .handleInvocation(async ctx => {
     let client = createSlackChatClient(ctx, { action: contract.key });
-    let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'forward');
+    let cursor = decodeSlackCursor(
+      ctx.input.cursor,
+      ctx.input.direction ?? 'forward',
+      contract.key
+    );
     let [result, identity] = await Promise.all([
       client.listUsers({ limit: ctx.input.limit ?? 100, cursor: cursor.data.cursor }),
       getSlackIdentity(client)

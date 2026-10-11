@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { AuthConfigSecretRedactor } from '../auth/redact';
 import { __traceInternals } from './trace';
 
 let {
@@ -270,6 +271,26 @@ describe('sanitizeUrl', () => {
     expect(out).toContain('access_token=[redacted]');
     expect(out).toContain('token_type=bearer');
     expect(out).toContain('expires_in=3600');
+  });
+
+  it('redacts long auth-config secrets embedded in the path', () => {
+    let redactor = new AuthConfigSecretRedactor({
+      token: '123456:ABCdefGHIjklMNOpqrSTU',
+      botId: '123456',
+      applicationId: '1503442063478362305'
+    });
+    expect(
+      sanitizeUrl('https://api.telegram.org/bot123456:ABCdefGHIjklMNOpqrSTU/getMe', redactor)
+    ).toBe('https://api.telegram.org/bot$$MT$secret$authConfig$token$$/getMe');
+    expect(sanitizeUrl('https://example.com/bots/123456/info', redactor)).toBe(
+      'https://example.com/bots/123456/info'
+    );
+    expect(
+      sanitizeUrl(
+        'https://discord.com/api/applications/1503442063478362305/commands',
+        redactor
+      )
+    ).toBe('https://discord.com/api/applications/1503442063478362305/commands');
   });
 
   it('leaves innocuous URLs unchanged', () => {

@@ -38,7 +38,7 @@ ${(ctx.input.redirectUris ?? []).map(uri => `    - ${yaml(uri)}`).join('\n') || 
       - channels:read
       - chat:write
       - chat:write.public
-      - emoji:read
+${commands.length ? '      - commands\n' : ''}      - emoji:read
       - files:read
       - files:write
       - groups:history

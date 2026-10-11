@@ -1,5 +1,11 @@
 import { createAxios, SlateAuth } from '@slates/provider';
 import { z } from 'zod';
+import { ZOOM_CHATBOT_AUTH_METHOD } from './lib/authMethods';
+import {
+  chatbotAuthInputSchema,
+  exchangeChatbotToken,
+  type ZoomChatbotAuthInput
+} from './lib/chatbotAuth';
 import { zoomApiError, zoomOAuthError, zoomServiceError } from './lib/errors';
 
 let authAxios = createAxios({
@@ -16,13 +22,18 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      accountId: z.string().optional()
+      accountId: z.string().optional(),
+      botJid: z.string().optional(),
+      chatbotUserJid: z.string().optional(),
+      apiUrl: z.string().optional()
     })
   )
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
+    // Acts as a Zoom user, not as the Team Chat chatbot, so it cannot back the chat adapter.
+    adapters: [],
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -485,6 +496,8 @@ export let auth = SlateAuth.create()
     type: 'auth.custom',
     name: 'Server-to-Server OAuth',
     key: 'server_to_server_oauth',
+    // Server-to-Server OAuth apps cannot enable the Team Chat chatbot feature.
+    adapters: [],
 
     inputSchema: z.object({
       accountId: z.string().describe('Zoom Account ID'),
@@ -555,4 +568,39 @@ export let auth = SlateAuth.create()
         }
       };
     }
+  })
+  .addCustomAuth({
+    type: 'auth.custom',
+    name: 'Team Chat Chatbot',
+    key: ZOOM_CHATBOT_AUTH_METHOD,
+    adapters: ['chat'],
+    docs: [
+      {
+        type: 'docs.auth.custom',
+        name: 'Chatbot authorization',
+        url: 'https://developers.zoom.us/docs/chat/installation-and-authentication/'
+      }
+    ],
+
+    inputSchema: chatbotAuthInputSchema,
+
+    getOutput: async (ctx: { input: ZoomChatbotAuthInput }) => ({
+      output: await exchangeChatbotToken(ctx.input)
+    }),
+
+    handleTokenRefresh: async (ctx: { input: ZoomChatbotAuthInput }) => ({
+      output: await exchangeChatbotToken(ctx.input)
+    }),
+
+    // imchat:bot has no profile endpoint; the identity is the configured Bot JID and account.
+    getProfile: async (ctx: {
+      output: { botJid?: string; accountId?: string };
+      input: ZoomChatbotAuthInput;
+    }) => ({
+      profile: {
+        id: ctx.output.botJid ?? ctx.input.botJid,
+        name: ctx.output.botJid ?? ctx.input.botJid,
+        accountId: ctx.output.accountId ?? ctx.input.accountId
+      }
+    })
   });

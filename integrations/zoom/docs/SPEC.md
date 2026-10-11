@@ -6,7 +6,7 @@ Zoom is a cloud-based video communications platform that provides video meetings
 
 ## Authentication
 
-Zoom uses **OAuth 2.0** exclusively for API authentication (JWT was deprecated in June 2023). There are two OAuth flows:
+Zoom uses **OAuth 2.0** exclusively for API authentication (JWT was deprecated in June 2023). There are three OAuth flows:
 
 ### User-Level OAuth (Authorization Code Grant)
 
@@ -28,6 +28,14 @@ Used to authenticate with Zoom using server-to-server OAuth account credentials 
 - Client authentication is sent as a Basic Auth header (Base64-encoded Client ID and Client Secret).
 - Scopes are configured at app creation time in the Zoom App Marketplace and cannot be overridden at token request time.
 - This flow operates at the account level, not per-user.
+
+### Team Chat Chatbot (Client Credentials)
+
+Used to act as a Team Chat chatbot from a General app with Chat Subscription enabled.
+
+- **Token URL:** `https://zoom.us/oauth/token?grant_type=client_credentials` with a Basic Auth header (Client ID and Client Secret).
+- The token carries only the `imchat:bot` scope and expires after one hour; a new token is requested the same way.
+- Inputs: Client ID, Client Secret, Bot JID, Account ID, and (user-managed apps only) the authorizing user's JID.
 
 ## Features
 
@@ -98,6 +106,10 @@ User events include actions such as: activated, created, deactivated, deleted, d
 ### Zoom Phone Events
 
 Call events for Zoom Phone: call started, ended, ringing, answered, missed, voicemail received, and call recording completed.
+
+### Chatbot Events
+
+Chatbot requests (`bot_notification` for slash command and chatbot messages, `endpoint.url_validation`) are sent to the app's Bot Endpoint URL and verified with the app Secret Token. `bot_notification` is emitted as a received chat message and a command invocation.
 
 ### Chat Message Events
 

@@ -1,5 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { ZOOM_USER_AUTH_METHODS } from '../lib/authMethods';
 import { ZoomClient } from '../lib/client';
 import { zoomServiceError } from '../lib/errors';
 import { spec } from '../spec';
@@ -114,6 +115,7 @@ export let manageChatMessages = SlateTool.create(spec, {
         .describe('Message returned by get or update')
     })
   )
+  .authMethods(ZOOM_USER_AUTH_METHODS)
   .handleInvocation(async ctx => {
     assertRecipient(ctx.input.toChannel, ctx.input.toContact);
 

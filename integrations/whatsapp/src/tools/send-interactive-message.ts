@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -80,7 +80,9 @@ Use these for structured user responses like surveys, menu selections, or quick 
 
     if (ctx.input.interactiveType === 'buttons') {
       if (!ctx.input.buttons || ctx.input.buttons.length === 0) {
-        throw new Error('buttons field is required for interactive buttons messages');
+        throw createApiServiceError(
+          'buttons field is required for interactive buttons messages'
+        );
       }
       result = await client.sendInteractiveButtonsMessage(ctx.input.to, {
         header,
@@ -90,10 +92,14 @@ Use these for structured user responses like surveys, menu selections, or quick 
       });
     } else {
       if (!ctx.input.sections || ctx.input.sections.length === 0) {
-        throw new Error('sections field is required for interactive list messages');
+        throw createApiServiceError(
+          'sections field is required for interactive list messages'
+        );
       }
       if (!ctx.input.listButtonText) {
-        throw new Error('listButtonText is required for interactive list messages');
+        throw createApiServiceError(
+          'listButtonText is required for interactive list messages'
+        );
       }
       result = await client.sendInteractiveListMessage(ctx.input.to, {
         header,

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
 import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
@@ -14,6 +15,7 @@ export let sendChannelMessage = SlateTool.create(spec, {
   ]
 })
   .scopes(microsoftTeamsActionScopes.sendChannelMessage)
+  .authMethods(graphAuthMethodKeys)
   .input(
     z.object({
       teamId: z.string().describe('ID of the team'),

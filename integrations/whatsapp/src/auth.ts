@@ -11,6 +11,7 @@ export let auth = SlateAuth.create()
     type: 'auth.token',
     name: 'Access Token',
     key: 'access_token',
+    adapters: ['chat'],
     inputSchema: z.object({
       token: z
         .string()

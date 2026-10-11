@@ -5,6 +5,7 @@ export * from './edit-message';
 export * from './forward-message';
 export * from './get-chat';
 export * from './get-file';
+export * from './get-file-url';
 export * from './manage-chat-member';
 export * from './pin-message';
 export * from './send-invoice';

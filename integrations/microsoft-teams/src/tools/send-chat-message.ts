@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
 import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
@@ -14,6 +15,7 @@ export let sendChatMessage = SlateTool.create(spec, {
   ]
 })
   .scopes(microsoftTeamsActionScopes.sendChatMessage)
+  .authMethods(graphAuthMethodKeys)
   .input(
     z.object({
       chatId: z.string().optional().describe('ID of an existing chat to send the message to'),

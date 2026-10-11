@@ -563,6 +563,10 @@ let redactHashFragment = (hash: string, redactor?: AuthConfigSecretRedactor) => 
   return redacted ? `#${redacted}` : '';
 };
 
+// Redacts secret-keyed auth values embedded in URL paths (e.g. Telegram's `/bot<token>/...`).
+let isEmbeddedPathSecret = (secret: string, path: string) =>
+  secret.length >= 8 && isSecretKeyName(path.split('.').pop() ?? '');
+
 let sanitizeUrl = (value: string, redactor?: AuthConfigSecretRedactor) => {
   if (!value) return value;
 
@@ -573,6 +577,8 @@ let sanitizeUrl = (value: string, redactor?: AuthConfigSecretRedactor) => {
       url.username = '';
       url.password = '';
     }
+
+    if (redactor) url.pathname = redactor.redactEmbedded(url.pathname, isEmbeddedPathSecret);
 
     for (let key of Array.from(url.searchParams.keys())) {
       if (isUrlFormSecretKeyName(key)) {
@@ -590,7 +596,7 @@ let sanitizeUrl = (value: string, redactor?: AuthConfigSecretRedactor) => {
 
     return decodeRedactedMarker(url.toString());
   } catch {
-    let text = redactor ? redactor.redact(value) : value;
+    let text = redactor ? redactor.redactEmbedded(value, isEmbeddedPathSecret) : value;
     return text.replace(
       /([?&]([^=&#]+)=)([^&#]+)/g,
       (_match, prefix: string, key: string, rawValue: string) =>

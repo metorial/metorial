@@ -72,6 +72,43 @@ Send a message in an existing chat. Supports plain text and HTML content. Can al
 
 Update properties of an existing Microsoft Team such as display name, description, visibility, or settings. Also supports archiving and unarchiving a team.
 
+## Teams Bot Chat
+
+Connect a Microsoft Teams bot (Azure Bot resource) with the **Teams Bot (Azure Bot)** connection to use the normalized chat actions and events. The connection takes the Microsoft App ID, a client secret, the directory (tenant) ID for single-tenant bots or for opening direct messages, and an optional Teams service URL (default `https://smba.trafficmanager.net/teams/`). Bot access tokens are requested with the client credentials flow for `https://api.botframework.com/.default` and renewed automatically.
+
+Microsoft Graph user connections keep the tools above but cannot act as the bot, so they are not offered for chat. The bot app is exposed as one workspace (`msteams-bot:<app id>`) that contains every personal chat, group chat, and channel the bot can reach.
+
+| Capability | Support | Notes |
+| --- | --- | --- |
+| Send message | Native | New posts, channel thread replies (`threadId`), and replies to an activity in chats. Text is sent as Teams Markdown; tables, charts, and cards are rendered as plain text and links. |
+| Edit / delete message | Native | Bot's own messages only. |
+| Typing indicator | Native | In chats and channel threads. |
+| Conversation members | Native | Paged roster. |
+| Open direct message | Native | Requires the tenant ID on the connection and the app installed for the user. |
+| Download file | Native | Files users send in personal chats (OneDrive link) and inline images (bot-authenticated link). |
+| Workspace list / get, current bot | Native | One synthetic workspace per bot. |
+| Get conversation | Fallback | Derived from the conversation id format; Teams does not return names or channel visibility to bots. |
+| Setup instructions | Native | Generates a Teams app manifest and Azure Bot steps without a connection. |
+| Upload file | Not supported | Bots can only send files in personal chats after a per-file consent card; there is no direct upload. |
+| Add / remove reactions | Not supported | Teams has no bot API for reactions. |
+| Read, list, or search messages | Not supported | The Bot Connector has no message history API. |
+| Ephemeral messages, slash command responses, group DMs, user lookup | Not supported | No bot API. |
+
+### Events
+
+Set the Azure Bot **Messaging endpoint** to the receive URL shown during event setup and enter the Microsoft App ID there. Every request must carry a Bot Connector token signed by a published Bot Framework key for this App ID; the issuer, audience, validity window, `serviceUrl` claim, and channel endorsement are checked before an event is accepted.
+
+| Event | Teams activity |
+| --- | --- |
+| Message received | `message` |
+| Mention received | `message` with a mention of the bot |
+| Message updated | `messageUpdate` (edit or undelete) |
+| Message deleted | `messageDelete` |
+| Reaction added / removed | `messageReaction` (reactions to the bot's own messages only) |
+| Member joined / left | `conversationUpdate` with `membersAdded` / `membersRemoved` (one event per member) |
+
+By default bots in channels and group chats only receive messages that @mention them; the generated manifest requests resource-specific consent (`ChannelMessage.Read.Group`, `ChatMessage.Read.Chat`) so team and chat owners can allow all messages. Bots cannot post in private channels. Only the public Microsoft cloud (and GCC service URLs) is supported. See the [Bot Connector authentication](https://learn.microsoft.com/en-us/azure/bot-service/rest-api/bot-framework-rest-connector-authentication?view=azure-bot-service-4.0) and [conversation events](https://learn.microsoft.com/en-us/microsoftteams/platform/bots/how-to/conversations/subscribe-to-conversation-events) references.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

@@ -111,3 +111,9 @@ Security-related alerts for your account.
 ### Flows
 
 Endpoint availability notifications for WhatsApp Flows integrations.
+
+## Normalized Chat Support
+
+The integration also exposes WhatsApp as a normalized chat provider. A connection represents one business phone number (the configured Phone Number ID); each customer conversation is a direct-message channel identified by the customer's WhatsApp ID, or by the business-scoped user ID when Meta omits the phone number for a user with a WhatsApp username.
+
+Inbound events use the **messages** webhook field, configured manually in the Meta App Dashboard with a callback URL, a verify token, and the app secret used to verify `X-Hub-Signature-256`. Supported events: customer messages (text, media, location, contacts, button and list replies, orders) and customer reactions (added and removed). Status updates, group messages, system messages, and unsupported message types are acknowledged without events. See the README for the full capability matrix and exclusions.

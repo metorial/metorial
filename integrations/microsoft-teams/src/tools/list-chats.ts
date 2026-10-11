@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
 import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
@@ -13,6 +14,7 @@ export let listChats = SlateTool.create(spec, {
   }
 })
   .scopes(microsoftTeamsActionScopes.listChats)
+  .authMethods(graphAuthMethodKeys)
   .input(
     z.object({
       top: z.number().optional().describe('Maximum number of chats to return')

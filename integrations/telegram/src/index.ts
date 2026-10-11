@@ -1,4 +1,5 @@
 import { Slate } from 'slates';
+import { telegramChatAdapter } from './chat';
 import { spec } from './spec';
 import {
   answerCallbackQueryTool,
@@ -8,6 +9,7 @@ import {
   forwardMessageTool,
   getChatTool,
   getFileTool,
+  getFileUrl,
   manageChatMemberTool,
   pinMessageTool,
   sendInvoiceTool,
@@ -17,6 +19,8 @@ import {
   stopPollTool,
   updateChatTool
 } from './tools';
+import { telegramUpdatesTriggerGroup } from './triggers';
+
 export let provider = Slate.create({
   spec,
   tools: [
@@ -34,7 +38,10 @@ export let provider = Slate.create({
     sendInvoiceTool,
     answerCallbackQueryTool,
     answerInlineQueryTool,
-    getFileTool
+    getFileTool,
+    getFileUrl
   ],
+  adapters: [telegramChatAdapter],
+  triggerGroups: [telegramUpdatesTriggerGroup],
   triggers: []
 });

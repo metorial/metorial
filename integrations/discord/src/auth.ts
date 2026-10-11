@@ -20,13 +20,27 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      tokenType: z.string().optional()
+      tokenType: z.string().optional(),
+      botUserId: z
+        .string()
+        .optional()
+        .describe(
+          'User id of the bot behind a bot token, resolved when the connection is created'
+        ),
+      applicationId: z
+        .string()
+        .optional()
+        .describe(
+          'Application id that owns the bot token, resolved when the connection is created'
+        )
     })
   )
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth2',
     key: 'oauth2',
+    // A user OAuth token cannot act as the bot, read bot channels, or open the gateway.
+    adapters: [],
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -204,16 +218,33 @@ export let auth = SlateAuth.create()
     type: 'auth.token',
     name: 'Bot Token',
     key: 'bot_token',
+    adapters: ['chat'],
 
     inputSchema: z.object({
       botToken: z.string().describe('Bot token from the Discord Developer Portal')
     }),
 
     getOutput: async ctx => {
+      let headers = { Authorization: `Bot ${ctx.input.botToken}` };
+
+      // Best-effort: chat actions resolve the identity again on demand.
+      let [botUser, application] = await Promise.all([
+        discordApi
+          .get('/users/@me', { headers })
+          .then(response => response.data as { id?: string })
+          .catch(() => undefined),
+        discordApi
+          .get('/applications/@me', { headers })
+          .then(response => response.data as { id?: string })
+          .catch(() => undefined)
+      ]);
+
       return {
         output: {
           token: ctx.input.botToken,
-          tokenType: 'Bot'
+          tokenType: 'Bot',
+          botUserId: typeof botUser?.id === 'string' ? botUser.id : undefined,
+          applicationId: typeof application?.id === 'string' ? application.id : undefined
         }
       };
     },

@@ -1,0 +1,791 @@
+{
+  "markdown": [
+    "",
+    "plain text",
+    "Hello **bold** and *italic* and ~~gone~~ and `code`.",
+    "# Heading one\n\n## Heading *two*\n\nBody",
+    "Escapes & < > \" ' * _ ~ ` \\ | [ ]",
+    "A [link](https://example.com/a?b=1&c=2) and [https://example.com](https://example.com) and <https://auto.example.com>",
+    "An empty [](https://empty.example.com) label",
+    "Image ![alt text](https://img.example.com/a.png) and ![](https://img.example.com/b.png)",
+    "Line one  \nLine two\\\nLine three",
+    "Inline <span>html</span> here",
+    "<div>\nblock html\n</div>",
+    "> quote line one\n> quote line two\n>\n> second paragraph",
+    "> outer\n>\n> > nested quote",
+    "> - list in quote\n> - second",
+    "```\nplain code\n```",
+    "```ts\nlet x = 1 < 2 && \"a\";\n```",
+    "```\nwith trailing\n\n```",
+    "    indented code",
+    "- one\n- two\n- three",
+    "1. first\n2. second\n3. third",
+    "3. three\n4. four",
+    "- parent\n  - child\n    - grandchild\n- sibling",
+    "1. ordered\n   - nested bullet\n   - another\n2. next",
+    "- [x] done\n- [ ] todo\n- plain",
+    "- item with\n\n  two paragraphs\n- second",
+    "- item\n\n  ```\n  code in list\n  ```",
+    "- > quote in list",
+    "-",
+    "| Name | Value |\n| --- | --- |\n| a | 1 |\n| **b** | `2` |",
+    "| H |\n| - |\n| [l](https://l.example.com) |",
+    "Before\n\n---\n\nAfter",
+    "Footnote ref[^1].\n\n[^1]: The note *text*.",
+    "Reference [link][ref] and ![img][imgref].\n\n[ref]: https://ref.example.com\n[imgref]: https://imgref.example.com/x.png",
+    "**bold with trailing space **and more",
+    "** spaced bold **",
+    "*_mixed_* **_nested_** ***both***",
+    "Multi\nline\nparagraph",
+    "Unicode: café — “quotes” 🎉",
+    "Text with `back`tick` and `` double ``",
+    "> code in quote:\n>\n> ```\n> x\n> ```",
+    "1. a\n\n   b\n\n2. c",
+    "* star\n+ plus",
+    "Trailing spaces   ",
+    "  leading spaces",
+    "html entity &amp; &copy;",
+    "line with > inside and\n> at start",
+    "link with title [t](https://t.example.com \"Title\")",
+    "a | b"
+  ],
+  "zoomRejected": ["[x](javascript:alert(1))", "![a](ftp://x.example.com/a.png)"],
+  "expected": {
+    "telegram": [
+      {
+        "output": ""
+      },
+      {
+        "output": "plain text"
+      },
+      {
+        "output": "Hello <b>bold</b> and <i>italic</i> and <s>gone</s> and <code>code</code>."
+      },
+      {
+        "output": "<b>Heading one</b>\n\n<b>Heading <i>two</i></b>\n\nBody"
+      },
+      {
+        "output": "Escapes &amp; &lt; &gt; \" ' * _ ~ ` \\ | [ ]"
+      },
+      {
+        "output": "A <a href=\"https://example.com/a?b=1&amp;c=2\">link</a> and <a href=\"https://example.com\">https://example.com</a> and <a href=\"https://auto.example.com\">https://auto.example.com</a>"
+      },
+      {
+        "output": "An empty <a href=\"https://empty.example.com\">https://empty.example.com</a> label"
+      },
+      {
+        "output": "Image <a href=\"https://img.example.com/a.png\">alt text</a> and <a href=\"https://img.example.com/b.png\">https://img.example.com/b.png</a>"
+      },
+      {
+        "output": "Line one\nLine two\nLine three"
+      },
+      {
+        "output": "Inline &lt;span&gt;html&lt;/span&gt; here"
+      },
+      {
+        "output": "&lt;div&gt;\nblock html\n&lt;/div&gt;"
+      },
+      {
+        "output": "<blockquote>quote line one\nquote line two\n\nsecond paragraph</blockquote>"
+      },
+      {
+        "output": "<blockquote>outer\n\n<blockquote>nested quote</blockquote></blockquote>"
+      },
+      {
+        "output": "<blockquote>• list in quote\n• second</blockquote>"
+      },
+      {
+        "output": "<pre><code>plain code</code></pre>"
+      },
+      {
+        "output": "<pre><code class=\"language-ts\">let x = 1 &lt; 2 &amp;&amp; \"a\";</code></pre>"
+      },
+      {
+        "output": "<pre><code>with trailing\n</code></pre>"
+      },
+      {
+        "output": "<pre><code>indented code</code></pre>"
+      },
+      {
+        "output": "• one\n• two\n• three"
+      },
+      {
+        "output": "1. first\n2. second\n3. third"
+      },
+      {
+        "output": "3. three\n4. four"
+      },
+      {
+        "output": "• parent\n  • child\n    • grandchild\n• sibling"
+      },
+      {
+        "output": "1. ordered\n  • nested bullet\n  • another\n2. next"
+      },
+      {
+        "output": "☑ done\n☐ todo\n• plain"
+      },
+      {
+        "output": "• item with\ntwo paragraphs\n• second"
+      },
+      {
+        "output": "• item\n<pre><code>code in list</code></pre>"
+      },
+      {
+        "output": "• <blockquote>quote in list</blockquote>"
+      },
+      {
+        "output": "• "
+      },
+      {
+        "output": "<pre>Name | Value\n-----|------\na    | 1\nb    | 2</pre>"
+      },
+      {
+        "output": "<pre>H\n-\nl</pre>"
+      },
+      {
+        "output": "Before\n\n———\n\nAfter"
+      },
+      {
+        "output": "Footnote ref.\n\nThe note <i>text</i>."
+      },
+      {
+        "output": "Reference link and ."
+      },
+      {
+        "output": "**bold with trailing space **and more"
+      },
+      {
+        "output": "** spaced bold **"
+      },
+      {
+        "output": "<i><i>mixed</i></i> <b><i>nested</i></b> <i><b>both</b></i>"
+      },
+      {
+        "output": "Multi\nline\nparagraph"
+      },
+      {
+        "output": "Unicode: café — “quotes” 🎉"
+      },
+      {
+        "output": "Text with <code>back</code>tick` and <code>double</code>"
+      },
+      {
+        "output": "<blockquote>code in quote:\n\n<pre><code>x</code></pre></blockquote>"
+      },
+      {
+        "output": "1. a\nb\n2. c"
+      },
+      {
+        "output": "• star\n\n• plus"
+      },
+      {
+        "output": "Trailing spaces"
+      },
+      {
+        "output": "leading spaces"
+      },
+      {
+        "output": "html entity &amp; ©"
+      },
+      {
+        "output": "line with &gt; inside and\n\n<blockquote>at start</blockquote>"
+      },
+      {
+        "output": "link with title <a href=\"https://t.example.com\">t</a>"
+      },
+      {
+        "output": "a | b"
+      }
+    ],
+    "whatsapp": [
+      {
+        "output": ""
+      },
+      {
+        "output": "plain text"
+      },
+      {
+        "output": "Hello *bold* and _italic_ and ~gone~ and `code`."
+      },
+      {
+        "output": "*Heading one*\n\n*Heading _two_*\n\nBody"
+      },
+      {
+        "output": "Escapes & < > \" ' * _ ~ ` \\ | [ ]"
+      },
+      {
+        "output": "A link (https://example.com/a?b=1&c=2) and https://example.com and https://auto.example.com"
+      },
+      {
+        "output": "An empty https://empty.example.com label"
+      },
+      {
+        "output": "Image alt text (https://img.example.com/a.png) and https://img.example.com/b.png"
+      },
+      {
+        "output": "Line one\nLine two\nLine three"
+      },
+      {
+        "output": "Inline <span>html</span> here"
+      },
+      {
+        "output": "<div>\nblock html\n</div>"
+      },
+      {
+        "output": "> quote line one\n> quote line two\n> \n> second paragraph"
+      },
+      {
+        "output": "> outer\n> \n> > nested quote"
+      },
+      {
+        "output": "> - list in quote\n> - second"
+      },
+      {
+        "output": "```\nplain code\n```"
+      },
+      {
+        "output": "```\nlet x = 1 < 2 && \"a\";\n```"
+      },
+      {
+        "output": "```\nwith trailing\n\n```"
+      },
+      {
+        "output": "```\nindented code\n```"
+      },
+      {
+        "output": "- one\n- two\n- three"
+      },
+      {
+        "output": "1. first\n2. second\n3. third"
+      },
+      {
+        "output": "3. three\n4. four"
+      },
+      {
+        "output": "- parent\n  - child\n    - grandchild\n- sibling"
+      },
+      {
+        "output": "1. ordered\n   - nested bullet\n   - another\n2. next"
+      },
+      {
+        "output": "- [x] done\n- [ ] todo\n- plain"
+      },
+      {
+        "output": "- item with\n  two paragraphs\n- second"
+      },
+      {
+        "output": "- item\n  ```\n  code in list\n  ```"
+      },
+      {
+        "output": "- > quote in list"
+      },
+      {
+        "output": "-"
+      },
+      {
+        "output": "```\nName | Value\n-----|------\na    | 1\nb    | 2\n```"
+      },
+      {
+        "output": "```\nH\n-------------------------\nl (https://l.example.com)\n```"
+      },
+      {
+        "output": "Before\n\n———\n\nAfter"
+      },
+      {
+        "output": "Footnote ref[1].\n\n[1] The note _text_."
+      },
+      {
+        "output": "Reference link and img."
+      },
+      {
+        "output": "**bold with trailing space **and more"
+      },
+      {
+        "output": "** spaced bold **"
+      },
+      {
+        "output": "__mixed__ *_nested_* _*both*_"
+      },
+      {
+        "output": "Multi\nline\nparagraph"
+      },
+      {
+        "output": "Unicode: café — “quotes” 🎉"
+      },
+      {
+        "output": "Text with `back`tick` and `double`"
+      },
+      {
+        "output": "> code in quote:\n> \n> ```\n> x\n> ```"
+      },
+      {
+        "output": "1. a\n   b\n2. c"
+      },
+      {
+        "output": "- star\n\n- plus"
+      },
+      {
+        "output": "Trailing spaces"
+      },
+      {
+        "output": "leading spaces"
+      },
+      {
+        "output": "html entity & ©"
+      },
+      {
+        "output": "line with > inside and\n\n> at start"
+      },
+      {
+        "output": "link with title t (https://t.example.com)"
+      },
+      {
+        "output": "a | b"
+      }
+    ],
+    "messenger": [
+      {
+        "output": ""
+      },
+      {
+        "output": "plain text"
+      },
+      {
+        "output": "Hello bold and italic and gone and code."
+      },
+      {
+        "output": "Heading one\n\nHeading two\n\nBody"
+      },
+      {
+        "output": "Escapes & < > \" ' * _ ~ ` \\ | [ ]"
+      },
+      {
+        "output": "A link (https://example.com/a?b=1&c=2) and https://example.com and https://auto.example.com"
+      },
+      {
+        "output": "An empty https://empty.example.com label"
+      },
+      {
+        "output": "Image alt text (https://img.example.com/a.png) and https://img.example.com/b.png"
+      },
+      {
+        "output": "Line one\nLine two\nLine three"
+      },
+      {
+        "output": "Inline <span>html</span> here"
+      },
+      {
+        "output": "<div>\nblock html\n</div>"
+      },
+      {
+        "output": "> quote line one\n> quote line two\n> \n> second paragraph"
+      },
+      {
+        "output": "> outer\n> \n> > nested quote"
+      },
+      {
+        "output": "> - list in quote\n> - second"
+      },
+      {
+        "output": "plain code"
+      },
+      {
+        "output": "let x = 1 < 2 && \"a\";"
+      },
+      {
+        "output": "with trailing"
+      },
+      {
+        "output": "indented code"
+      },
+      {
+        "output": "- one\n- two\n- three"
+      },
+      {
+        "output": "1. first\n2. second\n3. third"
+      },
+      {
+        "output": "3. three\n4. four"
+      },
+      {
+        "output": "- parent\n  \n  - child\n    \n    - grandchild\n- sibling"
+      },
+      {
+        "output": "1. ordered\n  \n  - nested bullet\n  - another\n2. next"
+      },
+      {
+        "output": "- done\n- todo\n- plain"
+      },
+      {
+        "output": "- item with\n  \n  two paragraphs\n- second"
+      },
+      {
+        "output": "- item\n  \n  code in list"
+      },
+      {
+        "output": "- > quote in list"
+      },
+      {
+        "output": "-"
+      },
+      {
+        "output": "Name | Value\na | 1\nb | 2"
+      },
+      {
+        "output": "H\nl (https://l.example.com)"
+      },
+      {
+        "output": "Before\n\n---\n\nAfter"
+      },
+      {
+        "output": "Footnote ref.\n\nThe note text."
+      },
+      {
+        "output": "Reference link and ."
+      },
+      {
+        "output": "**bold with trailing space **and more"
+      },
+      {
+        "output": "** spaced bold **"
+      },
+      {
+        "output": "mixed nested both"
+      },
+      {
+        "output": "Multi\nline\nparagraph"
+      },
+      {
+        "output": "Unicode: café — “quotes” 🎉"
+      },
+      {
+        "output": "Text with backtick` and double"
+      },
+      {
+        "output": "> code in quote:\n> \n> x"
+      },
+      {
+        "output": "1. a\n  \n  b\n2. c"
+      },
+      {
+        "output": "- star\n\n- plus"
+      },
+      {
+        "output": "Trailing spaces"
+      },
+      {
+        "output": "leading spaces"
+      },
+      {
+        "output": "html entity & ©"
+      },
+      {
+        "output": "line with > inside and\n\n> at start"
+      },
+      {
+        "output": "link with title t (https://t.example.com)"
+      },
+      {
+        "output": "a | b"
+      }
+    ],
+    "googleChat": [
+      {
+        "output": ""
+      },
+      {
+        "output": "plain text"
+      },
+      {
+        "output": "Hello *bold* and _italic_ and ~gone~ and `code`."
+      },
+      {
+        "output": "*Heading one*\n\n*Heading _two_*\n\nBody"
+      },
+      {
+        "output": "Escapes & < > \" ' * _ ~ ` \\ | [ ]"
+      },
+      {
+        "output": "A <https://example.com/a?b=1&c=2|link> and https://example.com and https://auto.example.com"
+      },
+      {
+        "output": "An empty https://empty.example.com label"
+      },
+      {
+        "output": "Image <https://img.example.com/a.png|alt text> and https://img.example.com/b.png"
+      },
+      {
+        "output": "Line one\nLine two\nLine three"
+      },
+      {
+        "output": "Inline <span>html</span> here"
+      },
+      {
+        "output": "<div>\nblock html\n</div>"
+      },
+      {
+        "output": ">quote line one\n>quote line two\n>second paragraph"
+      },
+      {
+        "output": ">outer\n>>nested quote"
+      },
+      {
+        "output": ">* list in quote\n>* second"
+      },
+      {
+        "output": "```\nplain code\n```"
+      },
+      {
+        "output": "```\nlet x = 1 < 2 && \"a\";\n```"
+      },
+      {
+        "output": "```\nwith trailing\n```"
+      },
+      {
+        "output": "```\nindented code\n```"
+      },
+      {
+        "output": "* one\n* two\n* three"
+      },
+      {
+        "output": "1. first\n2. second\n3. third"
+      },
+      {
+        "output": "3. three\n4. four"
+      },
+      {
+        "output": "* parent\n    * child\n        * grandchild\n* sibling"
+      },
+      {
+        "output": "1. ordered\n    * nested bullet\n    * another\n2. next"
+      },
+      {
+        "output": "* done\n* todo\n* plain"
+      },
+      {
+        "output": "* item with\n    two paragraphs\n* second"
+      },
+      {
+        "output": "* item\n    ```\ncode in list\n```"
+      },
+      {
+        "output": "* >quote in list"
+      },
+      {
+        "output": "*"
+      },
+      {
+        "output": "```\nName | Value\n-----|------\na    | 1\n*b*  | `2`\n```"
+      },
+      {
+        "output": "```\nH\n-------------------------\n<https://l.example.com|l>\n```"
+      },
+      {
+        "output": "Before\n\n---\n\nAfter"
+      },
+      {
+        "output": "Footnote ref.\n\nThe note _text_."
+      },
+      {
+        "output": "Reference link and ."
+      },
+      {
+        "output": "**bold with trailing space **and more"
+      },
+      {
+        "output": "** spaced bold **"
+      },
+      {
+        "output": "__mixed__ *_nested_* _*both*_"
+      },
+      {
+        "output": "Multi\nline\nparagraph"
+      },
+      {
+        "output": "Unicode: café — “quotes” 🎉"
+      },
+      {
+        "output": "Text with `back`tick` and `double`"
+      },
+      {
+        "output": ">code in quote:\n>```\n>x\n>```"
+      },
+      {
+        "output": "1. a\n    b\n2. c"
+      },
+      {
+        "output": "* star\n\n* plus"
+      },
+      {
+        "output": "Trailing spaces"
+      },
+      {
+        "output": "leading spaces"
+      },
+      {
+        "output": "html entity & ©"
+      },
+      {
+        "output": "line with > inside and\n\n>at start"
+      },
+      {
+        "output": "link with title <https://t.example.com|t>"
+      },
+      {
+        "output": "a | b"
+      }
+    ],
+    "zoom": [
+      {
+        "output": ""
+      },
+      {
+        "output": "plain text"
+      },
+      {
+        "output": "Hello **bold** and _italic_ and ~gone~ and `code`."
+      },
+      {
+        "output": "**Heading one**\n\n**Heading _two_**\n\nBody"
+      },
+      {
+        "output": "Escapes & \\< > \" ' \\* \\_ \\~ \\` \\\\ | [ ]"
+      },
+      {
+        "output": "A link <https://example.com/a?b=1&c=2> and <https://example.com> and <https://auto.example.com>"
+      },
+      {
+        "output": "An empty <https://empty.example.com> label"
+      },
+      {
+        "output": "Image <img:https://img.example.com/a.png|alt text> and <img:https://img.example.com/b.png>"
+      },
+      {
+        "output": "Line one\nLine two\nLine three"
+      },
+      {
+        "output": "Inline \\<span>html\\</span> here"
+      },
+      {
+        "output": "\\<div>\nblock html\n\\</div>"
+      },
+      {
+        "output": "> quote line one\n> quote line two\n> \n> second paragraph"
+      },
+      {
+        "output": "> outer\n> \n> > nested quote"
+      },
+      {
+        "output": "> • list in quote\n> • second"
+      },
+      {
+        "output": "`plain code`"
+      },
+      {
+        "output": "`let x = 1 < 2 && \"a\";`"
+      },
+      {
+        "output": "`with trailing`\n"
+      },
+      {
+        "output": "`indented code`"
+      },
+      {
+        "output": "• one\n• two\n• three"
+      },
+      {
+        "output": "1. first\n2. second\n3. third"
+      },
+      {
+        "output": "3. three\n4. four"
+      },
+      {
+        "output": "• parent\n   \n   • child\n      \n      • grandchild\n• sibling"
+      },
+      {
+        "output": "1. ordered\n   \n   • nested bullet\n   • another\n2. next"
+      },
+      {
+        "output": "• done\n• todo\n• plain"
+      },
+      {
+        "output": "• item with\n   \n   two paragraphs\n• second"
+      },
+      {
+        "output": "• item\n   \n   `code in list`"
+      },
+      {
+        "output": "• > quote in list"
+      },
+      {
+        "output": "• "
+      },
+      {
+        "output": "`Name | Value`\n`-----|------`\n`a    | 1`\n`b    | 2`"
+      },
+      {
+        "output": "`H`\n`-`\n`l`"
+      },
+      {
+        "output": "Before\n\n---\n\nAfter"
+      },
+      {
+        "output": "Footnote ref.\n\nThe note _text_."
+      },
+      {
+        "output": "Reference link and ."
+      },
+      {
+        "output": "\\*\\*bold with trailing space \\*\\*and more"
+      },
+      {
+        "output": "\\*\\* spaced bold \\*\\*"
+      },
+      {
+        "output": "__mixed__ **_nested_** _**both**_"
+      },
+      {
+        "output": "Multi\nline\nparagraph"
+      },
+      {
+        "output": "Unicode: café — “quotes” 🎉"
+      },
+      {
+        "output": "Text with `back`tick\\` and `double`"
+      },
+      {
+        "output": "> code in quote:\n> \n> `x`"
+      },
+      {
+        "output": "1. a\n   \n   b\n2. c"
+      },
+      {
+        "output": "• star\n\n• plus"
+      },
+      {
+        "output": "Trailing spaces"
+      },
+      {
+        "output": "leading spaces"
+      },
+      {
+        "output": "html entity & ©"
+      },
+      {
+        "output": "line with > inside and\n\n> at start"
+      },
+      {
+        "output": "link with title t <https://t.example.com>"
+      },
+      {
+        "output": "a | b"
+      },
+      {
+        "error": "chat.input.invalid"
+      },
+      {
+        "error": "chat.input.invalid"
+      }
+    ]
+  }
+}

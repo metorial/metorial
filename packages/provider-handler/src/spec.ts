@@ -282,18 +282,20 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
           type: 'polling',
           intervalSeconds: group.polling?.intervalSeconds ?? SlateDefaultPollingIntervalSeconds
         }
-      : {
-          type: 'webhook',
-          registration: group.webhook?.manualRegistration
-            ? {
-                mode: 'manual',
-                userConfigSchema: toJsonSchema(
-                  group.webhook.manualRegistration.userConfigSchema
-                ),
-                fullConfigSchema: toJsonSchema(
-                  group.webhook.manualRegistration.fullConfigSchema
-                )
-              }
-            : { mode: 'auto' }
-        }
+      : group.source === 'gateway'
+        ? { type: 'gateway' }
+        : {
+            type: 'webhook',
+            registration: group.webhook?.manualRegistration
+              ? {
+                  mode: 'manual',
+                  userConfigSchema: toJsonSchema(
+                    group.webhook.manualRegistration.userConfigSchema
+                  ),
+                  fullConfigSchema: toJsonSchema(
+                    group.webhook.manualRegistration.fullConfigSchema
+                  )
+                }
+              : { mode: 'auto' }
+          }
 });

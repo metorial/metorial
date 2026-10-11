@@ -1,5 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { ZOOM_USER_AUTH_METHODS } from '../lib/authMethods';
 import { ZoomClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -24,6 +25,7 @@ export let getMeetingInvitation = SlateTool.create(spec, {
       sipLinks: z.array(z.string()).optional().describe('SIP dial-in links for the meeting')
     })
   )
+  .authMethods(ZOOM_USER_AUTH_METHODS)
   .handleInvocation(async ctx => {
     let client = new ZoomClient(ctx.auth.token);
     let result = await client.getMeetingInvitation(ctx.input.meetingId);

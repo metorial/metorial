@@ -398,6 +398,8 @@ let slackUserInfoScopes = allOf('users:read', 'users:read.email');
 
 export let slackActionScopes = {
   chatWrite: anyOf('chat:write'),
+  // Only on bring-your-own apps that define slash commands
+  commands: anyOf('commands'),
   chatTyping: anyOf('assistant:write'),
   appMentions: anyOf('app_mentions:read'),
   conversationRead: slackConversationReadScopes,

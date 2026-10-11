@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,9 @@ let mapTemplateMediaSource = (source: TemplateMediaSource, field: string) => {
   let hasMediaId = typeof source.mediaId === 'string' && source.mediaId.length > 0;
 
   if (hasLink === hasMediaId) {
-    throw new Error(`Provide exactly one of link or mediaId for template ${field}.`);
+    throw createApiServiceError(
+      `Provide exactly one of link or mediaId for template ${field}.`
+    );
   }
 
   let mapped: Record<string, any> = {};

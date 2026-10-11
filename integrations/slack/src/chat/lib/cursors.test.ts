@@ -10,7 +10,7 @@ describe('Slack chat cursors', () => {
       timestamp: '123.456'
     });
 
-    expect(decodeSlackCursor(cursor)).toEqual({
+    expect(decodeSlackCursor(cursor, 'backward', 'test')).toEqual({
       direction: 'backward',
       data: { cursor: 'next-page', page: 2, timestamp: '123.456' }
     });
@@ -26,9 +26,11 @@ describe('Slack chat cursors', () => {
       data: { page: 1 }
     });
 
-    expect(() => decodeSlackCursor(invalid)).toThrow();
-    expect(() => decodeSlackCursor(foreign)).toThrow(
-      'Chat cursor belongs to discord, not slack'
+    expect(() => decodeSlackCursor(invalid, 'backward', 'test')).toThrow();
+    expect(() => decodeSlackCursor(foreign, 'backward', 'test')).toThrow(
+      expect.objectContaining({
+        chat: expect.objectContaining({ code: 'chat.input.cursor_invalid' })
+      })
     );
   });
 });

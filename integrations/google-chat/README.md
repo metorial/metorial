@@ -23,7 +23,40 @@ Google OAuth is user authentication. It supports offline access, refresh-token r
 
 Consolidated tools carry relaxed `anyOf` scope gates and document per-action requirements in their instructions: `manage_space` works with any of `chat.spaces`, `chat.spaces.readonly`, or `chat.delete` (get works with either spaces scope; create/setup/update need `chat.spaces`; delete needs `chat.delete`, otherwise Google returns 403). `manage_message` `action=get` works with `chat.messages.readonly`, while update/delete need `chat.messages`. `list_space_events` accepts any message, reaction, membership, or space read scope because Google enforces the scope per filtered `eventTypes` family. Read state reads accept `chat.users.readstate` or its read-only variant, while `update_space_read_state` needs `chat.users.readstate`; notification settings need `chat.users.spacesettings`; section and custom emoji reads accept the full or read-only scope, and their writes need `chat.users.sections` or `chat.customemojis`. `search_spaces_admin` needs `chat.admin.spaces.readonly` or `chat.admin.spaces`, and the signed-in user must hold the Manage Chat and spaces conversations administrator privilege.
 
-Google Chat app authentication uses the JSON key for the service account configured as the Chat app and requests only `chat.bot`. The Chat app must be configured in Google Cloud and added to every space it accesses. `get_attachment` is app-only because Google requires Chat app authentication for that metadata endpoint. `send_message`, `search_conversations`, `manage_message`, `find_direct_message`, `download_attachment`, and `upload_attachment` support either user OAuth or Chat app authentication; with app authentication, message updates and deletes are limited to messages created by that app.
+Google Chat app authentication uses the JSON key for the service account configured as the Chat app and requests only `chat.bot`. Add the optional numeric `projectNumber` so Chat app events reach the connection. The Chat app must be configured in Google Cloud and added to every space it accesses. `get_attachment` is app-only because Google requires Chat app authentication for that metadata endpoint. `send_message`, `search_conversations`, `manage_message`, `find_direct_message`, `download_attachment`, and `upload_attachment` support either user OAuth or Chat app authentication; with app authentication, message updates and deletes are limited to messages created by that app.
+
+## Chat app adapter
+
+The normalized chat actions (`metorial_chat$…`) run as the **Google Chat app** through the `service_account` method (`chat.bot` scope). User OAuth connections act as a person, not the app, and are not eligible for these actions. All Chat app spaces belong to one workspace that represents the app, with the stable ID `projects/{projectId}` taken from the service account key.
+
+| Action or event | Support | Google Chat API |
+|---|---|---|
+| `message.send` | Native | `spaces.messages.create`; thread replies use `thread.name` with `REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD`; a reply target without a thread ID is resolved to its thread |
+| `message.sendEphemeral`, `message.send` with `ephemeral` | Native | `privateMessageViewer`; only the viewer and the app see the message |
+| `message.edit` / `message.delete` | Native, app-authored messages only | `spaces.messages.patch` (`updateMask=text`) / `spaces.messages.delete` |
+| `message.get` | Native | `spaces.messages.get` for messages the app can access |
+| `channel.list` / `channel.get` | Native | `spaces.list` (page cursor; `dm` and `group_dm` filters run in Google) / `spaces.get` |
+| `channel.members` | Native | `spaces.members.list`; Google omits app memberships |
+| `dm.openSingle` | Native, existing DMs only | `spaces.findDirectMessage`; a missing DM is reported as not allowed |
+| `workspace.list` / `workspace.get` / `user.getAuthenticated` | Synthetic | The connected Chat app and its workspace; no API call |
+| `file.download` | Native | `spaces.messages.attachments.get` then `media.download` (`alt=media`) as an authenticated download; Google Drive attachments are rejected |
+| `setup.get` | Public | Google Chat API configuration steps; no connection needed |
+| `message.received` | Native | `MESSAGE` events: direct messages to the app and space messages that @mention it |
+| `mention.received` | Native | `MESSAGE` events with a `USER_MENTION` annotation of the app; direct messages without a mention fire only `message.received` |
+| `command.invoked` | Native | Slash commands (`MESSAGE` with `slashCommand`) and quick commands or message actions (`APP_COMMAND`) |
+
+Not available, because Google requires user authentication or administrator-approved `chat.app.*` scopes for them, or has no such API: message list and search, read receipts, reactions and reaction events, file upload and file attachments on sent messages, typing indicators, group DMs and creating new DMs, user lookup and search, thread listing, command responses through an interaction handle, command listing, and message update/delete or membership events (Chat apps do not receive them as interaction events). Message text is rendered from Markdown to Google Chat's text formatting; tables, charts, and cards are sent as plain-text fallbacks. Messages over 32,000 bytes are rejected rather than truncated.
+
+### Inbound events
+
+Chat app interaction events arrive at the HTTP endpoint configured in the Google Chat API configuration. Event setup asks for the **Authentication Audience** selected there and the Google Cloud **project number** and **project ID**:
+
+- **Project Number** (recommended): requests carry a JWT issued by `chat@system.gserviceaccount.com` whose audience is the project number, so they are bound to your project.
+- **HTTP endpoint URL**: requests carry a Google-signed ID token whose audience is the endpoint URL and whose email is `chat@system.gserviceaccount.com`. Any Chat app configured with the same URL is accepted, so keep the URL private.
+
+Apps built as a **Google Workspace add-on** (the "Build this Chat app as a Google Workspace add-on" option) are supported too. Their requests carry a Google-signed ID token whose audience is the endpoint URL and whose email is the add-on's own service account, so choose **HTTP endpoint URL** and also enter the **add-on service account email** shown in the Chat API configuration (`service-PROJECT_NUMBER@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`). Only requests issued to that account are accepted, which binds them to your project. Select **Use common HTTP endpoint URL for all triggers** so commands reach the same endpoint. Converting an existing Chat app to an add-on cannot be undone. Add-on events (`chat.messagePayload`, `chat.appCommandPayload`, and so on) produce the same message, mention, and command events as other Chat apps; slash commands from add-on apps arrive as app commands.
+
+Every request's signature, issuer, audience, and expiry are verified against Google's public keys before the event is accepted; failed requests receive `401`. The endpoint answers with an empty JSON object, and replies are sent through `message.send`. Events reach service account connections whose key belongs to the same project and that were created with the same project number, so set `projectNumber` on the connection. `ADDED_TO_SPACE`, `REMOVED_FROM_SPACE`, card clicks, dialogs, and app home events are acknowledged without being forwarded. Event IDs are the message resource name with a `:received`, `:mention`, or `:command` suffix, so a mention produces both a `message.received` and a `mention.received` event.
 
 ## Configuration
 

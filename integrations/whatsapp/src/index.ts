@@ -1,4 +1,5 @@
 import { Slate } from 'slates';
+import { whatsappChatAdapter } from './chat';
 import { spec } from './spec';
 import {
   createTemplate,
@@ -16,6 +17,9 @@ import {
   sendTemplateMessage,
   updateBusinessProfile
 } from './tools';
+import { getFileUrl } from './tools/get-file-url';
+import { whatsappWebhookTriggerGroup } from './triggers';
+
 export let provider = Slate.create({
   spec,
   tools: [
@@ -32,7 +36,10 @@ export let provider = Slate.create({
     listPhoneNumbers,
     getPhoneNumber,
     registerPhoneNumber,
-    markMessageRead
+    markMessageRead,
+    getFileUrl
   ],
+  adapters: [whatsappChatAdapter],
+  triggerGroups: [whatsappWebhookTriggerGroup],
   triggers: []
 });

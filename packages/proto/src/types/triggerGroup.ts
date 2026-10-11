@@ -8,6 +8,9 @@ export let slatesTriggerGroupInvocation = z.union([
     intervalSeconds: z.number().min(60 * 10)
   }),
   z.object({
+    type: z.literal('gateway')
+  }),
+  z.object({
     type: z.literal('webhook'),
     registration: z.union([
       z.object({

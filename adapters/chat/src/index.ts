@@ -13,6 +13,8 @@ export type ChatAdapterClient = InferClient<typeof ChatAdapter>;
 export * from './builders';
 export * from './emoji';
 export * from './errors';
+export * from './files';
+export * from './helpers';
 export * from './markdown';
 export * from './schema';
 export * from './tools';

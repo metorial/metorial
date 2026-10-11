@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { graphAuthMethodKeys } from '../auth';
 import { GraphClient } from '../lib/client';
 import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
@@ -14,6 +15,7 @@ export let updateTeam = SlateTool.create(spec, {
   ]
 })
   .scopes(microsoftTeamsActionScopes.updateTeam)
+  .authMethods(graphAuthMethodKeys)
   .input(
     z.object({
       teamId: z.string().describe('ID of the team to update'),

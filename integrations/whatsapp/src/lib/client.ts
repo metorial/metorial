@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import { createApiServiceError } from 'slates';
+import {
+  WhatsAppGraphApi,
+  type WhatsAppGraphMethod,
+  type WhatsAppGraphRequestOptions
+} from './graph';
+import { toWhatsAppServiceError } from './graphErrors';
 
 type MediaSource = {
   link?: string;
@@ -17,7 +23,7 @@ let applyMediaSource = (
   let hasMediaId = hasMediaValue(media.mediaId);
 
   if (hasLink === hasMediaId) {
-    throw new Error(`Provide exactly one of link or mediaId for ${mediaType}.`);
+    throw createApiServiceError(`Provide exactly one of link or mediaId for ${mediaType}.`);
   }
 
   if (hasLink) {
@@ -28,7 +34,7 @@ let applyMediaSource = (
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private graph: WhatsAppGraphApi;
   private phoneNumberId: string;
   private wabaId: string;
 
@@ -40,23 +46,28 @@ export class Client {
   }) {
     this.phoneNumberId = config.phoneNumberId;
     this.wabaId = config.wabaId;
-    this.axios = createAxios({
-      baseURL: `https://graph.facebook.com/${config.apiVersion}`,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    this.graph = new WhatsAppGraphApi({ token: config.token, apiVersion: config.apiVersion });
+  }
+
+  private async request(
+    operation: string,
+    method: WhatsAppGraphMethod,
+    path: string,
+    options?: WhatsAppGraphRequestOptions
+  ): Promise<any> {
+    try {
+      return await this.graph.request(method, path, options);
+    } catch (error) {
+      throw toWhatsAppServiceError(error, operation);
+    }
   }
 
   // ── Messaging ──
 
   async sendMessage(payload: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/${this.phoneNumberId}/messages`, {
-      messaging_product: 'whatsapp',
-      ...payload
+    return this.request('send message', 'POST', `/${this.phoneNumberId}/messages`, {
+      body: { messaging_product: 'whatsapp', ...payload }
     });
-    return response.data;
   }
 
   async sendTextMessage(to: string, body: string, previewUrl?: boolean): Promise<any> {
@@ -260,12 +271,9 @@ export class Client {
   }
 
   async markMessageAsRead(messageId: string): Promise<any> {
-    let response = await this.axios.post(`/${this.phoneNumberId}/messages`, {
-      messaging_product: 'whatsapp',
-      status: 'read',
-      message_id: messageId
+    return this.request('mark message as read', 'POST', `/${this.phoneNumberId}/messages`, {
+      body: { messaging_product: 'whatsapp', status: 'read', message_id: messageId }
     });
-    return response.data;
   }
 
   // ── Message Templates ──
@@ -280,10 +288,9 @@ export class Client {
     if (params?.after) queryParams.after = params.after;
     queryParams.fields = params?.fields || 'name,status,category,language,components,id';
 
-    let response = await this.axios.get(`/${this.wabaId}/message_templates`, {
+    return this.request('list templates', 'GET', `/${this.wabaId}/message_templates`, {
       params: queryParams
     });
-    return response.data;
   }
 
   async createTemplate(template: {
@@ -303,45 +310,46 @@ export class Client {
       payload.allow_category_change = template.allowCategoryChange;
     }
 
-    let response = await this.axios.post(`/${this.wabaId}/message_templates`, payload);
-    return response.data;
+    return this.request('create template', 'POST', `/${this.wabaId}/message_templates`, {
+      body: payload
+    });
   }
 
   async deleteTemplate(name: string): Promise<any> {
-    let response = await this.axios.delete(`/${this.wabaId}/message_templates`, {
+    return this.request('delete template', 'DELETE', `/${this.wabaId}/message_templates`, {
       params: { name }
     });
-    return response.data;
   }
 
   async getTemplate(templateId: string): Promise<any> {
-    let response = await this.axios.get(`/${templateId}`, {
+    return this.request('get template', 'GET', `/${templateId}`, {
       params: { fields: 'name,status,category,language,components,id' }
     });
-    return response.data;
   }
 
   // ── Media Management ──
 
   async getMediaUrl(mediaId: string): Promise<any> {
-    let response = await this.axios.get(`/${mediaId}`);
-    return response.data;
+    return this.request('get media URL', 'GET', `/${mediaId}`);
   }
 
   async deleteMedia(mediaId: string): Promise<any> {
-    let response = await this.axios.delete(`/${mediaId}`);
-    return response.data;
+    return this.request('delete media', 'DELETE', `/${mediaId}`);
   }
 
   // ── Business Profile ──
 
   async getBusinessProfile(): Promise<any> {
-    let response = await this.axios.get(`/${this.phoneNumberId}/whatsapp_business_profile`, {
-      params: {
-        fields: 'about,address,description,email,websites,vertical,profile_picture_url'
+    return this.request(
+      'get business profile',
+      'GET',
+      `/${this.phoneNumberId}/whatsapp_business_profile`,
+      {
+        params: {
+          fields: 'about,address,description,email,websites,vertical,profile_picture_url'
+        }
       }
-    });
-    return response.data;
+    );
   }
 
   async updateBusinessProfile(profile: {
@@ -365,36 +373,32 @@ export class Client {
     if (profile.profilePictureHandle !== undefined)
       payload.profile_picture_handle = profile.profilePictureHandle;
 
-    let response = await this.axios.post(
+    return this.request(
+      'update business profile',
+      'POST',
       `/${this.phoneNumberId}/whatsapp_business_profile`,
-      payload
+      { body: payload }
     );
-    return response.data;
   }
 
   // ── Phone Numbers ──
 
   async listPhoneNumbers(): Promise<any> {
-    let response = await this.axios.get(`/${this.wabaId}/phone_numbers`);
-    return response.data;
+    return this.request('list phone numbers', 'GET', `/${this.wabaId}/phone_numbers`);
   }
 
   async getPhoneNumber(phoneNumberId: string): Promise<any> {
-    let response = await this.axios.get(`/${phoneNumberId}`);
-    return response.data;
+    return this.request('get phone number', 'GET', `/${phoneNumberId}`);
   }
 
   async registerPhoneNumber(phoneNumberId: string, pin: string): Promise<any> {
-    let response = await this.axios.post(`/${phoneNumberId}/register`, {
-      messaging_product: 'whatsapp',
-      pin
+    return this.request('register phone number', 'POST', `/${phoneNumberId}/register`, {
+      body: { messaging_product: 'whatsapp', pin }
     });
-    return response.data;
   }
 
   async deregisterPhoneNumber(phoneNumberId: string): Promise<any> {
-    let response = await this.axios.post(`/${phoneNumberId}/deregister`);
-    return response.data;
+    return this.request('deregister phone number', 'POST', `/${phoneNumberId}/deregister`);
   }
 
   async requestVerificationCode(
@@ -402,17 +406,19 @@ export class Client {
     codeMethod: string,
     language: string
   ): Promise<any> {
-    let response = await this.axios.post(`/${phoneNumberId}/request_code`, {
-      code_method: codeMethod,
-      language
-    });
-    return response.data;
+    return this.request(
+      'request verification code',
+      'POST',
+      `/${phoneNumberId}/request_code`,
+      {
+        body: { code_method: codeMethod, language }
+      }
+    );
   }
 
   async verifyCode(phoneNumberId: string, code: string): Promise<any> {
-    let response = await this.axios.post(`/${phoneNumberId}/verify_code`, {
-      code
+    return this.request('verify code', 'POST', `/${phoneNumberId}/verify_code`, {
+      body: { code }
     });
-    return response.data;
   }
 }

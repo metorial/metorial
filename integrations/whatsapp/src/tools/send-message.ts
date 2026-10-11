@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -203,7 +203,8 @@ For text messages within the 24-hour customer service window, use this tool. For
 
     switch (type) {
       case 'text': {
-        if (!ctx.input.text) throw new Error('text field is required for text messages');
+        if (!ctx.input.text)
+          throw createApiServiceError('text field is required for text messages');
         result = await client.sendTextMessage(
           to,
           ctx.input.text.body,
@@ -212,35 +213,38 @@ For text messages within the 24-hour customer service window, use this tool. For
         break;
       }
       case 'image': {
-        if (!ctx.input.image) throw new Error('image field is required for image messages');
+        if (!ctx.input.image)
+          throw createApiServiceError('image field is required for image messages');
         result = await client.sendImageMessage(to, ctx.input.image);
         break;
       }
       case 'video': {
-        if (!ctx.input.video) throw new Error('video field is required for video messages');
+        if (!ctx.input.video)
+          throw createApiServiceError('video field is required for video messages');
         result = await client.sendVideoMessage(to, ctx.input.video);
         break;
       }
       case 'audio': {
-        if (!ctx.input.audio) throw new Error('audio field is required for audio messages');
+        if (!ctx.input.audio)
+          throw createApiServiceError('audio field is required for audio messages');
         result = await client.sendAudioMessage(to, ctx.input.audio);
         break;
       }
       case 'document': {
         if (!ctx.input.document)
-          throw new Error('document field is required for document messages');
+          throw createApiServiceError('document field is required for document messages');
         result = await client.sendDocumentMessage(to, ctx.input.document);
         break;
       }
       case 'location': {
         if (!ctx.input.location)
-          throw new Error('location field is required for location messages');
+          throw createApiServiceError('location field is required for location messages');
         result = await client.sendLocationMessage(to, ctx.input.location);
         break;
       }
       case 'contacts': {
         if (!ctx.input.contacts)
-          throw new Error('contacts field is required for contacts messages');
+          throw createApiServiceError('contacts field is required for contacts messages');
         let formattedContacts = ctx.input.contacts.map(c => ({
           name: {
             formatted_name: c.name.formattedName,
@@ -282,13 +286,13 @@ For text messages within the 24-hour customer service window, use this tool. For
       }
       case 'sticker': {
         if (!ctx.input.sticker)
-          throw new Error('sticker field is required for sticker messages');
+          throw createApiServiceError('sticker field is required for sticker messages');
         result = await client.sendStickerMessage(to, ctx.input.sticker);
         break;
       }
       case 'reaction': {
         if (!ctx.input.reaction)
-          throw new Error('reaction field is required for reaction messages');
+          throw createApiServiceError('reaction field is required for reaction messages');
         result = await client.sendReactionMessage(
           to,
           ctx.input.reaction.messageId,

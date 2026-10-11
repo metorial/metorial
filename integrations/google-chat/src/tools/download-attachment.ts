@@ -1,7 +1,6 @@
-import { Buffer } from 'node:buffer';
-import { createBase64Attachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoogleChatClient } from '../lib/client';
+import { GOOGLE_CHAT_API_BASE_URL } from '../lib/client';
 import { googleChatValidationError } from '../lib/errors';
 import { googleChatActionAuthMethods, googleChatActionScopes } from '../scopes';
 import { spec } from '../spec';
@@ -80,33 +79,31 @@ export let downloadAttachment = SlateTool.create(spec, {
     z.object({
       attachmentDataResourceName: z
         .string()
-        .describe('Downloaded Google Chat attachment data resource name'),
+        .describe('Google Chat attachment data resource name of the file'),
       filename: z.string().optional().describe('Original filename when provided'),
-      mimeType: z.string().describe('MIME type of the downloaded file'),
-      byteLength: z.number().int().nonnegative().describe('Downloaded byte count')
+      mimeType: z.string().describe('MIME type of the file')
     })
   )
   .handleInvocation(async ctx => {
     let request = buildDownloadAttachmentRequest(ctx.input.attachmentDataResourceName);
-    let client = new GoogleChatClient(ctx.auth.token);
-    let content = await client.request<ArrayBuffer>(request.path, {
-      method: 'get',
-      params: request.params,
-      responseType: 'arraybuffer',
-      operation: 'download attachment'
-    });
-    let bytes = Buffer.from(content);
     let mimeType = ctx.input.mimeType ?? 'application/octet-stream';
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: `${GOOGLE_CHAT_API_BASE_URL}${request.path}`,
+      query: request.params,
+      mimeType,
+      filename: ctx.input.filename,
+      headers: { Authorization: `Bearer ${ctx.auth.token}` }
+    });
 
     return {
       output: {
         attachmentDataResourceName: request.attachmentDataResourceName,
         filename: ctx.input.filename,
-        mimeType,
-        byteLength: bytes.byteLength
+        mimeType
       },
-      message: `Downloaded${ctx.input.filename ? ` **${ctx.input.filename}**` : ' Google Chat attachment'} (${bytes.byteLength} bytes).`,
-      attachments: [createBase64Attachment(bytes.toString('base64'), mimeType)]
+      message: `Prepared${ctx.input.filename ? ` **${ctx.input.filename}**` : ' the Google Chat attachment'} for download.`
     };
   })
   .build();

@@ -10,7 +10,11 @@ export let chatListChannelMembers = contract
   .scopes(slackActionScopes.conversationRead)
   .handleInvocation(async ctx => {
     let client = createSlackChatClient(ctx, { action: contract.key });
-    let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'forward');
+    let cursor = decodeSlackCursor(
+      ctx.input.cursor,
+      ctx.input.direction ?? 'forward',
+      contract.key
+    );
     let [result, identity, rawChannel] = await Promise.all([
       client.getConversationMembers(ctx.input.channelId, {
         limit: ctx.input.limit ?? 100,

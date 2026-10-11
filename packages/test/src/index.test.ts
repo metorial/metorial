@@ -15,6 +15,7 @@ import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  connectSlateTriggerGroupGateway,
   createLocalSlateTestClient,
   expectSlateContract,
   expectSlateError,
@@ -23,6 +24,7 @@ import {
   mapSlateTriggerEvent,
   pollSlateTriggerGroupEvents,
   processSlateTriggerGroupWebhook,
+  receiveSlateTriggerGroupGatewayFrames,
   registerSlateTriggerGroupWebhook,
   unregisterSlateTriggerGroupWebhook
 } from './index';
@@ -298,11 +300,57 @@ let createDemoSlate = () => {
     }))
     .build();
 
+  let gatewayGroup = SlateTriggerGroup.create(spec, {
+    key: 'gateway_group',
+    name: 'Gateway Group'
+  })
+    .gateway({
+      connect: async ctx => ({
+        url: `wss://gateway.example.com?resume=${ctx.input.state?.session ?? 'none'}`,
+        state: { session: ctx.input.state?.session ?? null }
+      }),
+      receive: async ctx => {
+        if (ctx.input.closed) {
+          return { close: { reconnect: ctx.input.closed.code !== 4004 } };
+        }
+        let frames = ctx.input.frames.map(
+          frame => JSON.parse(frame) as { op: string; v?: string }
+        );
+        return {
+          state: { session: 'session-1' },
+          send: frames.some(f => f.op === 'hello')
+            ? [JSON.stringify({ op: 'identify', token: ctx.auth.token })]
+            : [],
+          heartbeat: { intervalMs: 41_250, frame: JSON.stringify({ op: 'heartbeat' }) },
+          events: frames
+            .filter(f => f.op === 'dispatch')
+            .map(f => ({ payload: { value: f.v }, idempotencyKey: `gw-${f.v}` }))
+        };
+      }
+    })
+    .routingMatchers(async () => [])
+    .build();
+
+  let gatewayEcho = SlateTrigger.create(spec, {
+    key: 'gateway_echo',
+    name: 'Gateway Echo'
+  })
+    .input(z.object({ value: z.string() }))
+    .output(z.object({ echoed: z.string() }))
+    .triggerGroup(gatewayGroup)
+    .matches(() => true)
+    .map(async ctx => ({
+      type: 'demo.gateway',
+      id: `gateway-${ctx.input.value}`,
+      output: { echoed: ctx.input.value }
+    }))
+    .build();
+
   return Slate.create({
     spec,
     tools: [echo, fail, attachmentEcho, downloadLink],
-    triggers: [webhookEcho, pollEcho],
-    triggerGroups: [webhookGroup, pollGroup]
+    triggers: [webhookEcho, pollEcho, gatewayEcho],
+    triggerGroups: [webhookGroup, pollGroup, gatewayGroup]
   });
 };
 
@@ -431,8 +479,8 @@ describe('@slates/test', () => {
         description: 'A tiny test slate'
       },
       toolIds: ['echo', 'fail', 'attachment_echo', 'download_link'],
-      triggerIds: ['webhook_echo', 'poll_echo'],
-      triggerGroupIds: ['webhook_group', 'poll_group'],
+      triggerIds: ['webhook_echo', 'poll_echo', 'gateway_echo'],
+      triggerGroupIds: ['webhook_group', 'poll_group', 'gateway_group'],
       authMethodIds: ['token_auth'],
       tools: [
         { id: 'echo', readOnly: false, destructive: false },
@@ -440,10 +488,11 @@ describe('@slates/test', () => {
         { id: 'attachment_echo', readOnly: true, destructive: false },
         { id: 'download_link', readOnly: true, destructive: false }
       ],
-      triggers: [{ id: 'webhook_echo' }, { id: 'poll_echo' }],
+      triggers: [{ id: 'webhook_echo' }, { id: 'poll_echo' }, { id: 'gateway_echo' }],
       triggerGroups: [
         { id: 'webhook_group', invocationType: 'webhook' },
-        { id: 'poll_group', invocationType: 'polling' }
+        { id: 'poll_group', invocationType: 'polling' },
+        { id: 'gateway_group', invocationType: 'gateway' }
       ]
     });
 
@@ -629,5 +678,65 @@ describe('@slates/test', () => {
     expect(repeatedPoll.updatedState).toEqual({
       seen: true
     });
+  });
+
+  it('wraps trigger gateway flows', async () => {
+    let client = createLocalSlateTestClient({
+      slate: createDemoSlate(),
+      state: {
+        config: { prefix: 'Hi' },
+        auth: { authenticationMethodId: 'token_auth', output: { token: 'secret-token' } }
+      }
+    });
+
+    let connected = await connectSlateTriggerGroupGateway({
+      client,
+      triggerGroupId: 'gateway_group'
+    });
+    expect(connected).toMatchObject({
+      url: 'wss://gateway.example.com?resume=none',
+      state: { session: null }
+    });
+
+    let received = await receiveSlateTriggerGroupGatewayFrames({
+      client,
+      triggerGroupId: 'gateway_group',
+      state: connected.state,
+      frames: [
+        JSON.stringify({ op: 'hello' }),
+        JSON.stringify({ op: 'dispatch', v: 'gw-value' })
+      ]
+    });
+    expect(received).toMatchObject({
+      state: { session: 'session-1' },
+      // The credential leaves the slate as a placeholder the hub resolves at the socket.
+      send: [JSON.stringify({ op: 'identify', token: '$$MT$secret$authConfig$token$$' })],
+      heartbeat: { intervalMs: 41_250, frame: JSON.stringify({ op: 'heartbeat' }) },
+      close: null,
+      events: [
+        {
+          payload: { value: 'gw-value' },
+          idempotencyKey: 'gw-gw-value',
+          triggerIds: ['gateway_echo']
+        }
+      ]
+    });
+
+    let mapped = await mapSlateTriggerEvent({
+      client,
+      triggerId: 'gateway_echo',
+      input: received.events[0]!.payload,
+      type: 'demo.gateway',
+      output: { echoed: 'gw-value' }
+    });
+    expect(mapped.id).toBe('gateway-gw-value');
+
+    let closed = await receiveSlateTriggerGroupGatewayFrames({
+      client,
+      triggerGroupId: 'gateway_group',
+      state: received.state,
+      closed: { code: 4004, reason: 'Authentication failed' }
+    });
+    expect(closed).toMatchObject({ send: [], events: [], close: { reconnect: false } });
   });
 });
