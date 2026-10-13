@@ -1,22 +1,29 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { asanaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listGoals = SlateTool.create(spec, {
   name: 'List Goals',
   key: 'list_goals',
-  description: `List goals in a workspace, optionally filtered by team or portfolio. Provides visibility into organizational objectives and their statuses.`,
+  description: `List goals in a workspace, team, or portfolio. At least one of workspaceId, teamId, or portfolioId is required. Provides visibility into organizational objectives and their statuses.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      workspaceId: z.string().optional().describe('Workspace GID'),
+      workspaceId: z
+        .string()
+        .optional()
+        .describe('Workspace GID. Provide this, teamId, or portfolioId.'),
       teamId: z.string().optional().describe('Filter by team GID'),
       portfolioId: z.string().optional().describe('Filter by portfolio GID'),
-      isWorkspaceLevel: z.boolean().optional().describe('Filter workspace-level goals only'),
+      isWorkspaceLevel: z
+        .boolean()
+        .optional()
+        .describe('Filter by whether goals are workspace-level. Requires workspaceId.'),
       limit: z.number().optional().describe('Maximum number of goals to return')
     })
   )
@@ -36,6 +43,15 @@ export let listGoals = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.workspaceId && !ctx.input.teamId && !ctx.input.portfolioId) {
+      throw asanaServiceError(
+        'Provide workspaceId, teamId, or portfolioId to list goals. Use list_workspaces to find a workspace GID.'
+      );
+    }
+    if (ctx.input.isWorkspaceLevel !== undefined && !ctx.input.workspaceId) {
+      throw asanaServiceError('isWorkspaceLevel can only be used together with workspaceId.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listGoals({
       workspaceId: ctx.input.workspaceId,
