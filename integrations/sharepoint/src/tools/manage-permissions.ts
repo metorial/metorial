@@ -1,7 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SharePointClient } from '../lib/client';
 import { spec } from '../spec';
+
+let requiredFieldError = (message: string, reason: string) =>
+  createApiServiceError(message, { reason });
 
 let getPermissionPrincipal = (permission: any) => {
   let identities = [
@@ -145,8 +148,18 @@ export let managePermissions = SlateTool.create(spec, {
       }
 
       case 'createLink': {
-        if (!ctx.input.linkType) throw new Error('linkType is required for createLink.');
-        if (!ctx.input.linkScope) throw new Error('linkScope is required for createLink.');
+        if (!ctx.input.linkType) {
+          throw requiredFieldError(
+            'linkType is required for createLink action. Use "view", "edit", or "embed".',
+            'sharepoint_linktype_required'
+          );
+        }
+        if (!ctx.input.linkScope) {
+          throw requiredFieldError(
+            'linkScope is required for createLink action. Use "anonymous", "organization", or "users".',
+            'sharepoint_linkscope_required'
+          );
+        }
         let perm = await client.createSharingLink(
           driveId,
           itemId,
@@ -163,7 +176,10 @@ export let managePermissions = SlateTool.create(spec, {
 
       case 'invite': {
         if (!ctx.input.recipientEmails || ctx.input.recipientEmails.length === 0) {
-          throw new Error('recipientEmails are required for invite.');
+          throw requiredFieldError(
+            'recipientEmails is required for invite action. Provide at least one email address.',
+            'sharepoint_recipientemails_required'
+          );
         }
         let roles = ctx.input.roles || ['read'];
         let data = await client.inviteToItem(
@@ -183,7 +199,12 @@ export let managePermissions = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.permissionId) throw new Error('permissionId is required for delete.');
+        if (!ctx.input.permissionId) {
+          throw requiredFieldError(
+            'permissionId is required for delete action. Use action "list" to find permission IDs.',
+            'sharepoint_permissionid_required'
+          );
+        }
         await client.deletePermission(driveId, itemId, ctx.input.permissionId);
         return {
           output: { deleted: true },

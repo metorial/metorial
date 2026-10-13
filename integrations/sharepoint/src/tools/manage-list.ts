@@ -1,7 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SharePointClient } from '../lib/client';
 import { spec } from '../spec';
+
+let requiredFieldError = (message: string, reason: string) =>
+  createApiServiceError(message, { reason });
 
 let listOutputSchema = z.object({
   listId: z.string().describe('Unique list ID'),
@@ -79,7 +82,12 @@ export let manageList = SlateTool.create(spec, {
 
     switch (action) {
       case 'get': {
-        if (!listId) throw new Error('listId is required for get action.');
+        if (!listId) {
+          throw requiredFieldError(
+            'listId is required for get action. Use action "list" to find the list ID.',
+            'sharepoint_listid_required'
+          );
+        }
         let list = await client.getList(siteId, listId);
         return {
           output: { list: mapList(list) },
@@ -97,7 +105,12 @@ export let manageList = SlateTool.create(spec, {
       }
 
       case 'create': {
-        if (!displayName) throw new Error('displayName is required for create action.');
+        if (!displayName) {
+          throw requiredFieldError(
+            'displayName is required for create action. Provide the name for the new list.',
+            'sharepoint_displayname_required'
+          );
+        }
         let list = await client.createList(siteId, displayName, template || 'genericList');
         if (description) {
           list = await client.updateList(siteId, list.id, { description });
@@ -109,7 +122,12 @@ export let manageList = SlateTool.create(spec, {
       }
 
       case 'update': {
-        if (!listId) throw new Error('listId is required for update action.');
+        if (!listId) {
+          throw requiredFieldError(
+            'listId is required for update action. Use action "list" to find the list ID.',
+            'sharepoint_listid_required'
+          );
+        }
         let updates: any = {};
         if (displayName) updates.displayName = displayName;
         if (description !== undefined) updates.description = description;
@@ -121,7 +139,12 @@ export let manageList = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!listId) throw new Error('listId is required for delete action.');
+        if (!listId) {
+          throw requiredFieldError(
+            'listId is required for delete action. Use action "list" to find the list ID.',
+            'sharepoint_listid_required'
+          );
+        }
         await client.deleteList(siteId, listId);
         return {
           output: { deleted: true },
