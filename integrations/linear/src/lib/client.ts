@@ -1,24 +1,6 @@
 import { ServiceError } from '@lowerdeck/error';
 import { createAxios } from 'slates';
-import { linearApiError } from './errors';
-
-let extractErrorMessage = (error: unknown) => {
-  let responseData = (error as any)?.response?.data;
-  let errors = responseData?.errors;
-  if (Array.isArray(errors) && errors.length > 0) {
-    return errors.map((item: any) => item?.message ?? 'Unknown error').join('; ');
-  }
-
-  if (typeof responseData?.message === 'string') {
-    return responseData.message;
-  }
-
-  if (typeof responseData === 'string' && responseData.trim()) {
-    return responseData.trim();
-  }
-
-  return error instanceof Error && error.message ? error.message : 'Unknown error';
-};
+import { flattenLinearErrorResponse, linearApiError, linearGraphQLError } from './errors';
 
 export class LinearClient {
   private axios: ReturnType<typeof createAxios>;
@@ -29,6 +11,9 @@ export class LinearClient {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
+      },
+      errorMapping: {
+        extractResponseData: response => flattenLinearErrorResponse(response.data)
       }
     });
   }
@@ -41,8 +26,7 @@ export class LinearClient {
       });
 
       if (response.data?.errors?.length) {
-        let messages = response.data.errors.map((e: any) => e.message).join('; ');
-        throw linearApiError(messages);
+        throw linearGraphQLError(response.data);
       }
 
       return response.data?.data;
@@ -51,7 +35,7 @@ export class LinearClient {
         throw error;
       }
 
-      throw linearApiError(extractErrorMessage(error));
+      throw linearApiError(error);
     }
   }
 
