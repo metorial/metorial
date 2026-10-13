@@ -1,4 +1,4 @@
-import { createAxios, SlateError } from 'slates';
+import { createApiServiceError, createAxios, SlateError } from 'slates';
 import { elasticsearchApiError, mapElasticsearchAxiosError } from './errors';
 
 let getErrorStatus = (error: unknown): number | undefined => {
@@ -154,8 +154,25 @@ export class ElasticsearchClient {
     if (params) {
       body = { ...body, ...params };
     }
-    let response = await this.axios.post('/_query', body);
-    return response.data;
+    try {
+      let response = await this.axios.post('/_query', body);
+      return response.data;
+    } catch (error) {
+      // Clusters older than 8.11 have no ES|QL endpoint, so Elasticsearch treats
+      // `_query` as an index name and rejects POST with HTTP 405.
+      if (
+        getErrorStatus(error) === 405 ||
+        (error instanceof Error &&
+          /Incorrect HTTP method for uri \[\/_query/.test(error.message))
+      ) {
+        throw createApiServiceError(
+          'ES|QL is not available on this Elasticsearch cluster. ES|QL requires Elasticsearch 8.11 or later; use search_documents with Query DSL instead.',
+          { reason: 'elasticsearch_esql_unsupported', upstreamStatus: 405, parent: error }
+        );
+      }
+
+      throw error;
+    }
   }
 
   async count(index?: string, body?: Record<string, any>) {
