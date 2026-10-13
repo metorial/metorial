@@ -1,5 +1,5 @@
 import { createAxios } from 'slates';
-import { salesforceApiError } from './errors';
+import { flattenSalesforceErrorResponse, salesforceApiError } from './errors';
 
 export interface SalesforceClientConfig {
   instanceUrl: string;
@@ -7,13 +7,19 @@ export interface SalesforceClientConfig {
   token: string;
 }
 
+let errorMapping = {
+  extractResponseData: (response: { status?: number; data?: unknown }) =>
+    flattenSalesforceErrorResponse(response.data, response.status)
+};
+
 export let createSalesforceClient = (config: SalesforceClientConfig) => {
   let http = createAxios({
     baseURL: `${config.instanceUrl}/services/data/${config.apiVersion}`,
     headers: {
       Authorization: `Bearer ${config.token}`,
       'Content-Type': 'application/json'
-    }
+    },
+    errorMapping
   });
 
   let rawHttp = createAxios({
@@ -21,7 +27,8 @@ export let createSalesforceClient = (config: SalesforceClientConfig) => {
     headers: {
       Authorization: `Bearer ${config.token}`,
       'Content-Type': 'application/json'
-    }
+    },
+    errorMapping
   });
 
   return {
