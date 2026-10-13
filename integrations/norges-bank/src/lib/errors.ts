@@ -9,11 +9,17 @@ type ErrorResponse = {
 let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+let MAX_ERROR_DETAILS = 5;
+let MAX_ERROR_MESSAGE_LENGTH = 1_000;
+
+let looksLikeHtml = (value: string) =>
+  /^\s*</.test(value) || /<\/?(html|body|head)\b/i.test(value);
+
 let addMessage = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
+  if (typeof value !== 'string' || messages.length >= MAX_ERROR_DETAILS) return;
 
   let trimmed = value.trim();
-  if (trimmed && !messages.includes(trimmed)) {
+  if (trimmed && !looksLikeHtml(trimmed) && !messages.includes(trimmed)) {
     messages.push(trimmed);
   }
 };
@@ -41,16 +47,36 @@ let extractMessage = (error: unknown) => {
 
   collectMessages(response?.data, messages);
 
-  if (isRecord(error)) {
+  if (isRecord(error) && isRecord(error.data)) {
+    // createAxios rejects with a SlateError that keeps the upstream body
+    // (for example SDMX { errors: [{ code, message }] }) in data.baggage.response.
+    let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
+    collectMessages(baggage?.response, messages);
+    collectMessages(error.data, messages);
+  } else if (isRecord(error)) {
     collectMessages(error.data, messages);
   }
 
   if (messages.length > 0) {
-    return messages.join(' - ');
+    let message = messages.join(' - ');
+    return message.length > MAX_ERROR_MESSAGE_LENGTH
+      ? `${message.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...`
+      : message;
   }
 
   if (error instanceof Error && error.message) {
-    return error.message;
+    let message = error.message.trim();
+    if (looksLikeHtml(message)) {
+      let response = (error as Error & { response?: unknown }).response;
+      let statusText = isRecord(response) ? response.statusText : undefined;
+      return typeof statusText === 'string' && statusText
+        ? statusText
+        : 'upstream returned an HTML error page';
+    }
+
+    return message.length > MAX_ERROR_MESSAGE_LENGTH
+      ? `${message.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...`
+      : message;
   }
 
   return 'Unknown error';
