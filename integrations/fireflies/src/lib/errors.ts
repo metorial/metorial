@@ -1,87 +1,59 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
+import { type ApiErrorResponse, buildApiServiceError } from 'slates';
 
 let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-let addMessage = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
+let FIREFLIES_DETAIL_KEYS = ['message', 'error', 'description', 'code'];
 
-  let trimmed = value.trim();
-  if (trimmed && !messages.includes(trimmed)) {
-    messages.push(trimmed);
+// createAxios converts upstream failures into SlateError before this adapter
+// runs, so the raw GraphQL error body only survives in SlateError.data.baggage.
+// GraphQL errors returned with HTTP 200 are passed in as `{ data: body }`.
+let firefliesErrorResponse = (
+  error: unknown,
+  response: ApiErrorResponse | undefined
+): ApiErrorResponse | undefined => {
+  if (response?.data !== undefined) return response;
+  if (!isRecord(error) || !isRecord(error.data)) return response;
+
+  if (error.name === 'SlateError') {
+    let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
+    if (baggage?.response === undefined) return response;
+    return { ...response, data: baggage.response };
   }
+
+  if (!(error instanceof Error)) {
+    return { ...response, data: error.data };
+  }
+
+  return response;
 };
 
-let collectMessages = (value: unknown, messages: string[]) => {
-  if (!isRecord(value)) {
-    addMessage(messages, value);
-    return;
-  }
+let upstreamCodeFor = (response: ApiErrorResponse | undefined) => {
+  let data = response?.data;
+  if (!isRecord(data) || !Array.isArray(data.errors)) return undefined;
 
-  for (let key of ['message', 'error', 'description', 'code']) {
-    addMessage(messages, value[key]);
-  }
-
-  if (Array.isArray(value.errors)) {
-    for (let item of value.errors) {
-      collectMessages(item, messages);
+  for (let item of data.errors) {
+    if (!isRecord(item)) continue;
+    if (typeof item.code === 'string') return item.code;
+    if (isRecord(item.extensions) && typeof item.extensions.code === 'string') {
+      return item.extensions.code;
     }
   }
-};
 
-let extractMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let messages: string[] = [];
-
-  collectMessages(response?.data, messages);
-
-  if (isRecord(error)) {
-    collectMessages(error.data, messages);
-  }
-
-  if (messages.length > 0) {
-    return messages.join(' - ');
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return 'Unknown error';
+  return undefined;
 };
 
 export let firefliesServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
-export let firefliesApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
-
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let status =
-    response?.status ??
-    (isRecord(error) && typeof error.status === 'number' ? error.status : undefined);
-  let statusText = response?.statusText;
-  let statusLabel =
-    status !== undefined ? `HTTP ${status}${statusText ? ` ${statusText}` : ''}: ` : '';
-
-  let serviceError = firefliesServiceError(
-    `Fireflies API ${operation} failed: ${statusLabel}${extractMessage(error)}`
-  );
-
-  serviceError.data.reason = 'fireflies_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+export let firefliesApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Fireflies',
+    operation,
+    reason: 'fireflies_api_error',
+    detailKeys: FIREFLIES_DETAIL_KEYS,
+    extractResponse: (input, helpers) =>
+      firefliesErrorResponse(input, helpers.getResponse(input)),
+    extractUpstreamCode: (_input, response) => upstreamCodeFor(response)
+  });
