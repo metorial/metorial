@@ -164,7 +164,52 @@ export let asArray = (value: unknown): unknown[] => (Array.isArray(value) ? valu
 export let jenkinsValidationError = (message: string) =>
   createApiServiceError(message, { reason: 'jenkins_validation_error' });
 
-export let jenkinsApiError = (error: unknown, operation = 'request') =>
+let jenkinsErrorTextLimit = 500;
+let jenkinsErrorSourceLimit = 100_000;
+let jenkinsUnreadableErrorPage = 'Jenkins returned an error page with no readable message.';
+
+let toJenkinsErrorText = (value: string) =>
+  decodeHtmlEntities(stripHtml(value.slice(0, jenkinsErrorSourceLimit)))
+    .trim()
+    .slice(0, jenkinsErrorTextLimit);
+
+let isSlateError = (error: unknown) => asRecord(error).name === 'SlateError';
+
+// createAxios rejects with SlateError, whose message is the full raw response
+// body (often a Jenkins HTML error page). SlateError.data.baggage.response only
+// keeps a 2,000-character copy, so it is just a fallback for the message.
+let getJenkinsErrorResponseData = (error: unknown) => {
+  let response = getApiErrorResponse(error);
+  if (response?.data !== undefined) return response.data;
+
+  if (!isSlateError(error)) return undefined;
+  return asRecord(asRecord(asRecord(error).data).baggage).response;
+};
+
+let jenkinsControllerOperations = new Set([
+  'get current user',
+  'get controller status',
+  'get queue',
+  'get computers'
+]);
+
+type JenkinsNotFoundScope = 'controller' | 'queue' | 'job';
+
+let jenkinsNotFoundHint = (operation: string, scope?: JenkinsNotFoundScope) => {
+  if (scope === 'queue' || (!scope && operation === 'get queue item')) {
+    return 'The Jenkins queue item was not found. Queue items are removed shortly after their build starts or is cancelled.';
+  }
+  if (scope === 'controller' || (!scope && jenkinsControllerOperations.has(operation))) {
+    return 'The Jenkins endpoint was not found. Check that the connection base URL points to the Jenkins root URL.';
+  }
+  return 'The Jenkins job, folder, or build was not found, or this user cannot read it. Use the exact full name returned by List Jobs (folder/job), encode "/" inside multibranch branch names as %2F, and check that the build number exists. If every request returns 404, check that the connection base URL is the Jenkins root URL.';
+};
+
+export let jenkinsApiError = (
+  error: unknown,
+  operation = 'request',
+  notFoundScope?: JenkinsNotFoundScope
+) =>
   buildApiServiceError(error, {
     providerLabel: 'Jenkins',
     operation,
@@ -172,11 +217,35 @@ export let jenkinsApiError = (error: unknown, operation = 'request') =>
     detailKeys: ['message', 'error', 'detail', 'reason'],
     nestedKeys: ['errors', 'causes'],
     extractMessage: (input, helpers) => {
-      let response = helpers.getResponse(input);
-      let responseText =
-        typeof response?.data === 'string' ? stripHtml(response.data).trim() : undefined;
-      if (responseText) return responseText.slice(0, 500);
-      if (input instanceof Error && input.message) return input.message;
+      if (getJenkinsErrorStatus(input) === 404) {
+        return jenkinsNotFoundHint(operation, notFoundScope);
+      }
+
+      let rawMessage = input instanceof Error ? input.message : '';
+      let data = getJenkinsErrorResponseData(input);
+      if (typeof data === 'string') {
+        // Prefer the untruncated SlateError message over the truncated baggage copy.
+        if (isSlateError(input) && rawMessage) {
+          let messageText = toJenkinsErrorText(rawMessage);
+          if (messageText) return messageText;
+        }
+        let responseText = toJenkinsErrorText(data);
+        if (responseText) return responseText;
+        return rawMessage || data.trim() ? jenkinsUnreadableErrorPage : undefined;
+      } else if (data !== undefined) {
+        let details: string[] = [];
+        helpers.collectDetails(data, details, {
+          detailKeys: ['message', 'error', 'detail', 'reason'],
+          nestedKeys: ['errors', 'causes']
+        });
+        if (details.length > 0) {
+          return details.slice(0, 5).join(' - ').slice(0, jenkinsErrorTextLimit);
+        }
+      }
+
+      if (rawMessage) {
+        return toJenkinsErrorText(rawMessage) || jenkinsUnreadableErrorPage;
+      }
       return undefined;
     },
     extractStatus: input => getJenkinsErrorStatus(input)
@@ -320,7 +389,9 @@ let stripHtml = (value: string) =>
   value
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<(script|style)\b[\s\S]*$/i, ' ')
     .replace(/<[^>]+>/g, ' ')
+    .replace(/<[^>]*$/, ' ')
     .replace(/\s+/g, ' ');
 
 let decodeHtmlEntities = (value: string) =>
@@ -1212,12 +1283,16 @@ export class JenkinsClient {
     return fullName ? this.jobPath(fullName) : '';
   }
 
-  private async requestData<T>(operation: string, run: () => Promise<{ data: T }>) {
+  private async requestData<T>(
+    operation: string,
+    run: () => Promise<{ data: T }>,
+    notFoundScope?: JenkinsNotFoundScope
+  ) {
     try {
       let response = await run();
       return response.data;
     } catch (error) {
-      throw jenkinsApiError(error, operation);
+      throw jenkinsApiError(error, operation, notFoundScope);
     }
   }
 
@@ -1346,13 +1421,17 @@ export class JenkinsClient {
       requestCount += 1;
       let data: JenkinsRecord;
       try {
-        data = await this.requestData<JenkinsRecord>('list jobs', () =>
-          this.axios.get(`${this.folderPath(folderFullName)}/api/json`, {
-            params: {
-              tree: 'jobs[name,fullName,url,color,buildable,_class,jobs[name,fullName,url,color,buildable,_class]]'
-            },
-            timeout: options.requestTimeoutMs
-          })
+        data = await this.requestData<JenkinsRecord>(
+          'list jobs',
+          () =>
+            this.axios.get(`${this.folderPath(folderFullName)}/api/json`, {
+              params: {
+                tree: 'jobs[name,fullName,url,color,buildable,_class,jobs[name,fullName,url,color,buildable,_class]]'
+              },
+              timeout: options.requestTimeoutMs
+            }),
+          // A 404 on the root listing means the base URL is not the Jenkins root.
+          folderFullName ? 'job' : 'controller'
         );
       } catch (error) {
         if (!options.bestEffort || requestCount === 1) throw error;
@@ -1999,9 +2078,29 @@ export class JenkinsClient {
   async getTestReportForBuild(jobFullName: string, buildNumber: number | undefined) {
     let resolvedBuildNumber =
       buildNumber ?? (await this.resolveBuildNumber(jobFullName, undefined));
-    let report = await this.requestData<JenkinsRecord>('get test report', () =>
-      this.axios.get(`${this.jobPath(jobFullName)}/${resolvedBuildNumber}/testReport/api/json`)
-    );
+    let report: JenkinsRecord;
+    try {
+      report = await this.requestData<JenkinsRecord>('get test report', () =>
+        this.axios.get(
+          `${this.jobPath(jobFullName)}/${resolvedBuildNumber}/testReport/api/json`
+        )
+      );
+    } catch (error) {
+      if (getJenkinsErrorStatus(error) !== 404) throw error;
+      // Jenkins also answers 404 when the build exists but recorded no test
+      // results; confirm the build first so a missing job/build keeps its error.
+      if (buildNumber !== undefined) {
+        try {
+          await this.resolveBuildNumber(jobFullName, buildNumber);
+        } catch (checkError) {
+          if (getJenkinsErrorStatus(checkError) === 404) throw checkError;
+        }
+      }
+      throw createApiServiceError(
+        `Jenkins build #${resolvedBuildNumber} of "${jobFullName}" has no test report (HTTP 404). Jenkins only publishes one when the build records JUnit test results, so the build may not run tests, may have stopped before tests ran, or is still running.`,
+        { reason: 'jenkins_api_error', upstreamStatus: 404, parent: error }
+      );
+    }
     return {
       buildNumber: resolvedBuildNumber,
       report
