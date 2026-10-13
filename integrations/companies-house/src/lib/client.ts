@@ -15,6 +15,7 @@ import {
   isDisqualifiedOfficerType,
   isSafeDocumentMimeType,
   MAX_DOCUMENT_DOWNLOAD_BYTES,
+  MAX_DOCUMENT_DOWNLOAD_LABEL,
   MAX_ITEMS_PER_PAGE,
   PUBLIC_DATA_BASE_URL,
   SAFE_DOCUMENT_MIME_EXTENSIONS
@@ -198,6 +199,14 @@ let binaryBuffer = (value: unknown) => {
 
 let normalizedMimeType = (value: string | undefined) =>
   value?.split(';', 1)[0]?.trim().toLowerCase();
+
+let documentTooLargeError = (byteLength?: number) =>
+  companiesHouseValidationError(
+    byteLength === undefined
+      ? `The Companies House document exceeds the ${MAX_DOCUMENT_DOWNLOAD_LABEL} download limit. Choose a smaller content type returned by get_document_metadata, or download it directly from Companies House.`
+      : `The Companies House document is ${byteLength} bytes, which exceeds the ${MAX_DOCUMENT_DOWNLOAD_LABEL} download limit. Choose a smaller content type returned by get_document_metadata, or download it directly from Companies House.`,
+    'companies_house_document_too_large'
+  );
 
 export class CompaniesHouseClient {
   private publicHttp: ReturnType<typeof createAuthenticatedAxios>;
@@ -450,7 +459,7 @@ export class CompaniesHouseClient {
       'get document metadata',
       `/document/${pathSegment(documentId)}`
     );
-    return mapDocumentMetadata(data);
+    return mapDocumentMetadata(data, documentId);
   }
 
   async getDocumentContent(documentId: string, requestedMimeType: string) {
@@ -462,6 +471,22 @@ export class CompaniesHouseClient {
       );
     }
     let safeMimeType = mimeType;
+
+    let metadata = await this.getDocumentMetadata(documentId);
+    let advertised = metadata.resources[safeMimeType];
+    if (!advertised && metadata.availableContentTypes.length > 0) {
+      throw companiesHouseValidationError(
+        `Companies House does not provide document ${documentId} as ${safeMimeType}. Available content types: ${metadata.availableContentTypes.map(item => item.mimeType).join(', ')}.`,
+        'companies_house_document_mime_unavailable'
+      );
+    }
+    if (
+      advertised?.contentLength !== undefined &&
+      advertised.contentLength > MAX_DOCUMENT_DOWNLOAD_BYTES
+    ) {
+      throw documentTooLargeError(advertised.contentLength);
+    }
+
     let locationResponse = await requestAxios(
       'locate document content',
       () =>
@@ -510,7 +535,10 @@ export class CompaniesHouseClient {
           maxContentLength: MAX_DOCUMENT_DOWNLOAD_BYTES,
           validateStatus: status => status >= 200 && status < 300
         }),
-      companiesHouseDownloadError
+      (error, operation) =>
+        error instanceof Error && error.message.includes('maxContentLength')
+          ? documentTooLargeError()
+          : companiesHouseDownloadError(error, operation)
     );
 
     let contentLength = getResponseHeaderValue(downloadResponse.headers, 'content-length');
@@ -519,10 +547,12 @@ export class CompaniesHouseClient {
         !/^\d+$/.test(contentLength) ||
         Number(contentLength) > MAX_DOCUMENT_DOWNLOAD_BYTES
       ) {
-        throw companiesHouseValidationError(
-          `The downloaded Companies House document exceeds the ${MAX_DOCUMENT_DOWNLOAD_BYTES}-byte limit or has an invalid declared size.`,
-          'companies_house_document_too_large'
-        );
+        throw /^\d+$/.test(contentLength)
+          ? documentTooLargeError(Number(contentLength))
+          : companiesHouseValidationError(
+              'Companies House returned a document with an invalid declared size.',
+              'companies_house_document_body_invalid'
+            );
       }
     }
 
@@ -534,10 +564,7 @@ export class CompaniesHouseClient {
       );
     }
     if (content.length > MAX_DOCUMENT_DOWNLOAD_BYTES) {
-      throw companiesHouseValidationError(
-        `The downloaded Companies House document exceeds the ${MAX_DOCUMENT_DOWNLOAD_BYTES}-byte limit.`,
-        'companies_house_document_too_large'
-      );
+      throw documentTooLargeError(content.length);
     }
 
     let responseMimeType = normalizedMimeType(
