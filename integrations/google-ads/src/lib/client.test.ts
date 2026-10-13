@@ -36,6 +36,9 @@ describe('GoogleAdsClient API version', () => {
         Authorization: 'Bearer access-token',
         'Content-Type': 'application/json',
         'login-customer-id': '1234567890'
+      },
+      errorMapping: {
+        mapAxiosError: expect.any(Function)
       }
     });
     expect(getMock).toHaveBeenCalledWith('/customers:listAccessibleCustomers');
