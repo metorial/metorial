@@ -188,6 +188,11 @@ describe('API service error helpers', () => {
     expect(readApiErrorText(42)).toBe('42');
     expect(readApiErrorText(42, { includeNumbers: false })).toBeUndefined();
     expect(readApiErrorText('[truncated]')).toBeUndefined();
+    expect(readApiErrorText(' [redacted] ')).toBeUndefined();
+    expect(readApiErrorText('[unserializable]')).toBeUndefined();
+    expect(readApiErrorText('Token [redacted] is invalid')).toBe(
+      'Token [redacted] is invalid'
+    );
     expect(readApiErrorText('<html></html>')).toBeUndefined();
     expect(readApiErrorText({ message: 'x' })).toBeUndefined();
 

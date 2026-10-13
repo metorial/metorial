@@ -1,6 +1,6 @@
 {
   "name": "@slates/client",
-  "version": "1.0.0-rc.28",
+  "version": "1.0.0-rc.29",
   "publishConfig": {
     "access": "public"
   },
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@slates/proto": "1.0.0-rc.24",
-    "@slates/provider": "1.0.0-rc.28",
-    "@slates/provider-handler": "1.0.0-rc.38"
+    "@slates/provider": "1.0.0-rc.29",
+    "@slates/provider-handler": "1.0.0-rc.39"
   },
   "devDependencies": {
     "@slates/tsconfig": "1.0.0-rc.1",

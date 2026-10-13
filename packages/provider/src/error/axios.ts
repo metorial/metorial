@@ -1,14 +1,20 @@
 import type { AxiosError } from 'axios';
 import { isAxiosError } from 'axios';
+import type { AuthConfigSecretRedactor } from '../auth/redact';
+import { sanitizeUrl } from '../axios/trace';
 import { getCurrentContext } from '../context/hook';
 import type { SlateAxiosErrorOptions, SlateErrorResponse } from './types';
 import {
+  BAGGAGE_MAX_STRING_LENGTH,
+  BAGGAGE_RESPONSE_MAX_DEPTH,
+  getCurrentAuthConfigRedactor,
   getDefaultMessage,
   isRecord,
   mergeRecords,
   normalizeKind,
   normalizeRetryable,
   normalizeSlateErrorInput,
+  sanitizeErrorText,
   sanitizeForBaggage
 } from './utils';
 
@@ -98,18 +104,29 @@ let getHeaderValue = (headers: unknown, key: string): string | undefined => {
   return undefined;
 };
 
-let buildRequestUrl = (error: AxiosError) => {
+// Credentials embedded in URL paths (Telegram `/bot<token>/`, Alchemy `/v2/<apiKey>`)
+// are only recognizable with the auth-config redactor, mirroring HTTP traces.
+let sanitizeRequestUrl = (url: string, redactor?: AuthConfigSecretRedactor) => {
+  try {
+    return sanitizeUrl(url, redactor);
+  } catch {
+    return sanitizeUrl(url);
+  }
+};
+
+let buildRequestUrl = (error: AxiosError, redactor?: AuthConfigSecretRedactor) => {
   let baseURL = error.config?.baseURL;
   let url = error.config?.url;
 
   if (!url) return undefined;
-  if (!baseURL) return url;
+  if (!baseURL) return sanitizeRequestUrl(url, redactor);
 
+  let absoluteUrl = url;
   try {
-    return new URL(url, baseURL).toString();
-  } catch {
-    return url;
-  }
+    absoluteUrl = new URL(url, baseURL).toString();
+  } catch {}
+
+  return sanitizeRequestUrl(absoluteUrl, redactor);
 };
 
 let getProviderDefaults = (): Partial<SlateErrorResponse> => {
@@ -158,13 +175,26 @@ let inferAxiosCode = (error: AxiosError, data: unknown) => {
   return 'upstream.error';
 };
 
-let inferAxiosMessage = (error: AxiosError, data: unknown, code: string) => {
-  return (
+// Upstream bodies can echo credentials back (request dumps, debug fields), so the
+// inferred message is scrubbed and bounded before it becomes SlateError.message.
+let inferAxiosMessage = (
+  error: AxiosError,
+  data: unknown,
+  code: string,
+  redactor?: AuthConfigSecretRedactor
+) => {
+  let message =
     getNestedMessage(data) ??
     error.response?.statusText ??
     error.message ??
-    getDefaultMessage(code)
-  );
+    getDefaultMessage(code);
+
+  // Scrub before cutting so the cut cannot leave a credential fragment the patterns
+  // no longer recognize; sanitizeErrorText bounds its own scan.
+  let scrubbed = sanitizeErrorText(message, redactor ?? null);
+  return scrubbed.length > BAGGAGE_MAX_STRING_LENGTH
+    ? `${scrubbed.slice(0, BAGGAGE_MAX_STRING_LENGTH)}...`
+    : scrubbed;
 };
 
 let inferAxiosRetryable = (error: AxiosError, code: string) => {
@@ -184,12 +214,14 @@ export let inferSlateErrorFromAxios = (
     : undefined;
 
   let code = inferAxiosCode(error, responseData);
+  let redactor = getCurrentAuthConfigRedactor();
 
   return normalizeSlateErrorInput({
     ...getProviderDefaults(),
     ...options.defaults,
     code: options.defaults?.code ?? code,
-    message: options.defaults?.message ?? inferAxiosMessage(error, responseData, code),
+    message:
+      options.defaults?.message ?? inferAxiosMessage(error, responseData, code, redactor),
     kind: options.defaults?.kind ?? normalizeKind(options.defaults?.code ?? code),
     retryable:
       options.defaults?.retryable ??
@@ -210,11 +242,14 @@ export let inferSlateErrorFromAxios = (
         getHeaderValue(error.response?.headers, 'x-correlation-id') ??
         options.defaults?.upstream?.requestId,
       method: error.config?.method?.toUpperCase() ?? options.defaults?.upstream?.method,
-      url: buildRequestUrl(error) ?? options.defaults?.upstream?.url
+      url: buildRequestUrl(error, redactor) ?? options.defaults?.upstream?.url
     },
     baggage: mergeRecords(options.defaults?.baggage, {
       axiosCode: error.code,
-      response: sanitizeForBaggage(responseData)
+      response: sanitizeForBaggage(responseData, {
+        maxDepth: BAGGAGE_RESPONSE_MAX_DEPTH,
+        redactor: redactor ?? null
+      })
     })
   });
 };

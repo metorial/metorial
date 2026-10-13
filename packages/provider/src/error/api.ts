@@ -1,4 +1,9 @@
 import { badRequestError, type ErrorRecord, ServiceError } from '@lowerdeck/error';
+import {
+  BAGGAGE_REDACTED_VALUE,
+  BAGGAGE_TRUNCATED_VALUE,
+  BAGGAGE_UNSERIALIZABLE_VALUE
+} from './utils';
 
 export type ApiErrorStatus = number | string;
 export type ApiServiceError = ServiceError<ErrorRecord<any, any>>;
@@ -168,9 +173,17 @@ export let getApiErrorResponseWithBody = (error: unknown): ApiErrorResponse | un
 export let API_ERROR_MAX_DETAILS = 5;
 export let API_ERROR_MAX_MESSAGE_LENGTH = 1_000;
 
-// sanitizeForBaggage replaces values nested four or more levels deep with this
-// placeholder; it never carries a useful upstream message.
-export let API_ERROR_TRUNCATED_PLACEHOLDER = '[truncated]';
+// sanitizeForBaggage replaces values nested past its depth limit (and values cut
+// by its size budget) with this placeholder; it never carries a useful upstream message.
+// Kept as an alias of BAGGAGE_TRUNCATED_VALUE for existing importers.
+export let API_ERROR_TRUNCATED_PLACEHOLDER = BAGGAGE_TRUNCATED_VALUE;
+
+// Sanitized-baggage placeholders that stand in for removed values, never messages.
+let BAGGAGE_PLACEHOLDERS = new Set([
+  BAGGAGE_TRUNCATED_VALUE,
+  BAGGAGE_REDACTED_VALUE,
+  BAGGAGE_UNSERIALIZABLE_VALUE
+]);
 
 // Detects HTML error pages (gateway, proxy, or login pages) so they are not shown
 // as error messages. Requires a doctype, a leading <html>/<head> tag (pages may be
@@ -204,7 +217,7 @@ export let readApiErrorText = (value: unknown, options: ApiErrorTextOptions = {}
   }
 
   let text = String(value).trim();
-  if (!text || text === API_ERROR_TRUNCATED_PLACEHOLDER || looksLikeHtmlErrorBody(text)) {
+  if (!text || BAGGAGE_PLACEHOLDERS.has(text) || looksLikeHtmlErrorBody(text)) {
     return undefined;
   }
 

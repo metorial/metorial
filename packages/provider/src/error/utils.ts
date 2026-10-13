@@ -1,3 +1,11 @@
+import { AuthConfigSecretRedactor } from '../auth/redact';
+import {
+  isSecretFieldName,
+  redactAuthConfigSecretsInText,
+  sanitizeSecretValuesInText,
+  splitKeyParts
+} from '../axios/trace';
+import { getCurrentContext } from '../context/hook';
 import { DEFAULT_CODE, DEFAULT_MESSAGES } from './defaults';
 import type {
   SlateErrorInput,
@@ -112,26 +120,273 @@ export let mergeSlateErrorData = (
   };
 };
 
-export let sanitizeForBaggage = (value: unknown, depth = 0): unknown => {
-  if (value == null) return value;
-  if (depth >= 4) return '[truncated]';
-  if (typeof value === 'string') {
-    return value.length > 2_000 ? `${value.slice(0, 2_000)}...[truncated]` : value;
+export let BAGGAGE_TRUNCATED_VALUE = '[truncated]';
+export let BAGGAGE_REDACTED_VALUE = '[redacted]';
+export let BAGGAGE_UNSERIALIZABLE_VALUE = '[unserializable]';
+
+// Values nested this deep (root = depth 0) are replaced with the truncated placeholder.
+export let BAGGAGE_DEFAULT_MAX_DEPTH = 4;
+// Upstream response bodies keep deeper structure so nested provider error details
+// (GraphQL errors[].extensions.*, QuickBooks Fault.Error[].Detail, validation error
+// lists) reach message extractors and telemetry.
+export let BAGGAGE_RESPONSE_MAX_DEPTH = 8;
+export let BAGGAGE_MAX_STRING_LENGTH = 2_000;
+export let BAGGAGE_MAX_ARRAY_ITEMS = 20;
+export let BAGGAGE_MAX_OBJECT_KEYS = 30;
+// Upper bound for the JSON-serialized size of one sanitized value. Entries past
+// the budget are dropped (and a string that crosses it is cut), so a single call
+// serializes to at most this many characters plus a small fixed overhead.
+export let BAGGAGE_MAX_SERIALIZED_SIZE = 16_384;
+
+let BAGGAGE_STRING_TRUNCATION_SUFFIX = '...[truncated]';
+// Keep budget cuts from producing near-empty strings.
+let BAGGAGE_MIN_STRING_SLICE = 32;
+
+// Free-text patterns are scanned over at most this many characters (the kept
+// string length plus a margin), which bounds their cost on adversarial input.
+let BAGGAGE_SCAN_LENGTH = BAGGAGE_MAX_STRING_LENGTH + 100;
+// Literal auth-config secrets are matched over a longer prefix so a long token that
+// straddles the scan boundary is still replaced before the string is cut.
+let BAGGAGE_REDACTOR_SCAN_LENGTH = BAGGAGE_MAX_STRING_LENGTH * 4;
+// Once fewer characters than the smallest entry (`"k":0,`) remain, stop walking keys.
+let BAGGAGE_MIN_ENTRY_COST = 6;
+
+export type SanitizeForBaggageOptions = {
+  maxDepth?: number;
+  maxSerializedSize?: number;
+  // Replaces literal auth-config values. Defaults to the current Slate context's auth
+  // config when one is available; `null` disables it.
+  redactor?: AuthConfigSecretRedactor | null;
+};
+
+// Returns a redactor for the current Slate context's auth config, or undefined when
+// no context is active (or it cannot be read).
+export let getCurrentAuthConfigRedactor = (): AuthConfigSecretRedactor | undefined => {
+  try {
+    let authConfig = getCurrentContext()._getAuthConfigForRedaction();
+    return authConfig ? new AuthConfigSecretRedactor(authConfig) : undefined;
+  } catch {
+    return undefined;
   }
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return value;
+};
+
+// sanitizeErrorText keeps at most this many characters. It scans a small margin past
+// the cut so a credential straddling it is still recognized before the text is cut.
+export let ERROR_TEXT_MAX_LENGTH = BAGGAGE_MAX_STRING_LENGTH * 4;
+let ERROR_TEXT_SCAN_MARGIN = 512;
+
+// Free-text scrub for human-readable error text (messages, details): literal
+// auth-config secrets first, then known credential formats and secret-named pairs.
+// Input past ERROR_TEXT_MAX_LENGTH is cut, which also bounds the pattern cost.
+// `redactor`: undefined uses the current Slate context's auth config, null skips it.
+// Never throws; a failing redactor falls back to the pattern scrub alone.
+export let sanitizeErrorText = (
+  text: string,
+  redactor?: AuthConfigSecretRedactor | null
+): string => {
+  let activeRedactor = redactor === undefined ? getCurrentAuthConfigRedactor() : redactor;
+  let truncated = text.length > ERROR_TEXT_MAX_LENGTH;
+  let scanned = truncated
+    ? text.slice(0, ERROR_TEXT_MAX_LENGTH + ERROR_TEXT_SCAN_MARGIN)
+    : text;
+
+  let result = scanned;
+  if (activeRedactor) {
+    try {
+      result = redactAuthConfigSecretsInText(result, activeRedactor);
+    } catch {
+      result = scanned;
+    }
   }
+  result = sanitizeSecretValuesInText(result);
+
+  return truncated
+    ? `${result.slice(0, ERROR_TEXT_MAX_LENGTH)}${BAGGAGE_STRING_TRUNCATION_SUFFIX}`
+    : result;
+};
+
+// Numbers under these keys are themselves secrets (PINs, card data, numeric
+// verification codes, numeric keys and secrets); other numeric and boolean values under
+// secret-named keys (`token: true`, `session: 3`) are flags or counts and are kept.
+let NUMERIC_SECRET_KEY_PATTERN =
+  /(?:^|_)(?:pin|passcode|password|passwd|pwd|otp|totp|cvv|cvc|ccv|pan|ssn|card_number|card_code|cc_num(?:ber)?)(?:_|$)|(?:^|_)(?:code|secret|key)$/;
+
+// Validation messages under secret-named fields (`{password: "is too short"}`,
+// `{token: ["This field is required."]}`) are kept when they are clearly prose:
+// three or more short words, no token-like word (20+ characters, or letters mixed
+// with digits), bounded length, and validation vocabulary. Multi-word passphrases rarely use that vocabulary, so a string that is
+// merely several words is still redacted.
+let VALIDATION_VOCABULARY_PATTERN =
+  /\b(?:required|invalid|must|blank|empty|missing|too (?:short|long|weak|common|simple)|characters?|(?:does not|doesn't|do not|don't) match|cannot be|can't be|not allowed|not valid|at least|at most|incorrect|already (?:taken|used|exists|in use)|has expired|is expired)\b/i;
+
+let isValidationProse = (value: string) => {
+  let text = value.trim();
+  if (text.length > 300) return false;
+  let words = text.split(/\s+/);
+  if (words.length < 3) return false;
+  if (words.some(word => word.length > 20 || (/[a-z]/i.test(word) && /\d/.test(word)))) {
+    return false;
+  }
+  return VALIDATION_VOCABULARY_PATTERN.test(text);
+};
+
+let isKeptUnderSecretKey = (key: string, value: unknown) => {
+  if (typeof value === 'boolean') return true;
+  if (typeof value === 'number')
+    return !NUMERIC_SECRET_KEY_PATTERN.test(splitKeyParts(key).join('_'));
+  if (typeof value === 'string') return isValidationProse(value);
   if (Array.isArray(value)) {
-    return value.slice(0, 20).map(item => sanitizeForBaggage(item, depth + 1));
-  }
-  if (isRecord(value)) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .slice(0, 30)
-        .map(([key, entry]) => [key, sanitizeForBaggage(entry, depth + 1)])
+    return (
+      value.length > 0 &&
+      value.length <= BAGGAGE_MAX_ARRAY_ITEMS &&
+      value.every(item => typeof item === 'string' && isValidationProse(item))
     );
   }
-  return String(value);
+  return false;
+};
+
+let jsonLength = (value: string) => JSON.stringify(value).length;
+
+type BaggageState = {
+  remaining: number;
+  redactor?: AuthConfigSecretRedactor;
+};
+
+let redactLiteralSecrets = (value: string, redactor?: AuthConfigSecretRedactor) => {
+  if (!redactor) return value;
+  try {
+    return redactAuthConfigSecretsInText(
+      value.slice(0, BAGGAGE_REDACTOR_SCAN_LENGTH),
+      redactor
+    );
+  } catch {
+    return value;
+  }
+};
+
+let sanitizeBaggageString = (value: string, state: BaggageState) => {
+  // Redact literal auth-config secrets and known secret formats before cutting, so a
+  // cut cannot split a token into a fragment the value patterns no longer recognize.
+  let literalRedacted = redactLiteralSecrets(value, state.redactor);
+  let text = sanitizeSecretValuesInText(literalRedacted.slice(0, BAGGAGE_SCAN_LENGTH));
+  if (
+    value.length > BAGGAGE_MAX_STRING_LENGTH ||
+    literalRedacted.length > BAGGAGE_MAX_STRING_LENGTH ||
+    text.length > BAGGAGE_MAX_STRING_LENGTH
+  ) {
+    text = `${text.slice(0, BAGGAGE_MAX_STRING_LENGTH)}${BAGGAGE_STRING_TRUNCATION_SUFFIX}`;
+  }
+
+  let cost = jsonLength(text);
+  if (cost > state.remaining) {
+    let sliceLength =
+      state.remaining - BAGGAGE_STRING_TRUNCATION_SUFFIX.length - 2 - (cost - text.length);
+    text =
+      sliceLength >= BAGGAGE_MIN_STRING_SLICE
+        ? `${text.slice(0, sliceLength)}${BAGGAGE_STRING_TRUNCATION_SUFFIX}`
+        : BAGGAGE_TRUNCATED_VALUE;
+    cost = jsonLength(text);
+    if (cost > state.remaining && text !== BAGGAGE_TRUNCATED_VALUE) {
+      text = BAGGAGE_TRUNCATED_VALUE;
+      cost = jsonLength(text);
+    }
+  }
+
+  state.remaining -= cost;
+  return text;
+};
+
+let sanitizeBaggageValue = (
+  value: unknown,
+  depth: number,
+  maxDepth: number,
+  state: BaggageState
+): unknown => {
+  if (value === undefined) return value;
+  if (value === null) {
+    state.remaining -= 4;
+    return value;
+  }
+  if (depth >= maxDepth) {
+    state.remaining -= jsonLength(BAGGAGE_TRUNCATED_VALUE);
+    return BAGGAGE_TRUNCATED_VALUE;
+  }
+  if (typeof value === 'string') return sanitizeBaggageString(value, state);
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    state.remaining -= String(value).length;
+    return value;
+  }
+  // JSON.stringify throws on bigint, so it is stored as a string.
+  if (typeof value === 'bigint') return sanitizeBaggageString(value.toString(), state);
+  if (Array.isArray(value)) {
+    state.remaining -= 2;
+    let items: unknown[] = [];
+    for (let item of value.slice(0, BAGGAGE_MAX_ARRAY_ITEMS)) {
+      if (state.remaining <= 0) break;
+      state.remaining -= 1;
+      if (item === undefined) {
+        // Serialized as `null` inside arrays.
+        state.remaining -= 4;
+        items.push(null);
+        continue;
+      }
+      items.push(sanitizeBaggageValue(item, depth + 1, maxDepth, state));
+    }
+    return items;
+  }
+  if (isRecord(value)) {
+    state.remaining -= 2;
+    let entries: [string, unknown][] = [];
+    for (let key of Object.keys(value).slice(0, BAGGAGE_MAX_OBJECT_KEYS)) {
+      if (state.remaining < BAGGAGE_MIN_ENTRY_COST) break;
+      // Key, colon, and separator are charged up front; an entry whose key does not
+      // fit is skipped so shorter later keys can still be kept.
+      let keyCost = jsonLength(key) + 2;
+      if (state.remaining - keyCost <= 0) continue;
+      state.remaining -= keyCost;
+
+      try {
+        // Property access is per entry so one throwing getter only loses that entry.
+        let entry = value[key];
+
+        if (entry != null && isSecretFieldName(key) && !isKeptUnderSecretKey(key, entry)) {
+          state.remaining -= jsonLength(BAGGAGE_REDACTED_VALUE);
+          entries.push([key, BAGGAGE_REDACTED_VALUE]);
+          continue;
+        }
+
+        entries.push([key, sanitizeBaggageValue(entry, depth + 1, maxDepth, state)]);
+      } catch {
+        state.remaining -= jsonLength(BAGGAGE_UNSERIALIZABLE_VALUE);
+        entries.push([key, BAGGAGE_UNSERIALIZABLE_VALUE]);
+      }
+    }
+    return Object.fromEntries(entries);
+  }
+  return sanitizeBaggageString(String(value), state);
+};
+
+// Bounds and redacts arbitrary values (upstream response bodies, service error data,
+// thrown non-Error values) before they are stored in SlateError baggage, which is
+// serialized to the platform. Secret-named keys are redacted at every depth, strings
+// are scrubbed for credential values and (inside a Slate context) literal auth-config
+// secrets; other personal data is left to platform-side redaction.
+export let sanitizeForBaggage = (
+  value: unknown,
+  options: SanitizeForBaggageOptions = {}
+): unknown => {
+  try {
+    return sanitizeBaggageValue(value, 0, options.maxDepth ?? BAGGAGE_DEFAULT_MAX_DEPTH, {
+      remaining: options.maxSerializedSize ?? BAGGAGE_MAX_SERIALIZED_SIZE,
+      redactor:
+        options.redactor === null
+          ? undefined
+          : (options.redactor ?? getCurrentAuthConfigRedactor())
+    });
+  } catch {
+    // Throwing getters or Proxy traps must not mask the error being mapped.
+    return BAGGAGE_UNSERIALIZABLE_VALUE;
+  }
 };
 
 export let normalizeSlateErrorInput = (input: SlateErrorInput): SlateErrorResponse => {
