@@ -1,38 +1,20 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-import { isApiErrorRecord } from 'slates';
+import {
+  API_ERROR_MAX_DETAILS,
+  isApiErrorRecord,
+  pushBoundedApiErrorDetail,
+  truncateApiErrorMessage
+} from 'slates';
 
 export let sentryServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
-let MAX_ERROR_DETAILS = 5;
-let MAX_ERROR_MESSAGE_LENGTH = 1_000;
 let MAX_FIELD_DEPTH = 6;
 
 // Organization-level endpoints the client calls with no other path identifiers.
 // A 404 here means the configured organization itself could not be resolved.
 let ORGANIZATION_SCOPED_PATH =
   /^\/(?:api\/0\/)?organizations\/([^/]+)\/(?:(?:projects|teams|issues|members|releases|alert-rules|monitors|events)\/)?$/;
-
-let looksLikeHtml = (value: string) =>
-  /^\s*</.test(value) || /<\/?(html|body|head)\b/i.test(value);
-
-let truncate = (value: string) =>
-  value.length > MAX_ERROR_MESSAGE_LENGTH
-    ? `${value.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...`
-    : value;
-
-let pushDetail = (details: string[], value: unknown, field?: string) => {
-  if (details.length >= MAX_ERROR_DETAILS) return;
-  if (typeof value !== 'string' && typeof value !== 'number') return;
-
-  let text = String(value).trim();
-  if (!text || looksLikeHtml(text)) return;
-
-  let detail = field ? `${field}: ${text}` : text;
-  if (!details.includes(detail)) {
-    details.push(detail);
-  }
-};
 
 // Sentry REST errors use { detail: string | { message, code } } and Django REST
 // serializer errors such as { field: ["message"], non_field_errors: ["message"] }.
@@ -42,7 +24,7 @@ let collectSentryDetails = (
   field: string | undefined,
   depth: number
 ) => {
-  if (details.length >= MAX_ERROR_DETAILS || depth > MAX_FIELD_DEPTH) return;
+  if (details.length >= API_ERROR_MAX_DETAILS || depth > MAX_FIELD_DEPTH) return;
 
   if (Array.isArray(value)) {
     for (let item of value) {
@@ -52,7 +34,7 @@ let collectSentryDetails = (
   }
 
   if (!isApiErrorRecord(value)) {
-    pushDetail(details, value, field);
+    pushBoundedApiErrorDetail(details, value, { field });
     return;
   }
 
@@ -138,7 +120,7 @@ export let flattenSentryErrorResponse = (
       : `Sentry API request failed${statusLabel}.`;
 
   return {
-    message: truncate(message),
+    message: truncateApiErrorMessage(message),
     ...(code ? { code } : {})
   };
 };

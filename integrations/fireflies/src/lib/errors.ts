@@ -1,32 +1,30 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-import { type ApiErrorResponse, buildApiServiceError } from 'slates';
-
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+import {
+  type ApiErrorBuildHelpers,
+  type ApiErrorResponse,
+  buildApiServiceError,
+  isApiErrorRecord as isRecord
+} from 'slates';
 
 let FIREFLIES_DETAIL_KEYS = ['message', 'error', 'description', 'code'];
 
-// createAxios converts upstream failures into SlateError before this adapter
-// runs, so the raw GraphQL error body only survives in SlateError.data.baggage.
 // GraphQL errors returned with HTTP 200 are passed in as `{ data: body }`.
 let firefliesErrorResponse = (
   error: unknown,
-  response: ApiErrorResponse | undefined
+  helpers: ApiErrorBuildHelpers
 ): ApiErrorResponse | undefined => {
+  let response = helpers.getResponseWithBody(error);
   if (response?.data !== undefined) return response;
-  if (!isRecord(error) || !isRecord(error.data)) return response;
-
-  if (error.name === 'SlateError') {
-    let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
-    if (baggage?.response === undefined) return response;
-    return { ...response, data: baggage.response };
+  if (
+    !isRecord(error) ||
+    error instanceof Error ||
+    error.name === 'SlateError' ||
+    !isRecord(error.data)
+  ) {
+    return response;
   }
 
-  if (!(error instanceof Error)) {
-    return { ...response, data: error.data };
-  }
-
-  return response;
+  return { ...response, data: error.data };
 };
 
 let upstreamCodeFor = (response: ApiErrorResponse | undefined) => {
@@ -53,7 +51,6 @@ export let firefliesApiError = (error: unknown, operation = 'request') =>
     operation,
     reason: 'fireflies_api_error',
     detailKeys: FIREFLIES_DETAIL_KEYS,
-    extractResponse: (input, helpers) =>
-      firefliesErrorResponse(input, helpers.getResponse(input)),
+    extractResponse: firefliesErrorResponse,
     extractUpstreamCode: (_input, response) => upstreamCodeFor(response)
   });

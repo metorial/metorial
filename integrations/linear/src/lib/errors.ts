@@ -1,35 +1,21 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-import { type ApiErrorResponse, buildApiServiceError, createApiServiceError } from 'slates';
+import {
+  API_ERROR_MAX_DETAILS,
+  type ApiErrorResponse,
+  buildApiServiceError,
+  createApiServiceError,
+  isApiErrorRecord as isRecord,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail,
+  readApiErrorText,
+  truncateApiErrorMessage
+} from 'slates';
 
-let MAX_ERROR_DETAILS = 5;
-let MAX_ERROR_MESSAGE_LENGTH = 1_000;
-let TRUNCATED_PLACEHOLDER = '[truncated]';
+// Linear error fields are strings; numeric values are not shown as details.
+let readText = (value: unknown) => readApiErrorText(value, { includeNumbers: false });
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-let looksLikeHtml = (value: string) =>
-  /^\s*</.test(value) || /<\/?(html|body|head)\b/i.test(value);
-
-let truncate = (value: string) =>
-  value.length > MAX_ERROR_MESSAGE_LENGTH
-    ? `${value.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...`
-    : value;
-
-let readText = (value: unknown) => {
-  if (typeof value !== 'string') return undefined;
-  let text = value.trim();
-  if (!text || text === TRUNCATED_PLACEHOLDER || looksLikeHtml(text)) return undefined;
-  return text;
-};
-
-let pushDetail = (details: string[], value: unknown) => {
-  if (details.length >= MAX_ERROR_DETAILS) return;
-  let text = readText(value);
-  if (text && !details.includes(text)) {
-    details.push(text);
-  }
-};
+let pushDetail = (details: string[], value: unknown) =>
+  pushBoundedApiErrorDetail(details, value, { includeNumbers: false });
 
 // Linear GraphQL errors look like
 // { errors: [{ message, extensions: { code, userPresentableMessage } }] }.
@@ -66,7 +52,7 @@ let extractLinearDataMessage = (data: unknown) => {
     pushDetail(details, data.error_description);
   }
 
-  return details.length > 0 ? truncate(details.join(' - ')) : undefined;
+  return details.length > 0 ? truncateApiErrorMessage(details.join(' - ')) : undefined;
 };
 
 let extractGraphQLErrorCode = (data: unknown) => {
@@ -83,16 +69,15 @@ let extractGraphQLErrorCode = (data: unknown) => {
   return undefined;
 };
 
-// createAxios stores the failed response body in SlateError baggage, but its
-// sanitizer truncates values nested 4+ levels deep, which drops
-// errors[].extensions.code and userPresentableMessage. Lift those fields onto
-// each error item so they survive into the baggage.
+// createAxios stores this flattened body in SlateError baggage. Lift
+// errors[].extensions.code and userPresentableMessage onto each error item and
+// cap the list so the baggage keeps a small, flat shape the extractors read.
 export let flattenLinearErrorResponse = (data: unknown) => {
   if (!isRecord(data) || !Array.isArray(data.errors)) return data;
 
   return {
     ...data,
-    errors: data.errors.slice(0, MAX_ERROR_DETAILS).map(item => {
+    errors: data.errors.slice(0, API_ERROR_MAX_DETAILS).map(item => {
       if (!isRecord(item)) return item;
       let extensions = isRecord(item.extensions) ? item.extensions : undefined;
       return {
@@ -104,26 +89,9 @@ export let flattenLinearErrorResponse = (data: unknown) => {
   };
 };
 
-// createAxios converts upstream failures into SlateError before this adapter
-// runs, so the raw response body only survives in SlateError.data.baggage.
-let withSlateErrorResponseData = (
-  error: unknown,
-  response: ApiErrorResponse | undefined
-): ApiErrorResponse | undefined => {
-  if (response?.data !== undefined) return response;
-  if (!isRecord(error) || error.name !== 'SlateError' || !isRecord(error.data)) {
-    return response;
-  }
-
-  let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
-  if (baggage?.response === undefined) return response;
-
-  return { ...response, data: baggage.response };
-};
-
 let fallbackMessageFor = (error: unknown, response: ApiErrorResponse | undefined) => {
   let message = error instanceof Error ? error.message.trim() : '';
-  if (message && !looksLikeHtml(message)) return truncate(message);
+  if (message && !looksLikeHtmlErrorBody(message)) return truncateApiErrorMessage(message);
   if (response?.statusText) return response.statusText;
   return message ? 'Linear returned an unexpected non-JSON error response.' : 'Unknown error';
 };
@@ -148,7 +116,7 @@ export let linearApiError = (error: unknown) => {
     providerLabel: 'Linear',
     reason: 'linear_api_error',
     extractResponse: (input, helpers) => {
-      response = withSlateErrorResponseData(input, helpers.getResponse(input));
+      response = helpers.getResponseWithBody(input);
       return response;
     },
     extractMessage: input =>

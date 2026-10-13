@@ -1,7 +1,10 @@
 import {
   createApiServiceError,
   createAxios,
+  decodeApiErrorBody,
   getApiErrorStatus,
+  isApiErrorRecord as isRecord,
+  readApiErrorText,
   type SlateAxiosErrorOptions
 } from 'slates';
 import type {
@@ -232,46 +235,27 @@ type DriveErrorDetail = { reason?: string; location?: string; message?: string }
 
 const MAX_DRIVE_ERROR_DETAILS = 5;
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 let optionalString = (value: unknown) =>
-  typeof value === 'string' && value.trim() ? value.trim().slice(0, 200) : undefined;
+  readApiErrorText(value, { includeNumbers: false })?.slice(0, 200);
 
 const MAX_DECODED_ERROR_BODY_BYTES = 64 * 1024;
 const MAX_TEXT_ERROR_BODY_CHARS = 500;
 let decodedErrorBodies = new WeakMap<object, unknown>();
 
-let parseDriveErrorText = (text: string): unknown => {
-  let trimmed = text.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // Prefer the HTTP status text over raw HTML error pages or empty bodies.
-    if (!trimmed || trimmed.startsWith('<')) return {};
-    return trimmed.slice(0, MAX_TEXT_ERROR_BODY_CHARS);
-  }
-};
-
 // Export downloads use responseType=arraybuffer, so Drive's JSON error body arrives as bytes.
 let decodeDriveErrorBody = (data: unknown): unknown => {
-  if (typeof data === 'string') return parseDriveErrorText(data);
+  let bytes = data instanceof ArrayBuffer || ArrayBuffer.isView(data) ? data : undefined;
+  if (bytes && decodedErrorBodies.has(bytes)) return decodedErrorBodies.get(bytes);
+  if (!bytes && typeof data !== 'string') return data;
 
-  let bytes: Buffer | undefined;
-  if (data instanceof ArrayBuffer) {
-    bytes = Buffer.from(data, 0, Math.min(data.byteLength, MAX_DECODED_ERROR_BODY_BYTES));
-  } else if (ArrayBuffer.isView(data)) {
-    bytes = Buffer.from(
-      data.buffer,
-      data.byteOffset,
-      Math.min(data.byteLength, MAX_DECODED_ERROR_BODY_BYTES)
-    );
+  let decoded = decodeApiErrorBody(data, { maxBytes: MAX_DECODED_ERROR_BODY_BYTES });
+  if (typeof decoded === 'string') {
+    // Prefer the HTTP status text over raw HTML error pages or empty bodies.
+    let text = readApiErrorText(decoded);
+    decoded = text ? text.slice(0, MAX_TEXT_ERROR_BODY_CHARS) : {};
   }
-  if (!bytes || typeof data !== 'object' || data === null) return data;
 
-  if (decodedErrorBodies.has(data)) return decodedErrorBodies.get(data);
-  let decoded = parseDriveErrorText(bytes.toString('utf8'));
-  decodedErrorBodies.set(data, decoded);
+  if (bytes) decodedErrorBodies.set(bytes, decoded);
   return decoded;
 };
 

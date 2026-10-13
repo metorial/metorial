@@ -1,33 +1,13 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-import { type ApiErrorResponse, buildApiServiceError } from '@slates/provider';
-
-let MAX_ERROR_DETAILS = 5;
-let MAX_ERROR_MESSAGE_LENGTH = 1_000;
-
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-let looksLikeHtml = (value: string) =>
-  /^\s*</.test(value) || /<\/?(html|body|head)\b/i.test(value);
-
-let truncate = (value: string) =>
-  value.length > MAX_ERROR_MESSAGE_LENGTH
-    ? `${value.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...`
-    : value;
-
-let textOf = (value: unknown) => {
-  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
-  let text = String(value).trim();
-  return text && text !== '[truncated]' && !looksLikeHtml(text) ? text : undefined;
-};
-
-let pushDetail = (details: string[], value: unknown) => {
-  if (details.length >= MAX_ERROR_DETAILS) return;
-  let text = textOf(value);
-  if (text && !details.includes(text)) {
-    details.push(text);
-  }
-};
+import {
+  type ApiErrorResponse,
+  buildApiServiceError,
+  isApiErrorRecord,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail,
+  readApiErrorText,
+  truncateApiErrorMessage
+} from '@slates/provider';
 
 let pick = (record: Record<string, unknown>, ...keys: string[]) => {
   for (let key of keys) {
@@ -39,12 +19,12 @@ let pick = (record: Record<string, unknown>, ...keys: string[]) => {
 // QuickBooks errors look like { Fault: { Error: [{ Message, Detail, code, element }], type } }
 // (401 responses use lowercase fault/error/message/detail keys).
 let formatFaultEntry = (entry: unknown) => {
-  if (!isRecord(entry)) return textOf(entry);
+  if (!isApiErrorRecord(entry)) return readApiErrorText(entry);
 
-  let message = textOf(pick(entry, 'Message', 'message'));
-  let detail = textOf(pick(entry, 'Detail', 'detail'));
-  let code = textOf(pick(entry, 'code', 'Code'));
-  let element = textOf(pick(entry, 'element', 'Element'));
+  let message = readApiErrorText(pick(entry, 'Message', 'message'));
+  let detail = readApiErrorText(pick(entry, 'Detail', 'detail'));
+  let code = readApiErrorText(pick(entry, 'code', 'Code'));
+  let element = readApiErrorText(pick(entry, 'element', 'Element'));
 
   let text =
     message && detail
@@ -61,13 +41,13 @@ let formatFaultEntry = (entry: unknown) => {
 };
 
 let getFault = (data: unknown) => {
-  if (!isRecord(data)) return undefined;
+  if (!isApiErrorRecord(data)) return undefined;
   let fault = pick(data, 'Fault', 'fault');
-  return isRecord(fault) ? fault : undefined;
+  return isApiErrorRecord(fault) ? fault : undefined;
 };
 
-// Flattens the nested QuickBooks Fault body so createAxios keeps the useful
-// fields in SlateError baggage (it truncates values nested four levels deep).
+// Flattens the nested QuickBooks Fault body so createAxios reads its message and
+// code (the shared mapping does not look inside Fault) and keeps them in baggage.
 export let flattenQuickBooksErrorResponse = (data: unknown): unknown => {
   let fault = getFault(data);
   if (!fault) return data;
@@ -78,15 +58,15 @@ export let flattenQuickBooksErrorResponse = (data: unknown): unknown => {
   );
   let details: string[] = [];
   for (let entry of errors) {
-    pushDetail(details, formatFaultEntry(entry));
+    pushBoundedApiErrorDetail(details, formatFaultEntry(entry));
   }
 
-  let firstError = errors.find(isRecord);
-  let code = firstError ? textOf(pick(firstError, 'code', 'Code')) : undefined;
-  let type = textOf(pick(fault, 'type', 'Type'));
+  let firstError = errors.find(isApiErrorRecord);
+  let code = firstError ? readApiErrorText(pick(firstError, 'code', 'Code')) : undefined;
+  let type = readApiErrorText(pick(fault, 'type', 'Type'));
 
   return {
-    message: details.length > 0 ? truncate(details.join(' - ')) : type,
+    message: details.length > 0 ? truncateApiErrorMessage(details.join(' - ')) : type,
     ...(code ? { code } : {}),
     ...(type ? { type } : {})
   };
@@ -97,41 +77,24 @@ let extractQuickBooksDataMessage = (data: unknown) => {
   let details: string[] = [];
 
   if (typeof flattened === 'string') {
-    pushDetail(details, flattened);
-  } else if (isRecord(flattened)) {
-    pushDetail(details, flattened.message);
-    if (isRecord(flattened.error)) {
-      pushDetail(details, flattened.error.message);
+    pushBoundedApiErrorDetail(details, flattened);
+  } else if (isApiErrorRecord(flattened)) {
+    pushBoundedApiErrorDetail(details, flattened.message);
+    if (isApiErrorRecord(flattened.error)) {
+      pushBoundedApiErrorDetail(details, flattened.error.message);
     } else {
-      pushDetail(details, flattened.error);
+      pushBoundedApiErrorDetail(details, flattened.error);
     }
-    pushDetail(details, flattened.error_description);
-    pushDetail(details, flattened.detail);
+    pushBoundedApiErrorDetail(details, flattened.error_description);
+    pushBoundedApiErrorDetail(details, flattened.detail);
   }
 
-  return details.length > 0 ? truncate(details.join(' - ')) : undefined;
-};
-
-// createAxios converts upstream failures into SlateError before this adapter
-// runs, so the raw response body only survives in SlateError.data.baggage.
-let withSlateErrorResponseData = (
-  error: unknown,
-  response: ApiErrorResponse | undefined
-): ApiErrorResponse | undefined => {
-  if (response?.data !== undefined) return response;
-  if (!isRecord(error) || error.name !== 'SlateError' || !isRecord(error.data)) {
-    return response;
-  }
-
-  let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
-  if (baggage?.response === undefined) return response;
-
-  return { ...response, data: baggage.response };
+  return details.length > 0 ? truncateApiErrorMessage(details.join(' - ')) : undefined;
 };
 
 let fallbackMessageFor = (error: unknown, response: ApiErrorResponse | undefined) => {
   let message = error instanceof Error ? error.message.trim() : '';
-  if (message && !looksLikeHtml(message)) return truncate(message);
+  if (message && !looksLikeHtmlErrorBody(message)) return truncateApiErrorMessage(message);
   if (response?.statusText) return response.statusText;
   return message
     ? 'QuickBooks returned an unexpected non-JSON error response.'
@@ -151,10 +114,11 @@ export let quickBooksApiError = (error: unknown, operation = 'request') =>
     providerLabel: 'QuickBooks',
     operation,
     reason: 'quickbooks_api_error',
-    extractResponse: (input, helpers) =>
-      withSlateErrorResponseData(input, helpers.getResponse(input)),
+    // createAxios converts upstream failures into SlateError before this adapter
+    // runs, so the raw response body only survives in SlateError baggage.
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
     extractMessage: (input, helpers) => {
-      let response = withSlateErrorResponseData(input, helpers.getResponse(input));
+      let response = helpers.getResponseWithBody(input);
       return (
         extractQuickBooksDataMessage(response?.data) ?? fallbackMessageFor(input, response)
       );

@@ -1,16 +1,16 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-import { type ApiErrorResponse, buildApiServiceError } from '@slates/provider';
+import {
+  buildApiServiceError,
+  extractApiErrorMessage,
+  isApiErrorRecord as isRecord,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail,
+  truncateApiErrorMessage
+} from '@slates/provider';
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-let pushString = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
-  let trimmed = value.trim();
-  if (trimmed && !messages.includes(trimmed)) {
-    messages.push(trimmed);
-  }
-};
+// Keeps up to the shared default number of unique text details.
+let pushString = (messages: string[], value: unknown) =>
+  pushBoundedApiErrorDetail(messages, value, { includeNumbers: false });
 
 let pushAtlassianErrorMessages = (messages: string[], value: unknown) => {
   if (!Array.isArray(value)) return;
@@ -51,25 +51,15 @@ let extractConfluenceDataMessage = (data: unknown) => {
     pushString(messages, data);
   }
 
-  return messages.length > 0 ? messages.join(' - ') : undefined;
+  return messages.length > 0 ? truncateApiErrorMessage(messages.join(' - ')) : undefined;
 };
 
-// createAxios converts upstream failures into SlateError before this adapter
-// runs, so the raw response body only survives in SlateError.data.baggage.
-let withSlateErrorResponseData = (
-  error: unknown,
-  response: ApiErrorResponse | undefined
-): ApiErrorResponse | undefined => {
-  if (response?.data !== undefined) return response;
-  if (!isRecord(error) || error.name !== 'SlateError' || !isRecord(error.data)) {
-    return response;
-  }
-
-  let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
-  if (baggage?.response === undefined) return response;
-
-  return { ...response, data: baggage.response };
-};
+// Non-JSON bodies (such as gateway or login HTML pages) fall back to the status text
+// or a short generic message instead of echoing the page.
+let fallbackMessageFor = (message: string, statusText: string | undefined) =>
+  looksLikeHtmlErrorBody(message)
+    ? statusText || 'Confluence returned an unexpected non-JSON error response.'
+    : message;
 
 let scopeMismatchHint = (status: unknown, message: string) =>
   (status === 401 || status === 403) && /scope does not match/i.test(message)
@@ -84,12 +74,14 @@ export let confluenceApiError = (error: unknown, operation = 'request') =>
     providerLabel: 'Confluence',
     operation,
     reason: 'confluence_api_error',
-    extractResponse: (input, helpers) =>
-      withSlateErrorResponseData(input, helpers.getResponse(input)),
-    extractMessage: (input, helpers) =>
-      extractConfluenceDataMessage(
-        withSlateErrorResponseData(input, helpers.getResponse(input))?.data
-      ),
+    extractResponse: (input, helpers) => helpers.getResponseWithBody(input),
+    extractMessage: (input, helpers) => {
+      let response = helpers.getResponseWithBody(input);
+      return (
+        extractConfluenceDataMessage(response?.data) ??
+        fallbackMessageFor(extractApiErrorMessage(input, { response }), response?.statusText)
+      );
+    },
     formatMessage: ({
       providerLabel,
       operation: requestOperation,

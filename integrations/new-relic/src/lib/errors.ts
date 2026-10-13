@@ -1,32 +1,27 @@
-import { type ApiErrorResponse, buildApiServiceError, createApiServiceError } from 'slates';
+import {
+  API_ERROR_MAX_DETAILS,
+  API_ERROR_TRUNCATED_PLACEHOLDER,
+  type ApiErrorResponse,
+  buildApiServiceError,
+  createApiServiceError,
+  isApiErrorRecord as isRecord,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail,
+  readApiErrorText,
+  truncateApiErrorMessage
+} from 'slates';
 
-let MAX_ERROR_DETAILS = 5;
-let MAX_ERROR_MESSAGE_LENGTH = 1_000;
-let TRUNCATED_PLACEHOLDER = '[truncated]';
+// New Relic error fields are strings; numeric values are not shown as details.
+let readText = (value: unknown) => readApiErrorText(value, { includeNumbers: false });
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-let looksLikeHtml = (value: string) =>
-  /^\s*<(!doctype|html|[a-z]+[\s>])/i.test(value) || /<\/?(html|body|head)\b/i.test(value);
-
-let truncate = (value: string) =>
-  value.length > MAX_ERROR_MESSAGE_LENGTH
-    ? `${value.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...`
-    : value;
-
-let readText = (value: unknown) => {
-  if (typeof value !== 'string') return undefined;
-  let text = value.trim();
-  if (!text || text === TRUNCATED_PLACEHOLDER || looksLikeHtml(text)) return undefined;
-  return text;
-};
+let pushDetail = (details: string[], value: unknown) =>
+  pushBoundedApiErrorDetail(details, value, { includeNumbers: false });
 
 let readPath = (value: unknown) => {
   if (Array.isArray(value)) {
     let parts = value.filter(
       part =>
-        (typeof part === 'string' && part !== TRUNCATED_PLACEHOLDER) ||
+        (typeof part === 'string' && part !== API_ERROR_TRUNCATED_PLACEHOLDER) ||
         typeof part === 'number'
     );
     return parts.length > 0 ? parts.join('.') : undefined;
@@ -37,7 +32,7 @@ let readPath = (value: unknown) => {
 let readValidationReasons = (value: unknown) => {
   if (!Array.isArray(value)) return [];
   return value
-    .slice(0, MAX_ERROR_DETAILS)
+    .slice(0, API_ERROR_MAX_DETAILS)
     .map(validationError =>
       readText(
         isRecord(validationError)
@@ -46,14 +41,6 @@ let readValidationReasons = (value: unknown) => {
       )
     )
     .filter((reason): reason is string => reason !== undefined);
-};
-
-let pushDetail = (details: string[], value: unknown) => {
-  if (details.length >= MAX_ERROR_DETAILS) return;
-  let text = readText(value);
-  if (text && !details.includes(text)) {
-    details.push(text);
-  }
 };
 
 // NerdGraph errors look like
@@ -107,19 +94,18 @@ let extractNewRelicDataMessage = (data: unknown) => {
     pushDetail(details, data.details);
   }
 
-  return details.length > 0 ? truncate(details.join(' - ')) : undefined;
+  return details.length > 0 ? truncateApiErrorMessage(details.join(' - ')) : undefined;
 };
 
-// createAxios stores the failed response body in SlateError baggage, but its
-// sanitizer truncates values nested 4+ levels deep, which drops
-// errors[].extensions.*. Lift the useful fields onto each error item so they
-// survive into the baggage.
+// createAxios stores this flattened body in SlateError baggage. Lift the useful
+// errors[].extensions.* fields onto each error item and cap the list so the
+// baggage keeps a small, flat shape the extractors read.
 export let flattenNewRelicErrorResponse = (data: unknown) => {
   if (!isRecord(data) || !Array.isArray(data.errors)) return data;
 
   return {
     ...data,
-    errors: data.errors.slice(0, MAX_ERROR_DETAILS).map(item => {
+    errors: data.errors.slice(0, API_ERROR_MAX_DETAILS).map(item => {
       if (!isRecord(item)) return item;
       let { extensions: rawExtensions, ...rest } = item;
       let extensions = isRecord(rawExtensions) ? rawExtensions : {};
@@ -136,26 +122,9 @@ export let flattenNewRelicErrorResponse = (data: unknown) => {
   };
 };
 
-// createAxios converts upstream failures into SlateError before this adapter
-// runs, so the raw response body only survives in SlateError.data.baggage.
-let withSlateErrorResponseData = (
-  error: unknown,
-  response: ApiErrorResponse | undefined
-): ApiErrorResponse | undefined => {
-  if (response?.data !== undefined) return response;
-  if (!isRecord(error) || error.name !== 'SlateError' || !isRecord(error.data)) {
-    return response;
-  }
-
-  let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
-  if (baggage?.response === undefined) return response;
-
-  return { ...response, data: baggage.response };
-};
-
 let fallbackMessageFor = (error: unknown, response: ApiErrorResponse | undefined) => {
   let message = error instanceof Error ? error.message.trim() : '';
-  if (message && !looksLikeHtml(message)) return truncate(message);
+  if (message && !looksLikeHtmlErrorBody(message)) return truncateApiErrorMessage(message);
   if (response?.statusText) return response.statusText;
   return message
     ? 'New Relic returned an unexpected non-JSON error response.'
@@ -170,7 +139,7 @@ export let newRelicApiError = (error: unknown, operation = 'request') => {
     operation,
     reason: 'new_relic_api_error',
     extractResponse: (input, helpers) => {
-      response = withSlateErrorResponseData(input, helpers.getResponse(input));
+      response = helpers.getResponseWithBody(input);
       return response;
     },
     extractMessage: input =>

@@ -1,12 +1,18 @@
-import { isApiErrorRecord } from 'slates';
+import {
+  API_ERROR_MAX_DETAILS,
+  API_ERROR_MAX_MESSAGE_LENGTH,
+  isApiErrorRecord,
+  pushBoundedApiErrorDetail,
+  readApiErrorText,
+  truncateApiErrorMessage
+} from 'slates';
 
 type GoogleAdsErrorDetail = {
   code?: string;
   message?: string;
 };
 
-let readString = (value: unknown) =>
-  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+let readString = (value: unknown) => readApiErrorText(value, { includeNumbers: false });
 
 // errorCode is a oneof such as { queryError: 'UNRECOGNIZED_FIELD' }.
 let readErrorCode = (value: unknown) => {
@@ -55,23 +61,19 @@ let LOGIN_CUSTOMER_ID_HINT =
 
 // Mutate and conversion-upload requests can return thousands of per-operation
 // errors; keep the message bounded.
-let MAX_REASONS = 5;
-let MAX_REASONS_LENGTH = 1000;
-
 let formatReasons = (details: GoogleAdsErrorDetail[]) => {
   let unique: string[] = [];
   for (let detail of details) {
-    let reason =
-      detail.code && detail.message
-        ? `${detail.code}: ${detail.message}`
-        : (detail.code ?? detail.message);
-    if (reason && !unique.includes(reason)) unique.push(reason);
+    pushBoundedApiErrorDetail(unique, detail.message ?? detail.code, {
+      field: detail.message ? detail.code : undefined,
+      maxDetails: Number.POSITIVE_INFINITY
+    });
   }
 
-  let shown = unique.slice(0, MAX_REASONS);
+  let shown = unique.slice(0, API_ERROR_MAX_DETAILS);
   let text = shown.join('; ');
-  if (text.length > MAX_REASONS_LENGTH) {
-    text = `${text.slice(0, MAX_REASONS_LENGTH - 3)}...`;
+  if (text.length > API_ERROR_MAX_MESSAGE_LENGTH) {
+    text = truncateApiErrorMessage(text, API_ERROR_MAX_MESSAGE_LENGTH - 3);
   }
 
   let more = unique.length - shown.length;
