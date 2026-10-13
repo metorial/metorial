@@ -21,7 +21,7 @@ export const companiesHouseToolKeys = [
 export { getCompanyCharge, listCompanyCharges } from './charges';
 export { getCompanyProfile } from './company-profile';
 export { getOfficerDisqualifications, searchDisqualifiedOfficers } from './disqualifications';
-export { downloadFilingDocument, getDocumentMetadata } from './documents';
+export { downloadFilingDocument, getDocumentMetadata, getFileUrl } from './documents';
 export { getFilingHistoryItem, listFilingHistory } from './filings';
 export { getCompanyInsolvency } from './insolvency';
 export { listCompanyOfficers, listOfficerAppointments, searchOfficers } from './officers';
@@ -31,7 +31,7 @@ export { searchCompanies, searchCompaniesAdvanced } from './search-companies';
 import { getCompanyCharge, listCompanyCharges } from './charges';
 import { getCompanyProfile } from './company-profile';
 import { getOfficerDisqualifications, searchDisqualifiedOfficers } from './disqualifications';
-import { downloadFilingDocument, getDocumentMetadata } from './documents';
+import { downloadFilingDocument, getDocumentMetadata, getFileUrl } from './documents';
 import { getFilingHistoryItem, listFilingHistory } from './filings';
 import { getCompanyInsolvency } from './insolvency';
 import { listCompanyOfficers, listOfficerAppointments, searchOfficers } from './officers';
@@ -55,5 +55,6 @@ export const tools = [
   getCompanyCharge,
   getCompanyInsolvency,
   listCompanyPscs,
-  listPscStatements
+  listPscStatements,
+  getFileUrl
 ];

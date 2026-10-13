@@ -34,9 +34,9 @@ Keep API keys, OAuth client secrets, and tokens secret. Do not commit them to so
 - `list_filing_history` — list a company’s filings, optionally filtered by filing category.
 - `get_filing_history_item` — retrieve one filing and its document identifier when an image is available.
 - `get_document_metadata` — inspect document metadata and discover available representations.
-- `download_filing_document` — download one representation advertised by the document metadata.
+- `download_filing_document` — get one representation advertised by the document metadata as a downloadable file.
 
-Call `get_document_metadata` before `download_filing_document`, then pass one of its advertised MIME types. Supported types are `application/pdf`, `application/json`, `application/xml`, `application/xhtml+xml`, `application/zip`, and `text/csv`. A downloaded document is limited to 50 MiB.
+Call `get_document_metadata` before `download_filing_document`, then pass one of its advertised MIME types. Supported types are `application/pdf`, `application/json`, `application/xml`, `application/xhtml+xml`, `application/zip`, and `text/csv`.
 
 ### Financial distress, security, and ownership
 

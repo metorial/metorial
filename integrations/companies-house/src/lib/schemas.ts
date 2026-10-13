@@ -364,7 +364,12 @@ export const downloadedDocumentOutputSchema = z.object({
   documentId: z.string(),
   fileName: z.string(),
   mimeType: z.string(),
-  byteLength: z.number().int().nonnegative()
+  byteLength: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe('File size in bytes as advertised by the document metadata, when available.')
 });
 
 export const providerLinksSchema = z.union([

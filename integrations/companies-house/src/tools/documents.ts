@@ -1,4 +1,4 @@
-import { createBase64Attachment, pickDefined, SlateTool } from 'slates';
+import { createApiServiceError, getFileUrlTool, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CompaniesHouseClient } from '../lib/client';
 import {
@@ -56,10 +56,7 @@ export let downloadFilingDocument = SlateTool.create(spec, {
   name: 'Download Filing Document',
   key: 'download_filing_document',
   description:
-    'Download one advertised representation of a Companies House filing document as a file.',
-  constraints: [
-    'Maximum downloadable file size is 4 MiB. If the selected representation exceeds this limit, download it directly from Companies House or choose a smaller content type returned by get_document_metadata.'
-  ],
+    'Get one advertised representation of a Companies House filing document as a downloadable file.',
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -74,22 +71,50 @@ export let downloadFilingDocument = SlateTool.create(spec, {
   )
   .output(downloadedDocumentOutputSchema)
   .handleInvocation(async ctx => {
-    let document = await new CompaniesHouseClient(ctx.auth).getDocumentContent(
+    let document = await new CompaniesHouseClient(ctx.auth).getDocumentDownload(
       ctx.input.documentId,
       ctx.input.contentType
     );
+    await ctx.addAttachment({
+      type: 'url',
+      url: document.url,
+      mimeType: document.mimeType,
+      refreshReference: { documentId: document.documentId, contentType: document.mimeType },
+      refreshAt: document.refreshAt
+    });
+
     let fileName = fileNameFor(document.documentId, document.extension);
     return {
       output: {
         documentId: document.documentId,
         fileName,
         mimeType: document.mimeType,
-        byteLength: document.content.length
+        ...pickDefined({ byteLength: document.byteLength })
       },
-      attachments: [
-        createBase64Attachment(document.content.toString('base64'), document.mimeType)
-      ],
-      message: `Downloaded file **${fileName}** as **${document.mimeType}**.`
+      message: `Prepared file **${fileName}** (**${document.mimeType}**) for download.`
     };
   })
   .build();
+
+let documentReferenceSchema = z.object({
+  documentId: documentIdSchema,
+  contentType: documentMimeTypeSchema
+});
+
+// Companies House document links are short-lived; issue a fresh one for the same
+// document representation when it is downloaded again.
+export let getFileUrl = getFileUrlTool(spec, async ctx => {
+  let reference = documentReferenceSchema.safeParse(ctx.input.reference);
+  if (!reference.success) {
+    throw createApiServiceError(
+      'The filing document reference is invalid. Download the filing document again.',
+      { reason: 'companies_house_document_reference_invalid' }
+    );
+  }
+
+  let link = await new CompaniesHouseClient(ctx.auth).getDocumentLink(
+    reference.data.documentId,
+    reference.data.contentType
+  );
+  return { url: link.url, expiresAt: link.refreshAt, headers: {}, query: {} };
+});

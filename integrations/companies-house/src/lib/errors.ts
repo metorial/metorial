@@ -79,11 +79,3 @@ export const companiesHouseApiError = (
   mapped.data.message = redact(mapped.data.message, secrets);
   return mapped;
 };
-
-export const companiesHouseDownloadError = (error: unknown, operation: string) =>
-  buildApiServiceError(error, {
-    providerLabel: 'Companies House document download',
-    reason: 'companies_house_document_download_error',
-    operation,
-    extractMessage: () => 'The document bytes could not be retrieved from the redirect URL.'
-  });

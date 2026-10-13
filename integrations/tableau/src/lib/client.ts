@@ -35,86 +35,6 @@ let applyTableauErrorInterceptor = (http: ReturnType<typeof createAxios>) => {
   );
 };
 
-// Exported files are returned inline with the tool result, which has a hard size limit.
-// Cap the encoded payload well below it so large views fail with a clear message.
-let MAX_EXPORT_PAYLOAD_BYTES = 4 * 1024 * 1024;
-let MAX_BINARY_EXPORT_BYTES = Math.floor((MAX_EXPORT_PAYLOAD_BYTES / 4) * 3);
-
-let exportTooLargeError = (format: ViewExportFormat, hint: string) =>
-  tableauServiceError(
-    format === 'csv'
-      ? `The Tableau CSV data export is larger than ${
-          MAX_EXPORT_PAYLOAD_BYTES / (1024 * 1024)
-        } MB, the most that can be returned. ${hint}`
-      : `The Tableau ${format === 'image' ? 'image' : 'PDF'} export is larger than about ${
-          MAX_BINARY_EXPORT_BYTES / (1024 * 1024)
-        } MB, the most that can be returned. ${hint}`
-  );
-
-let EXPORT_SIZE_HINTS = {
-  viewData:
-    'Use the Export View tool with format "csv" and filters to narrow the data, or export a smaller view.',
-  viewCsv: 'Narrow it with view filters or export a smaller view or custom view.',
-  viewImage:
-    'Omit the high imageResolution setting, narrow it with view filters, or export a smaller view.',
-  viewPdf:
-    'Use a smaller pdfPageType or lower vizWidth/vizHeight, narrow it with view filters, or export a smaller view.',
-  customView: 'Narrow it with view filters or export a smaller custom view.'
-};
-
-// Axios aborts the download with this message once maxContentLength is exceeded; it
-// reaches here already wrapped by the shared and Tableau error interceptors.
-let isMaxContentLengthError = (error: unknown) => {
-  let messages = [
-    error instanceof Error ? error.message : undefined,
-    (error as { data?: { message?: unknown } } | undefined)?.data?.message
-  ];
-  return messages.some(
-    message =>
-      typeof message === 'string' && /maxContentLength size of \d+ exceeded/i.test(message)
-  );
-};
-
-let downloadExport = async <T>(
-  format: ViewExportFormat,
-  hint: string,
-  request: () => Promise<T>
-) => {
-  try {
-    return await request();
-  } catch (error) {
-    if (isMaxContentLengthError(error)) throw exportTooLargeError(format, hint);
-    throw error;
-  }
-};
-
-let exportRequestConfig = (format: ViewExportFormat, options?: ViewExportOptions) => ({
-  params: buildViewExportParams(options),
-  responseType: format === 'csv' ? ('text' as const) : ('arraybuffer' as const),
-  headers: { Accept: '*/*' },
-  maxContentLength: format === 'csv' ? MAX_EXPORT_PAYLOAD_BYTES : MAX_BINARY_EXPORT_BYTES
-});
-
-let readTextExport = (data: unknown, hint: string) => {
-  let text =
-    typeof data === 'string'
-      ? data
-      : data instanceof ArrayBuffer || ArrayBuffer.isView(data)
-        ? Buffer.from(data as any).toString('utf8')
-        : String(data ?? '');
-  // Measure the JSON-encoded size, since quotes and newlines are escaped in the result.
-  if (Buffer.byteLength(JSON.stringify(text), 'utf8') > MAX_EXPORT_PAYLOAD_BYTES) {
-    throw exportTooLargeError('csv', hint);
-  }
-  return text;
-};
-
-let readBinaryExport = (data: unknown, format: ViewExportFormat, hint: string) => {
-  let encoded = encodeResponseData(data);
-  if (encoded.length > MAX_EXPORT_PAYLOAD_BYTES) throw exportTooLargeError(format, hint);
-  return encoded;
-};
-
 let buildViewExportParams = (options?: ViewExportOptions) => {
   let params: Record<string, string> = {};
 
@@ -144,7 +64,22 @@ let buildViewExportParams = (options?: ViewExportOptions) => {
   return params;
 };
 
-let encodeResponseData = (data: unknown) => Buffer.from(data as any).toString('base64');
+export interface ViewExportFile {
+  url: string;
+  mimeType: string;
+}
+
+let EXPORT_MIME_TYPES: Record<ViewExportFormat, string> = {
+  csv: 'text/csv',
+  image: 'image/png',
+  pdf: 'application/pdf'
+};
+
+let EXPORT_ENDPOINTS: Record<ViewExportFormat, string> = {
+  csv: 'data',
+  image: 'image',
+  pdf: 'pdf'
+};
 
 let tableauErrorMapping = {
   extractResponseData: (response: { data: unknown }) => decodeTableauErrorBody(response.data)
@@ -369,54 +304,23 @@ export class TableauClient {
     return response.data;
   }
 
-  async getViewData(
-    viewId: string,
-    options?: ViewExportOptions,
-    sizeHint = EXPORT_SIZE_HINTS.viewData
-  ): Promise<string> {
-    let response = await downloadExport('csv', sizeHint, () =>
-      this.http.get(
-        `/sites/${this.siteId}/views/${viewId}/data`,
-        exportRequestConfig('csv', options)
-      )
-    );
-    return readTextExport(response.data, sizeHint);
+  async getView(viewId: string): Promise<any> {
+    let response = await this.http.get(`/sites/${this.siteId}/views/${viewId}`);
+    return response.data.view;
   }
 
-  async exportView(
+  // Export endpoints are stable GET URLs authenticated by the X-Tableau-Auth header, so
+  // the file is fetched on download instead of being read here.
+  viewExportFile(
     viewId: string,
     format: ViewExportFormat,
     options?: ViewExportOptions
-  ): Promise<{
-    data: string;
-    contentType: string;
-    encoding: 'text' | 'base64';
-  }> {
-    if (format === 'csv') {
-      let data = await this.getViewData(viewId, options, EXPORT_SIZE_HINTS.viewCsv);
-      return {
-        data,
-        contentType: 'text/csv',
-        encoding: 'text'
-      };
-    }
-
-    let endpoint = format === 'image' ? 'image' : 'pdf';
-    let contentType = format === 'image' ? 'image/png' : 'application/pdf';
-    let sizeHint =
-      format === 'image' ? EXPORT_SIZE_HINTS.viewImage : EXPORT_SIZE_HINTS.viewPdf;
-    let response = await downloadExport(format, sizeHint, () =>
-      this.http.get(
-        `/sites/${this.siteId}/views/${viewId}/${endpoint}`,
-        exportRequestConfig(format, options)
-      )
+  ): ViewExportFile {
+    return this.exportFile(
+      `/sites/${this.siteId}/views/${encodeURIComponent(viewId)}/${EXPORT_ENDPOINTS[format]}`,
+      format,
+      options
     );
-
-    return {
-      data: readBinaryExport(response.data, format, sizeHint),
-      contentType,
-      encoding: 'base64'
-    };
   }
 
   // --- Custom Views ---
@@ -458,33 +362,28 @@ export class TableauClient {
     await this.http.delete(`/sites/${this.siteId}/customviews/${customViewId}`);
   }
 
-  async exportCustomView(
+  customViewExportFile(
     customViewId: string,
     format: ViewExportFormat,
     options?: ViewExportOptions
-  ): Promise<{
-    data: string;
-    contentType: string;
-    encoding: 'text' | 'base64';
-  }> {
-    let endpoint = format === 'csv' ? 'data' : format;
-    let contentType =
-      format === 'csv' ? 'text/csv' : format === 'image' ? 'image/png' : 'application/pdf';
-    let sizeHint = EXPORT_SIZE_HINTS.customView;
-    let response = await downloadExport(format, sizeHint, () =>
-      this.http.get(
-        `/sites/${this.siteId}/customviews/${customViewId}/${endpoint}`,
-        exportRequestConfig(format, options)
-      )
+  ): ViewExportFile {
+    return this.exportFile(
+      `/sites/${this.siteId}/customviews/${encodeURIComponent(customViewId)}/${EXPORT_ENDPOINTS[format]}`,
+      format,
+      options
     );
+  }
 
+  private exportFile(
+    path: string,
+    format: ViewExportFormat,
+    options?: ViewExportOptions
+  ): ViewExportFile {
+    // getUri applies the client's base URL and the same query serialization as a request,
+    // so view filters reach Tableau exactly as a direct export call would send them.
     return {
-      data:
-        format === 'csv'
-          ? readTextExport(response.data, sizeHint)
-          : readBinaryExport(response.data, format, sizeHint),
-      contentType,
-      encoding: format === 'csv' ? 'text' : 'base64'
+      url: this.http.getUri({ url: path, params: buildViewExportParams(options) }),
+      mimeType: EXPORT_MIME_TYPES[format]
     };
   }
 

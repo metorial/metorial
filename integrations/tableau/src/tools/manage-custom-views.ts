@@ -1,7 +1,7 @@
-import { createBase64Attachment, createTextAttachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { tableauServiceError } from '../lib/errors';
-import { createClient } from '../lib/helpers';
+import { addViewExportFile, createClient, EXPORT_FORMAT_LABELS } from '../lib/helpers';
 import { spec } from '../spec';
 
 let filterValueSchema = z.union([z.string(), z.number(), z.boolean()]);
@@ -31,7 +31,7 @@ let normalizeCustomView = (customView: any) => ({
 export let manageCustomViews = SlateTool.create(spec, {
   name: 'Manage Custom Views',
   key: 'manage_custom_views',
-  description: `List, get, update, delete, or export Tableau custom views. Custom views are saved user-specific configurations of workbook views.`,
+  description: `List, get, update, delete, or export Tableau custom views. Custom views are saved user-specific configurations of workbook views. The export action returns the custom view as a downloadable CSV, PNG, or PDF file.`,
   tags: { destructive: true }
 })
   .input(
@@ -145,25 +145,22 @@ export let manageCustomViews = SlateTool.create(spec, {
         throw tableauServiceError('exportFormat is required for export action.');
       }
 
-      let result = await client.exportCustomView(
-        ctx.input.customViewId,
-        ctx.input.exportFormat,
-        {
-          maxAgeMinutes: ctx.input.maxAgeMinutes,
-          filters: ctx.input.filters
-        }
-      );
+      let customView = await client.getCustomView(ctx.input.customViewId);
+      let file = client.customViewExportFile(ctx.input.customViewId, ctx.input.exportFormat, {
+        maxAgeMinutes: ctx.input.maxAgeMinutes,
+        filters: ctx.input.filters
+      });
+      await addViewExportFile(ctx, file);
+
+      let label = customView?.name
+        ? `**${customView.name}**`
+        : `\`${ctx.input.customViewId}\``;
       return {
         output: {
           exportFormat: ctx.input.exportFormat,
-          contentType: result.contentType
+          contentType: file.mimeType
         },
-        attachments: [
-          result.encoding === 'text'
-            ? createTextAttachment(result.data, result.contentType)
-            : createBase64Attachment(result.data, result.contentType)
-        ],
-        message: `Exported custom view \`${ctx.input.customViewId}\` as ${ctx.input.exportFormat}.`
+        message: `Prepared custom view ${label} as a ${EXPORT_FORMAT_LABELS[ctx.input.exportFormat]} for download.`
       };
     }
 

@@ -10,11 +10,11 @@ Retrieve information about the current Tableau site, including name, URL, storag
 
 ### Get View Data
 
-Export the underlying data from a Tableau view as CSV. Useful for retrieving the tabular data behind a dashboard visualization.
+Export the underlying data from a Tableau view as a downloadable CSV file. Useful for retrieving the tabular data behind a dashboard visualization.
 
 ### Export View
 
-Export a Tableau view as CSV data, a PNG image, or a PDF file. Supports Tableau view filter query parameters and cache max-age controls.
+Export a Tableau view as a downloadable CSV data, PNG image, or PDF file. Supports Tableau view filter query parameters and cache max-age controls.
 
 ### List Data Sources
 
@@ -38,7 +38,7 @@ List, get, create, update, or delete collections, and add, remove, or list colle
 
 ### Manage Custom Views
 
-List, get, update, delete, or export Tableau custom views. Custom views are saved user-specific configurations of workbook views.
+List, get, update, delete, or export Tableau custom views. Custom views are saved user-specific configurations of workbook views. The export action returns the custom view as a downloadable CSV, PNG, or PDF file.
 
 ### Manage Data Source
 

@@ -6,10 +6,6 @@ export const IDENTITY_BASE_URL = 'https://identity.company-information.service.g
 
 export const DEFAULT_ITEMS_PER_PAGE = 20;
 export const MAX_ITEMS_PER_PAGE = 100;
-// Downloaded bytes are returned base64-encoded inside the tool response, which must stay
-// under the runtime response payload limit (about 6 MB), so cap raw documents at 4 MiB.
-export const MAX_DOCUMENT_DOWNLOAD_BYTES = 4 * 1024 * 1024;
-export const MAX_DOCUMENT_DOWNLOAD_LABEL = '4 MiB';
 
 export const SAFE_DOCUMENT_MIME_EXTENSIONS = {
   'application/pdf': 'pdf',

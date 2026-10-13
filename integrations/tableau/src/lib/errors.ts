@@ -1,32 +1,24 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-import { type ApiErrorResponse, buildApiServiceError } from 'slates';
+import {
+  type ApiErrorBuildHelpers,
+  type ApiErrorResponse,
+  buildApiServiceError,
+  decodeApiErrorBody,
+  isApiErrorRecord,
+  looksLikeHtmlErrorBody,
+  pushBoundedApiErrorDetail,
+  readApiErrorText,
+  truncateApiErrorMessage
+} from 'slates';
 
-let MAX_ERROR_DETAILS = 5;
-let MAX_ERROR_MESSAGE_LENGTH = 1_000;
 let MAX_ERROR_BODY_SCAN_LENGTH = 64 * 1024;
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-let looksLikeHtml = (value: string) =>
-  /^\s*<!doctype html/i.test(value) || /<\/?(html|body|head)\b/i.test(value);
-
-let truncate = (value: string) =>
-  value.length > MAX_ERROR_MESSAGE_LENGTH
-    ? `${value.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...`
-    : value;
-
-let pushDetail = (details: string[], value: unknown) => {
-  if (details.length >= MAX_ERROR_DETAILS) return;
-  if (typeof value !== 'string') return;
-
-  let text = value.trim();
-  if (!text || looksLikeHtml(text) || text === '[truncated]') return;
-  if (!details.includes(text)) details.push(text);
-};
+// Tableau error details are text; numeric values are never shown as messages.
+let pushDetail = (details: string[], value: unknown) =>
+  pushBoundedApiErrorDetail(details, value, { includeNumbers: false });
 
 let collectTableauDetails = (value: unknown, details: string[]) => {
-  if (!isRecord(value)) return;
+  if (!isApiErrorRecord(value)) return;
 
   pushDetail(details, value.summary);
   pushDetail(details, value.detail);
@@ -38,7 +30,7 @@ let collectTableauDetails = (value: unknown, details: string[]) => {
     pushDetail(details, `code ${value.code.trim()}`);
   }
 
-  if (isRecord(value.error)) collectTableauDetails(value.error, details);
+  if (isApiErrorRecord(value.error)) collectTableauDetails(value.error, details);
 
   if (Array.isArray(value.errors)) {
     for (let item of value.errors) collectTableauDetails(item, details);
@@ -53,8 +45,8 @@ let decodeXmlEntities = (value: string) =>
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&');
 
-// Export endpoints are requested with Accept: */*, so Tableau can answer errors
-// with its XML tsResponse envelope instead of JSON.
+// Tableau can answer errors with its XML tsResponse envelope instead of JSON,
+// depending on the request's Accept header.
 let parseTableauXmlError = (text: string) => {
   let errorMatch = /<error\b([^>]*)>([\s\S]*?)<\/error>/i.exec(text);
   if (!errorMatch) return undefined;
@@ -74,82 +66,69 @@ let parseTableauXmlError = (text: string) => {
   };
 };
 
+let isTextBody = (data: unknown) =>
+  typeof data === 'string' || data instanceof ArrayBuffer || ArrayBuffer.isView(data);
+
 /**
- * Decodes Tableau error bodies (JSON, XML, text, or binary from file exports) into a
- * structured value so the shared error baggage keeps readable details instead of
- * raw byte maps or markup.
+ * Decodes Tableau error bodies (JSON, XML, or text, as strings or bytes) into a structured
+ * value so the shared error baggage keeps readable details instead of raw byte maps or markup.
  */
 export let decodeTableauErrorBody = (data: unknown): unknown => {
-  let text: string | undefined;
+  if (!isTextBody(data)) return data;
 
-  if (typeof data === 'string') {
-    text = data;
-  } else if (data instanceof ArrayBuffer) {
-    text = Buffer.from(data).toString('utf8');
-  } else if (ArrayBuffer.isView(data)) {
-    text = Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf8');
-  } else {
-    return data;
-  }
+  let decoded = decodeApiErrorBody(data);
+  if (typeof decoded !== 'string') return decoded;
 
-  let trimmed = text.trim();
-  // Empty, HTML, and unrecognized markup bodies become an empty record so raw markup
-  // or byte maps never end up in the stored error details.
-  if (!trimmed) return {};
+  // Empty and HTML bodies become an empty record so raw markup never ends up in the
+  // stored error details.
+  if (!decoded) return {};
 
-  if (/^[{[]/.test(trimmed)) {
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      // Fall through to the bounded text handling below.
-    }
-  }
-
-  let bounded = trimmed.slice(0, MAX_ERROR_BODY_SCAN_LENGTH);
-  if (looksLikeHtml(bounded)) return {};
+  let bounded = decoded.slice(0, MAX_ERROR_BODY_SCAN_LENGTH);
+  if (looksLikeHtmlErrorBody(bounded)) return {};
 
   if (bounded.startsWith('<')) {
-    return parseTableauXmlError(bounded) ?? {};
+    let xmlError = parseTableauXmlError(bounded);
+    if (xmlError) return xmlError;
+    // Other XML documents carry no readable message; plain text such as "<id> is required"
+    // is kept below.
+    if (/^<(\?xml|tsResponse)\b/i.test(bounded)) return {};
   }
 
-  return truncate(bounded);
+  return truncateApiErrorMessage(bounded);
 };
 
 // createAxios converts upstream failures into SlateError before this adapter runs, so
-// the upstream status only survives in SlateError.data and the body in its baggage.
-let withSlateErrorResponseData = (
+// the body is recovered from its baggage and decoded the same way as a raw response.
+let getTableauErrorResponse = (
   error: unknown,
-  response: ApiErrorResponse | undefined
+  helpers: ApiErrorBuildHelpers
 ): ApiErrorResponse | undefined => {
-  if (response?.data !== undefined) {
-    return { ...response, data: decodeTableauErrorBody(response.data) };
-  }
-  if (!isRecord(error) || error.name !== 'SlateError' || !isRecord(error.data)) {
-    return response;
-  }
-
-  let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
-  if (baggage?.response === undefined) return response;
-
-  return { ...response, data: decodeTableauErrorBody(baggage.response) };
+  let response = helpers.getResponseWithBody(error);
+  if (response?.data === undefined) return response;
+  return { ...response, data: decodeTableauErrorBody(response.data) };
 };
 
 let extractTableauMessage = (error: unknown, response: ApiErrorResponse | undefined) => {
   let details: string[] = [];
   let data = response?.data;
 
-  if (isRecord(data)) {
+  if (isApiErrorRecord(data)) {
     collectTableauDetails(data, details);
   } else {
     pushDetail(details, data);
   }
 
-  if (details.length > 0) return truncate(details.join(' - '));
+  if (details.length > 0) return truncateApiErrorMessage(details.join(' - '));
 
-  let message = error instanceof Error ? error.message.trim() : '';
-  if (message && !looksLikeHtml(message)) return truncate(message);
+  // The intercepted error message can itself be an HTML page or a sanitized-baggage
+  // placeholder; neither is shown.
+  let rawMessage = error instanceof Error ? error.message.trim() : '';
+  let message = readApiErrorText(rawMessage);
+  if (message) return truncateApiErrorMessage(message);
   if (response?.statusText) return response.statusText;
-  return message ? 'Tableau returned an unexpected non-JSON error response.' : 'Unknown error';
+  return rawMessage
+    ? 'Tableau returned an unexpected non-JSON error response.'
+    : 'Unknown error';
 };
 
 export let tableauServiceError = (message: string) =>
@@ -160,11 +139,7 @@ export let tableauApiError = (error: unknown, operation = 'request') =>
     providerLabel: 'Tableau',
     operation,
     reason: 'tableau_api_error',
-    extractResponse: (input, helpers) =>
-      withSlateErrorResponseData(input, helpers.getResponse(input)),
+    extractResponse: getTableauErrorResponse,
     extractMessage: (input, helpers) =>
-      extractTableauMessage(
-        input,
-        withSlateErrorResponseData(input, helpers.getResponse(input))
-      )
+      extractTableauMessage(input, getTableauErrorResponse(input, helpers))
   });
