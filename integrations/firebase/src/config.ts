@@ -22,7 +22,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Firebase Web API key. Required by the Firebase Authentication REST API for create user operations.'
+        'Optional Firebase Web API key. Sent with create user requests when provided; not required because user management authenticates with the connected Google account.'
       )
   })
 );
