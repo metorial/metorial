@@ -16,6 +16,22 @@ import {
 
 export type AmplitudeRegion = 'US' | 'EU';
 
+// Built-in user properties accepted by the Dashboard REST composition endpoint.
+let BUILT_IN_COMPOSITION_PROPERTIES = new Set([
+  'version',
+  'country',
+  'city',
+  'region',
+  'dma',
+  'language',
+  'platform',
+  'os',
+  'device',
+  'device_type',
+  'start_version',
+  'paying'
+]);
+
 let getBaseUrl = (region: AmplitudeRegion) => {
   return region === 'EU' ? 'https://analytics.eu.amplitude.com' : 'https://amplitude.com';
 };
@@ -550,8 +566,16 @@ export class AmplitudeClient {
 
   async getUserComposition(params: { start: string; end: string; p: string }) {
     validateDateRange(params.start, params.end);
+    let property = params.p.trim();
+    if (!property) throw amplitudeServiceError('property must name a user property.');
+    // Amplitude rejects custom user properties without the gp: prefix as an invalid chart.
+    if (
+      !property.includes(':') &&
+      !BUILT_IN_COMPOSITION_PROPERTIES.has(property.toLowerCase())
+    )
+      property = `gp:${property}`;
     let ax = this.getAnalyticsAxios();
-    let response = await ax.get('/2/composition', { params });
+    let response = await ax.get('/2/composition', { params: { ...params, p: property } });
     return response.data;
   }
 
