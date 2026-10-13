@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { tableauServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
@@ -71,8 +71,18 @@ export let manageCustomViews = SlateTool.create(spec, {
       deleted: z.boolean().optional(),
       exportFormat: z.enum(['csv', 'image', 'pdf']).optional(),
       contentType: z.string().optional(),
-      csvData: z.string().optional(),
-      contentBase64: z.string().optional()
+      csvData: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy inline CSV field; omitted because the export is returned as a downloadable file'
+        ),
+      contentBase64: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy inline file field; omitted because the export is returned as a downloadable file'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -146,10 +156,13 @@ export let manageCustomViews = SlateTool.create(spec, {
       return {
         output: {
           exportFormat: ctx.input.exportFormat,
-          contentType: result.contentType,
-          csvData: result.encoding === 'text' ? result.data : undefined,
-          contentBase64: result.encoding === 'base64' ? result.data : undefined
+          contentType: result.contentType
         },
+        attachments: [
+          result.encoding === 'text'
+            ? createTextAttachment(result.data, result.contentType)
+            : createBase64Attachment(result.data, result.contentType)
+        ],
         message: `Exported custom view \`${ctx.input.customViewId}\` as ${ctx.input.exportFormat}.`
       };
     }
