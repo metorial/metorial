@@ -45,6 +45,9 @@ let encodeWebhooks = (webhooks: ApifyRecord[] | undefined) =>
 
 let pathId = (id: string) => encodeURIComponent(id);
 
+// Apify identifies named tasks as `username~task-name`; accept the common `username/task-name` form too.
+let taskPathId = (taskId: string) => encodeURIComponent(taskId.trim().replace('/', '~'));
+
 let apifyList = <T = ApifyRecord>(data: any): ApifyListResult<T> => ({
   items: Array.isArray(data?.items) ? data.items : [],
   total: typeof data?.total === 'number' ? data.total : 0,
@@ -243,33 +246,6 @@ export class ApifyClient {
     );
   }
 
-  async runActorSync(
-    actorId: string,
-    params?: {
-      input?: unknown;
-      timeout?: number;
-      memory?: number;
-      build?: string;
-      maxItems?: number;
-      maxTotalChargeUsd?: number;
-      webhooks?: ApifyRecord[];
-    }
-  ): Promise<ApifyRecord[]> {
-    let data = await requestAxiosData<unknown>(
-      'run actor synchronously',
-      () =>
-        this.http.post(
-          `/acts/${pathId(actorId)}/run-sync-get-dataset-items`,
-          params?.input ?? {},
-          {
-            params: runOptionsQuery(params)
-          }
-        ),
-      apifyApiError
-    );
-    return Array.isArray(data) ? (data as ApifyRecord[]) : [];
-  }
-
   async getRun(runId: string, params?: { waitForFinish?: number }): Promise<ApifyRecord> {
     return this.wrapped('get actor run', () =>
       this.http.get(`/actor-runs/${pathId(runId)}`, {
@@ -343,7 +319,9 @@ export class ApifyClient {
   }
 
   async getTask(taskId: string): Promise<ApifyRecord> {
-    return this.wrapped('get actor task', () => this.http.get(`/actor-tasks/${taskId}`));
+    return this.wrapped('get actor task', () =>
+      this.http.get(`/actor-tasks/${taskPathId(taskId)}`)
+    );
   }
 
   async createTask(taskData: ApifyRecord): Promise<ApifyRecord> {
@@ -352,14 +330,14 @@ export class ApifyClient {
 
   async updateTask(taskId: string, taskData: ApifyRecord): Promise<ApifyRecord> {
     return this.wrapped('update actor task', () =>
-      this.http.put(`/actor-tasks/${taskId}`, taskData)
+      this.http.put(`/actor-tasks/${taskPathId(taskId)}`, taskData)
     );
   }
 
   async deleteTask(taskId: string): Promise<void> {
     await requestAxios(
       'delete actor task',
-      () => this.http.delete(`/actor-tasks/${taskId}`),
+      () => this.http.delete(`/actor-tasks/${taskPathId(taskId)}`),
       apifyApiError
     );
   }
@@ -379,37 +357,10 @@ export class ApifyClient {
     }
   ): Promise<ApifyRecord> {
     return this.wrapped('run actor task', () =>
-      this.http.post(`/actor-tasks/${taskId}/runs`, params?.input ?? {}, {
+      this.http.post(`/actor-tasks/${taskPathId(taskId)}/runs`, params?.input ?? {}, {
         params: runOptionsQuery(params)
       })
     );
-  }
-
-  async runTaskSync(
-    taskId: string,
-    params?: {
-      input?: unknown;
-      timeout?: number;
-      memory?: number;
-      build?: string;
-      maxItems?: number;
-      maxTotalChargeUsd?: number;
-      webhooks?: ApifyRecord[];
-    }
-  ): Promise<ApifyRecord[]> {
-    let data = await requestAxiosData<unknown>(
-      'run actor task synchronously',
-      () =>
-        this.http.post(
-          `/actor-tasks/${pathId(taskId)}/run-sync-get-dataset-items`,
-          params?.input ?? {},
-          {
-            params: runOptionsQuery(params)
-          }
-        ),
-      apifyApiError
-    );
-    return Array.isArray(data) ? (data as ApifyRecord[]) : [];
   }
 
   async listDatasets(params?: {
