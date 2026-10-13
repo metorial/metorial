@@ -1,5 +1,9 @@
 import { createApiServiceError, createAxios } from 'slates';
-import { newRelicApiError, newRelicGraphqlErrors } from './errors';
+import {
+  flattenNewRelicErrorResponse,
+  newRelicApiError,
+  newRelicGraphqlErrors
+} from './errors';
 
 export type Region = 'us' | 'eu';
 
@@ -280,6 +284,9 @@ export class NerdGraphClient {
       headers: {
         'API-Key': config.token,
         'Content-Type': 'application/json'
+      },
+      errorMapping: {
+        extractResponseData: response => flattenNewRelicErrorResponse(response.data)
       }
     });
   }
