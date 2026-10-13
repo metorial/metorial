@@ -37,6 +37,10 @@ let selectionSchema = z.object({
     .string()
     .optional()
     .describe('Optional codelist or grouping id to apply for this variable.'),
+  codeList: z
+    .string()
+    .optional()
+    .describe('Alias for codelist, matching the PxWebApi field name. Use only one of them.'),
   outputValues: z
     .enum(['aggregated', 'single'])
     .optional()
@@ -287,6 +291,42 @@ let expandQuerySelectionExpressions = (
 let formatVariables = (variables: string[]) =>
   variables.map(variable => `\`${variable}\``).join(', ');
 
+const MAX_REPORTED_UNKNOWN_VARIABLES = 5;
+const MAX_REPORTED_UNKNOWN_CODES = 5;
+const MAX_REPORTED_VALID_CODES = 10;
+
+// Only plain codes are checked; SSB expressions (*, ?, top(), from(), [range()]) are left to SSB.
+let isPlainValueCode = (valueCode: string) => !/[*?([]/.test(valueCode);
+
+let formatCodeSample = (codes: string[], limit: number) =>
+  `${codes.slice(0, limit).join(', ')}${codes.length > limit ? `, ... (${codes.length} total)` : ''}`;
+
+let findUnknownValueCodes = (
+  selectionsByVariable: Map<string, TableSelection>,
+  dimensions: MetadataDimension[]
+) => {
+  let problems: string[] = [];
+
+  for (let dimension of dimensions) {
+    let selection = selectionsByVariable.get(dimension.id);
+    if (!selection || dimension.codes.length === 0) continue;
+
+    // SSB matches value codes case-insensitively.
+    let knownCodes = new Set(dimension.codes.map(code => code.toLowerCase()));
+    let unknownCodes = selection.valueCodes
+      .map(code => code.trim())
+      .filter(code => code && isPlainValueCode(code) && !knownCodes.has(code.toLowerCase()));
+
+    if (unknownCodes.length > 0) {
+      problems.push(
+        `\`${dimension.id}\`: ${formatCodeSample([...new Set(unknownCodes)], MAX_REPORTED_UNKNOWN_CODES)} (valid codes include ${formatCodeSample(dimension.codes, MAX_REPORTED_VALID_CODES)})`
+      );
+    }
+  }
+
+  return problems;
+};
+
 export let validateQuerySelectionAgainstMetadata = (
   query: Pick<TableQuery, 'tableId' | 'selection'>,
   metadata: unknown
@@ -328,6 +368,14 @@ export let validateQuerySelectionAgainstMetadata = (
   if (unknownVariables.length > 0) {
     throw ssbServiceError(
       `Unknown SSB variableCode for table ${query.tableId}: ${formatVariables(unknownVariables)}. Call get_tables with action="get_metadata" to discover valid variable codes.`
+    );
+  }
+
+  let unknownValueCodes = findUnknownValueCodes(selectionsByVariable, dimensions);
+
+  if (unknownValueCodes.length > 0) {
+    throw ssbServiceError(
+      `Unknown SSB valueCodes for table ${query.tableId}: ${unknownValueCodes.slice(0, MAX_REPORTED_UNKNOWN_VARIABLES).join('; ')}. Call get_tables with action="get_metadata" (with the same codelist, if any) to discover valid value codes.`
     );
   }
 
@@ -388,6 +436,20 @@ let preflightQuerySelection = async (client: SsbClient, query: TableQuery) => {
   };
 };
 
+let normalizeSelection = (
+  selection: z.infer<typeof selectionSchema>[] | undefined
+): TableSelection[] | undefined =>
+  selection?.map(({ codeList, codelist, ...item }) => {
+    if (codeList && codelist && codeList !== codelist) {
+      throw ssbServiceError(
+        `Selection for variable ${item.variableCode} sets both codelist (${codelist}) and codeList (${codeList}). Use only codelist.`
+      );
+    }
+
+    let resolvedCodelist = codelist ?? codeList;
+    return resolvedCodelist ? { ...item, codelist: resolvedCodelist } : item;
+  });
+
 let validateOutputParams = (
   outputFormat: z.infer<typeof outputFormatSchema>,
   outputFormatParams: z.infer<typeof outputFormatParamSchema>[]
@@ -446,10 +508,10 @@ export let queryTable = SlateTool.create(spec, {
       tableId: z.string().describe('Five digit SSB Statbank table id.'),
       language: languageSchema.optional().default('en').describe('Response language.'),
       method: z
-        .enum(['post', 'get'])
+        .enum(['post', 'get', 'POST', 'GET'])
         .optional()
         .default('post')
-        .describe('HTTP method. POST is preferred for larger selections.'),
+        .describe('HTTP method (case-insensitive). POST is preferred for larger selections.'),
       selection: z
         .array(selectionSchema)
         .optional()
@@ -480,7 +542,7 @@ export let queryTable = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('MIME type returned as metadata or attachment MIME.'),
-      attachmentCount: z.number().describe('Number of Slate attachments returned.'),
+      attachmentCount: z.number().describe('Number of downloadable files returned.'),
       label: z.string().optional().describe('JSON dataset label, when available.'),
       source: z.string().optional().describe('JSON dataset source, when available.'),
       updated: z
@@ -502,22 +564,25 @@ export let queryTable = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     validateOutputParams(ctx.input.outputFormat, ctx.input.outputFormatParams);
 
+    let method = ctx.input.method.toLowerCase() as 'post' | 'get';
+    let inputSelection = normalizeSelection(ctx.input.selection);
+
     let client = new SsbClient();
     let preflight = await preflightQuerySelection(client, {
       tableId: ctx.input.tableId,
       language: ctx.input.language,
-      method: ctx.input.method,
-      selection: ctx.input.selection,
+      method,
+      selection: inputSelection,
       outputFormat: ctx.input.outputFormat,
       outputFormatParams: ctx.input.outputFormatParams,
       placement: ctx.input.placement
     });
-    let selection = preflight.selection ?? ctx.input.selection;
+    let selection = preflight.selection ?? inputSelection;
 
     let result = await client.queryTable({
       tableId: ctx.input.tableId,
       language: ctx.input.language,
-      method: ctx.input.method,
+      method,
       selection,
       outputFormat: ctx.input.outputFormat,
       outputFormatParams: ctx.input.outputFormatParams,
@@ -532,7 +597,7 @@ export let queryTable = SlateTool.create(spec, {
         output: {
           tableId: ctx.input.tableId,
           language: ctx.input.language,
-          method: ctx.input.method,
+          method,
           outputFormat: ctx.input.outputFormat,
           contentType,
           attachmentCount: 0,
@@ -553,7 +618,7 @@ export let queryTable = SlateTool.create(spec, {
         output: {
           tableId: ctx.input.tableId,
           language: ctx.input.language,
-          method: ctx.input.method,
+          method,
           outputFormat: ctx.input.outputFormat,
           contentType,
           attachmentCount: 1
@@ -572,7 +637,7 @@ export let queryTable = SlateTool.create(spec, {
       output: {
         tableId: ctx.input.tableId,
         language: ctx.input.language,
-        method: ctx.input.method,
+        method,
         outputFormat: ctx.input.outputFormat,
         contentType,
         attachmentCount: 1
