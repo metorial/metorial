@@ -1,7 +1,37 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import {
+  createClient,
+  jsonByteLength,
+  takeWithinOutputBudget,
+  truncateText
+} from '../lib/helpers';
 import { spec } from '../spec';
+
+let MAX_LOG_MESSAGE_CHARS = 20_000;
+let MAX_LOG_ATTRIBUTES_BYTES = 50_000;
+
+let mapLogs = (data: any[]) =>
+  data.map((log: any) => {
+    let message = truncateText(log.attributes?.message, MAX_LOG_MESSAGE_CHARS);
+    let attributes = log.attributes?.attributes;
+    let attributesOmitted =
+      attributes !== undefined &&
+      attributes !== null &&
+      jsonByteLength(attributes) > MAX_LOG_ATTRIBUTES_BYTES;
+
+    return {
+      logId: log.id,
+      timestamp: log.attributes?.timestamp,
+      host: log.attributes?.host,
+      service: log.attributes?.service,
+      status: log.attributes?.status,
+      message: message.value,
+      tags: log.attributes?.tags,
+      attributes: attributesOmitted ? undefined : (attributes ?? undefined),
+      truncated: message.truncated || attributesOmitted ? true : undefined
+    };
+  });
 
 export let searchLogs = SlateTool.create(spec, {
   name: 'Search Logs',
@@ -11,7 +41,8 @@ Uses the Datadog log search query language, e.g. \`service:my-service status:err
   instructions: [
     'Use Datadog log query syntax for filtering, e.g. "service:web status:error".',
     'Time range is specified as ISO 8601 timestamps.',
-    'Use cursor for pagination when there are more results.'
+    'Use cursor for pagination when there are more results.',
+    'Very long log messages are shortened and very large custom attribute sets are omitted; such logs are marked truncated. Pages that would be too large are returned with fewer logs, and nextCursor continues after the last returned log.'
   ],
   tags: {
     readOnly: true
@@ -52,33 +83,67 @@ Uses the Datadog log search query language, e.g. \`service:my-service status:err
             status: z.string().optional(),
             message: z.string().optional(),
             tags: z.array(z.string()).optional(),
-            attributes: z.any().optional()
+            attributes: z.any().optional(),
+            truncated: z
+              .boolean()
+              .optional()
+              .describe(
+                'True when the message was shortened or custom attributes were omitted because they were too large'
+              )
           })
         )
         .describe('List of log entries'),
-      nextCursor: z.string().optional().describe('Cursor for the next page of results')
+      nextCursor: z.string().optional().describe('Cursor for the next page of results'),
+      pageReduced: z
+        .boolean()
+        .optional()
+        .describe(
+          'True when fewer logs than requested were returned to keep the response size manageable; continue with nextCursor'
+        ),
+      truncated: z
+        .boolean()
+        .optional()
+        .describe(
+          'True when at least one log had its message shortened or custom attributes omitted'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth, ctx.config);
     let result = await client.searchLogs(ctx.input);
+    let logs = mapLogs(result.data || []);
+    let nextCursor: string | undefined = result.meta?.page?.after;
+    let pageReduced = false;
 
-    let logs = (result.data || []).map((log: any) => ({
-      logId: log.id,
-      timestamp: log.attributes?.timestamp,
-      host: log.attributes?.host,
-      service: log.attributes?.service,
-      status: log.attributes?.status,
-      message: log.attributes?.message,
-      tags: log.attributes?.tags,
-      attributes: log.attributes?.attributes
-    }));
+    let fitted = takeWithinOutputBudget(logs);
+    if (fitted.truncated) {
+      // Request a smaller page so the returned cursor continues right after the last returned log.
+      let smaller = await client.searchLogs({ ...ctx.input, limit: fitted.items.length });
+      // Return the smaller page as-is: dropping logs here would skip them, since nextCursor
+      // continues after the last log of this page. Per-log caps keep it well under the limit.
+      logs = mapLogs(smaller.data || []);
+      nextCursor = smaller.meta?.page?.after;
+      pageReduced = true;
+    }
 
-    let nextCursor = result.meta?.page?.after;
+    let contentTruncated = logs.some(log => log.truncated);
 
     return {
-      output: { logs, nextCursor },
-      message: `Found **${logs.length}** log entries${nextCursor ? ' (more available)' : ''}`
+      output: {
+        logs,
+        nextCursor,
+        pageReduced: pageReduced || undefined,
+        truncated: contentTruncated || undefined
+      },
+      message: `Found **${logs.length}** log entries${nextCursor ? ' (more available)' : ''}${
+        pageReduced
+          ? '. The page was reduced to keep the response size manageable; use nextCursor to continue.'
+          : ''
+      }${
+        contentTruncated
+          ? ' Some log messages were shortened or custom attributes omitted because they were too large.'
+          : ''
+      }`
     };
   })
   .build();
