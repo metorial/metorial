@@ -4,6 +4,11 @@ import { pipedriveServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
+type ContactValue = string | { value: string; primary?: boolean; label?: string };
+
+let normalizeContactValues = (values: ContactValue[]) =>
+  values.map(item => (typeof item === 'string' ? { value: item } : item));
+
 export let managePersons = SlateTool.create(spec, {
   name: 'Manage Persons',
   key: 'manage_persons',
@@ -21,24 +26,32 @@ Supports setting name, email, phone, organization, and custom fields.`,
       name: z.string().optional().describe('Full name (required for create)'),
       email: z
         .array(
-          z.object({
-            value: z.string().describe('Email address'),
-            primary: z.boolean().optional().describe('Whether this is the primary email'),
-            label: z.string().optional().describe('Label (e.g. work, home)')
-          })
+          z.union([
+            z.string().describe('Email address'),
+            z.object({
+              value: z.string().describe('Email address'),
+              primary: z.boolean().optional().describe('Whether this is the primary email'),
+              label: z.string().optional().describe('Label (e.g. work, home)')
+            })
+          ])
         )
         .optional()
-        .describe('Email addresses'),
+        .describe(
+          'Email addresses, as plain strings or objects with value, primary, and label'
+        ),
       phone: z
         .array(
-          z.object({
-            value: z.string().describe('Phone number'),
-            primary: z.boolean().optional().describe('Whether this is the primary phone'),
-            label: z.string().optional().describe('Label (e.g. work, mobile, home)')
-          })
+          z.union([
+            z.string().describe('Phone number'),
+            z.object({
+              value: z.string().describe('Phone number'),
+              primary: z.boolean().optional().describe('Whether this is the primary phone'),
+              label: z.string().optional().describe('Label (e.g. work, mobile, home)')
+            })
+          ])
         )
         .optional()
-        .describe('Phone numbers'),
+        .describe('Phone numbers, as plain strings or objects with value, primary, and label'),
       organizationId: z.number().optional().describe('Organization ID to link'),
       visibleTo: z
         .enum(['1', '3', '5', '7'])
@@ -79,8 +92,8 @@ Supports setting name, email, phone, organization, and custom fields.`,
 
     let body: Record<string, any> = {};
     if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.email) body.email = ctx.input.email;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
+    if (ctx.input.email) body.email = normalizeContactValues(ctx.input.email);
+    if (ctx.input.phone) body.phone = normalizeContactValues(ctx.input.phone);
     if (ctx.input.organizationId) body.org_id = ctx.input.organizationId;
     if (ctx.input.visibleTo) body.visible_to = ctx.input.visibleTo;
     if (ctx.input.customFields) {

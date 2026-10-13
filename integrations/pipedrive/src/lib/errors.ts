@@ -1,80 +1,102 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
+import { type ApiErrorResponse, buildApiServiceError } from '@slates/provider';
 
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
+let MAX_ERROR_DETAILS = 5;
+let MAX_ERROR_MESSAGE_LENGTH = 1_000;
 
 let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
-let pushString = (messages: string[], value: unknown) => {
-  if (typeof value === 'string' && value.trim() && !messages.includes(value.trim())) {
-    messages.push(value.trim());
-  }
+let looksLikeHtml = (value: string) =>
+  /^\s*</.test(value) || /<\/?(html|body|head)\b/i.test(value);
+
+let truncate = (value: string) =>
+  value.length > MAX_ERROR_MESSAGE_LENGTH
+    ? `${value.slice(0, MAX_ERROR_MESSAGE_LENGTH)}...`
+    : value;
+
+let pushDetail = (details: string[], value: unknown) => {
+  if (details.length >= MAX_ERROR_DETAILS) return;
+  if (typeof value !== 'string') return;
+
+  let text = value.trim();
+  if (!text || looksLikeHtml(text) || details.includes(text)) return;
+
+  details.push(text);
 };
 
-let extractPipedriveMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let data = response?.data;
-  let messages: string[] = [];
+// Pipedrive errors look like { success: false, error, error_info, data, additional_data };
+// OAuth and gateway errors use message, error, or error_description.
+let extractPipedriveDataMessage = (data: unknown) => {
+  let details: string[] = [];
 
-  if (isRecord(data)) {
-    for (let key of ['error', 'error_info', 'error_description', 'message']) {
-      pushString(messages, data[key]);
+  if (typeof data === 'string') {
+    pushDetail(details, data);
+  } else if (isRecord(data)) {
+    if (isRecord(data.error)) {
+      pushDetail(details, data.error.message);
+    } else {
+      pushDetail(details, data.error);
     }
+    pushDetail(details, data.message);
+    pushDetail(details, data.error_description);
+    pushDetail(details, data.error_info);
 
-    let errors = data.errors;
-    if (Array.isArray(errors)) {
-      for (let item of errors) {
+    if (Array.isArray(data.errors)) {
+      for (let item of data.errors) {
         if (isRecord(item)) {
-          pushString(messages, item.message);
-          pushString(messages, item.error);
+          pushDetail(details, item.message);
+          pushDetail(details, item.error);
         } else {
-          pushString(messages, item);
+          pushDetail(details, item);
         }
       }
     }
-  } else {
-    pushString(messages, data);
   }
 
-  if (messages.length > 0) {
-    return messages.join(' - ');
+  return details.length > 0 ? truncate(details.join(' - ')) : undefined;
+};
+
+// createAxios converts upstream failures into SlateError before this adapter
+// runs, so the raw response body only survives in SlateError.data.baggage.
+let withSlateErrorResponseData = (
+  error: unknown,
+  response: ApiErrorResponse | undefined
+): ApiErrorResponse | undefined => {
+  if (response?.data !== undefined) return response;
+  if (!isRecord(error) || error.name !== 'SlateError' || !isRecord(error.data)) {
+    return response;
   }
 
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
+  let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
+  if (baggage?.response === undefined) return response;
 
-  return 'Unknown error';
+  return { ...response, data: baggage.response };
+};
+
+let fallbackMessageFor = (error: unknown, response: ApiErrorResponse | undefined) => {
+  let message = error instanceof Error ? error.message.trim() : '';
+  if (message && !looksLikeHtml(message)) return truncate(message);
+  if (response?.statusText) return response.statusText;
+  return message
+    ? 'Pipedrive returned an unexpected non-JSON error response.'
+    : 'Unknown error';
 };
 
 export let pipedriveServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
-export let pipedriveApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
-
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let status = response?.status;
-  let statusLabel =
-    status !== undefined
-      ? `HTTP ${status}${response?.statusText ? ` ${response.statusText}` : ''}: `
-      : '';
-
-  let serviceError = pipedriveServiceError(
-    `Pipedrive API ${operation} failed: ${statusLabel}${extractPipedriveMessage(error)}`
-  );
-  serviceError.data.reason = 'pipedrive_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+export let pipedriveApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Pipedrive',
+    operation,
+    reason: 'pipedrive_api_error',
+    extractResponse: (input, helpers) =>
+      withSlateErrorResponseData(input, helpers.getResponse(input)),
+    extractMessage: (input, helpers) => {
+      let response = withSlateErrorResponseData(input, helpers.getResponse(input));
+      return (
+        extractPipedriveDataMessage(response?.data) ?? fallbackMessageFor(input, response)
+      );
+    }
+  });
