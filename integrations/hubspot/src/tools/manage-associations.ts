@@ -1,8 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HubSpotClient } from '../lib/client';
+import { hubSpotServiceError } from '../lib/errors';
 import { hubSpotActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
+
+let placeholderIdPattern = /^(?:none|null|undefined|nan)?$/i;
+
+let assertRecordId = (field: string, objectType: string, value: string) => {
+  if (placeholderIdPattern.test(value.trim())) {
+    throw hubSpotServiceError(
+      `${field} "${value}" is not a HubSpot record ID. Provide the numeric ID of an existing ${objectType} record, for example from search_crm.`
+    );
+  }
+};
 
 export let createAssociation = SlateTool.create(spec, {
   name: 'Create Association',
@@ -40,6 +51,9 @@ export let createAssociation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    assertRecordId('fromObjectId', ctx.input.fromObjectType, ctx.input.fromObjectId);
+    assertRecordId('toObjectId', ctx.input.toObjectType, ctx.input.toObjectId);
+
     let client = new HubSpotClient(ctx.auth.token);
     let result = await client.createAssociation(
       ctx.input.fromObjectType,
@@ -75,7 +89,7 @@ export let getAssociations = SlateTool.create(spec, {
       fromObjectType: z
         .string()
         .describe('Source object type (e.g., contacts, companies, deals, tickets)'),
-      fromObjectId: z.string().describe('Source object ID'),
+      fromObjectId: z.string().describe('Numeric HubSpot ID of the source record'),
       toObjectType: z.string().describe('Target object type to retrieve associations for')
     })
   )
@@ -101,6 +115,8 @@ export let getAssociations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    assertRecordId('fromObjectId', ctx.input.fromObjectType, ctx.input.fromObjectId);
+
     let client = new HubSpotClient(ctx.auth.token);
     let result = await client.getAssociations(
       ctx.input.fromObjectType,
@@ -145,6 +161,9 @@ export let deleteAssociation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    assertRecordId('fromObjectId', ctx.input.fromObjectType, ctx.input.fromObjectId);
+    assertRecordId('toObjectId', ctx.input.toObjectType, ctx.input.toObjectId);
+
     let client = new HubSpotClient(ctx.auth.token);
     await client.deleteAssociation(
       ctx.input.fromObjectType,
