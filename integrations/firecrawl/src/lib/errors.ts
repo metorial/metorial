@@ -1,96 +1,43 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
+import { type ApiErrorResponse, buildApiServiceError } from 'slates';
 
 let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-let pushDetail = (details: string[], value: unknown) => {
-  if (typeof value !== 'string' && typeof value !== 'number') {
-    return;
+let FIRECRAWL_DETAIL_KEYS = ['message', 'detail', 'title', 'error', 'reason', 'code'];
+
+// createAxios converts upstream failures into SlateError before this adapter
+// runs, so the raw response body only survives in SlateError.data.baggage.
+let withSlateErrorResponseData = (
+  error: unknown,
+  response: ApiErrorResponse | undefined
+): ApiErrorResponse | undefined => {
+  if (response?.data !== undefined) return response;
+  if (!isRecord(error) || error.name !== 'SlateError' || !isRecord(error.data)) {
+    return response;
   }
 
-  let detail = String(value).trim();
-  if (detail && !details.includes(detail)) {
-    details.push(detail);
-  }
+  let baggage = isRecord(error.data.baggage) ? error.data.baggage : undefined;
+  if (baggage?.response === undefined) return response;
+
+  return { ...response, data: baggage.response };
 };
 
-let collectDetails = (value: unknown, details: string[]) => {
-  if (Array.isArray(value)) {
-    for (let item of value) {
-      collectDetails(item, details);
-    }
-    return;
-  }
-
-  if (!isRecord(value)) {
-    pushDetail(details, value);
-    return;
-  }
-
-  pushDetail(details, value.message);
-  pushDetail(details, value.detail);
-  pushDetail(details, value.title);
-  pushDetail(details, value.error);
-  pushDetail(details, value.reason);
-  pushDetail(details, value.code);
-  collectDetails(value.errors, details);
-};
-
-let extractFirecrawlMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let details: string[] = [];
-
-  collectDetails(response?.data, details);
-
-  if (details.length > 0) {
-    return details.join(' - ');
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return 'Unknown error';
-};
-
-let statusLabelFor = (response?: ErrorResponse) =>
-  response?.status !== undefined
-    ? `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}: `
-    : '';
-
-let upstreamCodeFor = (response?: ErrorResponse) => {
-  if (!isRecord(response?.data)) {
-    return undefined;
-  }
-
-  return typeof response.data.code === 'string' ? response.data.code : undefined;
-};
+let upstreamCodeFor = (response: ApiErrorResponse | undefined) =>
+  isRecord(response?.data) && typeof response.data.code === 'string'
+    ? response.data.code
+    : undefined;
 
 export let firecrawlServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
-export let firecrawlApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
-
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let serviceError = firecrawlServiceError(
-    `Firecrawl API ${operation} failed: ${statusLabelFor(response)}${extractFirecrawlMessage(error)}`
-  );
-  serviceError.data.reason = 'firecrawl_api_error';
-  serviceError.data.upstreamStatus = response?.status;
-  serviceError.data.upstreamCode = upstreamCodeFor(response);
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+export let firecrawlApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Firecrawl',
+    operation,
+    reason: 'firecrawl_api_error',
+    detailKeys: FIRECRAWL_DETAIL_KEYS,
+    extractResponse: (input, helpers) =>
+      withSlateErrorResponseData(input, helpers.getResponse(input)),
+    extractUpstreamCode: (_input, response) => upstreamCodeFor(response)
+  });
