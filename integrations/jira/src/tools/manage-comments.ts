@@ -1,7 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
 import { jiraServiceError, resolveJiraIssueIdOrKey } from '../lib/errors';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let addCommentTool = SlateTool.create(spec, {
@@ -22,7 +22,8 @@ export let addCommentTool = SlateTool.create(spec, {
       commentBody: z
         .any()
         .optional()
-        .describe('Legacy alias for body, used only when body is omitted.')
+        .describe('Legacy alias for body, used only when body is omitted.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -34,11 +35,7 @@ export let addCommentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let body = ctx.input.body !== undefined ? ctx.input.body : ctx.input.commentBody;
     if (body === undefined) {
@@ -81,7 +78,8 @@ export let updateCommentTool = SlateTool.create(spec, {
     z.object({
       issueIdOrKey: z.string().describe('The issue key or ID containing the comment.'),
       commentId: z.string().describe('The comment ID to update.'),
-      body: z.any().describe('Updated comment body as a plain text string or ADF object.')
+      body: z.any().describe('Updated comment body as a plain text string or ADF object.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -93,11 +91,7 @@ export let updateCommentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let body = ctx.input.body;
     if (typeof body === 'string') {
@@ -138,7 +132,8 @@ export let deleteCommentTool = SlateTool.create(spec, {
   .input(
     z.object({
       issueIdOrKey: z.string().describe('The issue key or ID containing the comment.'),
-      commentId: z.string().describe('The comment ID to delete.')
+      commentId: z.string().describe('The comment ID to delete.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -148,11 +143,7 @@ export let deleteCommentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     await client.deleteComment(ctx.input.issueIdOrKey, ctx.input.commentId);
 
@@ -194,7 +185,8 @@ export let listCommentsTool = SlateTool.create(spec, {
           'Legacy alias for issueIdOrKey, used only when the camel-case identifier fields are omitted.'
         ),
       startAt: z.number().optional().default(0).describe('Pagination start index.'),
-      maxResults: z.number().optional().default(50).describe('Maximum comments to return.')
+      maxResults: z.number().optional().default(50).describe('Maximum comments to return.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -213,11 +205,7 @@ export let listCommentsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let issueIdOrKey = resolveJiraIssueIdOrKey(ctx.input);
     let result = await client.getComments(issueIdOrKey, {

@@ -1,6 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let searchIssuesTool = SlateTool.create(spec, {
@@ -32,7 +32,8 @@ export let searchIssuesTool = SlateTool.create(spec, {
       fields: z
         .array(z.string())
         .optional()
-        .describe('Specific fields to return (e.g., ["summary", "status", "assignee"]).')
+        .describe('Specific fields to return (e.g., ["summary", "status", "assignee"]).'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -60,11 +61,7 @@ export let searchIssuesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let result = await client.searchIssues(ctx.input.jql, {
       nextPageToken: ctx.input.nextPageToken,

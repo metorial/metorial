@@ -5,6 +5,7 @@ export interface JiraClientConfig {
   token: string;
   cloudId: string;
   refreshToken?: string;
+  notFoundHint?: string;
 }
 
 export class JiraClient {
@@ -34,9 +35,17 @@ export class JiraClient {
       }
     });
 
-    let rejectWithJiraError = (error: unknown) => Promise.reject(jiraApiError(error));
+    let rejectWithJiraError = (error: unknown) =>
+      Promise.reject(jiraApiError(error, 'request', { notFoundHint: config.notFoundHint }));
     this.api.interceptors.response.use(response => response, rejectWithJiraError);
     this.agileApi.interceptors.response.use(response => response, rejectWithJiraError);
+  }
+
+  // ---- Site ----
+
+  async getServerInfo(): Promise<any> {
+    let response = await this.api.get('/serverInfo');
+    return response.data;
   }
 
   // ---- Issues ----

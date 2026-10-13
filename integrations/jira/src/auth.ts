@@ -1,10 +1,22 @@
 import { createAxios, SlateAuth } from '@slates/provider';
 import { z } from 'zod';
 import { jiraApiError, jiraServiceError } from './lib/errors';
+import {
+  fetchAccessibleJiraSites,
+  type JiraSite,
+  jiraSiteSchema,
+  selectOauthJiraSite
+} from './lib/site';
 
 let outputSchema = z.object({
   token: z.string(),
   cloudId: z.string().describe('Jira Cloud site ID'),
+  siteUrl: z.string().optional().describe('URL of the connected Jira site'),
+  siteName: z.string().optional().describe('Name of the connected Jira site'),
+  sites: z
+    .array(jiraSiteSchema)
+    .optional()
+    .describe('All Atlassian sites this authorization can access'),
   refreshToken: z.string().optional(),
   expiresAt: z.string().optional()
 });
@@ -17,6 +29,15 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'OAuth 2.0',
     key: 'oauth2',
+
+    inputSchema: z.object({
+      site: z
+        .string()
+        .optional()
+        .describe(
+          'Optional Jira site to connect when your Atlassian account can access several sites: the site URL (e.g. "https://mycompany.atlassian.net"), its subdomain ("mycompany"), or the site name. Leave blank to use the first site Atlassian returns.'
+        )
+    }),
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -152,25 +173,16 @@ export let auth = SlateAuth.create()
           ? new Date(Date.now() + expiresIn * 1000).toISOString()
           : undefined;
 
-        let resourcesResponse = await http.get(
-          'https://api.atlassian.com/oauth/token/accessible-resources',
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-
-        let resources = resourcesResponse.data as Array<{
-          id: string;
-          name: string;
-          url: string;
-        }>;
-        let cloudId = resources[0]?.id ?? '';
-        if (!cloudId) {
-          throw jiraServiceError('Jira OAuth did not return an accessible Cloud site.');
-        }
+        let sites = await fetchAccessibleJiraSites(accessToken);
+        let site = selectOauthJiraSite(sites, ctx.input?.site);
 
         return {
           output: {
             token: accessToken,
-            cloudId,
+            cloudId: site.cloudId,
+            siteUrl: site.url || undefined,
+            siteName: site.name || undefined,
+            sites,
             refreshToken,
             expiresAt
           }
@@ -208,20 +220,46 @@ export let auth = SlateAuth.create()
           ? new Date(Date.now() + expiresIn * 1000).toISOString()
           : undefined;
 
-        return {
-          output: {
-            token: accessToken,
-            cloudId: ctx.output.cloudId,
-            refreshToken,
-            expiresAt
-          }
+        let output: AuthOutput = {
+          ...ctx.output,
+          token: accessToken,
+          refreshToken,
+          expiresAt
         };
+
+        // Connections created before the site list was stored get it filled in
+        // here. This is best-effort: the refreshed token is valid either way,
+        // and the connected site (cloudId) never changes on refresh.
+        if (!output.sites) {
+          let sites: JiraSite[] | undefined;
+          try {
+            sites = await fetchAccessibleJiraSites(accessToken);
+          } catch {
+            sites = undefined;
+          }
+
+          if (sites) {
+            let active = sites.find(candidate => candidate.cloudId === output.cloudId);
+            output = {
+              ...output,
+              sites,
+              siteUrl: output.siteUrl ?? (active?.url || undefined),
+              siteName: output.siteName ?? (active?.name || undefined)
+            };
+          }
+        }
+
+        return { output };
       } catch (error) {
         throw jiraApiError(error, 'OAuth refresh');
       }
     },
 
-    getProfile: async (ctx: { output: AuthOutput; input: {}; scopes: string[] }) => {
+    getProfile: async (ctx: {
+      output: AuthOutput;
+      input: { site?: string };
+      scopes: string[];
+    }) => {
       try {
         let http = createAxios({
           baseURL: 'https://api.atlassian.com',
@@ -278,7 +316,8 @@ export let auth = SlateAuth.create()
         return {
           output: {
             token: basicToken,
-            cloudId
+            cloudId,
+            siteUrl: `https://${ctx.input.domain}.atlassian.net`
           }
         };
       } catch (error) {

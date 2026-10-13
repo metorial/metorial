@@ -1,7 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
 import { jiraServiceError } from '../lib/errors';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let createFilterTool = SlateTool.create(spec, {
@@ -21,7 +21,8 @@ export let createFilterTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .default(false)
-        .describe('Whether to mark the filter as a favourite.')
+        .describe('Whether to mark the filter as a favourite.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -33,11 +34,7 @@ export let createFilterTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let filter = await client.createFilter({
       name: ctx.input.name,
@@ -68,7 +65,8 @@ export let getFilterTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      filterId: z.string().describe('The filter ID to retrieve.')
+      filterId: z.string().describe('The filter ID to retrieve.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -82,11 +80,7 @@ export let getFilterTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let filter = await client.getFilter(ctx.input.filterId);
 
@@ -118,7 +112,8 @@ export let updateFilterTool = SlateTool.create(spec, {
       name: z.string().optional().describe('Updated filter name.'),
       jql: z.string().optional().describe('Updated JQL query.'),
       description: z.string().optional().describe('Updated filter description.'),
-      favourite: z.boolean().optional().describe('Whether to mark the filter as favourite.')
+      favourite: z.boolean().optional().describe('Whether to mark the filter as favourite.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -131,11 +126,7 @@ export let updateFilterTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let fields: Record<string, any> = {};
     if (ctx.input.name !== undefined) fields.name = ctx.input.name;
@@ -175,7 +166,8 @@ export let deleteFilterTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      filterId: z.string().describe('The filter ID to delete.')
+      filterId: z.string().describe('The filter ID to delete.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -184,11 +176,7 @@ export let deleteFilterTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     await client.deleteFilter(ctx.input.filterId);
 
@@ -209,7 +197,7 @@ export let listFavouriteFiltersTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ site: siteInputSchema }))
   .output(
     z.object({
       filters: z.array(
@@ -224,11 +212,7 @@ export let listFavouriteFiltersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let filters = await client.getFavouriteFilters();
 

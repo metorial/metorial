@@ -30,7 +30,7 @@ OAuth 2.0 authorization code grants (3LO) is the recommended method for most cas
   - `manage:jira-project` — Manage project settings.
   - `manage:jira-configuration` — Manage Jira global settings.
   - `manage:jira-webhook` — Manage webhooks.
-- **Cloud ID:** After authorization, you must call `https://api.atlassian.com/oauth/token/accessible-resources` to obtain the `cloudId` of the user's site. API calls are then made to `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...`.
+- **Cloud ID:** After authorization, you must call `https://api.atlassian.com/oauth/token/accessible-resources` to obtain the `cloudId` of the user's site. API calls are then made to `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...`. The endpoint can return several sites when the user has granted the app access to more than one; the integration lets the user pick a site when connecting (site URL, subdomain, or name), defaults to the first returned site, keeps the full site list, and accepts an optional per-call `site` input to target another accessible site.
 
 **Basic Authentication (API Token)**
 

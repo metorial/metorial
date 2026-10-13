@@ -1,7 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
 import { jiraServiceError } from '../lib/errors';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let logWorkTool = SlateTool.create(spec, {
@@ -30,7 +30,8 @@ export let logWorkTool = SlateTool.create(spec, {
         .describe(
           'When the work started in ISO 8601 format (e.g., "2024-01-15T09:00:00.000+0000"). Defaults to now.'
         ),
-      comment: z.string().optional().describe('Optional worklog comment.')
+      comment: z.string().optional().describe('Optional worklog comment.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -43,11 +44,7 @@ export let logWorkTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     if (!ctx.input.timeSpent && ctx.input.timeSpentSeconds === undefined) {
       throw jiraServiceError('Provide either timeSpent or timeSpentSeconds to log work.');
@@ -99,7 +96,8 @@ export let listWorklogsTool = SlateTool.create(spec, {
     z.object({
       issueIdOrKey: z.string().describe('The issue key or ID.'),
       startAt: z.number().optional().default(0).describe('Pagination start index.'),
-      maxResults: z.number().optional().default(50).describe('Maximum worklogs to return.')
+      maxResults: z.number().optional().default(50).describe('Maximum worklogs to return.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -123,11 +121,7 @@ export let listWorklogsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let result = await client.getWorklogs(ctx.input.issueIdOrKey, {
       startAt: ctx.input.startAt,
@@ -177,7 +171,8 @@ export let updateWorklogTool = SlateTool.create(spec, {
         .optional()
         .describe('Updated time spent in seconds.'),
       started: z.string().optional().describe('Updated start timestamp in ISO 8601 format.'),
-      comment: z.string().optional().describe('Updated worklog comment.')
+      comment: z.string().optional().describe('Updated worklog comment.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -190,11 +185,7 @@ export let updateWorklogTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     if (
       !ctx.input.timeSpent &&
@@ -252,7 +243,8 @@ export let deleteWorklogTool = SlateTool.create(spec, {
   .input(
     z.object({
       issueIdOrKey: z.string().describe('The issue key or ID containing the worklog.'),
-      worklogId: z.string().describe('The worklog ID to delete.')
+      worklogId: z.string().describe('The worklog ID to delete.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -262,11 +254,7 @@ export let deleteWorklogTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     await client.deleteWorklog(ctx.input.issueIdOrKey, ctx.input.worklogId);
 

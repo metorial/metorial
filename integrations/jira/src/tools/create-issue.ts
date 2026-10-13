@@ -1,7 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { normalizeAdf } from '../lib/adf';
-import { JiraClient } from '../lib/client';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let createIssueTool = SlateTool.create(spec, {
@@ -59,7 +59,8 @@ export let createIssueTool = SlateTool.create(spec, {
         .optional()
         .describe(
           'Custom field values keyed by field ID (e.g., {"customfield_10001": "value"}).'
-        )
+        ),
+      site: siteInputSchema
     })
   )
   .output(
@@ -70,11 +71,7 @@ export let createIssueTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     let fields: Record<string, any> = {
       project: { key: ctx.input.projectKey },

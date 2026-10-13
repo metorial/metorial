@@ -1,6 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { JiraClient } from '../lib/client';
+import { createJiraClient, siteInputSchema } from '../lib/site';
 import { spec } from '../spec';
 
 export let deleteIssueTool = SlateTool.create(spec, {
@@ -21,7 +21,8 @@ export let deleteIssueTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .default(false)
-        .describe('If true, also deletes all sub-tasks of this issue.')
+        .describe('If true, also deletes all sub-tasks of this issue.'),
+      site: siteInputSchema
     })
   )
   .output(
@@ -30,11 +31,7 @@ export let deleteIssueTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new JiraClient({
-      token: ctx.auth.token,
-      cloudId: ctx.auth.cloudId,
-      refreshToken: ctx.auth.refreshToken
-    });
+    let client = await createJiraClient(ctx.auth, ctx.input.site);
 
     await client.deleteIssue(ctx.input.issueIdOrKey, ctx.input.deleteSubtasks);
 

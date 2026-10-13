@@ -56,6 +56,10 @@ List Jira boards (Scrum or Kanban). Optionally filter by board type or project.
 
 List Jira projects accessible to the authenticated user. Supports pagination for large project lists.
 
+### List Sites
+
+List the Atlassian sites the connected account can access and show which site Jira tools use by default. If your account can access several Jira sites, choose one when connecting with OAuth, or pass the **site** input (site URL, subdomain, site name, or Cloud ID) on any Jira tool to work with a different site for that call.
+
 ### List Worklogs
 
 List worklogs for a Jira issue with pagination support.
