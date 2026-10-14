@@ -7,7 +7,7 @@ export let createHmacSignature = (
   secretKey: string
 ): string => {
   let stringToSign = `${method} /${uri}`;
-  let hmac = crypto.createHmac('sha256', secretKey).update(stringToSign).digest('base64');
+  let hmac = crypto.createHmac('sha256', secretKey).update(stringToSign).digest('hex');
   let combined = `${apiKey}:${hmac}`;
   return Buffer.from(combined).toString('base64');
 };

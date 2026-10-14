@@ -43,7 +43,11 @@ export let listDocumentEnvelopes = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
     let envelopes = await client.listDocumentEnvelopes({
@@ -53,15 +57,15 @@ export let listDocumentEnvelopes = SlateTool.create(spec, {
 
     let mapped = envelopes.map((e: any) => ({
       envelopeId: e.id,
-      documentId: e.document,
-      userId: e.user,
-      signerEmail: e.signer,
-      senderEmail: e.sender,
+      documentId: e.document ?? undefined,
+      userId: e.user ?? undefined,
+      signerEmail: e.signer ?? undefined,
+      senderEmail: e.sender ?? undefined,
       fileUrl: e.file_url || e.file,
-      documentType: e.type,
-      viewed: e.viewed,
-      signed: e.signed,
-      tags: e.tags,
+      documentType: e.type ?? undefined,
+      viewed: e.viewed ?? undefined,
+      signed: e.signed ?? undefined,
+      tags: e.tags ?? undefined,
       createdAt: e.created_at
     }));
 

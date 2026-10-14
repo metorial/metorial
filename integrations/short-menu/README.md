@@ -1,6 +1,8 @@
 # Short Menu
 
-Create, update, and delete branded short links with custom domains or the default shm.to domain. Assign tags to organize links and specify custom slugs or let the system generate random ones. Supports custom domain configuration for branded URLs. Note: the API is currently limited to link CRUD operations with tagging; features like QR code generation, click analytics, UTM parameters, link add-ons, and region/mobile redirects are available only through the dashboard and apps, not yet via the API.
+Create, update, and delete branded short links with custom domains or the default shm.to domain. Assign tags to organize links and specify custom slugs or let the system generate random ones. Created and updated links include their identifiers and any click count returned by the API. Configure custom domains in the Short Menu dashboard before using them.
+
+The current [API reference](https://docs.shortmenu.com/api-reference/introduction) documents these three link operations. This integration does not provide link listing, account discovery, detailed analytics, or QR-code generation.
 
 ## License
 

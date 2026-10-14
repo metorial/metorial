@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { taskState } from '../lib/task-values';
 import { spec } from '../spec';
 
 export let getIssue = SlateTool.create(spec, {
@@ -48,26 +49,29 @@ export let getIssue = SlateTool.create(spec, {
       timeline = await client.getIssueTimeline(ctx.input.issueId);
     }
 
-    let collaborators = (issue.collaborators || []).map((c: any) => c.user_id || c.id || c);
+    let task = issue.task ?? issue;
+    let collaborators = (task.collaborators || [])
+      .map((c: any) => c.user?.user_id || c.collaborator_id || c.user_id || c.id)
+      .filter((id: unknown): id is string => typeof id === 'string');
 
     return {
       output: {
-        issueId: issue.id || issue.incident_id,
-        title: issue.title,
-        description: issue.description,
-        status: issue.status,
-        priority: issue.priority,
-        categoryId: issue.category_id || issue.category?.id,
-        siteId: issue.site_id || issue.site?.id,
-        assetId: issue.asset_id || issue.asset?.id,
-        dueAt: issue.due_at,
-        occurredAt: issue.occurred_at,
-        createdAt: issue.created_at,
-        creatorId: issue.creator?.user_id || issue.creator_id,
+        issueId: task.task_id || issue.id || issue.incident_id || ctx.input.issueId,
+        title: task.title ?? undefined,
+        description: task.description ?? undefined,
+        status: taskState(task.status) ?? task.status_id ?? undefined,
+        priority: taskState(task.priority) ?? task.priority_id ?? undefined,
+        categoryId: issue.category_id ?? issue.category?.id ?? undefined,
+        siteId: task.site_id ?? task.site?.site_id ?? task.site?.id ?? undefined,
+        assetId: task.asset_id ?? task.asset?.id ?? undefined,
+        dueAt: task.due_at ?? undefined,
+        occurredAt: task.occurred_at ?? undefined,
+        createdAt: task.created_at ?? undefined,
+        creatorId: task.creator?.user_id ?? task.creator_id ?? undefined,
         collaborators,
         timeline
       },
-      message: `Retrieved issue **${issue.title || ctx.input.issueId}** (status: ${issue.status || 'unknown'}).`
+      message: `Retrieved issue **${task.title || ctx.input.issueId}** (status: ${taskState(task.status) || task.status_id || 'unknown'}).`
     };
   })
   .build();

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseNumericValue } from '../lib/response';
 import { spec } from '../spec';
 
 export let getProject = SlateTool.create(spec, {
@@ -35,11 +36,16 @@ export let getProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.config.domain
+      domain: ctx.auth.domain ?? ctx.config.domain
     });
 
     let result = await client.getProjects({ projectId: ctx.input.projectId });
     let p = result?.data?.[0] || result?.data || result;
+    if (!p?.project_id) {
+      throw createApiServiceError('Project Bubble did not return the requested project.', {
+        reason: 'project_not_found'
+      });
+    }
 
     return {
       output: {
@@ -49,8 +55,8 @@ export let getProject = SlateTool.create(spec, {
         startDate: p.start_date || undefined,
         dueDate: p.due_date || undefined,
         clientId: p.client_id ? String(p.client_id) : undefined,
-        progress: p.progress ?? undefined,
-        billableHours: p.billable_hours ?? undefined,
+        progress: parseNumericValue(p.progress),
+        billableHours: parseNumericValue(p.billable_hours),
         users: p.users || undefined,
         teams: p.teams || undefined,
         dateCreated: p.date_created || undefined,

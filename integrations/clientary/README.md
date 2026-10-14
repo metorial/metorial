@@ -1,6 +1,6 @@
 # Clientary
 
-Manage clients, leads, invoices, estimates, projects, and expenses for small businesses and professional services firms. Create and send invoices with line items and taxes, track time against projects, log expenses, process payments, set up recurring billing schedules, manage estimates and proposals, and organize contacts and staff. Supports filtering by client, project, date range, and status across all resources.
+Manage clients, leads, invoices, estimates, projects, and expenses for small businesses and professional services firms. Create and send invoices with line items and taxes, track time against projects, log expenses, process payments, set up recurring billing schedules, and organize contacts and staff. Retrieve individual contacts and list a client's stored payment profiles before charging an invoice or setting up automatic billing. Available filters vary by resource and include client, project, date range, and billing status.
 
 ## License
 

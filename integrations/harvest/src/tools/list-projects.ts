@@ -1,20 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listProjects = SlateTool.create(spec, {
   name: 'List Projects',
   key: 'list_projects',
-  description: `Retrieve projects with optional filtering by active status and client. Returns project details including billing configuration, budget, and team information.`,
+  description: `Retrieve projects with optional filtering by active status and client. Returns project details including billing configuration, budget, and team information. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       isActive: z.boolean().optional().describe('Filter by active status'),
       clientId: z.number().optional().describe('Filter by client ID'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Cursor returned as nextCursor by the previous call'),
       page: z.number().optional().describe('Page number'),
       perPage: z.number().optional().describe('Results per page (max 2000)')
     })
@@ -41,19 +47,24 @@ export let listProjects = SlateTool.create(spec, {
       ),
       totalEntries: z.number().describe('Total projects'),
       totalPages: z.number().describe('Total pages'),
-      page: z.number().describe('Current page')
+      nextCursor: z.string().nullable().describe('Pass this cursor to retrieve the next page'),
+      pageNumberKnown: z
+        .boolean()
+        .describe('Whether the API returned a page number; cursor responses may omit it'),
+      page: z.number().describe('Page number; 1 when pageNumberKnown is false')
     })
   )
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     let result = await client.listProjects({
       isActive: ctx.input.isActive,
       clientId: ctx.input.clientId,
-      page: ctx.input.page,
+      cursor: ctx.input.cursor,
+      page: ctx.input.cursor ? undefined : ctx.input.page,
       perPage: ctx.input.perPage
     });
 
@@ -79,9 +90,11 @@ export let listProjects = SlateTool.create(spec, {
         projects,
         totalEntries: result.totalEntries,
         totalPages: result.totalPages,
+        nextCursor: result.nextCursor,
+        pageNumberKnown: result.pageNumberKnown,
         page: result.page
       },
-      message: `Found **${result.totalEntries}** projects (page ${result.page}/${result.totalPages}).`
+      message: `Found **${result.totalEntries}** projects${result.pageNumberKnown ? ` (page ${result.page}/${result.totalPages})` : ' (cursor page)'}.`
     };
   })
   .build();

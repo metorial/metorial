@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios, pickDefined } from 'slates';
 import { dataForSEOApiError, dataForSEOServiceError } from './errors';
 
 export interface DataForSEOResponse<T = any> {
@@ -18,7 +18,7 @@ export interface DataForSEOResponse<T = any> {
     result_count: number;
     path: string[];
     data: any;
-    result: T[];
+    result: T[] | null;
   }>;
 }
 
@@ -43,17 +43,12 @@ let taskResultPaths: Record<DataForSEOTaskEndpoint, string> = {
   google_reviews: 'business_data/google/reviews/task_get'
 };
 
-let removeUndefined = <T extends Record<string, unknown>>(value: T) =>
-  Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined));
-
 let assertDataForSEOTopLevelOk = (response: DataForSEOResponse, operation: string) => {
   if (response.status_code === 20000) {
     return;
   }
 
-  throw dataForSEOServiceError(
-    `DataForSEO API ${operation} failed: ${response.status_message} (code: ${response.status_code}).`
-  );
+  throw dataForSEOApiError({ response: { status: 200, data: response } }, operation);
 };
 
 let assertDataForSEOTaskOk = (
@@ -65,8 +60,13 @@ let assertDataForSEOTaskOk = (
   }
 
   if (task.status_code >= 40000) {
-    throw dataForSEOServiceError(
-      `DataForSEO API ${operation} task failed: ${task.status_message} (code: ${task.status_code}).`
+    throw createApiServiceError(
+      `DataForSEO API ${operation} task failed: ${task.status_message} (code: ${task.status_code}).`,
+      {
+        reason: 'dataforseo_api_error',
+        upstreamStatus: 200,
+        upstreamCode: String(task.status_code)
+      }
     );
   }
 };
@@ -108,6 +108,15 @@ export class Client {
     }
   }
 
+  async getCurrentUser() {
+    return this.get('/appendix/user_data', 'current account');
+  }
+
+  async getSerpLocations(country?: string) {
+    let suffix = country ? `/${encodeURIComponent(country.toLowerCase())}` : '';
+    return this.get(`/serp/google/locations${suffix}`, 'Google SERP locations');
+  }
+
   // SERP
 
   async serpOrganicLive(params: {
@@ -121,7 +130,7 @@ export class Client {
     os?: string;
     depth?: number;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -157,7 +166,7 @@ export class Client {
     languageCode?: string;
     searchPartners?: boolean;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keywords: params.keywords,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -182,16 +191,19 @@ export class Client {
     includeSerpInfo?: boolean;
     limit?: number;
     offset?: number;
+    targetType?: 'site' | 'page';
+    searchPartners?: boolean;
+    sortBy?: string;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       location_name: params.locationName,
       location_code: params.locationCode,
       language_name: params.languageName,
       language_code: params.languageCode,
-      include_serp_info: params.includeSerpInfo,
-      limit: params.limit,
-      offset: params.offset
+      target_type: params.targetType,
+      search_partners: params.searchPartners,
+      sort_by: params.sortBy
     });
 
     return this.post(
@@ -210,7 +222,7 @@ export class Client {
     backlinksFilters?: unknown[];
     backlinksStatusType?: 'all' | 'live' | 'lost';
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       include_subdomains: params.includeSubdomains,
       include_indirect_links: params.includeIndirectLinks,
@@ -233,7 +245,7 @@ export class Client {
     backlinksStatusType?: 'all' | 'live' | 'lost';
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       mode: params.mode,
       filters: params.filters ?? params.backlinksFilters,
@@ -259,7 +271,7 @@ export class Client {
     backlinksStatusType?: 'all' | 'live' | 'lost';
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       limit: params.limit,
       offset: params.offset,
@@ -312,7 +324,7 @@ export class Client {
     disableCookiePopup?: boolean;
     checksThreshold?: Record<string, number>;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       max_crawl_pages: params.maxCrawlPages,
       start_url: params.startUrl,
@@ -341,7 +353,7 @@ export class Client {
     filters?: unknown[];
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       id: params.taskId,
       limit: params.limit,
       offset: params.offset,
@@ -366,7 +378,7 @@ export class Client {
     sentimentConnotation?: string;
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       keyword_fields: params.keywordFields,
       page_type: params.pageType,
@@ -388,7 +400,7 @@ export class Client {
     pageType?: string[];
     internalListLimit?: number;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       keyword_fields: params.keywordFields,
       page_type: params.pageType,
@@ -412,7 +424,7 @@ export class Client {
     filters?: unknown[];
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -444,7 +456,7 @@ export class Client {
     filters?: unknown[];
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -476,7 +488,7 @@ export class Client {
     filters?: unknown[];
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -503,7 +515,7 @@ export class Client {
     languageName?: string;
     languageCode?: string;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -529,7 +541,7 @@ export class Client {
     filters?: unknown[];
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -561,7 +573,7 @@ export class Client {
     filters?: unknown[];
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target1: params.target1,
       target2: params.target2,
       intersections: params.intersections,
@@ -595,7 +607,7 @@ export class Client {
     limit?: number;
     offset?: number;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -630,7 +642,7 @@ export class Client {
     seDomain?: string;
     depth?: number;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -657,7 +669,7 @@ export class Client {
     languageCode?: string;
     seDomain?: string;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       asin: params.asin,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -680,7 +692,7 @@ export class Client {
     languageCode?: string;
     depth?: number;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -703,7 +715,7 @@ export class Client {
     languageName?: string;
     languageCode?: string;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       app_id: params.appId,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -727,7 +739,7 @@ export class Client {
     depth?: number;
     sortBy?: string;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       app_id: params.appId,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -760,7 +772,7 @@ export class Client {
     filters?: unknown[];
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       categories: params.categories,
       description: params.description,
       title: params.title,
@@ -792,7 +804,7 @@ export class Client {
     depth?: number;
     sortBy?: string;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keyword: params.keyword,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -819,7 +831,7 @@ export class Client {
     languageName?: string;
     languageCode?: string;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       keywords: params.keywords,
       location_name: params.locationName,
       location_code: params.locationCode,
@@ -847,7 +859,7 @@ export class Client {
     filters?: unknown[];
     orderBy?: string[];
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       target: params.target,
       platform: params.platform,
       location_name: params.locationName,
@@ -882,7 +894,7 @@ export class Client {
     webSearchCity?: string;
     useReasoning?: boolean;
   }) {
-    let body = removeUndefined({
+    let body = pickDefined({
       user_prompt: params.userPrompt,
       model_name: params.modelName,
       system_message: params.systemMessage,
@@ -926,8 +938,13 @@ export class Client {
     assertDataForSEOTaskOk(task, 'result extraction');
 
     if (task?.status_code !== 20000) {
-      throw dataForSEOServiceError(
-        `DataForSEO task did not complete successfully: ${task?.status_message ?? 'Unknown'} (code: ${task?.status_code ?? 'N/A'}).`
+      throw createApiServiceError(
+        `DataForSEO task did not complete successfully: ${task?.status_message ?? 'Unknown'} (code: ${task?.status_code ?? 'N/A'}).`,
+        {
+          reason: 'dataforseo_api_error',
+          upstreamStatus: 200,
+          upstreamCode: task ? String(task.status_code) : undefined
+        }
       );
     }
 

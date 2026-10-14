@@ -57,40 +57,47 @@ export let searchServiceTickets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let params: Record<string, any> = {};
-    if (ctx.input.status) params.status = ctx.input.status;
-    if (ctx.input.category) params.category = ctx.input.category;
-    if (ctx.input.priority) params.priority = ctx.input.priority;
-    if (ctx.input.resolution) params.resolution = ctx.input.resolution;
-    if (ctx.input.csrId) params.csrId = ctx.input.csrId;
-    if (ctx.input.customerId) params.customerId = ctx.input.customerId;
-    if (ctx.input.fromDate) params.fromDate = ctx.input.fromDate;
-    if (ctx.input.toDate) params.toDate = ctx.input.toDate;
-    if (ctx.input.carrier) params.carrier = ctx.input.carrier;
-    if (ctx.input.policyType) params.policyType = ctx.input.policyType;
+    if (ctx.input.status !== undefined) params.status = ctx.input.status;
+    if (ctx.input.category !== undefined) params.category = ctx.input.category;
+    if (ctx.input.priority !== undefined) params.priority = ctx.input.priority;
+    if (ctx.input.resolution !== undefined) params.resolution = ctx.input.resolution;
+    if (ctx.input.csrId !== undefined) params.csrId = ctx.input.csrId;
+    if (ctx.input.customerId !== undefined) params.customerId = ctx.input.customerId;
+    if (ctx.input.fromDate !== undefined) params.fromDate = ctx.input.fromDate;
+    if (ctx.input.toDate !== undefined) params.toDate = ctx.input.toDate;
+    if (ctx.input.carrier !== undefined) params.carrier = ctx.input.carrier;
+    if (ctx.input.policyType !== undefined) params.policyType = ctx.input.policyType;
     if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
     if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
 
     let result = await client.searchServiceTickets(params);
 
-    let tickets = Array.isArray(result) ? result : (result?.data ?? result?.items ?? []);
-    let total = result?.total ?? result?.count ?? tickets.length;
+    let tickets = Array.isArray(result)
+      ? result
+      : (result?.serviceTickets ?? result?.data ?? result?.items ?? []);
+    let total = result?.total ?? result?.totalCount ?? result?.count ?? tickets.length;
 
     let mappedTickets = tickets.map((t: any) => ({
-      ticketId: t.ticketId ?? t.id ?? '',
-      customerId: t.customerId ?? '',
-      csrId: t.csrId,
-      category: t.category,
-      priority: t.priority,
-      status: t.status,
-      resolution: t.resolution,
-      createdAt: t.createdAt ?? t.created
+      ticketId: String(t.ticketId ?? t.id ?? ''),
+      customerId: String(t.customerId ?? t.householdId ?? ''),
+      csrId: t.csrId != null || t.csr != null ? String(t.csrId ?? t.csr) : undefined,
+      category:
+        t.category != null || t.categoryId != null
+          ? String(t.category ?? t.categoryId)
+          : undefined,
+      priority:
+        t.priority != null || t.priorityId != null
+          ? String(t.priority ?? t.priorityId)
+          : undefined,
+      status: t.status != null ? String(t.status) : undefined,
+      resolution:
+        t.resolution != null || t.resolutionId != null
+          ? String(t.resolution ?? t.resolutionId)
+          : undefined,
+      createdAt: t.createdAt ?? t.createDate ?? t.created
     }));
 
     return {

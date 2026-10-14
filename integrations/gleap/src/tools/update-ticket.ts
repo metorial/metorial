@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -44,18 +44,13 @@ export let updateTicket = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let { ticketId, ...updateData } = ctx.input;
 
-    // Remove undefined values
-    let cleanData: Record<string, any> = {};
-    for (let [key, value] of Object.entries(updateData)) {
-      if (value !== undefined) {
-        cleanData[key] = value;
-      }
-    }
+    let cleanData = pickDefined(updateData);
 
     let result = await client.updateTicket(ticketId, cleanData);
 

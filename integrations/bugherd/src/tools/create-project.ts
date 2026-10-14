@@ -13,8 +13,8 @@ export let createProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Name of the project'),
-      devurl: z.string().describe('Website URL to associate with the project'),
+      name: z.string().min(1).describe('Name of the project'),
+      devurl: z.string().url().describe('Website URL to associate with the project'),
       isActive: z
         .boolean()
         .optional()

@@ -1,6 +1,8 @@
 # <img src="logo.jpeg" height="20"> Post Grid Verify
 
-Verify, standardize, and geocode postal addresses for US, Canada, and 245+ international countries. Validate single or batch addresses (up to 2,000), autocomplete partial addresses with type-ahead suggestions, perform geocoding and reverse geocoding, and detect change-of-address records via NCOA. Addresses can be submitted as structured components or freeform strings, with options for detailed parsing, residential/vacant detection, ZIP+4 lookup, and transliteration of foreign-language addresses.
+Verify and standardize US, Canadian, and international postal addresses. Verify individual addresses or batches of up to 2,000, resolve autocomplete suggestions, request geographic coordinates when supported by your account, parse freeform addresses, look up a city or state from a postal code, and inspect standard lookup usage.
+
+Use a secret Address Verification API key for server-side workflows and batch verification. Standard autocomplete returns selection tokens for use with Complete Address Suggestion; international autocomplete uses provider preview IDs and supports building-level drilldown. Geographic lookup for a resolved international suggestion performs a separate verification call.
 
 ## License
 

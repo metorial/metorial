@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -72,7 +72,7 @@ Use **action** to specify the operation. For updates, only fields provided will 
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required for creating an account');
+        throw createApiServiceError('Fields are required for creating an account');
       }
       let result = await client.createCompany(ctx.input.fields);
       let accountId = result?.id;
@@ -85,7 +85,7 @@ Use **action** to specify the operation. For updates, only fields provided will 
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.accountId) {
-        throw new Error('accountId is required for updating an account');
+        throw createApiServiceError('accountId is required for updating an account');
       }
       await client.updateCompany(ctx.input.accountId, ctx.input.fields || {});
       let account = await client.getCompany(ctx.input.accountId);
@@ -101,7 +101,7 @@ Use **action** to specify the operation. For updates, only fields provided will 
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.accountId) {
-        throw new Error('accountId is required for deleting an account');
+        throw createApiServiceError('accountId is required for deleting an account');
       }
       await client.deleteCompany(ctx.input.accountId);
       return {
@@ -110,6 +110,6 @@ Use **action** to specify the operation. For updates, only fields provided will 
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,6 +1,8 @@
 # Here
 
-Access HERE Technologies' location data and mapping platform to geocode addresses, reverse geocode coordinates, search for places and POIs, and calculate routes for cars, trucks, bicycles, pedestrians, and public transit. Render map tiles in raster and vector formats, retrieve real-time traffic flow and incident data, compute route matrices and isoline reachability areas, and plan optimized multi-vehicle tours with real-life constraints. Monitor assets with geofencing, snap GPS traces to roads, access road attributes like speed limits and truck restrictions, estimate positions from cellular and Wi-Fi signals, calculate toll costs, perform EV charge-aware routing, and retrieve weather forecasts and severe weather alerts for specific locations.
+Geocode addresses, reverse geocode coordinates, find places, and calculate road and public transit routes with HERE Technologies. Retrieve traffic and weather data, calculate route matrices and reachable areas, optimize vehicle tours, and estimate device positions from Wi-Fi and cellular measurements.
+
+Public transit journeys use the HERE Transit API; the bus mode in road routing calculates a vehicle route. A HERE API key or manually supplied bearer access token is required. Access depends on the services enabled for the application, and supplied bearer tokens must be replaced when they expire.
 
 ## License
 

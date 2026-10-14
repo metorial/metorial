@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  checkApiHealth,
   createCustomProperty,
   createGoal,
   createSharedLink,
@@ -10,6 +11,7 @@ import {
   deleteSite,
   getRealtimeVisitors,
   getSite,
+  getTrackerInstallation,
   inviteGuest,
   listCustomProperties,
   listGoals,
@@ -43,7 +45,9 @@ export let provider = Slate.create({
     listGuests,
     inviteGuest,
     removeGuest,
-    listTeams
+    listTeams,
+    checkApiHealth,
+    getTrackerInstallation
   ],
   triggers: []
 });

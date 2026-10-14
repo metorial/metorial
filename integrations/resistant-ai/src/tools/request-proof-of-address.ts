@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let requestProofOfAddress = SlateTool.create(spec, {
   name: 'Request Proof of Address',
   key: 'request_proof_of_address',
-  description: `Sends a proof of address verification request to an individual. The recipient will receive an email with a link to upload their proof of address documentation. This is an add-on check typically used alongside identity verification to confirm an individual's residential address.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Sends a proof of address verification request to an individual. The recipient will receive an email with a link to upload their proof of address documentation. This is an add-on check typically used alongside identity verification to confirm an individual's residential address.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -32,7 +32,7 @@ export let requestProofOfAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.createProofOfAddress({
       email: ctx.input.email,

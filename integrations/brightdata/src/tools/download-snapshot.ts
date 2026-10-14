@@ -6,13 +6,13 @@ import { spec } from '../spec';
 export let downloadSnapshot = SlateTool.create(spec, {
   name: 'Download Snapshot',
   key: 'download_snapshot',
-  description: `Download the results of a completed scraping job by its snapshot ID. Returns the scraped data as structured records. Data remains available for 16 days after collection.`,
+  description: `Download the results of a completed scraping job by its snapshot ID as a file in the requested format, with structured records also returned for compatibility.`,
   instructions: [
     'Ensure the scraping job status is "ready" before attempting to download.',
     'Use "Get Scraping Job Status" first to verify the job has completed.'
   ],
   constraints: [
-    'Snapshot data is available for 16 days after collection.',
+    'Download data before the provider retention window expires.',
     'A 409 error is returned if the snapshot is not yet ready.'
   ],
   tags: {
@@ -43,6 +43,16 @@ export let downloadSnapshot = SlateTool.create(spec, {
       snapshotId: ctx.input.snapshotId,
       format: ctx.input.format,
       compress: ctx.input.compress
+    });
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: `https://api.brightdata.com/datasets/v3/snapshot/${encodeURIComponent(ctx.input.snapshotId)}`,
+      headers: { Authorization: `Bearer ${ctx.auth.token}` },
+      query: {
+        format: ctx.input.format ?? 'ndjson',
+        ...(ctx.input.compress === undefined ? {} : { compress: String(ctx.input.compress) })
+      }
     });
 
     return {

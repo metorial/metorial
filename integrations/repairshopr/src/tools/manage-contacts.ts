@@ -22,19 +22,19 @@ let contactSchema = z.object({
 
 let mapContact = (c: any) => ({
   contactId: c.id,
-  customerId: c.customer_id,
-  name: c.name,
-  email: c.email,
-  phone: c.phone,
-  mobile: c.mobile,
-  address1: c.address1,
-  address2: c.address2,
-  city: c.city,
-  state: c.state,
-  zip: c.zip,
-  notes: c.notes,
-  createdAt: c.created_at,
-  updatedAt: c.updated_at
+  customerId: c.customer_id ?? undefined,
+  name: c.name ?? undefined,
+  email: c.email ?? undefined,
+  phone: c.phone ?? undefined,
+  mobile: c.mobile ?? undefined,
+  address1: c.address1 ?? undefined,
+  address2: c.address2 ?? undefined,
+  city: c.city ?? undefined,
+  state: c.state ?? undefined,
+  zip: c.zip ?? undefined,
+  notes: c.notes ?? undefined,
+  createdAt: c.created_at ?? undefined,
+  updatedAt: c.updated_at ?? undefined
 });
 
 export let listContacts = SlateTool.create(spec, {

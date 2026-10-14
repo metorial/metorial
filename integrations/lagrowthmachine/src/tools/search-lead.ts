@@ -18,6 +18,7 @@ export let searchLead = SlateTool.create(spec, {
         .optional()
         .describe('Professional or personal email address of the lead'),
       leadId: z.string().optional().describe('La Growth Machine internal lead ID'),
+      crmId: z.string().optional().describe('Contact ID in the connected CRM'),
       linkedinUrl: z
         .string()
         .optional()
@@ -42,7 +43,17 @@ export let searchLead = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      lead: z.any().describe('The matching lead record with all available profile fields')
+      lead: z
+        .any()
+        .describe('The provider search response containing the lead and recent logs'),
+      searchedLead: z
+        .any()
+        .optional()
+        .describe('The matching lead record with all available profile fields'),
+      recentLogs: z
+        .array(z.any())
+        .optional()
+        .describe('Recent successful lead actions by campaign')
     })
   )
   .handleInvocation(async ctx => {
@@ -51,6 +62,7 @@ export let searchLead = SlateTool.create(spec, {
     let result = await client.searchLead({
       email: ctx.input.email,
       leadId: ctx.input.leadId,
+      crmId: ctx.input.crmId,
       linkedinUrl: ctx.input.linkedinUrl,
       firstname: ctx.input.firstname,
       lastname: ctx.input.lastname,
@@ -59,8 +71,8 @@ export let searchLead = SlateTool.create(spec, {
     });
 
     return {
-      output: { lead: result },
-      message: `Successfully searched for lead. ${result ? 'Lead found.' : 'No matching lead found.'}`
+      output: { lead: result, searchedLead: result?.lead, recentLogs: result?.recentLogs },
+      message: 'Matching lead retrieved.'
     };
   })
   .build();

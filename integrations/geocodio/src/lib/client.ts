@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface GeocodioClientConfig {
   token: string;
@@ -63,16 +63,24 @@ export interface GeocodioListStatus {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
-  private token: string;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: GeocodioClientConfig) {
-    this.token = config.token;
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Geocodio API key is required. Reconnect with an API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.geocod.io/v1.11',
-      headers: {
-        Authorization: `Bearer ${config.token}`
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      contentType: false,
+      timeout: 60000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Geocodio',
+          reason: 'geocodio_api_error'
+        })
     });
   }
 
@@ -101,7 +109,7 @@ export class Client {
     if (params.country) queryParams.country = params.country;
     if (params.fields && params.fields.length > 0)
       queryParams.fields = params.fields.join(',');
-    if (params.limit) queryParams.limit = params.limit;
+    if (params.limit !== undefined) queryParams.limit = params.limit;
     if (params.format) queryParams.format = params.format;
 
     let response = await this.axios.get('/geocode', { params: queryParams });
@@ -122,9 +130,9 @@ export class Client {
 
     if (params.fields && params.fields.length > 0)
       queryParams.fields = params.fields.join(',');
-    if (params.limit) queryParams.limit = params.limit;
+    if (params.limit !== undefined) queryParams.limit = params.limit;
     if (params.format) queryParams.format = params.format;
-    if (params.skipGeocoding) queryParams.skip_geocoding = true;
+    if (params.skipGeocoding) queryParams.skipGeocoding = true;
 
     let response = await this.axios.get('/reverse', { params: queryParams });
     return response.data;
@@ -139,7 +147,7 @@ export class Client {
 
     if (params.fields && params.fields.length > 0)
       queryParams.fields = params.fields.join(',');
-    if (params.limit) queryParams.limit = params.limit;
+    if (params.limit !== undefined) queryParams.limit = params.limit;
 
     let response = await this.axios.post('/geocode', params.addresses, {
       params: queryParams
@@ -156,7 +164,7 @@ export class Client {
 
     if (params.fields && params.fields.length > 0)
       queryParams.fields = params.fields.join(',');
-    if (params.limit) queryParams.limit = params.limit;
+    if (params.limit !== undefined) queryParams.limit = params.limit;
 
     let response = await this.axios.post('/reverse', params.coordinates, {
       params: queryParams
@@ -183,7 +191,10 @@ export class Client {
 
     if (params.fields && params.fields.length > 0)
       queryParams.fields = params.fields.join(',');
-    if (params.distanceMode) queryParams.distance_mode = params.distanceMode;
+    queryParams.distance_mode =
+      params.distanceMode === 'straight-line'
+        ? 'straightline'
+        : (params.distanceMode ?? 'driving');
     if (params.distanceUnits) queryParams.distance_units = params.distanceUnits;
 
     params.destinations.forEach((dest, i) => {
@@ -210,16 +221,8 @@ export class Client {
     formData.append('format', params.format);
 
     if (params.callback) formData.append('callback', params.callback);
-    if (params.fields && params.fields.length > 0) {
-      params.fields.forEach(field => {
-        formData.append('fields[]', field);
-      });
-    }
-
     let response = await this.axios.post('/lists', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+      params: params.fields?.length ? { fields: params.fields.join(',') } : undefined
     });
     return response.data;
   }
@@ -237,8 +240,34 @@ export class Client {
     return response.data;
   }
 
-  async downloadList(listId: number): Promise<any> {
-    let response = await this.axios.get(`/lists/${listId}/download`);
+  async downloadList(listId: number): Promise<string> {
+    let response = await this.axios.get<string>(`/lists/${listId}/download`, {
+      responseType: 'text',
+      transformResponse: [data => data]
+    });
+    if (
+      typeof response.data !== 'string' ||
+      String(response.headers['content-type'] ?? '').includes('application/json')
+    ) {
+      throw createApiServiceError(
+        'Geocodio did not return a CSV file. Check get_list_status and retry once the list is completed.'
+      );
+    }
+    return response.data;
+  }
+
+  async calculateDistanceMatrix(params: {
+    origins: string[];
+    destinations: string[];
+    mode?: string;
+    units?: string;
+  }): Promise<any> {
+    let response = await this.axios.post('/distance-matrix', {
+      origins: params.origins,
+      destinations: params.destinations,
+      mode: params.mode === 'straight-line' ? 'straightline' : (params.mode ?? 'driving'),
+      units: params.units ?? 'miles'
+    });
     return response.data;
   }
 

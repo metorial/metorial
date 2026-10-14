@@ -25,7 +25,17 @@ export let checkWhatsAppNumber = SlateTool.create(spec, {
   .output(
     z.object({
       isWhatsAppUser: z.boolean().describe('Whether the number is registered on WhatsApp'),
-      numberExists: z.boolean().describe('Whether the phone number exists')
+      numberExists: z
+        .boolean()
+        .describe(
+          'Whether the service reports number existence; falls back to WhatsApp registration'
+        ),
+      isValid: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the phone number is syntactically valid; this does not prove carrier allocation'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -38,7 +48,8 @@ export let checkWhatsAppNumber = SlateTool.create(spec, {
     return {
       output: {
         isWhatsAppUser: isWhatsApp,
-        numberExists: exists
+        numberExists: exists,
+        isValid: result.is_valid ?? undefined
       },
       message: isWhatsApp
         ? `**${ctx.input.toNumber}** is registered on WhatsApp.`

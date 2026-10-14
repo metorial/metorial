@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -22,7 +22,12 @@ export let manageAppointment = SlateTool.create(spec, {
       clientId: z.string().optional().describe('Client ID (for create)'),
       serviceId: z.string().optional().describe('Service ID (for create)'),
       staffId: z.string().optional().describe('Staff member ID (for create and reschedule)'),
-      locationId: z.string().optional().describe('Location ID (for create)'),
+      locationId: z
+        .string()
+        .optional()
+        .describe(
+          'Location ID from list_locations; required for create, discovered from the appointment if omitted for reschedule/cancel'
+        ),
       date: z.string().optional().describe('Appointment date (YYYY-MM-DD)'),
       time: z.string().optional().describe('Appointment time (HH:MM AM/PM)'),
       timezone: z.string().optional().describe('Timezone (for create)'),
@@ -62,9 +67,9 @@ export let manageAppointment = SlateTool.create(spec, {
       return {
         output: {
           appointmentId: result.id || result._id,
-          status: result.status,
-          date: result.date,
-          time: result.time,
+          status: result.status ?? undefined,
+          date: result.date ?? undefined,
+          time: result.time ?? undefined,
           success: true
         },
         message: `Created appointment on **${result.date}** at **${result.time}**.`
@@ -73,20 +78,22 @@ export let manageAppointment = SlateTool.create(spec, {
 
     if (action === 'reschedule') {
       if (!ctx.input.appointmentId)
-        throw new Error('appointmentId is required for reschedule');
+        throw createApiServiceError('appointmentId is required for reschedule');
       if (!ctx.input.date || !ctx.input.time)
-        throw new Error('date and time are required for reschedule');
+        throw createApiServiceError('date and time are required for reschedule');
 
       let result = await client.rescheduleAppointment({
         appointmentId: ctx.input.appointmentId,
         date: ctx.input.date,
         time: ctx.input.time,
-        staffId: ctx.input.staffId
+        staffId: ctx.input.staffId,
+        locationId: ctx.input.locationId,
+        timezone: ctx.input.timezone
       });
       return {
         output: {
           appointmentId: ctx.input.appointmentId,
-          status: result.status,
+          status: result.status ?? undefined,
           date: ctx.input.date,
           time: ctx.input.time,
           success: true
@@ -96,10 +103,12 @@ export let manageAppointment = SlateTool.create(spec, {
     }
 
     if (action === 'cancel') {
-      if (!ctx.input.appointmentId) throw new Error('appointmentId is required for cancel');
+      if (!ctx.input.appointmentId)
+        throw createApiServiceError('appointmentId is required for cancel');
       let _result = await client.cancelAppointment({
         appointmentId: ctx.input.appointmentId,
-        reason: ctx.input.reason
+        reason: ctx.input.reason,
+        locationId: ctx.input.locationId
       });
       return {
         output: {
@@ -111,6 +120,6 @@ export let manageAppointment = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

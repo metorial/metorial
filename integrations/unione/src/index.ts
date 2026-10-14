@@ -2,8 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   addSuppression,
+  createConfirmedEmail,
   createEventDump,
   createProject,
+  deleteConfirmedEmail,
   deleteDomain,
   deleteEventDump,
   deleteProject,
@@ -15,6 +17,7 @@ import {
   getSuppression,
   getSystemInfo,
   getTemplate,
+  listConfirmedEmails,
   listDomains,
   listEventDumps,
   listProjects,
@@ -34,6 +37,9 @@ export let provider = Slate.create({
     sendEmail,
     subscribeEmail,
     validateEmail,
+    createConfirmedEmail,
+    listConfirmedEmails,
+    deleteConfirmedEmail,
     upsertTemplate,
     getTemplate,
     listTemplates,

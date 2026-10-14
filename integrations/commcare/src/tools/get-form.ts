@@ -46,29 +46,30 @@ export let getForm = SlateTool.create(spec, {
     });
 
     let f = await client.getForm(ctx.input.formId);
+    let metadata = f.metadata ?? {};
 
     return {
       output: {
         formId: f.id,
-        appId: f.app_id,
-        buildId: f.build_id,
+        appId: f.app_id ?? '',
+        buildId: f.build_id ?? '',
         domain: f.domain,
         receivedOn: f.received_on,
         formType: f.type,
         formData: f.form,
         archived: f.archived,
-        editedOn: f.edited_on,
+        editedOn: f.edited_on ?? null,
         metadata: {
-          appVersion: f.metadata.appVersion,
-          deviceId: f.metadata.deviceID,
-          instanceId: f.metadata.instanceID,
-          timeEnd: f.metadata.timeEnd,
-          timeStart: f.metadata.timeStart,
-          userId: f.metadata.userID,
-          username: f.metadata.username
+          appVersion: metadata.appVersion ?? '',
+          deviceId: metadata.deviceID ?? '',
+          instanceId: metadata.instanceID ?? '',
+          timeEnd: metadata.timeEnd ?? '',
+          timeStart: metadata.timeStart ?? '',
+          userId: metadata.userID ?? '',
+          username: metadata.username ?? ''
         }
       },
-      message: `Retrieved form **${f.id}** submitted by ${f.metadata.username} on ${f.received_on}.`
+      message: `Retrieved form **${f.id}** submitted by ${metadata.username ?? 'an unknown user'} on ${f.received_on}.`
     };
   })
   .build();

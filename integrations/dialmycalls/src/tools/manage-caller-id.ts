@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -51,7 +51,7 @@ export let manageCallerId = SlateTool.create(spec, {
     let { action, callerIdId, phone, name, pin } = ctx.input;
 
     if (action === 'delete') {
-      if (!callerIdId) throw new Error('callerIdId is required for delete action');
+      if (!callerIdId) throw createApiServiceError('callerIdId is required for delete action');
       await client.deleteCallerId(callerIdId);
       return {
         output: { callerIdId },
@@ -60,8 +60,8 @@ export let manageCallerId = SlateTool.create(spec, {
     }
 
     if (action === 'verify') {
-      if (!callerIdId) throw new Error('callerIdId is required for verify action');
-      if (!pin) throw new Error('pin is required for verify action');
+      if (!callerIdId) throw createApiServiceError('callerIdId is required for verify action');
+      if (!pin) throw createApiServiceError('pin is required for verify action');
       let result = await client.verifyCallerId(callerIdId, pin);
       return {
         output: {
@@ -77,8 +77,8 @@ export let manageCallerId = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!callerIdId) throw new Error('callerIdId is required for update action');
-      if (!name) throw new Error('name is required for update action');
+      if (!callerIdId) throw createApiServiceError('callerIdId is required for update action');
+      if (!name) throw createApiServiceError('name is required for update action');
       let result = await client.updateCallerId(callerIdId, { name });
       return {
         output: {
@@ -94,8 +94,9 @@ export let manageCallerId = SlateTool.create(spec, {
     }
 
     if (action === 'create_unverified') {
-      if (!phone) throw new Error('phone is required for create_unverified action');
-      if (!name) throw new Error('name is required for create_unverified action');
+      if (!phone)
+        throw createApiServiceError('phone is required for create_unverified action');
+      if (!name) throw createApiServiceError('name is required for create_unverified action');
       let result = await client.createUnverifiedCallerId({ phone, name });
       return {
         output: {
@@ -111,8 +112,8 @@ export let manageCallerId = SlateTool.create(spec, {
     }
 
     // create (verified)
-    if (!phone) throw new Error('phone is required for create action');
-    if (!name) throw new Error('name is required for create action');
+    if (!phone) throw createApiServiceError('phone is required for create action');
+    if (!name) throw createApiServiceError('name is required for create action');
     let result = await client.createCallerId({ phone, name });
     return {
       output: {

@@ -17,7 +17,10 @@ export let listTasks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().optional().describe('Filter tasks by project ID')
+      projectId: z
+        .string()
+        .optional()
+        .describe('Filter by numeric project ID. Call list_projects to discover project IDs.')
     })
   )
   .output(
@@ -34,7 +37,10 @@ export let listTasks = SlateTool.create(spec, {
             startDate: z.string().optional().describe('Start date'),
             dueDate: z.string().optional().describe('Due date'),
             timeEstimate: z.number().optional().describe('Time estimate in hours'),
-            billingType: z.string().optional().describe('Billing type')
+            billingType: z.string().optional().describe('Billing type'),
+            assigneeMemberId: z.string().optional().describe('Assigned team member ID'),
+            taskStatusId: z.string().optional().describe('Task board column ID'),
+            url: z.string().optional().describe('Link to the task in Bonsai')
           })
         )
         .describe('List of tasks'),
@@ -58,7 +64,10 @@ export let listTasks = SlateTool.create(spec, {
           startDate: t.startDate,
           dueDate: t.dueDate,
           timeEstimate: t.timeEstimate,
-          billingType: t.billingType
+          billingType: t.billingType,
+          assigneeMemberId: t.assigneeMemberId,
+          taskStatusId: t.taskStatusId,
+          url: t.url
         })),
         totalCount: tasks.length
       },

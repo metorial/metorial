@@ -23,7 +23,9 @@ export let listDocuments = SlateTool.create(spec, {
         z.object({
           documentId: z.string().describe('Unique document ID'),
           templateId: z.string().describe('ID of the source template'),
-          created: z.number().describe('Creation timestamp (Unix epoch)'),
+          created: z
+            .number()
+            .describe('Creation timestamp in milliseconds since the Unix epoch'),
           name: z.string().describe('Document name'),
           dataLength: z
             .number()

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -28,7 +28,8 @@ export let getSession = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let session: any;
@@ -37,7 +38,7 @@ export let getSession = SlateTool.create(spec, {
     } else if (ctx.input.userId) {
       session = await client.getSessionByUserId(ctx.input.userId);
     } else {
-      throw new Error('Either sessionId or userId must be provided');
+      throw createApiServiceError('Either sessionId or userId must be provided');
     }
 
     return {

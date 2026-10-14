@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,14 +57,14 @@ export let modifyRows = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'append':
         if (!ctx.input.rows || ctx.input.rows.length === 0) {
-          throw new Error('rows is required for append');
+          throw createApiServiceError('rows is required for append');
         }
         result = await client.appendRowsByName(ctx.input.sheetHandle, ctx.input.rows);
         break;
 
       case 'append_from_sheet':
         if (!ctx.input.sourceSheetHandle) {
-          throw new Error('sourceSheetHandle is required for append_from_sheet');
+          throw createApiServiceError('sourceSheetHandle is required for append_from_sheet');
         }
         result = await client.appendFromSheet(
           ctx.input.sheetHandle,
@@ -78,7 +78,7 @@ export let modifyRows = SlateTool.create(spec, {
 
       case 'update_cell':
         if (!ctx.input.columnName || !ctx.input.rowId) {
-          throw new Error('columnName and rowId are required for update_cell');
+          throw createApiServiceError('columnName and rowId are required for update_cell');
         }
         result = await client.updateCellByName(
           ctx.input.sheetHandle,
@@ -90,14 +90,16 @@ export let modifyRows = SlateTool.create(spec, {
 
       case 'delete_rows':
         if (!ctx.input.rowIds || ctx.input.rowIds.length === 0) {
-          throw new Error('rowIds is required for delete_rows');
+          throw createApiServiceError('rowIds is required for delete_rows');
         }
         result = await client.deleteRows(ctx.input.sheetHandle, ctx.input.rowIds);
         break;
 
       case 'delete_rows_matching_filter':
         if (!ctx.input.filterModel) {
-          throw new Error('filterModel is required for delete_rows_matching_filter');
+          throw createApiServiceError(
+            'filterModel is required for delete_rows_matching_filter'
+          );
         }
         result = await client.deleteRowsMatchingFilter(
           ctx.input.sheetHandle,
@@ -107,7 +109,9 @@ export let modifyRows = SlateTool.create(spec, {
 
       case 'delete_rows_not_matching_filter':
         if (!ctx.input.filterModel) {
-          throw new Error('filterModel is required for delete_rows_not_matching_filter');
+          throw createApiServiceError(
+            'filterModel is required for delete_rows_not_matching_filter'
+          );
         }
         result = await client.deleteRowsNotMatchingFilter(
           ctx.input.sheetHandle,

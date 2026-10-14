@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createProfile = SlateTool.create(spec, {
   name: 'Create Profile',
   key: 'create_profile',
-  description: `Create a new NextDNS DNS configuration profile. Returns the ID and setup information for the newly created profile. After creation, configure security, privacy, and parental control settings using other tools.`,
+  description: `Create a new NextDNS DNS configuration profile and return its ID. After creation, configure security, privacy, and parental control settings using other tools. Use get_setup for connection details.`,
   tags: {
     destructive: false
   }

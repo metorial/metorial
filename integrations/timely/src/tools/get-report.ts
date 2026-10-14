@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getReport = SlateTool.create(spec, {
   name: 'Get Report',
   key: 'get_report',
-  description: `Generate a filtered time report from Timely. Filter by date range, users, projects, labels, and teams. Group results by clients, users, labels, days, or teams for aggregated metrics including duration, cost, profit, and profitability.`,
+  description: `Call list_accounts to choose a workspace when needed. Generate a filtered time report from Timely. Filter by date range, users, projects, labels, and teams. Group results by clients, users, labels, days, or teams for aggregated metrics including duration, cost, profit, and profitability.`,
   instructions: [
     'Both since and upto are required to define the date range.',
     'Grouping options: clients, users, labels, days, teams.'
@@ -15,6 +16,7 @@ export let getReport = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       since: z.string().describe('Report start date (YYYY-MM-DD)'),
       upto: z.string().describe('Report end date (YYYY-MM-DD)'),
       userIds: z.array(z.string()).optional().describe('Filter by user IDs'),
@@ -33,10 +35,7 @@ export let getReport = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let report = await client.getFilteredReports({
       since: ctx.input.since,

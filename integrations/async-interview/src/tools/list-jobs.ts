@@ -24,7 +24,7 @@ export let listJobs = SlateTool.create(spec, {
 
     return {
       output: {
-        jobs: jobs as Record<string, unknown>[]
+        jobs
       },
       message: `Retrieved **${jobs.length}** interview job(s).`
     };

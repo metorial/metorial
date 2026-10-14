@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Flexisign
 
-Send, sign, and manage digital documents and e-signature requests. List and retrieve reusable document templates, create documents from templates, and send signature requests to one or more recipients. Track document status across stages such as waiting, completed, declined, and voided. Supports over 25 document types including PDF, Word, Excel, and images. Configure signing order for sequential or simultaneous workflows.
+List reusable FlexiSign templates, inspect their signer roles and required fields, and send documents for signature from an existing template. Connect with a workspace API key, then use the template's body structure to supply recipient names, emails, a message, and expiration settings.
+
+See the [FlexiSign API documentation](https://flexisign.io/esignature-api) for the template-based sending workflow.
 
 ## License
 

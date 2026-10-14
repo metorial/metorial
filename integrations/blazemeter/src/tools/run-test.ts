@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BlazeMeterClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,12 +37,13 @@ export let runTest = SlateTool.create(spec, {
     let client = new BlazeMeterClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     if (ctx.input.operation === 'start') {
       if (!ctx.input.testId) {
-        throw new Error('testId is required to start a test');
+        throw createApiServiceError('testId is required to start a test');
       }
       let result: any;
       if (ctx.input.isMultiTest) {
@@ -74,12 +75,12 @@ export let runTest = SlateTool.create(spec, {
           message: `Stopped test **${ctx.input.testId}**.`
         };
       }
-      throw new Error('Either testId or masterId is required to stop');
+      throw createApiServiceError('Either testId or masterId is required to stop');
     }
 
     if (ctx.input.operation === 'terminate') {
       if (!ctx.input.masterId) {
-        throw new Error('masterId is required to terminate a test run');
+        throw createApiServiceError('masterId is required to terminate a test run');
       }
       await client.terminateMaster(ctx.input.masterId);
       return {
@@ -88,6 +89,6 @@ export let runTest = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown operation: ${ctx.input.operation}`);
+    throw createApiServiceError(`Unknown operation: ${ctx.input.operation}`);
   })
   .build();

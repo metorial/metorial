@@ -1,6 +1,4 @@
-Now let me get more details on authentication and the options/fields configuration:Now let me get details on the document classification API and options:Now I have enough information to write the specification.
-
-# Slates Specification for Extracta.ai
+# Extracta.ai API Specification
 
 ## Overview
 
@@ -44,7 +42,7 @@ Create and manage extraction templates that define which fields to extract from 
   - `checkboxRecognition` — detects checkbox states (checked/unchecked).
   - `longDocument` — optimized processing for very large or complex documents.
   - `splitPdfPages` — treats each PDF page as a separate extraction unit (useful for multi-page documents where each page is a separate record).
-  - `specificPageProcessing` — processes only a specified range of pages from a PDF, with configurable `from` and `to` page parameters.
+  - `specificPageProcessing` — processes only a specified range of pages from a PDF, with `from` and `to` mapped to the API's nested `specificPageProcessingOptions` object.
 - Extractions can be viewed, updated, and deleted after creation.
 
 ### File Upload and Processing
@@ -60,7 +58,7 @@ Extracta LABS specializes in extracting structured data from any type of documen
 
 - Users define **document types** with a name, description, and a list of unique/keywords to guide classification.
 - Each document type can optionally be linked to an existing extraction template (`extractionId`) to automatically extract structured data upon classification.
-- Supports creating, viewing, updating, and deleting classifications.
+- Supports creating, viewing, updating, and deleting classifications, as well as deleting selected batches or files without deleting their classification template.
 - Files can be uploaded and results retrieved similarly to the data extraction workflow.
 
 ### Pre-built Document Templates

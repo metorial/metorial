@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StartonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,6 +51,8 @@ export let manageWatchers = SlateTool.create(spec, {
       webhookUrl: z.string().optional().describe('Webhook URL for notifications (for create)'),
       confirmationsBlocks: z
         .number()
+        .min(0)
+        .max(180)
         .default(12)
         .describe('Block confirmations before triggering (for create)'),
       customEventAbi: z
@@ -62,8 +64,13 @@ export let manageWatchers = SlateTool.create(spec, {
       isPaused: z.boolean().optional().describe('Pause or resume the watcher (for update)'),
 
       // List params
-      limit: z.number().default(20).describe('Number of watchers to return (for list)'),
-      page: z.number().default(0).describe('Page number (for list)')
+      limit: z
+        .number()
+        .min(1)
+        .max(2500)
+        .default(20)
+        .describe('Number of watchers to return (for list)'),
+      page: z.number().min(0).default(0).describe('Page number (for list)')
     })
   )
   .output(
@@ -96,9 +103,12 @@ export let manageWatchers = SlateTool.create(spec, {
         !ctx.input.watcherType ||
         !ctx.input.webhookUrl
       ) {
-        throw new Error(
+        throw createApiServiceError(
           'address, network, watcherType, and webhookUrl are required for creating a watcher'
         );
+      }
+      if (ctx.input.watcherType === 'EVENT_CUSTOM' && !ctx.input.customEventAbi) {
+        throw createApiServiceError('customEventAbi is required for an EVENT_CUSTOM watcher.');
       }
       let result = await client.createWatcher({
         name: ctx.input.name || `Watcher for ${ctx.input.address}`,
@@ -116,12 +126,12 @@ export let manageWatchers = SlateTool.create(spec, {
           watchers: [
             {
               watcherId: result.id || '',
-              name: result.name,
+              name: result.name ?? undefined,
               address: result.address,
               network: result.network,
               watcherType: result.type,
               webhookUrl: result.webhookUrl,
-              isPaused: result.isPaused,
+              isPaused: result.paused ?? result.isPaused,
               createdAt: result.createdAt
             }
           ],
@@ -133,7 +143,7 @@ export let manageWatchers = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.watcherId) throw new Error('watcherId is required');
+      if (!ctx.input.watcherId) throw createApiServiceError('watcherId is required');
       let result = await client.getWatcher(ctx.input.watcherId);
 
       return {
@@ -141,12 +151,12 @@ export let manageWatchers = SlateTool.create(spec, {
           watchers: [
             {
               watcherId: result.id || ctx.input.watcherId,
-              name: result.name,
+              name: result.name ?? undefined,
               address: result.address,
               network: result.network,
               watcherType: result.type,
               webhookUrl: result.webhookUrl,
-              isPaused: result.isPaused,
+              isPaused: result.paused ?? result.isPaused,
               createdAt: result.createdAt
             }
           ],
@@ -158,7 +168,16 @@ export let manageWatchers = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.watcherId) throw new Error('watcherId is required');
+      if (!ctx.input.watcherId) throw createApiServiceError('watcherId is required');
+      if (
+        ctx.input.name === undefined &&
+        ctx.input.description === undefined &&
+        ctx.input.isPaused === undefined
+      ) {
+        throw createApiServiceError(
+          'Provide name, description, or isPaused to update a watcher.'
+        );
+      }
       let result = await client.updateWatcher(ctx.input.watcherId, {
         name: ctx.input.name,
         description: ctx.input.description,
@@ -170,12 +189,12 @@ export let manageWatchers = SlateTool.create(spec, {
           watchers: [
             {
               watcherId: result.id || ctx.input.watcherId,
-              name: result.name,
+              name: result.name ?? undefined,
               address: result.address,
               network: result.network,
               watcherType: result.type,
               webhookUrl: result.webhookUrl,
-              isPaused: result.isPaused,
+              isPaused: result.paused ?? result.isPaused,
               createdAt: result.createdAt
             }
           ],
@@ -187,7 +206,7 @@ export let manageWatchers = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.watcherId) throw new Error('watcherId is required');
+      if (!ctx.input.watcherId) throw createApiServiceError('watcherId is required');
       await client.deleteWatcher(ctx.input.watcherId);
 
       return {
@@ -207,21 +226,21 @@ export let manageWatchers = SlateTool.create(spec, {
       network: ctx.input.network
     });
 
-    let items = result.items || result || [];
+    let items = result.items ?? (Array.isArray(result) ? result : []);
 
     return {
       output: {
         watchers: items.map((w: any) => ({
           watcherId: w.id || '',
-          name: w.name,
+          name: w.name ?? undefined,
           address: w.address,
           network: w.network,
           watcherType: w.type,
           webhookUrl: w.webhookUrl,
-          isPaused: w.isPaused,
+          isPaused: w.paused ?? w.isPaused,
           createdAt: w.createdAt
         })),
-        totalCount: result.meta?.totalCount || items.length,
+        totalCount: result.meta?.totalItems ?? result.meta?.totalCount ?? items.length,
         deleted: undefined
       },
       message: `Found **${items.length}** watchers${ctx.input.network ? ` on ${ctx.input.network}` : ''}.`

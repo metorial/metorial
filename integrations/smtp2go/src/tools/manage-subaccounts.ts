@@ -11,10 +11,26 @@ export let listSubaccounts = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      continueToken: z.string().optional().describe('Token for the next page of subaccounts'),
+      pageSize: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Number of subaccounts per page; default 100'),
+      searchTerms: z
+        .array(z.string())
+        .optional()
+        .describe('Search names, email addresses, and IDs')
+    })
+  )
   .output(
     z.object({
-      subaccounts: z.array(z.any()).describe('List of subaccounts')
+      subaccounts: z.array(z.any()).describe('List of subaccounts'),
+      continueToken: z.string().optional().describe('Token for the next page'),
+      totalCount: z.number().optional().describe('Number of matching subaccounts')
     })
   )
   .handleInvocation(async ctx => {
@@ -23,12 +39,14 @@ export let listSubaccounts = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.viewSubaccounts();
+    let result = await client.viewSubaccounts(ctx.input);
     let data = result.data || result;
 
     return {
       output: {
-        subaccounts: data.subaccounts || data
+        subaccounts: data.subaccounts || [],
+        continueToken: data.continue_token || undefined,
+        totalCount: data.total_count
       },
       message: `Retrieved subaccounts.`
     };
@@ -47,8 +65,16 @@ export let createSubaccount = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      email: z.string().describe('Email address for the subaccount'),
-      password: z.string().describe('Password for the subaccount'),
+      email: z
+        .string()
+        .optional()
+        .describe(
+          'Email address to invite as the first team member; also used as name if name is omitted'
+        ),
+      password: z
+        .string()
+        .optional()
+        .describe('Omit this field; SMTP2GO creates subaccounts through email invitations'),
       name: z.string().optional().describe('Display name for the subaccount')
     })
   )
@@ -70,7 +96,7 @@ export let createSubaccount = SlateTool.create(spec, {
       output: {
         subaccount: data
       },
-      message: `Subaccount created for **${ctx.input.email}**.`
+      message: `Subaccount **${data.name ?? ctx.input.name ?? ctx.input.email}** created.`
     };
   })
   .build();
@@ -78,7 +104,7 @@ export let createSubaccount = SlateTool.create(spec, {
 export let editSubaccount = SlateTool.create(spec, {
   name: 'Edit Subaccount',
   key: 'edit_subaccount',
-  description: `Update a subaccount's email or display name.`,
+  description: `Update a subaccount's display name.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -87,7 +113,10 @@ export let editSubaccount = SlateTool.create(spec, {
   .input(
     z.object({
       subaccountId: z.string().describe('ID of the subaccount to edit'),
-      email: z.string().optional().describe('New email address'),
+      email: z
+        .string()
+        .optional()
+        .describe('Omit this field; the API cannot update the subaccount email'),
       name: z.string().optional().describe('New display name')
     })
   )

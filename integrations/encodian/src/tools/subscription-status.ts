@@ -18,19 +18,23 @@ export let subscriptionStatus = SlateTool.create(spec, {
       subscriptionStatus: z
         .any()
         .describe('Full subscription status including plan, credits, and usage details'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result = await client.getSubscriptionStatus();
 
     return {
       output: {
         subscriptionStatus: result,
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Retrieved Encodian subscription status.`
+      message: client.message(`Retrieved Encodian subscription status.`)
     };
   })
   .build();

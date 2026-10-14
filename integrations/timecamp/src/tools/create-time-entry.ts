@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, timeCampCreatedId } from '../lib/client';
 import { spec } from '../spec';
 
 export let createTimeEntry = SlateTool.create(spec, {
@@ -9,7 +9,7 @@ export let createTimeEntry = SlateTool.create(spec, {
   description: `Create a new time entry in TimeCamp. You can specify a start/end time range or a duration in seconds. Optionally associate the entry with a task and mark it as billable.`,
   instructions: [
     'Provide either (start AND end) OR duration, not both.',
-    'Date format for start/end is YYYY-MM-DD HH:MM:SS.',
+    'Date format for start/end is YYYY-MM-DD HH:MM:SS; both must be on the same date.',
     'Date format for date is YYYY-MM-DD.'
   ]
 })
@@ -18,7 +18,9 @@ export let createTimeEntry = SlateTool.create(spec, {
       date: z
         .string()
         .optional()
-        .describe('Date for the entry (YYYY-MM-DD). Defaults to today if not specified.'),
+        .describe(
+          'Date for the entry (YYYY-MM-DD). Defaults to the start datetime date, or today in UTC for duration-only entries.'
+        ),
       start: z
         .string()
         .optional()
@@ -51,10 +53,10 @@ export let createTimeEntry = SlateTool.create(spec, {
       duration: ctx.input.duration,
       note: ctx.input.note,
       taskId: ctx.input.taskId,
-      billable: ctx.input.billable !== undefined ? (ctx.input.billable ? 1 : 0) : undefined
+      billable: ctx.input.billable
     });
 
-    let entryId = String(result?.entry_id || result?.id || '');
+    let entryId = timeCampCreatedId(result, ['id', 'entry_id'], 'time entry');
 
     return {
       output: {

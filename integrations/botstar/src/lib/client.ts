@@ -1,15 +1,25 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export interface CmsEntityField {
+  name: string;
+  dataType: string;
+  uniqueName?: string;
+  options?: Record<string, unknown>;
+}
 
 export class BotstarClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    if (!token.trim()) throw createApiServiceError('An account-level API token is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://apis.botstar.com/v1',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'BotStar',
+          reason: 'botstar_api_error'
+        })
     });
   }
 
@@ -21,7 +31,7 @@ export class BotstarClient {
   }
 
   async getBot(botId: string): Promise<any> {
-    let response = await this.axios.get(`/bots/${botId}`);
+    let response = await this.axios.get(`/bots/${encodeURIComponent(botId)}`);
     return response.data;
   }
 
@@ -31,14 +41,14 @@ export class BotstarClient {
   }
 
   async publishBot(botId: string): Promise<any> {
-    let response = await this.axios.post(`/bots/${botId}/publish`);
+    let response = await this.axios.post(`/bots/${encodeURIComponent(botId)}/publish`);
     return response.data;
   }
 
   // ---- Bot Attributes ----
 
   async listBotAttributes(botId: string, env?: string): Promise<any[]> {
-    let response = await this.axios.get(`/bots/${botId}/attributes`, {
+    let response = await this.axios.get(`/bots/${encodeURIComponent(botId)}/attributes`, {
       params: { env }
     });
     return response.data;
@@ -50,14 +60,14 @@ export class BotstarClient {
     env?: string
   ): Promise<any> {
     let response = await this.axios.post(
-      `/bots/${botId}/attributes`,
+      `/bots/${encodeURIComponent(botId)}/attributes`,
       {
         name: attribute.name,
         data_type: attribute.dataType,
         desc: attribute.desc,
         value: attribute.value
       },
-      { params: { env } }
+      { params: { env: env === 'live' ? 'draft,live' : env } }
     );
     return response.data;
   }
@@ -69,31 +79,39 @@ export class BotstarClient {
     env?: string
   ): Promise<any> {
     let response = await this.axios.patch(
-      `/bots/${botId}/attributes/${attributeId}`,
+      `/bots/${encodeURIComponent(botId)}/attributes/${encodeURIComponent(attributeId)}`,
       updates,
       {
-        params: { env }
+        params: { env: env === 'live' ? 'draft,live' : env }
       }
     );
     return response.data;
   }
 
   async deleteBotAttribute(botId: string, attributeId: string, env?: string): Promise<any> {
-    let response = await this.axios.delete(`/bots/${botId}/attributes/${attributeId}`, {
-      params: { env }
-    });
+    let response = await this.axios.delete(
+      `/bots/${encodeURIComponent(botId)}/attributes/${encodeURIComponent(attributeId)}`,
+      {
+        params: { env: env === 'live' ? 'draft,live' : env }
+      }
+    );
     return response.data;
   }
 
   // ---- Users ----
 
   async getUser(botId: string, userId: string): Promise<any> {
-    let response = await this.axios.get(`/bots/${botId}/users/${userId}`);
+    let response = await this.axios.get(
+      `/bots/${encodeURIComponent(botId)}/users/${encodeURIComponent(userId)}`
+    );
     return response.data;
   }
 
   async updateUser(botId: string, userId: string, updates: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/bots/${botId}/users/${userId}`, updates);
+    let response = await this.axios.patch(
+      `/bots/${encodeURIComponent(botId)}/users/${encodeURIComponent(userId)}`,
+      updates
+    );
     return response.data;
   }
 
@@ -102,37 +120,53 @@ export class BotstarClient {
     fieldName: string,
     fieldType: string
   ): Promise<any> {
-    let response = await this.axios.post(`/bots/${botId}/users/attributes`, {
-      field_name: fieldName,
-      field_type: fieldType
-    });
+    let response = await this.axios.post(
+      `/bots/${encodeURIComponent(botId)}/users/attributes`,
+      {
+        field_name: fieldName,
+        field_type: fieldType
+      }
+    );
     return response.data;
   }
 
   // ---- CMS Entities ----
 
   async listCmsEntities(botId: string, env?: string): Promise<any[]> {
-    let response = await this.axios.get(`/bots/${botId}/cms_entities`, {
+    let response = await this.axios.get(`/bots/${encodeURIComponent(botId)}/cms_entities`, {
       params: { env }
     });
     return response.data;
   }
 
   async getCmsEntity(botId: string, entityId: string, env?: string): Promise<any> {
-    let response = await this.axios.get(`/bots/${botId}/cms_entities/${entityId}`, {
-      params: { env }
-    });
+    let response = await this.axios.get(
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}`,
+      {
+        params: { env }
+      }
+    );
     return response.data;
   }
 
   async createCmsEntity(
     botId: string,
-    entity: { name: string; fields?: any[] },
+    entity: { name: string; fields?: CmsEntityField[] },
     env?: string
   ): Promise<any> {
-    let response = await this.axios.post(`/bots/${botId}/cms_entities`, entity, {
-      params: { env }
-    });
+    let response = await this.axios.post(
+      `/bots/${encodeURIComponent(botId)}/cms_entities`,
+      {
+        name: entity.name,
+        fields: entity.fields?.map(field => ({
+          name: field.name,
+          unique_name: field.uniqueName ?? field.name,
+          data_type: field.dataType,
+          options: field.options
+        }))
+      },
+      { params: { env: env === 'live' ? 'draft,live' : env } }
+    );
     return response.data;
   }
 
@@ -142,16 +176,23 @@ export class BotstarClient {
     updates: { name?: string },
     env?: string
   ): Promise<any> {
-    let response = await this.axios.patch(`/bots/${botId}/cms_entities/${entityId}`, updates, {
-      params: { env }
-    });
+    let response = await this.axios.patch(
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}`,
+      updates,
+      {
+        params: { env: env === 'live' ? 'draft,live' : env }
+      }
+    );
     return response.data;
   }
 
   async deleteCmsEntity(botId: string, entityId: string, env?: string): Promise<any> {
-    let response = await this.axios.delete(`/bots/${botId}/cms_entities/${entityId}`, {
-      params: { env }
-    });
+    let response = await this.axios.delete(
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}`,
+      {
+        params: { env: env === 'live' ? 'draft,live' : env }
+      }
+    );
     return response.data;
   }
 
@@ -164,10 +205,10 @@ export class BotstarClient {
     env?: string
   ): Promise<any> {
     let response = await this.axios.post(
-      `/bots/${botId}/cms_entities/${entityId}/fields`,
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}/fields`,
       fields,
       {
-        params: { env }
+        params: { env: env === 'live' ? 'draft,live' : env }
       }
     );
     return response.data;
@@ -180,10 +221,10 @@ export class BotstarClient {
     env?: string
   ): Promise<any> {
     let response = await this.axios.patch(
-      `/bots/${botId}/cms_entities/${entityId}/fields`,
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}/fields`,
       fields,
       {
-        params: { env }
+        params: { env: env === 'live' ? 'draft,live' : env }
       }
     );
     return response.data;
@@ -195,9 +236,15 @@ export class BotstarClient {
     uniqueNames: string[],
     env?: string
   ): Promise<any> {
-    let response = await this.axios.delete(`/bots/${botId}/cms_entities/${entityId}/fields`, {
-      params: { env, unique_names: uniqueNames.join(',') }
-    });
+    let response = await this.axios.delete(
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}/fields`,
+      {
+        params: {
+          env: env === 'live' ? 'draft,live' : env,
+          unique_names: uniqueNames.join(',')
+        }
+      }
+    );
     return response.data;
   }
 
@@ -208,15 +255,18 @@ export class BotstarClient {
     entityId: string,
     options?: { env?: string; page?: number; limit?: number; name?: string; status?: string }
   ): Promise<any[]> {
-    let response = await this.axios.get(`/bots/${botId}/cms_entities/${entityId}/items`, {
-      params: {
-        env: options?.env,
-        page: options?.page,
-        limit: options?.limit,
-        name: options?.name,
-        status: options?.status
+    let response = await this.axios.get(
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}/items`,
+      {
+        params: {
+          env: options?.env,
+          page: options?.page,
+          limit: options?.limit,
+          name: options?.name,
+          status: options?.status
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -227,7 +277,7 @@ export class BotstarClient {
     env?: string
   ): Promise<any> {
     let response = await this.axios.get(
-      `/bots/${botId}/cms_entities/${entityId}/items/${itemId}`,
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}/items/${encodeURIComponent(itemId)}`,
       {
         params: { env }
       }
@@ -242,10 +292,10 @@ export class BotstarClient {
     env?: string
   ): Promise<any> {
     let response = await this.axios.post(
-      `/bots/${botId}/cms_entities/${entityId}/items`,
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}/items`,
       item,
       {
-        params: { env }
+        params: { env: env === 'live' ? 'draft,live' : env }
       }
     );
     return response.data;
@@ -259,10 +309,10 @@ export class BotstarClient {
     env?: string
   ): Promise<any> {
     let response = await this.axios.patch(
-      `/bots/${botId}/cms_entities/${entityId}/items/${itemId}`,
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}/items/${encodeURIComponent(itemId)}`,
       updates,
       {
-        params: { env }
+        params: { env: env === 'live' ? 'draft,live' : env }
       }
     );
     return response.data;
@@ -275,9 +325,9 @@ export class BotstarClient {
     env?: string
   ): Promise<any> {
     let response = await this.axios.delete(
-      `/bots/${botId}/cms_entities/${entityId}/items/${itemId}`,
+      `/bots/${encodeURIComponent(botId)}/cms_entities/${encodeURIComponent(entityId)}/items/${encodeURIComponent(itemId)}`,
       {
-        params: { env }
+        params: { env: env === 'live' ? 'draft,live' : env }
       }
     );
     return response.data;

@@ -1,4 +1,4 @@
-Let me get the full API reference page for more details on endpoints and webhooks.# Slates Specification for Parsehub
+# ParseHub API Specification
 
 ## Overview
 
@@ -42,7 +42,7 @@ Start a scraping run for a given project on the ParseHub cloud. This will start 
 
 ### Retrieving Extracted Data
 
-Download the structured data extracted by a completed run in JSON format.
+Retrieve structured JSON data with get_run_data, or prepare a downloadable JSON or CSV file with export_run_data. Runs with data available can be downloaded even if their status is cancelled or error.
 
 - Retrieve data for a specific run using its run token.
 - For simple use cases, you can use the last ready run data endpoint, which will automatically get the data from the most recent run where data_ready is truthy.
@@ -51,6 +51,10 @@ Download the structured data extracted by a completed run in JSON format.
 
 - **Cancel a run:** Cancels a run and changes its status to cancelled. Any data that was extracted so far will be available.
 - **Delete a run:** This cancels a run if running, and deletes the run and its data.
+
+## API Reference
+
+[Official ParseHub API v2 reference](https://www.parsehub.com/docs/ref/api/v2/) documents the project, run, and data endpoints. The API has no documented account identity endpoint. Project creation and editing are configured in the ParseHub client.
 
 ## Events
 

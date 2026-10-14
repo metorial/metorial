@@ -84,8 +84,19 @@ export let listRecipients = SlateTool.create(spec, {
   .input(
     z.object({
       mailingListId: z.string().describe('The mailing list to list recipients from'),
-      limit: z.number().min(1).max(1000).default(10).describe('Number of results to return'),
-      skip: z.number().default(0).describe('Number of results to skip for pagination'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Use a whole-number limit')
+        .min(1)
+        .max(1000)
+        .default(10)
+        .describe('Number of results to return'),
+      skip: z
+        .number()
+        .refine(Number.isSafeInteger, 'Use a whole-number offset')
+        .min(0)
+        .default(0)
+        .describe('Number of results to skip for pagination'),
       sortField: z.enum(['created', 'name']).optional().describe('Field to sort by'),
       sortOrder: z.enum(['asc', 'desc']).default('desc').describe('Sort order')
     })

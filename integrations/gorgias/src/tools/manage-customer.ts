@@ -216,7 +216,13 @@ export let listCustomers = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Number of customers to return'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('Number of customers to return'),
       email: z.string().optional().describe('Filter by email address')
     })
   )
@@ -253,10 +259,10 @@ export let listCustomers = SlateTool.create(spec, {
     return {
       output: {
         customers,
-        nextCursor: result.meta.next_cursor,
-        prevCursor: result.meta.prev_cursor
+        nextCursor: result.meta?.next_cursor ?? null,
+        prevCursor: result.meta?.prev_cursor ?? null
       },
-      message: `Found **${customers.length}** customer(s).${result.meta.next_cursor ? ' More results available.' : ''}`
+      message: `Found **${customers.length}** customer(s).${result.meta?.next_cursor ? ' More results available.' : ''}`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZeplinClient } from '../lib/client';
 import { spec } from '../spec';
@@ -41,6 +41,9 @@ export let listColors = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.projectId) === Boolean(ctx.input.styleguideId)) {
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
+    }
     let client = new ZeplinClient(ctx.auth.token);
     let colors: any[];
 
@@ -55,7 +58,7 @@ export let listColors = SlateTool.create(spec, {
         offset: ctx.input.offset
       })) as any[];
     } else {
-      throw new Error('Either projectId or styleguideId must be provided');
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
     }
 
     let mapped = colors.map((c: any) => ({
@@ -112,7 +115,7 @@ export let createProjectColor = SlateTool.create(spec, {
     return {
       output: {
         colorId: result.id,
-        name: result.name
+        name: ctx.input.name
       },
       message: `Created color **${ctx.input.name}** (rgba(${ctx.input.r}, ${ctx.input.g}, ${ctx.input.b}, ${ctx.input.a})).`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,10 +6,11 @@ import { spec } from '../spec';
 export let updateContact = SlateTool.create(spec, {
   name: 'Update Contact',
   key: 'update_contact',
-  description: `Updates an existing contact in SuiteDash CRM. You can update standard fields like name, email, and role, as well as any custom fields configured in your account. Use the **Get Metadata** tool to discover available custom fields.`,
+  description: `Updates an existing contact in SuiteDash CRM. You can update standard fields like name and email, as well as custom fields configured in your account. Use the **Get Metadata** tool to discover available custom fields.`,
   instructions: [
     'The contact UID is required to identify which contact to update.',
-    'Use the Get Metadata tool to discover custom field keys for your account.'
+    'Use the Get Metadata tool to discover custom field keys for your account.',
+    'The existing role input is retained for compatibility, but role changes are not specified by the current update endpoint schema; provider support must be confirmed.'
   ],
   tags: {
     destructive: false,
@@ -40,9 +41,7 @@ export let updateContact = SlateTool.create(spec, {
       secretKey: ctx.auth.secretKey
     });
 
-    let payload: Record<string, unknown> = {
-      uid: ctx.input.contactUid
-    };
+    let payload: Record<string, unknown> = {};
 
     if (ctx.input.firstName !== undefined) payload.first_name = ctx.input.firstName;
     if (ctx.input.lastName !== undefined) payload.last_name = ctx.input.lastName;
@@ -52,7 +51,13 @@ export let updateContact = SlateTool.create(spec, {
       Object.assign(payload, ctx.input.customFields);
     }
 
-    let result = await client.updateContact(payload);
+    if (Object.keys(payload).length === 0) {
+      throw createApiServiceError('Provide at least one field to update the contact.', {
+        reason: 'contact_update_required'
+      });
+    }
+
+    let result = await client.updateContact(ctx.input.contactUid, payload);
 
     return {
       output: { contact: result },

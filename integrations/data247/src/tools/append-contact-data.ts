@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRawData247Result } from '../lib/client';
 import { spec } from '../spec';
 
 export let appendContactData = SlateTool.create(spec, {
@@ -37,6 +37,11 @@ export let appendContactData = SlateTool.create(spec, {
       lastName: z.string().optional().describe('Last name'),
       phone: z.string().optional().describe('Appended phone number'),
       email: z.string().optional().describe('Appended email address'),
+      phoneType: z.string().optional().describe('Type of the appended phone number'),
+      additionalPhones: z
+        .array(z.unknown())
+        .optional()
+        .describe('Additional phone matches returned by the provider'),
       address: z.string().optional().describe('Address'),
       city: z.string().optional().describe('City'),
       state: z.string().optional().describe('State'),
@@ -70,7 +75,10 @@ export let appendContactData = SlateTool.create(spec, {
       });
     }
 
+    let original = getRawData247Result(raw);
     let result = {
+      phoneType: raw.type,
+      additionalPhones: Array.isArray(original.addtl) ? original.addtl : undefined,
       firstName: raw.firstname,
       lastName: raw.lastname,
       phone: raw.phone,

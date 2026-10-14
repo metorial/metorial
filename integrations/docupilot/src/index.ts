@@ -9,6 +9,7 @@ import {
   deleteFolder,
   deleteTemplate,
   generateDocument,
+  getCurrentUser,
   getDelivery,
   getEnvelopeDetails,
   getTemplate,
@@ -26,6 +27,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     listTemplates,
     getTemplate,
     createTemplate,

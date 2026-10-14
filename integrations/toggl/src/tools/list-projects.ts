@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TogglClient } from '../lib/client';
+import { workspaceIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listProjects = SlateTool.create(spec, {
@@ -13,10 +14,7 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z
-        .string()
-        .optional()
-        .describe('Workspace ID. Uses the configured default if not provided.'),
+      workspaceId: workspaceIdInput,
       active: z
         .boolean()
         .optional()
@@ -26,7 +24,7 @@ export let listProjects = SlateTool.create(spec, {
       perPage: z
         .number()
         .optional()
-        .describe('Number of results per page (default 20, max 200)'),
+        .describe('Number of results per page (provider default 151, max 200)'),
       sortField: z
         .string()
         .optional()
@@ -54,8 +52,8 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
-    let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
+    let wsId = await client.resolveWorkspaceId(ctx.input.workspaceId, ctx.config);
 
     let raw = await client.listProjects(wsId, {
       active: ctx.input.active,

@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, validateOrderReference } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateCompletionDetails = SlateTool.create(spec, {
   name: 'Update Completion Details',
   key: 'update_completion_details',
-  description: `Update the completion status and details of an order. Use this to programmatically mark orders as completed, failed, cancelled, or update timestamps and notes.`,
+  description: `Update the completion status and details of an order. Use this to programmatically mark orders as completed, failed, cancelled, or update service timestamps. Completion note updates are not documented by the API.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -44,7 +44,10 @@ export let updateCompletionDetails = SlateTool.create(spec, {
         })
         .optional()
         .describe('Service end time'),
-      notes: z.string().optional().describe('Completion notes')
+      notes: z
+        .string()
+        .optional()
+        .describe('Completion notes. Note updates are not documented by the provider API.')
     })
   )
   .output(
@@ -57,15 +60,65 @@ export let updateCompletionDetails = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let body: Record<string, unknown> = {};
-    if (ctx.input.orderNo) body.orderNo = ctx.input.orderNo;
-    if (ctx.input.orderId) body.id = ctx.input.orderId;
-    if (ctx.input.status) body.status = ctx.input.status;
-    if (ctx.input.startTime) body.startTime = ctx.input.startTime;
-    if (ctx.input.endTime) body.endTime = ctx.input.endTime;
-    if (ctx.input.notes) body.notes = ctx.input.notes;
+    validateOrderReference({ orderNo: ctx.input.orderNo, id: ctx.input.orderId });
+    if (!ctx.input.status) {
+      throw createApiServiceError('Provide the new completion status.');
+    }
+    if (ctx.input.notes !== undefined) {
+      throw createApiServiceError(
+        'OptimoRoute does not document completion note updates through this API. Update notes in the driver app.'
+      );
+    }
+    for (let [label, time] of [
+      ['startTime', ctx.input.startTime],
+      ['endTime', ctx.input.endTime]
+    ] as const) {
+      if (!time) continue;
+      if (time.unixTimestamp === undefined && !time.utcTime && !time.localTime) {
+        throw createApiServiceError(
+          `Provide unixTimestamp, utcTime, or localTime for ${label}.`
+        );
+      }
+      if (time.unixTimestamp !== undefined && !Number.isSafeInteger(time.unixTimestamp)) {
+        throw createApiServiceError(
+          `${label}.unixTimestamp must be a whole number of seconds.`
+        );
+      }
+    }
+    if (
+      ctx.input.startTime &&
+      !['servicing', 'success', 'failed'].includes(ctx.input.status)
+    ) {
+      throw createApiServiceError(
+        'startTime applies only to servicing, success, or failed status.'
+      );
+    }
+    if (ctx.input.endTime && !['success', 'failed'].includes(ctx.input.status)) {
+      throw createApiServiceError('endTime applies only to success or failed status.');
+    }
 
-    let result = await client.updateCompletionDetails(body);
+    let result = await client.updateCompletionDetails({
+      orderNo: ctx.input.orderNo,
+      id: ctx.input.orderId,
+      data: {
+        status: ctx.input.status,
+        startTime: ctx.input.startTime,
+        endTime: ctx.input.endTime
+      }
+    });
+    let update = result.updates?.[0] ?? result.orders?.[0];
+    if (!update || typeof update.success !== 'boolean') {
+      throw createApiServiceError('OptimoRoute returned no completion update result.');
+    }
+    if (!update.success) {
+      throw createApiServiceError(
+        `OptimoRoute completion update failed: ${update.message || update.code || 'Unknown API error'}`,
+        {
+          upstreamCode: update.code
+        }
+      );
+    }
+    result = update;
 
     return {
       output: {

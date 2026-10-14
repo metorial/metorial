@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -9,8 +9,18 @@ export class Client {
   private axios;
 
   constructor(private config: ClientConfig) {
-    this.axios = createAxios({
-      baseURL: 'https://api.woodpecker.co/rest'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.woodpecker.co/rest',
+      authHeader: { name: 'x-api-key', value: config.token },
+      errorMapping: {
+        extractResponseData: response => {
+          let data = response.data;
+          if (data?.status && typeof data.status === 'object') {
+            return { ...data, ...data.status, message: data.status.msg };
+          }
+          return data;
+        }
+      }
     });
   }
 
@@ -120,8 +130,8 @@ export class Client {
 
   async addProspectsToDatabase(prospects: any[]): Promise<any> {
     let response = await this.axios.post(
-      '/v1/prospects',
-      { prospects },
+      '/v1/add_prospects_list',
+      { update: true, prospects },
       {
         headers: this.getHeaders()
       }
@@ -131,8 +141,8 @@ export class Client {
 
   async addProspectsToCampaign(campaignId: number, prospects: any[]): Promise<any> {
     let response = await this.axios.post(
-      `/v1/campaigns/${campaignId}/prospects`,
-      { prospects },
+      '/v1/add_prospects_campaign',
+      { campaign: { campaign_id: campaignId }, update: true, prospects },
       {
         headers: this.getHeaders()
       }
@@ -142,8 +152,8 @@ export class Client {
 
   async updateProspectInCampaign(campaignId: number, prospects: any[]): Promise<any> {
     let response = await this.axios.post(
-      `/v1/campaigns/${campaignId}/prospects`,
-      { update: true, prospects },
+      '/v1/add_prospects_campaign',
+      { campaign: { campaign_id: campaignId }, update: true, prospects },
       {
         headers: this.getHeaders()
       }
@@ -158,8 +168,8 @@ export class Client {
     });
   }
 
-  async getProspectResponses(params?: Record<string, any>): Promise<any> {
-    let response = await this.axios.get('/v2/prospects/responses', {
+  async getProspectResponses(prospectId: number, params?: Record<string, any>): Promise<any> {
+    let response = await this.axios.get(`/v2/prospects/${prospectId}/responses`, {
       headers: this.getHeaders(),
       params
     });
@@ -169,11 +179,37 @@ export class Client {
   // ─── Inbox ───────────────────────────────────────────────────
 
   async listInboxMessages(params?: Record<string, any>): Promise<any> {
-    let response = await this.axios.get('/v2/inbox/messages', {
-      headers: this.getHeaders(),
-      params
-    });
-    return response.data;
+    let { page = 1, ...query } = params ?? {};
+    if (!Number.isInteger(page) || page < 1) {
+      throw createApiServiceError('page must be a positive integer.', {
+        reason: 'invalid_inbox_page'
+      });
+    }
+    if (page > 1 && (query.next_page_cursor || query.previous_page_cursor)) {
+      throw createApiServiceError('Use either page or a pagination cursor.', {
+        reason: 'invalid_inbox_pagination'
+      });
+    }
+    if (query.next_page_cursor && query.previous_page_cursor) {
+      throw createApiServiceError('Use only one pagination cursor at a time.', {
+        reason: 'invalid_inbox_pagination'
+      });
+    }
+    for (let currentPage = 1; ; currentPage++) {
+      let response = await this.axios.get('/v2/inbox/messages', {
+        headers: this.getHeaders(),
+        params: query
+      });
+      if (currentPage >= page) return response.data;
+      let cursor = response.data?.pagination?.next_page_cursor;
+      if (!cursor) {
+        return {
+          content: [],
+          pagination: { next_page_cursor: null, previous_page_cursor: null }
+        };
+      }
+      query.next_page_cursor = cursor;
+    }
   }
 
   async replyToInboxMessage(messageId: number, body: any): Promise<any> {
@@ -279,14 +315,21 @@ export class Client {
   // ─── Reports ─────────────────────────────────────────────────
 
   async requestReport(reportName: string, params: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/v2/reports/${reportName}`, params, {
+    let reportPaths: Record<string, string> = {
+      complete_statistics: 'complete_statistics_for_each_level_of_campaign',
+      general_statistics: 'campaigns',
+      sent_messages: 'messages',
+      open_rate: 'open_rate'
+    };
+    let path = reportPaths[reportName] ?? reportName;
+    let response = await this.axios.post(`/v2/reports/${encodeURIComponent(path)}`, params, {
       headers: this.getHeaders()
     });
     return response.data;
   }
 
   async getReport(hash: string): Promise<any> {
-    let response = await this.axios.get(`/v2/reports/${hash}`, {
+    let response = await this.axios.get(`/v2/reports/${encodeURIComponent(hash)}`, {
       headers: this.getHeaders()
     });
     return response.data;
@@ -294,8 +337,9 @@ export class Client {
 
   // ─── Users ───────────────────────────────────────────────────
 
-  async listUsers(): Promise<any[]> {
-    let response = await this.axios.get('/v1/users', {
+  async listUsers(params?: Record<string, any>): Promise<any> {
+    let response = await this.axios.get('/v2/users', {
+      params,
       headers: this.getHeaders()
     });
     return response.data;

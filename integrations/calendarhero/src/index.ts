@@ -5,10 +5,12 @@ import {
   createMeetingRequest,
   deleteContact,
   getContact,
+  getContactCount,
   getProfile,
   listMeetings,
   listMeetingTypes,
   manageMeetingRequest,
+  manageMeetingType,
   searchContacts,
   updateContact
 } from './tools';
@@ -20,9 +22,11 @@ export let provider = Slate.create({
     listMeetings,
     createMeetingRequest,
     manageMeetingRequest,
+    manageMeetingType,
     createContact,
     searchContacts,
     getContact,
+    getContactCount,
     updateContact,
     deleteContact
   ],

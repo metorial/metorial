@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ExperimentationClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,6 +6,12 @@ import { spec } from '../spec';
 let variationSchema = z
   .object({
     name: z.string().describe('Name of the variation'),
+    variationId: z.number().optional().describe('Existing variation ID when updating'),
+    key: z.string().optional().describe('Variation key for non-web experiments'),
+    actions: z
+      .array(z.record(z.string(), z.any()))
+      .optional()
+      .describe('Web variation page actions and changes'),
     weight: z.number().optional().describe('Traffic allocation weight (0-10000)')
   })
   .describe('Experiment variation');
@@ -65,6 +71,14 @@ Use this to set up new experiments with variations and metrics, modify existing 
         .string()
         .optional()
         .describe('Audience conditions JSON string (for create/update)'),
+      pageIds: z
+        .array(z.number())
+        .optional()
+        .describe('Page IDs targeted by the web experiment (for create/update)'),
+      urlTargeting: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Web experiment URL targeting configuration (for create/update)'),
       startTime: z.string().optional().describe('Start time for results filter (ISO 8601)'),
       endTime: z.string().optional().describe('End time for results filter (ISO 8601)'),
       page: z.number().optional().describe('Page number (for list)'),
@@ -84,7 +98,7 @@ Use this to set up new experiments with variations and metrics, modify existing 
     switch (ctx.input.action) {
       case 'list': {
         if (!ctx.input.projectId)
-          throw new Error('projectId is required for listing experiments');
+          throw createApiServiceError('projectId is required for listing experiments');
         let experiments = await client.listExperiments(ctx.input.projectId, {
           page: ctx.input.page,
           per_page: ctx.input.perPage,
@@ -96,7 +110,7 @@ Use this to set up new experiments with variations and metrics, modify existing 
         };
       }
       case 'get': {
-        if (!ctx.input.experimentId) throw new Error('experimentId is required');
+        if (!ctx.input.experimentId) throw createApiServiceError('experimentId is required');
         let experiment = await client.getExperiment(ctx.input.experimentId);
         return {
           output: { experiment },
@@ -105,21 +119,34 @@ Use this to set up new experiments with variations and metrics, modify existing 
       }
       case 'create': {
         if (!ctx.input.projectId)
-          throw new Error('projectId is required for creating experiments');
-        if (!ctx.input.name) throw new Error('name is required for creating experiments');
+          throw createApiServiceError('projectId is required for creating experiments');
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for creating experiments');
+        if (ctx.input.variations?.some(variation => variation.weight === undefined))
+          throw createApiServiceError(
+            'Provide a traffic allocation weight for every variation when creating an experiment.'
+          );
         let experiment = await client.createExperiment({
           project_id: ctx.input.projectId,
           name: ctx.input.name,
           description: ctx.input.description,
           type: ctx.input.type,
           holdback: ctx.input.holdback,
-          variations: ctx.input.variations?.map(v => ({ name: v.name, weight: v.weight })),
+          variations: ctx.input.variations?.map(v => ({
+            name: v.name,
+            weight: v.weight,
+            variation_id: v.variationId,
+            key: v.key,
+            actions: v.actions
+          })),
           metrics: ctx.input.metrics?.map(m => ({
             aggregator: m.aggregator,
             event_id: m.eventId,
             scope: m.scope
           })),
-          audience_conditions: ctx.input.audienceConditions
+          audience_conditions: ctx.input.audienceConditions,
+          page_ids: ctx.input.pageIds,
+          url_targeting: ctx.input.urlTargeting
         });
         return {
           output: { experiment },
@@ -127,7 +154,7 @@ Use this to set up new experiments with variations and metrics, modify existing 
         };
       }
       case 'update': {
-        if (!ctx.input.experimentId) throw new Error('experimentId is required');
+        if (!ctx.input.experimentId) throw createApiServiceError('experimentId is required');
         let updateData: Record<string, any> = {};
         if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
         if (ctx.input.description !== undefined)
@@ -136,7 +163,10 @@ Use this to set up new experiments with variations and metrics, modify existing 
         if (ctx.input.variations !== undefined)
           updateData.variations = ctx.input.variations.map(v => ({
             name: v.name,
-            weight: v.weight
+            weight: v.weight,
+            variation_id: v.variationId,
+            key: v.key,
+            actions: v.actions
           }));
         if (ctx.input.metrics !== undefined)
           updateData.metrics = ctx.input.metrics.map(m => ({
@@ -146,6 +176,9 @@ Use this to set up new experiments with variations and metrics, modify existing 
           }));
         if (ctx.input.audienceConditions !== undefined)
           updateData.audience_conditions = ctx.input.audienceConditions;
+        if (ctx.input.pageIds !== undefined) updateData.page_ids = ctx.input.pageIds;
+        if (ctx.input.urlTargeting !== undefined)
+          updateData.url_targeting = ctx.input.urlTargeting;
         let experiment = await client.updateExperiment(ctx.input.experimentId, updateData);
         return {
           output: { experiment },
@@ -153,15 +186,15 @@ Use this to set up new experiments with variations and metrics, modify existing 
         };
       }
       case 'delete': {
-        if (!ctx.input.experimentId) throw new Error('experimentId is required');
+        if (!ctx.input.experimentId) throw createApiServiceError('experimentId is required');
         await client.deleteExperiment(ctx.input.experimentId);
         return {
           output: {},
-          message: `Deleted experiment ${ctx.input.experimentId}.`
+          message: `Archived experiment ${ctx.input.experimentId}.`
         };
       }
       case 'results': {
-        if (!ctx.input.experimentId) throw new Error('experimentId is required');
+        if (!ctx.input.experimentId) throw createApiServiceError('experimentId is required');
         let results = await client.getExperimentResults(ctx.input.experimentId, {
           start_time: ctx.input.startTime,
           end_time: ctx.input.endTime

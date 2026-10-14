@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorSchema, getNextCursor, nextCursorSchema } from '../lib/pagination';
 import { spec } from '../spec';
 
 let cellSchema = z.object({
@@ -28,6 +29,7 @@ export let manageDataSetRecords = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorSchema,
       dataSetId: z.string().describe('ID of the data set'),
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
@@ -36,6 +38,12 @@ export let manageDataSetRecords = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ID of the record (required for get, update, delete)'),
+      columns: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          'Exact case-insensitive column-value filters for list. Keys are field IDs from list_data_sets; records must match every filter.'
+        ),
       cells: z
         .array(
           z.object({
@@ -49,6 +57,7 @@ export let manageDataSetRecords = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextCursor: nextCursorSchema,
       record: recordSchema
         .optional()
         .describe('Single record (for get, create, update, delete)'),
@@ -61,8 +70,11 @@ export let manageDataSetRecords = SlateTool.create(spec, {
     let { dataSetId, action, recordId, cells } = ctx.input;
 
     if (action === 'list') {
-      let data = await client.listDataSetRecords(dataSetId);
-      let records = (data.rows || []).map((r: any) => ({
+      let data = await client.listDataSetRecords(dataSetId, {
+        columns: ctx.input.columns,
+        cursor: ctx.input.cursor
+      });
+      let records = (data.records || data.rows || []).map((r: any) => ({
         recordId: r.id,
         dataSetId: r.dataSetId,
         cells: (r.cells || []).map((c: any) => ({
@@ -71,13 +83,13 @@ export let manageDataSetRecords = SlateTool.create(spec, {
         }))
       }));
       return {
-        output: { records, success: true },
+        output: { records, nextCursor: getNextCursor(data), success: true },
         message: `Found **${records.length}** record(s).`
       };
     }
 
     if (action === 'get') {
-      if (!recordId) throw new Error('recordId is required for get action');
+      if (!recordId) throw createApiServiceError('recordId is required for get action');
       let r = await client.getDataSetRecord(dataSetId, recordId);
       return {
         output: {
@@ -97,7 +109,7 @@ export let manageDataSetRecords = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!cells || cells.length === 0)
-        throw new Error('cells are required for create action');
+        throw createApiServiceError('cells are required for create action');
       let result = await client.createDataSetRecord(dataSetId, cells);
       return {
         output: {
@@ -113,9 +125,9 @@ export let manageDataSetRecords = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!recordId) throw new Error('recordId is required for update action');
+      if (!recordId) throw createApiServiceError('recordId is required for update action');
       if (!cells || cells.length === 0)
-        throw new Error('cells are required for update action');
+        throw createApiServiceError('cells are required for update action');
       let r = await client.updateDataSetRecord(dataSetId, recordId, cells);
       return {
         output: {
@@ -134,7 +146,7 @@ export let manageDataSetRecords = SlateTool.create(spec, {
     }
 
     // delete
-    if (!recordId) throw new Error('recordId is required for delete action');
+    if (!recordId) throw createApiServiceError('recordId is required for delete action');
     let r = await client.deleteDataSetRecord(dataSetId, recordId);
     return {
       output: {

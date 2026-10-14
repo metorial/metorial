@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, durationMilliseconds } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTestRuns = SlateTool.create(spec, {
@@ -40,7 +40,10 @@ export let listTestRuns = SlateTool.create(spec, {
         .describe('Only include runs started before this ISO datetime'),
       page: z.number().optional().describe('Page number for paginated results'),
       pageSize: z.number().optional().describe('Number of results per page'),
-      ordering: z.enum(['-started', 'started']).optional().describe('Sort order by start time')
+      ordering: z
+        .enum(['-started', 'started', '-created', 'created'])
+        .optional()
+        .describe('Sort order by start time')
     })
   )
   .output(
@@ -49,7 +52,7 @@ export let listTestRuns = SlateTool.create(spec, {
       testRuns: z.array(
         z.object({
           testRunId: z.string().describe('Unique identifier of the test run'),
-          testId: z.string().describe('ID of the test that was run'),
+          testId: z.string().nullable().describe('ID of the test that was run'),
           testName: z.string().describe('Name of the test that was run'),
           status: z.string().describe('Final or current status of the run'),
           started: z.string().nullable().describe('ISO timestamp when the run started'),
@@ -78,20 +81,20 @@ export let listTestRuns = SlateTool.create(spec, {
     let testRuns = result.results.map(r => ({
       testRunId: r.id,
       testId: r.testId,
-      testName: r.testName,
+      testName: r.name,
       status: r.status,
       started: r.started,
-      finished: r.finished,
-      duration: r.duration,
+      finished: r.ended,
+      duration: durationMilliseconds(r),
       runMode: r.runMode,
-      runProfileName: r.runProfileName
+      runProfileName: r.profileName
     }));
 
     return {
       output: {
         totalCount: result.count,
         testRuns,
-        hasMore: result.next !== null
+        hasMore: Boolean(result.next)
       },
       message: `Found **${result.count}** test run(s). Returned ${testRuns.length} on this page.`
     };

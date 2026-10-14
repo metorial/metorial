@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FeatheryClient } from '../lib/client';
 import { spec } from '../spec';
@@ -36,19 +36,25 @@ export let getLogs = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
     let logs: any;
 
     if (ctx.input.logType === 'api_connector') {
-      if (!ctx.input.formId) throw new Error('formId is required for api_connector logs');
+      if (!ctx.input.formId)
+        throw createApiServiceError('formId is required for api_connector logs');
       logs = await client.getApiConnectorLogs(ctx.input.formId, {
         startTime: ctx.input.startTime,
         endTime: ctx.input.endTime
       });
     } else if (ctx.input.logType === 'form_email') {
-      if (!ctx.input.formId) throw new Error('formId is required for form_email logs');
+      if (!ctx.input.formId)
+        throw createApiServiceError('formId is required for form_email logs');
       logs = await client.getFormEmailLogs(ctx.input.formId, {
         startTime: ctx.input.startTime,
         endTime: ctx.input.endTime

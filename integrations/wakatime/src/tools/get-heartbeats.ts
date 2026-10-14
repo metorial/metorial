@@ -42,7 +42,7 @@ export let getHeartbeats = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let result = await client.getHeartbeats(ctx.input.date);
 
@@ -51,14 +51,14 @@ export let getHeartbeats = SlateTool.create(spec, {
       entity: h.entity ?? '',
       type: h.type ?? 'file',
       time: h.time ?? 0,
-      project: h.project,
-      branch: h.branch,
-      language: h.language,
-      category: h.category,
-      isWrite: h.is_write,
-      lines: h.lines,
-      lineNumber: h.lineno,
-      cursorPosition: h.cursorpos
+      project: h.project ?? undefined,
+      branch: h.branch ?? undefined,
+      language: h.language ?? undefined,
+      category: h.category ?? undefined,
+      isWrite: h.is_write ?? undefined,
+      lines: h.lines ?? undefined,
+      lineNumber: h.lineno ?? undefined,
+      cursorPosition: h.cursorpos ?? undefined
     }));
 
     return {

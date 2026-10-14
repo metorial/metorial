@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createContactLogTool = SlateTool.create(spec, {
   name: 'Create Contact Log',
   key: 'create_contact_log',
-  description: `Log a communication interaction for a contact. Record phone calls, SMS messages, emails, and other interactions with a date and optional description.`,
+  description: `Log a phone call, SMS message, or email for a contact. Provide both a communication type and interaction date. Returns the accepted submitted details; the API does not return a new log ID.`,
   tags: {
     destructive: false
   }
@@ -17,14 +17,25 @@ export let createContactLogTool = SlateTool.create(spec, {
       type: z
         .string()
         .optional()
-        .describe('Type of communication (e.g. "Phone Call", "SMS", "Email")'),
-      date: z.string().optional().describe('Date of the interaction in YYYY-MM-DD format'),
+        .describe(
+          'Communication type required to submit a log: PhoneCall, Phone Call, SMS, or Email'
+        ),
+      date: z
+        .string()
+        .optional()
+        .describe(
+          'Interaction date required to submit a log: YYYY-MM-DD (midnight UTC) or ISO 8601 timestamp with a timezone'
+        ),
       description: z.string().optional().describe('Description or notes about the interaction')
     })
   )
   .output(
     z.object({
-      log: z.record(z.string(), z.any()).describe('The created log entry')
+      log: z
+        .record(z.string(), z.any())
+        .describe(
+          'Accepted submitted contact ID, communication type, UTC logDate, and description; no provider-generated log ID is returned'
+        )
     })
   )
   .handleInvocation(async ctx => {

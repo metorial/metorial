@@ -12,7 +12,11 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      token: z.string().describe('SecurityTrails API key from your account dashboard')
+      token: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('SecurityTrails API key from your account dashboard')
     }),
     getOutput: async ctx => {
       return {

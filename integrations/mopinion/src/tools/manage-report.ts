@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MopinionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -42,7 +42,7 @@ export let manageReport = SlateTool.create(spec, {
     let { action, reportId, name, description, language } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating a report');
+      if (!name) throw createApiServiceError('Name is required when creating a report');
 
       let result = await client.addReport({ name, description, language });
       let created = result.data || result;
@@ -59,7 +59,8 @@ export let manageReport = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!reportId) throw new Error('reportId is required when updating a report');
+      if (!reportId)
+        throw createApiServiceError('reportId is required when updating a report');
 
       let updateData: any = {};
       if (name !== undefined) updateData.name = name;
@@ -81,7 +82,8 @@ export let manageReport = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!reportId) throw new Error('reportId is required when deleting a report');
+      if (!reportId)
+        throw createApiServiceError('reportId is required when deleting a report');
 
       let result = await client.deleteReport(reportId);
 
@@ -95,6 +97,6 @@ export let manageReport = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

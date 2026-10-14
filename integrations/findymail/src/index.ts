@@ -6,7 +6,10 @@ import {
   findPhone,
   getContactLists,
   getCredits,
+  getIntellimatchResults,
+  getIntellimatchStatus,
   intellimatchSearch,
+  listContacts,
   reverseEmailLookup,
   searchEmployees,
   verifyEmail
@@ -22,7 +25,10 @@ export let provider = Slate.create({
     enrichCompany,
     searchEmployees,
     intellimatchSearch,
+    getIntellimatchStatus,
+    getIntellimatchResults,
     getContactLists,
+    listContacts,
     getCredits
   ],
   triggers: []

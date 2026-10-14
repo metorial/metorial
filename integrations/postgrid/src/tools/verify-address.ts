@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AddressVerificationClient } from '../lib/address-client';
 import { spec } from '../spec';
@@ -78,7 +78,9 @@ export let verifyAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressVerificationClient(ctx.auth.token);
+    let client = new AddressVerificationClient(
+      ctx.auth.addressVerificationToken ?? ctx.auth.token
+    );
 
     let address:
       | string
@@ -90,12 +92,15 @@ export let verifyAddress = SlateTool.create(spec, {
           postalOrZip?: string;
           country?: string;
         };
+    if (ctx.input.freeformAddress !== undefined && ctx.input.structuredAddress !== undefined) {
+      throw createApiServiceError('Provide only one of freeformAddress or structuredAddress.');
+    }
     if (ctx.input.freeformAddress) {
       address = ctx.input.freeformAddress;
     } else if (ctx.input.structuredAddress) {
       address = ctx.input.structuredAddress;
     } else {
-      throw new Error('Provide either freeformAddress or structuredAddress.');
+      throw createApiServiceError('Provide either freeformAddress or structuredAddress.');
     }
 
     let result = await client.verifyAddress(address, {
@@ -105,6 +110,9 @@ export let verifyAddress = SlateTool.create(spec, {
     });
 
     let verified = result.data;
+    if (typeof verified.status !== 'string') {
+      throw createApiServiceError('PostGrid did not return a domestic verification status.');
+    }
 
     return {
       output: {
@@ -173,7 +181,9 @@ export let verifyInternationalAddress = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressVerificationClient(ctx.auth.token);
+    let client = new AddressVerificationClient(
+      ctx.auth.addressVerificationToken ?? ctx.auth.token
+    );
 
     let address:
       | string
@@ -185,12 +195,15 @@ export let verifyInternationalAddress = SlateTool.create(spec, {
           postalOrZip?: string;
           country?: string;
         };
+    if (ctx.input.freeformAddress !== undefined && ctx.input.structuredAddress !== undefined) {
+      throw createApiServiceError('Provide only one of freeformAddress or structuredAddress.');
+    }
     if (ctx.input.freeformAddress) {
       address = ctx.input.freeformAddress;
     } else if (ctx.input.structuredAddress) {
       address = ctx.input.structuredAddress;
     } else {
-      throw new Error('Provide either freeformAddress or structuredAddress.');
+      throw createApiServiceError('Provide either freeformAddress or structuredAddress.');
     }
 
     let result = await client.verifyInternationalAddress(address, {
@@ -200,10 +213,17 @@ export let verifyInternationalAddress = SlateTool.create(spec, {
     });
 
     let verified = result.data;
+    let status =
+      verified.status ?? verified.verificationStatus ?? verified.summary?.verificationStatus;
+    if (typeof status !== 'string') {
+      throw createApiServiceError(
+        'PostGrid did not return an international verification status.'
+      );
+    }
 
     return {
       output: {
-        status: verified.status,
+        status,
         line1: verified.line1,
         line2: verified.line2,
         city: verified.city,
@@ -213,7 +233,7 @@ export let verifyInternationalAddress = SlateTool.create(spec, {
         countryName: verified.countryName,
         errors: verified.errors
       },
-      message: `International address verification result: **${verified.status}** — ${verified.line1}, ${verified.city}, ${verified.provinceOrState} ${verified.postalOrZip}.`
+      message: `International address verification result: **${status}** — ${verified.line1}, ${verified.city}, ${verified.provinceOrState} ${verified.postalOrZip}.`
     };
   })
   .build();

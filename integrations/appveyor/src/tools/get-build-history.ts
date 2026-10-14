@@ -35,7 +35,7 @@ export let getBuildHistory = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     let result = await client.getProjectHistory(ctx.input.accountName, ctx.input.projectSlug, {

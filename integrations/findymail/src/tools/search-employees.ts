@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FindymailClient } from '../lib/client';
 import { spec } from '../spec';
@@ -17,8 +17,11 @@ export let searchEmployees = SlateTool.create(spec, {
       website: z.string().describe('Company website domain, e.g. "stripe.com".'),
       jobTitles: z
         .array(z.string())
-        .describe('List of job titles to search for, e.g. ["CEO", "CTO", "VP of Sales"].'),
-      count: z.number().optional().describe('Maximum number of employees to return.')
+        .describe('Up to 10 job titles to search for, e.g. ["CEO", "CTO", "VP of Sales"].'),
+      count: z
+        .number()
+        .optional()
+        .describe('Maximum employees to return, 1 to 5. Defaults to 1.')
     })
   )
   .output(
@@ -28,7 +31,9 @@ export let searchEmployees = SlateTool.create(spec, {
           z.object({
             name: z.string().optional().describe('Employee full name.'),
             linkedinUrl: z.string().optional().describe('LinkedIn profile URL.'),
-            jobTitle: z.string().optional().describe('Job title.')
+            jobTitle: z.string().optional().describe('Job title.'),
+            companyName: z.string().optional().describe('Employer company name.'),
+            companyWebsite: z.string().optional().describe('Employer website.')
           })
         )
         .describe('List of matching employees.'),
@@ -36,6 +41,15 @@ export let searchEmployees = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.jobTitles.length < 1 || ctx.input.jobTitles.length > 10) {
+      throw createApiServiceError('Provide between 1 and 10 job titles.');
+    }
+    if (
+      ctx.input.count !== undefined &&
+      (!Number.isInteger(ctx.input.count) || ctx.input.count < 1 || ctx.input.count > 5)
+    ) {
+      throw createApiServiceError('count must be an integer between 1 and 5.');
+    }
     let client = new FindymailClient({ token: ctx.auth.token });
 
     let result = await client.searchEmployees({
@@ -48,7 +62,9 @@ export let searchEmployees = SlateTool.create(spec, {
     let mapped = employees.map((e: any) => ({
       name: e?.name ?? undefined,
       linkedinUrl: e?.linkedinUrl ?? e?.linkedin_url ?? undefined,
-      jobTitle: e?.jobTitle ?? e?.job_title ?? undefined
+      jobTitle: e?.jobTitle ?? e?.job_title ?? undefined,
+      companyName: e?.companyName ?? undefined,
+      companyWebsite: e?.companyWebsite ?? undefined
     }));
 
     return {

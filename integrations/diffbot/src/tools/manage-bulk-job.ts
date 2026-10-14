@@ -1,12 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { DiffbotClient } from '../lib/client';
+import { DiffbotClient, withJobStatus } from '../lib/client';
 import { spec } from '../spec';
 
 let bulkJobSchema = z
   .object({
     jobName: z.string().optional().describe('Name of the bulk job'),
     jobStatus: z.string().optional().describe('Current status of the bulk job'),
+    jobStatusDetails: z
+      .object({ status: z.number().optional(), message: z.string().optional() })
+      .passthrough()
+      .optional()
+      .describe('Original provider job status object, including its status code and message'),
     sentDone: z.boolean().optional().describe('Whether the job has finished processing'),
     objectsFound: z.number().optional().describe('Number of objects found'),
     pageProcessAttempts: z
@@ -92,7 +97,9 @@ export let manageBulkJob = SlateTool.create(spec, {
 
     if (action === 'list') {
       let result = await client.listBulkJobs();
-      let jobs = result.jobs || [];
+      let jobs = (result.jobs || [])
+        .filter((job: any) => !job.type || job.type === 'bulk')
+        .map(withJobStatus);
       return {
         output: {
           success: true,
@@ -102,13 +109,13 @@ export let manageBulkJob = SlateTool.create(spec, {
       };
     }
 
-    if (!jobName) {
-      throw new Error('jobName is required for this action.');
+    if (!jobName?.trim()) {
+      throw createApiServiceError('jobName is required for this action.');
     }
 
     if (action === 'create') {
       if (!ctx.input.urls || ctx.input.urls.length === 0) {
-        throw new Error('At least one URL is required to create a bulk job.');
+        throw createApiServiceError('At least one URL is required to create a bulk job.');
       }
 
       let result = await client.createBulkJob({
@@ -118,7 +125,7 @@ export let manageBulkJob = SlateTool.create(spec, {
         notifyWebhook: ctx.input.notifyWebhook
       });
 
-      let job = result.jobs?.[0] || result;
+      let job = withJobStatus(result.jobs?.[0] || result);
 
       return {
         output: {
@@ -131,13 +138,13 @@ export let manageBulkJob = SlateTool.create(spec, {
 
     if (action === 'status') {
       let result = await client.getBulkJobStatus(jobName);
-      let job = result.jobs?.[0] || result;
+      let job = withJobStatus(result.jobs?.[0] || result);
       return {
         output: {
           success: true,
           bulkJob: job
         },
-        message: `Bulk job **${jobName}** status: **${job.jobStatus?.message || job.jobStatus || 'unknown'}**.`
+        message: `Bulk job **${jobName}** status: **${job.jobStatus || 'unknown'}**.`
       };
     }
 
@@ -152,7 +159,26 @@ export let manageBulkJob = SlateTool.create(spec, {
     }
 
     if (action === 'results') {
+      if (
+        ctx.input.resultCount !== undefined &&
+        (!Number.isSafeInteger(ctx.input.resultCount) || ctx.input.resultCount <= 0)
+      ) {
+        throw createApiServiceError('resultCount must be a positive whole number.');
+      }
       let results = await client.getBulkJobResults(jobName, undefined, ctx.input.resultCount);
+      await ctx.addAttachment({
+        type: 'url',
+        url: 'https://api.diffbot.com/v3/bulk/data',
+        query: {
+          token: ctx.auth.token,
+          name: jobName,
+          ...(ctx.input.resultCount !== undefined
+            ? { num: String(ctx.input.resultCount) }
+            : {})
+        },
+        mimeType: 'application/json',
+        filename: `${jobName}.json`
+      });
       return {
         output: {
           success: true,
@@ -162,6 +188,6 @@ export let manageBulkJob = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

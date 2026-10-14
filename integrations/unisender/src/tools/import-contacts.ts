@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { UnisenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,11 +7,11 @@ export let importContacts = SlateTool.create(spec, {
   name: 'Import Contacts',
   key: 'import_contacts',
   description: `Bulk import contacts into Unisender. Provide field names and data rows to import multiple contacts at once. Supports setting list memberships, tags, and custom field values.
-The first field name should typically be "email" or "phone". Use "email_list_ids_<LIST_ID>" fields to subscribe contacts to specific lists.`,
+The first field name should typically be "email" or "phone". Use the "email_list_ids" column with comma-separated list IDs to subscribe contacts to lists.`,
   instructions: [
     'fieldNames should include "email" and/or "phone" as well as any custom fields.',
     'Each row in data must have the same number of elements as fieldNames.',
-    'Use "email_list_ids_<LIST_ID>" to subscribe contacts to specific lists (value should be empty string or list ID).'
+    'Use "email_list_ids" to subscribe contacts to lists (value should contain comma-separated list IDs).'
   ]
 })
   .input(
@@ -54,6 +54,15 @@ The first field name should typically be "email" or "phone". Use "email_list_ids
       token: ctx.auth.token,
       locale: ctx.config.locale
     });
+
+    if (!ctx.input.fieldNames.includes('email'))
+      throw createApiServiceError('fieldNames must include email.');
+    if (ctx.input.data.length === 0 || ctx.input.data.length > 500)
+      throw createApiServiceError('Import between 1 and 500 contacts per call.');
+    if (ctx.input.data.some(row => row.length !== ctx.input.fieldNames.length))
+      throw createApiServiceError(
+        'Every data row must have the same number of values as fieldNames.'
+      );
 
     let result = await client.importContacts({
       field_names: ctx.input.fieldNames,

@@ -1,7 +1,37 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+
+let countEmployees = (employees: unknown): number | undefined => {
+  let ids = new Set<string>();
+  let addEmployee = (employee: unknown, fallbackId?: string): boolean => {
+    if (!isApiErrorRecord(employee)) return false;
+    let id = employee.id ?? fallbackId;
+    if (typeof id !== 'string' && typeof id !== 'number') return false;
+    ids.add(String(id));
+    return true;
+  };
+
+  if (Array.isArray(employees)) {
+    return employees.every(employee => addEmployee(employee)) ? ids.size : undefined;
+  }
+  if (!isApiErrorRecord(employees)) return undefined;
+
+  for (let [key, value] of Object.entries(employees)) {
+    if (key.startsWith('__')) continue;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+      if (!isApiErrorRecord(value)) return undefined;
+      for (let [employeeId, employee] of Object.entries(value)) {
+        if (employeeId.startsWith('__')) continue;
+        if (!addEmployee(employee, employeeId)) return undefined;
+      }
+    } else if (!addEmployee(value, key)) {
+      return undefined;
+    }
+  }
+  return ids.size;
+};
 
 export let getEmployees = SlateTool.create(spec, {
   name: 'Get Employees',
@@ -37,7 +67,7 @@ export let getEmployees = SlateTool.create(spec, {
       employees: z
         .any()
         .describe(
-          'Map of employee IDs to their tracking data including productivity metrics and time breakdowns'
+          'Tracking data grouped by date and employee ID, including productivity metrics and time breakdowns. Employee IDs can be used with get_employee and get_employee_projects.'
         ),
       rawResponse: z.any().describe('Full API response')
     })
@@ -50,8 +80,16 @@ export let getEmployees = SlateTool.create(spec, {
       period: ctx.input.period
     });
 
-    let employees = response?.employees || response;
-    let employeeCount = employees ? Object.keys(employees).length : 0;
+    let employees =
+      isApiErrorRecord(response) && response.employees !== undefined
+        ? response.employees
+        : response;
+    if (!Array.isArray(employees) && !isApiErrorRecord(employees)) {
+      throw createApiServiceError('DeskTime returned an invalid employees response.', {
+        reason: 'desktime_invalid_response'
+      });
+    }
+    let employeeCount = countEmployees(employees);
     let dateLabel = ctx.input.date || 'today';
     let periodLabel = ctx.input.period || 'day';
 
@@ -60,7 +98,10 @@ export let getEmployees = SlateTool.create(spec, {
         employees,
         rawResponse: response
       },
-      message: `Retrieved tracking data for **${employeeCount}** employees for **${dateLabel}** (period: ${periodLabel}).`
+      message:
+        employeeCount === undefined
+          ? `Retrieved employee tracking data for **${dateLabel}** (period: ${periodLabel}).`
+          : `Retrieved tracking data for **${employeeCount}** employees for **${dateLabel}** (period: ${periodLabel}).`
     };
   })
   .build();

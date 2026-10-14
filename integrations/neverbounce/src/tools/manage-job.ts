@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -39,6 +39,13 @@ export let manageJobTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.autoStart !== undefined && ctx.input.action !== 'parse') {
+      throw createApiServiceError('autoStart is only supported for the parse action.');
+    }
+    if (ctx.input.runSample !== undefined && ctx.input.action !== 'start') {
+      throw createApiServiceError('runSample is only supported for the start action.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let { jobId, action } = ctx.input;
 
@@ -58,7 +65,6 @@ export let manageJobTool = SlateTool.create(spec, {
       };
     }
 
-    // delete
     await client.deleteJob(jobId);
     return {
       output: { success: true },

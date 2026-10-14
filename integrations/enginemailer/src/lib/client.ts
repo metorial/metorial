@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 let apiAxios = createAxios({
   baseURL: 'https://api.enginemailer.com'
@@ -7,6 +13,43 @@ let apiAxios = createAxios({
 let connectorAxios = createAxios({
   baseURL: 'https://connect.enginemailer.com/api/N8N/v1'
 });
+
+for (let axios of [apiAxios, connectorAxios]) {
+  axios.interceptors.response.use(
+    response => {
+      let data: unknown = response.data;
+      let result = isApiErrorRecord(data) ? data.Result : undefined;
+      if (isApiErrorRecord(result)) {
+        let statusCode = String(result.StatusCode ?? '');
+        let status = String(result.Status ?? '');
+        if ((statusCode && statusCode !== '200') || (status && status !== 'OK')) {
+          let message = String(result.ErrorMessage ?? result.Message ?? status);
+          let missingSubscriber =
+            response.config.url?.endsWith('/getSubscriber') &&
+            /subscriber (?:was )?not (?:found|exist)|subscriber does not exist/i.test(message);
+          throw createApiServiceError(`Enginemailer API request failed: ${message}`, {
+            reason: missingSubscriber
+              ? 'enginemailer_subscriber_not_found'
+              : 'enginemailer_api_error',
+            upstreamStatus: statusCode,
+            upstreamCode: status
+          });
+        }
+        if (result.StatusCode !== undefined) result.StatusCode = statusCode;
+      }
+      return response;
+    },
+    error =>
+      Promise.reject(
+        buildApiServiceError(error, {
+          providerLabel: 'Enginemailer',
+          reason: 'enginemailer_api_error',
+          detailKeys: ['ErrorMessage', 'Message', 'message'],
+          nestedKeys: ['Result']
+        })
+      )
+  );
+}
 
 export interface CustomField {
   customfield_key: string;
@@ -30,6 +73,8 @@ export interface EngineMailerResult {
     Message?: string;
     ErrorMessage?: string;
     Data?: any;
+    CampaignID?: string;
+    TransactionID?: string;
   };
 }
 
@@ -37,6 +82,9 @@ export class Client {
   private token: string;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('An Enginemailer API key is required.');
+    }
     this.token = config.token;
   }
 
@@ -46,6 +94,14 @@ export class Client {
       'Content-Type': 'application/json',
       Accept: 'application/json'
     };
+  }
+
+  private numericId(value: string, label: string): number {
+    let id = Number(value);
+    if (!/^\d+$/.test(value) || !Number.isSafeInteger(id) || id <= 0) {
+      throw createApiServiceError(`${label} must be a positive integer ID.`);
+    }
+    return id;
   }
 
   // ============ Subscriber Management ============
@@ -66,7 +122,10 @@ export class Client {
   }): Promise<EngineMailerResult> {
     let response = await apiAxios.post(
       '/restapi/subscriber/emsubscriber/insertSubscriber',
-      params,
+      {
+        ...params,
+        subcategories: params.subcategories?.map(id => this.numericId(id, 'Subcategory'))
+      },
       {
         headers: this.headers
       }
@@ -77,13 +136,16 @@ export class Client {
   async updateSubscriber(params: {
     email: string;
     subcategories?: string[];
-    subcategories_type?: string;
+    subcategories_type?: number;
     customfields?: CustomField[];
-    customfield_type?: string;
+    customfield_type?: number;
   }): Promise<EngineMailerResult> {
     let response = await apiAxios.post(
       '/restapi/subscriber/emsubscriber/updateSubscriber',
-      params,
+      {
+        ...params,
+        subcategories: params.subcategories?.map(id => this.numericId(id, 'Subcategory'))
+      },
       {
         headers: this.headers
       }
@@ -169,8 +231,8 @@ export class Client {
   async sendTransactionalEmail(params: {
     toEmail: string;
     senderEmail: string;
-    senderName: string;
-    subject: string;
+    senderName?: string;
+    subject?: string;
     submittedContent?: string;
     templateId?: string;
     substitutionTags?: SubstitutionTag[];
@@ -181,8 +243,7 @@ export class Client {
     let body: Record<string, any> = {
       ToEmail: params.toEmail,
       SenderEmail: params.senderEmail,
-      SenderName: params.senderName,
-      Subject: params.subject
+      ...pickDefined({ SenderName: params.senderName, Subject: params.subject })
     };
 
     if (params.submittedContent) {
@@ -195,10 +256,16 @@ export class Client {
       body.SubstitutionTags = params.substitutionTags;
     }
     if (params.ccEmails) {
-      body.CCEmails = params.ccEmails;
+      body.CCEmails = params.ccEmails
+        .split(',')
+        .map(email => email.trim())
+        .filter(Boolean);
     }
     if (params.bccEmails) {
-      body.BCCEmails = params.bccEmails;
+      body.BCCEmails = params.bccEmails
+        .split(',')
+        .map(email => email.trim())
+        .filter(Boolean);
     }
     if (params.attachments && params.attachments.length > 0) {
       body.Attachments = params.attachments;
@@ -218,6 +285,7 @@ export class Client {
     senderEmail: string;
     subject: string;
     content: string;
+    replyTo?: string;
   }): Promise<EngineMailerResult> {
     let response = await apiAxios.post(
       '/restapi/Campaign/EMCampaign/CreateCampaign',
@@ -226,7 +294,8 @@ export class Client {
         SenderName: params.senderName,
         SenderEmail: params.senderEmail,
         Subject: params.subject,
-        Content: params.content
+        Content: params.content,
+        ...pickDefined({ ReplyTo: params.replyTo })
       },
       {
         headers: this.headers
@@ -242,15 +311,17 @@ export class Client {
     senderEmail?: string;
     subject?: string;
     content?: string;
+    replyTo?: string;
   }): Promise<EngineMailerResult> {
     let body: Record<string, any> = {
       CampaignID: params.campaignId
     };
-    if (params.campaignName) body.CampaignName = params.campaignName;
-    if (params.senderName) body.SenderName = params.senderName;
-    if (params.senderEmail) body.SenderEmail = params.senderEmail;
-    if (params.subject) body.Subject = params.subject;
-    if (params.content) body.Content = params.content;
+    if (params.campaignName !== undefined) body.CampaignName = params.campaignName;
+    if (params.senderName !== undefined) body.SenderName = params.senderName;
+    if (params.senderEmail !== undefined) body.SenderEmail = params.senderEmail;
+    if (params.subject !== undefined) body.Subject = params.subject;
+    if (params.content !== undefined) body.Content = params.content;
+    if (params.replyTo !== undefined) body.ReplyTo = params.replyTo;
 
     let response = await apiAxios.post('/restapi/Campaign/EMCampaign/UpdateCampaign', body, {
       headers: this.headers
@@ -272,12 +343,24 @@ export class Client {
     categoryList: string[];
     filterType?: string;
   }): Promise<EngineMailerResult> {
-    let body: Record<string, any> = {
-      campaignid: params.campaignId,
-      FilterBy: params.filterBy,
-      CategoryList: params.categoryList
+    let filterBy = Number(params.filterBy);
+    if (filterBy !== 1 && filterBy !== 2) {
+      throw createApiServiceError(
+        'recipientFilterBy must be "1" (all subscribers) or "2" (categories).'
+      );
+    }
+    let body = {
+      CampaignID: this.numericId(params.campaignId, 'Campaign'),
+      FilterBy: filterBy,
+      ...(filterBy === 2
+        ? {
+            Data: {
+              CategoryList: params.categoryList.map(id => this.numericId(id, 'Subcategory')),
+              FilterType: params.filterType ?? 'OR'
+            }
+          }
+        : {})
     };
-    if (params.filterType) body.FilterType = params.filterType;
 
     let response = await apiAxios.post(
       '/restapi/campaign/emcampaign/AssignRecipientList',
@@ -325,14 +408,25 @@ export class Client {
   }
 
   async listCampaigns(page?: number, pageSize?: number): Promise<EngineMailerResult> {
-    let params: Record<string, any> = {};
-    if (page !== undefined) params.page = page;
-    if (pageSize !== undefined) params.pageSize = pageSize;
-
     let response = await apiAxios.get('/restapi/campaign/emcampaign/ListCampaign', {
-      params,
       headers: this.headers
     });
+    let result: EngineMailerResult = response.data;
+    if (pageSize !== undefined && Array.isArray(result.Result.Data)) {
+      let offset = ((page ?? 1) - 1) * pageSize;
+      result.Result.Data = result.Result.Data.slice(offset, offset + pageSize);
+    }
+    return result;
+  }
+
+  async getCampaignDeliveryStatus(campaignId: string): Promise<EngineMailerResult> {
+    let response = await apiAxios.get(
+      '/restapi/campaign/emcampaign/getcampaigndeliverystatus',
+      {
+        params: { campaignid: this.numericId(campaignId, 'Campaign') },
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 

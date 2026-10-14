@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createApplication = SlateTool.create(spec, {
   name: 'Create Application',
   key: 'create_application',
   description: `Create a new web application on a server. Supports one-click installers (WordPress, Mautic, Moodle, Joomla, etc.), custom PHP apps, and Git-based deployments.
-The required parameters vary by framework. Use **frameworkSettings** for framework-specific options like WordPress title, username, password, etc.`,
+The required parameters vary by framework. Use **frameworkSettings** for framework-specific options like WordPress title, username, password, etc.
+${organizationScopeGuidance}`,
   instructions: [
     'For one-click installs (e.g. WordPress), set method to "one_click" and framework to the app name.',
     'For custom PHP apps, set method to "custom" and framework to "custom".',
@@ -21,7 +23,7 @@ The required parameters vary by framework. Use **frameworkSettings** for framewo
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID to create the application on'),
       name: z.string().describe('Application name'),
       method: z.enum(['custom', 'one_click', 'git']).describe('Installation method'),
@@ -79,9 +81,11 @@ The required parameters vary by framework. Use **frameworkSettings** for framewo
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let body: Record<string, unknown> = {
+      ...ctx.input.frameworkSettings,
       name: ctx.input.name,
       method: ctx.input.method,
       framework: ctx.input.framework,
@@ -94,14 +98,44 @@ The required parameters vary by framework. Use **frameworkSettings** for framewo
     if (ctx.input.hostname) body.hostname = ctx.input.hostname;
     if (ctx.input.systemUserId) body.systemUserId = ctx.input.systemUserId;
     if (ctx.input.systemUserUsername || ctx.input.systemUserPassword) {
-      body['systemUserInfo[username]'] = ctx.input.systemUserUsername;
-      body['systemUserInfo[password]'] = ctx.input.systemUserPassword;
+      let existingInfo = body.systemUserInfo;
+      body.systemUserInfo = {
+        ...(typeof existingInfo === 'object' &&
+        existingInfo !== null &&
+        !Array.isArray(existingInfo)
+          ? existingInfo
+          : {}),
+        ...pickDefined({
+          username: ctx.input.systemUserUsername,
+          password: ctx.input.systemUserPassword
+        })
+      };
     }
     if (ctx.input.phpVersion) body.php_version = ctx.input.phpVersion;
 
-    if (ctx.input.frameworkSettings) {
-      for (let [key, value] of Object.entries(ctx.input.frameworkSettings)) {
-        body[key] = value;
+    if (ctx.input.tempDomain && !body.temp_sub_domain_name) {
+      throw createApiServiceError('tempSubDomainName is required when tempDomain is true.');
+    }
+    if (!ctx.input.tempDomain && !body.hostname) {
+      throw createApiServiceError('hostname is required when tempDomain is false.');
+    }
+    if (ctx.input.systemUser === 'existing' && !body.systemUserId) {
+      throw createApiServiceError('systemUserId is required when systemUser is "existing".');
+    }
+    if (ctx.input.systemUser === 'new') {
+      let systemUserInfo = body.systemUserInfo;
+      if (
+        typeof systemUserInfo !== 'object' ||
+        systemUserInfo === null ||
+        Array.isArray(systemUserInfo) ||
+        !('username' in systemUserInfo) ||
+        !systemUserInfo.username ||
+        !('password' in systemUserInfo) ||
+        !systemUserInfo.password
+      ) {
+        throw createApiServiceError(
+          'systemUserUsername and systemUserPassword are required when systemUser is "new".'
+        );
       }
     }
 

@@ -6,14 +6,17 @@ import { spec } from '../spec';
 export let listBoardsTool = SlateTool.create(spec, {
   name: 'List Boards',
   key: 'list_boards',
-  description: `List boards in your Kanbanize account. Optionally filter by workspace or archived status. Returns board details including name, description, and workspace assignment.`,
+  description: `List boards in your Businessmap account. Optionally filter by workspace or archived status. Returns board details including name, description, and workspace assignment.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      workspaceId: z.number().optional().describe('Filter boards by workspace ID'),
+      workspaceId: z
+        .number()
+        .optional()
+        .describe('Workspace ID. Call list_workspaces to discover authorized workspaces.'),
       includeArchived: z
         .boolean()
         .optional()
@@ -39,10 +42,7 @@ export let listBoardsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     let result = await client.listBoards({
       workspaceId: ctx.input.workspaceId,

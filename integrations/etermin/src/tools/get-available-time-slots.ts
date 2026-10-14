@@ -21,7 +21,21 @@ export let getAvailableTimeSlots = SlateTool.create(spec, {
       serviceId: z
         .string()
         .optional()
-        .describe('Service ID to filter available slots for a specific service')
+        .describe(
+          'Service IDs from list_services, comma-separated. Required when calendars or working times are restricted to services.'
+        ),
+      durationMinutes: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Override the appointment duration in minutes'),
+      capacity: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Required number of places when capacity booking is enabled')
     })
   )
   .output(
@@ -40,7 +54,9 @@ export let getAvailableTimeSlots = SlateTool.create(spec, {
     let result = await client.getAvailableTimeSlots({
       date: ctx.input.date,
       calendarid: ctx.input.calendarId,
-      serviceid: ctx.input.serviceId
+      serviceid: ctx.input.serviceId,
+      duration: ctx.input.durationMinutes,
+      capacity: ctx.input.capacity
     });
 
     let timeSlots = Array.isArray(result) ? result : [result];

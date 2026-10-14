@@ -76,18 +76,16 @@ export let sendMmsTool = SlateTool.create(spec, {
       status: msg.status || ''
     }));
 
-    let totalPrice = sentMessages.reduce(
-      (sum: number, msg: any) => sum + (Number.parseFloat(msg.message_price) || 0),
-      0
-    );
+    let totalPrice = Number(result.data?.total_price ?? 0);
+    let queuedCount = Number(result.data?.queued_count ?? 0);
 
     return {
       output: {
         totalPrice,
-        queuedCount: mappedMessages.length,
+        queuedCount,
         messages: mappedMessages
       },
-      message: `Sent **${mappedMessages.length}** MMS message(s). Total cost: **$${totalPrice.toFixed(4)}**`
+      message: `Queued **${queuedCount}** MMS message(s). Total cost: **$${totalPrice.toFixed(4)}**`
     };
   })
   .build();

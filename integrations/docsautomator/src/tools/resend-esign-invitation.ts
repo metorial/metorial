@@ -17,6 +17,8 @@ export let resendEsignInvitation = SlateTool.create(spec, {
       sessionId: z.string().describe('The e-signature session ID.'),
       signerIndex: z
         .number()
+        .min(1)
+        .refine(Number.isInteger, 'The signer index must be a whole number.')
         .describe('The signer index (1-based). First signer is 1, second is 2, etc.')
     })
   )

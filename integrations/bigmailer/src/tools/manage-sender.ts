@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -54,7 +54,7 @@ export let manageSender = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.senderId) {
-        throw new Error('senderId is required for delete action');
+        throw createApiServiceError('senderId is required for delete action');
       }
       await client.deleteSender(ctx.input.brandId, ctx.input.senderId);
       return {
@@ -64,7 +64,9 @@ export let manageSender = SlateTool.create(spec, {
     }
 
     if (!ctx.input.identity || !ctx.input.identityType || !ctx.input.shareType) {
-      throw new Error('identity, identityType, and shareType are required for create action');
+      throw createApiServiceError(
+        'identity, identityType, and shareType are required for create action'
+      );
     }
 
     let sender = await client.createSender(ctx.input.brandId, {

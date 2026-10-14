@@ -13,7 +13,11 @@ export let validateEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      email: z.string().describe('Email address to validate (e.g., "user@example.com")')
+      email: z
+        .string()
+        .min(1)
+        .max(320)
+        .describe('Email address to validate (e.g., "user@example.com")')
     })
   )
   .output(
@@ -39,20 +43,20 @@ export let validateEmail = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressZenClient({ token: ctx.auth.token });
+    let client = new AddressZenClient(ctx.auth);
 
     let result = await client.validateEmail(ctx.input.email);
     let r = result.result || {};
 
     let output = {
-      valid: r.valid,
+      valid: r.valid ?? r.deliverable ?? undefined,
       email: r.email || ctx.input.email,
-      disposable: r.disposable,
-      reachable: r.reachable,
-      roleAccount: r.role_account ?? r.role,
-      freeProvider: r.free_provider ?? r.free,
-      domain: r.domain,
-      suggestion: r.suggestion,
+      disposable: r.disposable ?? undefined,
+      reachable: r.reachable ?? r.result ?? undefined,
+      roleAccount: r.role_account ?? r.role ?? undefined,
+      freeProvider: r.free_provider ?? r.free ?? undefined,
+      domain: r.domain ?? undefined,
+      suggestion: r.suggestion ?? r.suggestions?.[0] ?? undefined,
       code: result.code
     };
 

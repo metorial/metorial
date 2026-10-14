@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteAsset = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let deleteAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      environmentId: environmentIdInput,
       identifier: z.string().describe('The ID or external ID of the asset to delete'),
       identifierType: z
         .enum(['id', 'external_id'])
@@ -28,7 +30,7 @@ export let deleteAsset = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
     await client.deleteAsset(ctx.input.identifier, ctx.input.identifierType);

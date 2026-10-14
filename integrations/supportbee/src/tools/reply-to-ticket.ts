@@ -9,7 +9,7 @@ export let replyToTicket = SlateTool.create(spec, {
   key: 'reply_to_ticket',
   description: `Send a reply to a support ticket. The reply is sent to the customer. Supports plain text and HTML content, CC/BCC recipients, file attachments, and sending on behalf of another agent.`,
   instructions: [
-    'Provide either contentText or contentHtml (or both). At least one is required.',
+    'Provide contentText, contentHtml, or at least one uploaded attachment ID.',
     'Use onBehalfOfEmail or onBehalfOfId to send the reply as another agent.'
   ]
 })

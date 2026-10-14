@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,7 +52,7 @@ export let scrapeWalmart = SlateTool.create(spec, {
 
     if (ctx.input.action === 'product') {
       if (!ctx.input.sku) {
-        throw new Error('sku is required for the "product" action');
+        throw createApiServiceError('sku is required for the "product" action');
       }
       results = await client.getWalmartProduct({
         sku: ctx.input.sku,
@@ -65,7 +65,7 @@ export let scrapeWalmart = SlateTool.create(spec, {
       };
     } else if (ctx.input.action === 'search') {
       if (!ctx.input.query) {
-        throw new Error('query is required for the "search" action');
+        throw createApiServiceError('query is required for the "search" action');
       }
       results = await client.searchWalmart({
         query: ctx.input.query,
@@ -78,7 +78,7 @@ export let scrapeWalmart = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.sku) {
-        throw new Error('sku is required for the "reviews" action');
+        throw createApiServiceError('sku is required for the "reviews" action');
       }
       results = await client.getWalmartReviews({
         sku: ctx.input.sku,

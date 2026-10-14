@@ -18,11 +18,12 @@ export let listConversations = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      inboxId: z.string().describe('ID of the inbox to list conversations from'),
+      inboxId: z.string().describe('Inbox ID from list_inboxes'),
       limit: z
         .number()
         .min(10)
         .max(100)
+        .refine(Number.isInteger, 'limit must be a whole number')
         .optional()
         .describe('Number of results per page (10-100, default: 10)'),
       sortBy: z.string().optional().describe('Field to sort results by'),

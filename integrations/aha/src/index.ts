@@ -16,11 +16,13 @@ import {
   manageIdea,
   manageInitiative,
   manageRelease,
-  manageTodo
+  manageTodo,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
     listProducts,
     listFeatures,
     getFeature,

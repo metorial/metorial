@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { UnisenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -31,7 +31,8 @@ export let validateSender = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'validate') {
-      if (!ctx.input.email) throw new Error('email is required for validate action');
+      if (!ctx.input.email)
+        throw createApiServiceError('email is required for validate action');
       let result = await client.validateSender(ctx.input.email);
       return {
         output: { result },

@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  archiveRecords,
   completeActivity,
   confirmPurchaseOrder,
   confirmSaleOrder,
@@ -10,6 +11,7 @@ import {
   downloadAttachment,
   executeMethod,
   getCurrentUser,
+  getRecordDefaults,
   listModelFields,
   listModels,
   markOpportunityWon,
@@ -27,9 +29,11 @@ export let provider = Slate.create({
     searchRecords,
     countRecords,
     readRecords,
+    getRecordDefaults,
     createRecord,
     updateRecords,
     deleteRecords,
+    archiveRecords,
     downloadAttachment,
     confirmSaleOrder,
     postInvoice,

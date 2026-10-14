@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type CampaynCreateContactInput, Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateContact = SlateTool.create(spec, {
@@ -16,7 +16,9 @@ export let updateContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      contactId: z.string().describe('ID of the contact to update'),
+      contactId: z
+        .string()
+        .describe('Contact ID. Call list_contacts to find contacts on a list.'),
       email: z.string().optional().describe('Email address'),
       firstName: z.string().optional().describe('First name'),
       lastName: z.string().optional().describe('Last name'),
@@ -75,7 +77,7 @@ export let updateContact = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let input = ctx.input;
 
-    let body: Record<string, unknown> = {};
+    let body: Partial<CampaynCreateContactInput> = {};
     if (input.email !== undefined) body.email = input.email;
     if (input.firstName !== undefined) body.first_name = input.firstName;
     if (input.lastName !== undefined) body.last_name = input.lastName;
@@ -95,7 +97,7 @@ export let updateContact = SlateTool.create(spec, {
         value: cf.value
       }));
 
-    let result = await client.updateContact(input.contactId, body as any);
+    let result = await client.updateContact(input.contactId, body);
 
     return {
       output: { success: result.success },

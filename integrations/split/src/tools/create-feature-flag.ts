@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateBuckets, validateTrafficAllocation } from '../lib/validation';
 import { spec } from '../spec';
 
 let treatmentInputSchema = z.object({
@@ -30,7 +31,9 @@ export let createFeatureFlag = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Falls back to the configured default.'),
+        .describe(
+          'Workspace ID. Call list_workspaces to discover IDs. Falls back to the configured default.'
+        ),
       trafficTypeName: z
         .string()
         .describe('Traffic type name or ID to associate the flag with (e.g., "user").'),
@@ -50,7 +53,7 @@ export let createFeatureFlag = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'The treatment served when no rules match. Required if environmentId is provided.'
+          'The treatment served when the flag is killed or traffic is outside its allocation. Required if environmentId is provided.'
         ),
       defaultRule: z
         .array(bucketInputSchema)
@@ -78,10 +81,46 @@ export let createFeatureFlag = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
     if (!wsId) {
-      throw new Error('workspaceId is required. Set it in config or pass it as input.');
+      throw createApiServiceError(
+        'workspaceId is required. Call list_workspaces to discover IDs, then pass the ID or set the default workspace.'
+      );
     }
 
-    let client = new Client({ token: ctx.auth.token });
+    let envId = ctx.input.environmentId ?? ctx.config.environmentId;
+    let definitionRequested =
+      ctx.input.environmentId !== undefined ||
+      ctx.input.treatments !== undefined ||
+      ctx.input.defaultTreatment !== undefined ||
+      ctx.input.defaultRule !== undefined ||
+      ctx.input.trafficAllocation !== undefined;
+    if (
+      definitionRequested &&
+      (!envId ||
+        !ctx.input.treatments?.length ||
+        !ctx.input.defaultTreatment ||
+        !ctx.input.defaultRule?.length)
+    ) {
+      throw createApiServiceError(
+        'Creating an environment definition requires environmentId, non-empty treatments, defaultTreatment, and defaultRule. Provide all of them before creating the flag.'
+      );
+    }
+    validateBuckets(ctx.input.defaultRule, 'defaultRule');
+    validateTrafficAllocation(ctx.input.trafficAllocation);
+    if (ctx.input.treatments) {
+      let treatmentNames = new Set(
+        ctx.input.treatments.map(treatment => treatment.treatmentName)
+      );
+      if (
+        treatmentNames.size !== ctx.input.treatments.length ||
+        !treatmentNames.has(ctx.input.defaultTreatment!) ||
+        ctx.input.defaultRule?.some(bucket => !treatmentNames.has(bucket.treatment))
+      ) {
+        throw createApiServiceError(
+          'Treatment names must be unique, and defaultTreatment and every defaultRule bucket must reference a supplied treatment.'
+        );
+      }
+    }
+    let client = new Client(ctx.auth);
 
     let flag = await client.createFeatureFlag(wsId, ctx.input.trafficTypeName, {
       name: ctx.input.flagName,
@@ -89,7 +128,6 @@ export let createFeatureFlag = SlateTool.create(spec, {
     });
 
     let definitionCreated = false;
-    let envId = ctx.input.environmentId ?? ctx.config.environmentId;
 
     if (envId && ctx.input.treatments && ctx.input.defaultTreatment && ctx.input.defaultRule) {
       await client.createFlagDefinition(wsId, ctx.input.flagName, envId, {
@@ -109,7 +147,7 @@ export let createFeatureFlag = SlateTool.create(spec, {
       output: {
         flagId: flag.id,
         flagName: flag.name,
-        description: flag.description,
+        description: flag.description ?? null,
         trafficTypeName: flag.trafficType.name,
         trafficTypeId: flag.trafficType.id,
         creationTime: flag.creationTime,

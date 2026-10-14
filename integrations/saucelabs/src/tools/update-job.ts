@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -44,6 +44,26 @@ export let updateJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.source === 'rdc' &&
+      (ctx.input.visibility !== undefined || ctx.input.customData !== undefined)
+    ) {
+      throw createApiServiceError(
+        'visibility and customData are supported only for VDC jobs. Omit them when source is rdc.'
+      );
+    }
+    if (
+      [
+        ctx.input.name,
+        ctx.input.tags,
+        ctx.input.passed,
+        ctx.input.build,
+        ctx.input.visibility,
+        ctx.input.customData
+      ].every(value => value === undefined)
+    ) {
+      throw createApiServiceError('Provide at least one job attribute to update.');
+    }
     let client = createClient(ctx);
 
     if (ctx.input.source === 'rdc') {
@@ -58,10 +78,10 @@ export let updateJob = SlateTool.create(spec, {
         output: {
           jobId: result.id ?? ctx.input.jobId,
           name: result.name,
-          status: result.consolidated_status ?? result.status,
+          status: result.consolidated_status ?? result.status ?? undefined,
           passed: result.passed,
           build: result.build,
-          tags: result.tags
+          tags: result.tags ?? undefined
         },
         message: `Updated RDC job **${ctx.input.jobId}**.`
       };
@@ -80,10 +100,10 @@ export let updateJob = SlateTool.create(spec, {
       output: {
         jobId: result.id ?? ctx.input.jobId,
         name: result.name,
-        status: result.consolidated_status ?? result.status,
+        status: result.consolidated_status ?? result.status ?? undefined,
         passed: result.passed,
         build: result.build,
-        tags: result.tags
+        tags: result.tags ?? undefined
       },
       message: `Updated VDC job **${ctx.input.jobId}**.`
     };

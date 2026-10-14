@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -64,7 +64,7 @@ export let manageExtension = SlateTool.create(spec, {
     }
 
     if (input.action === 'get') {
-      if (!input.extensionId) throw new Error('extensionId is required for get.');
+      if (!input.extensionId) throw createApiServiceError('extensionId is required for get.');
       let e = await client.getExtension(input.extensionId);
       return {
         output: {
@@ -81,7 +81,8 @@ export let manageExtension = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.extensionId) throw new Error('extensionId is required for delete.');
+      if (!input.extensionId)
+        throw createApiServiceError('extensionId is required for delete.');
       await client.deleteExtension(input.extensionId);
       return {
         output: { deleted: true },
@@ -89,6 +90,6 @@ export let manageExtension = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

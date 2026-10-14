@@ -4,7 +4,10 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string().describe('API key for SMS Alert authentication')
+      token: z.string().describe('SMS Alert authentication credential'),
+      authType: z.enum(['api_key', 'username_password']).optional(),
+      username: z.string().optional(),
+      password: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -21,7 +24,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey,
+          authType: 'api_key' as const
         }
       };
     }
@@ -37,7 +41,10 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: `${ctx.input.username}:${ctx.input.password}`
+          token: `${ctx.input.username}:${ctx.input.password}`,
+          authType: 'username_password' as const,
+          username: ctx.input.username,
+          password: ctx.input.password
         }
       };
     }

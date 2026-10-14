@@ -17,7 +17,11 @@ export let validatePhone = SlateTool.create(spec, {
         .string()
         .describe(
           'Phone number to validate (include country code for international numbers, e.g., "+14155552671")'
-        )
+        ),
+      currentCarrier: z
+        .boolean()
+        .optional()
+        .describe('Request the current carrier, including number-porting information')
     })
   )
   .output(
@@ -41,21 +45,25 @@ export let validatePhone = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressZenClient({ token: ctx.auth.token });
+    let client = new AddressZenClient(ctx.auth);
 
-    let result = await client.validatePhoneNumber(ctx.input.phoneNumber);
+    let result = await client.validatePhoneNumber(
+      ctx.input.phoneNumber,
+      ctx.input.currentCarrier
+    );
     let r = result.result || {};
+    let carrier = r.current_carrier ?? r.original_carrier;
 
     let output = {
-      valid: r.valid,
+      valid: r.valid ?? undefined,
       phoneNumber: r.phone_number || r.number || ctx.input.phoneNumber,
-      localFormat: r.local_format,
-      internationalFormat: r.international_format,
-      countryCode: r.country_code,
-      countryIso: r.country_iso || r.country,
-      lineType: r.line_type || r.type,
-      carrier: r.carrier,
-      location: r.location,
+      localFormat: r.local_format ?? r.national_format ?? undefined,
+      internationalFormat: r.international_format ?? undefined,
+      countryCode: r.country_code ?? undefined,
+      countryIso: r.country_iso ?? r.iso_country ?? undefined,
+      lineType: r.line_type ?? r.type ?? carrier?.network_type ?? undefined,
+      carrier: r.carrier ?? carrier?.name ?? undefined,
+      location: r.location ?? undefined,
       code: result.code
     };
 

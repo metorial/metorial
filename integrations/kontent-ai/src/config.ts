@@ -5,8 +5,9 @@ export let config = SlateConfig.create(
   z.object({
     environmentId: z
       .string()
+      .optional()
       .describe(
-        'The Environment ID (formerly Project ID) from Kontent.ai project settings. Identifies the specific environment within a project.'
+        'Legacy default Environment ID from Kontent.ai project settings. Prefer the environmentId tool input; existing connections may keep this default.'
       )
   })
 );

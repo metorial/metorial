@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendlaneClient } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,9 @@ export let manageSuppression = SlateTool.create(spec, {
     }
 
     if (!ctx.input.emails || ctx.input.emails.length === 0) {
-      throw new Error('Emails are required for add/remove actions');
+      throw createApiServiceError(
+        'Provide at least one email address for add/remove actions.'
+      );
     }
 
     if (ctx.input.action === 'add') {

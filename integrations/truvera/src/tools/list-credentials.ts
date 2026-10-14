@@ -13,8 +13,31 @@ export let listCredentials = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      offset: z.number().optional().describe('Number of items to skip for pagination'),
-      limit: z.number().optional().describe('Maximum number of items to return (max 64)')
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(0)
+        .optional()
+        .describe('Number of items to skip for pagination'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum number of items to return (max 100)'),
+      filter: z
+        .string()
+        .max(512)
+        .optional()
+        .describe(
+          'Search credential ID, subject reference or ID, issuer, type, creation date, or issuance date'
+        ),
+      subjectId: z
+        .string()
+        .max(512)
+        .optional()
+        .describe('Filter by the exact credential subject ID, such as a holder DID')
     })
   )
   .output(
@@ -39,7 +62,9 @@ export let listCredentials = SlateTool.create(spec, {
 
     let result = await client.listCredentials({
       offset: ctx.input.offset,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      filter: ctx.input.filter,
+      subjectId: ctx.input.subjectId
     });
 
     let list = Array.isArray(result) ? result : result?.list || [];
@@ -47,8 +72,8 @@ export let listCredentials = SlateTool.create(spec, {
 
     let credentials = list.map((c: any) => ({
       credentialId: c.id || '',
-      issuerKey: c.issuerKey,
-      issuerName: c.issuerName,
+      issuerKey: c.issuerKey ?? undefined,
+      issuerName: c.issuerName ?? undefined,
       createdAt: c.createdAt,
       expiryDate: c.expiryDate,
       issuanceDate: c.issuanceDate,

@@ -28,9 +28,9 @@ export let listLeadStatuses = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listLeadStatuses();
 
-    let statuses = (result.lead_statuses || result.statuses || []).map((s: any) => ({
+    let statuses = (result.lead_statuses || []).map(s => ({
       statusId: s.id,
-      name: s.name || s.status
+      name: s.name
     }));
 
     return {

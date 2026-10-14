@@ -1,6 +1,6 @@
 {
   "name": "@metorial/astica-ai",
-  "description": "Analyze images using computer vision for object detection, face detection, OCR, content moderation, tagging, and GPT-powered descriptions. Generate AI images from text prompts. Convert text to speech with 500+ voices, voice cloning, and multilingual support. Transcribe speech to text from audio files or streams. Generate natural language text using GPT-S for question answering, content creation, and diverse text generation. Upscale images using AI enhancement. Train and run custom AI models for vision and NLP tasks.",
+  "description": "Analyze images for objects, faces, text, tags, colors, moderation, and detailed descriptions. Generate images and text, transcribe audio, browse available voices and private clones, and synthesize downloadable speech. Retrieve completed low-priority speech tasks with their word timestamps.",
   "categories": [
     "apis-and-http-requests",
     "document-processing",
@@ -15,8 +15,8 @@
     "generate natural language text",
     "detect faces in images",
     "extract text via OCR",
-    "upscale images with AI",
-    "train custom AI models"
+    "retrieve queued speech audio",
+    "list available voices and private clones"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/astica-ai.png"
 }

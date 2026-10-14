@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let companyOutputSchema = z.object({
@@ -25,16 +26,16 @@ let mapCompany = (c: any) => ({
   companyId: c.id,
   name: c.name,
   type: c.type,
-  website: c.website,
-  email: c.email,
-  phone: c.phone,
-  fax: c.fax,
-  address: c.address,
-  currency: c.currency,
-  identifier: c.identifier,
+  website: c.website ?? undefined,
+  email: c.email ?? undefined,
+  phone: c.phone ?? undefined,
+  fax: c.fax ?? undefined,
+  address: c.address ?? undefined,
+  currency: c.currency ?? undefined,
+  identifier: c.identifier ?? undefined,
   tags: c.tags,
   user: c.user,
-  info: c.info,
+  info: c.info ?? undefined,
   createdAt: c.created_at,
   updatedAt: c.updated_at
 });
@@ -49,6 +50,7 @@ export let listCompanies = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       type: z
         .enum(['customer', 'supplier', 'organization'])
         .optional()
@@ -72,11 +74,14 @@ export let listCompanies = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.type) params.type = ctx.input.type;
     if (ctx.input.tags) params.tags = ctx.input.tags;
     if (ctx.input.term) params.term = ctx.input.term;
     if (ctx.input.identifier) params.identifier = ctx.input.identifier;
-    if (ctx.input.includeArchived) params.include_archived = ctx.input.includeArchived;
+    if (ctx.input.includeArchived !== undefined)
+      params.include_archived = ctx.input.includeArchived;
     if (ctx.input.updatedAfter) params.updated_after = ctx.input.updatedAfter;
 
     let data = await client.listCompanies(params);

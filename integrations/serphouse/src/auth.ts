@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let httpClient = createAxios({
-  baseURL: 'https://api.serphouse.com'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -31,13 +28,7 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await httpClient.get('/account/info', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data;
+      let data = await new Client(ctx.output.token).getAccountInfo();
       let results = data.results;
 
       return {

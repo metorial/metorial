@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { EntryWrite } from '../lib/client';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -49,7 +50,7 @@ export let recordKpiEntry = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
 
-    let data: Record<string, unknown> = {
+    let data: EntryWrite = {
       kpi_id: ctx.input.kpiId,
       entry_date: ctx.input.entryDate
     };
@@ -64,7 +65,7 @@ export let recordKpiEntry = SlateTool.create(spec, {
     if (ctx.input.setNotes !== undefined) data.setNotes = ctx.input.setNotes;
     if (ctx.input.addToActual !== undefined) data.addToActual = ctx.input.addToActual;
 
-    let result = await client.createKpiEntry(data as any);
+    let result = await client.createKpiEntry(data);
 
     return {
       output: {

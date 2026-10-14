@@ -13,7 +13,13 @@ export let updateAgent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('ID of the agent to update'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent to update'),
       projectName: z.string().optional().describe('New name for the agent'),
       sitemapPath: z.string().optional().describe('New sitemap URL'),
       isShared: z.boolean().optional().describe('Whether the agent should be publicly shared'),

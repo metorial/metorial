@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapContact } from '../lib/mappers';
 import { spec } from '../spec';
 
 export let manageContact = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let manageContact = SlateTool.create(spec, {
   key: 'manage_contact',
   description: `Create or update a research contact (participant/customer) in Dovetail. Contacts represent people involved in research activities.`,
   instructions: [
-    'To create a contact, set action to "create" and provide name and optionally email.',
+    'To create a contact, set action to "create" and provide both name and email.',
     'To update a contact, set action to "update", provide the contactId, and include fields to change.'
   ],
   tags: {
@@ -29,47 +30,35 @@ export let manageContact = SlateTool.create(spec, {
       name: z.string(),
       email: z.string().optional(),
       createdAt: z.string(),
-      updatedAt: z.string()
+      updatedAt: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      let body: Record<string, unknown> = {};
-      if (ctx.input.name) body.name = ctx.input.name;
-      if (ctx.input.email) body.email = ctx.input.email;
+      if (!ctx.input.name || !ctx.input.email)
+        throw createApiServiceError('Both name and email are required to create a contact.');
+      let body = pickDefined({ name: ctx.input.name, email: ctx.input.email });
 
       let contact = await client.createContact(body);
       return {
-        output: {
-          contactId: contact.id,
-          name: contact.name,
-          email: contact.email,
-          createdAt: contact.created_at,
-          updatedAt: contact.updated_at
-        },
+        output: mapContact(contact),
         message: `Created contact **${contact.name}** (ID: ${contact.id}).`
       };
     }
 
     if (!ctx.input.contactId) {
-      throw new Error('contactId is required for update action');
+      throw createApiServiceError('contactId is required for update action');
     }
 
-    let body: Record<string, unknown> = {};
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.email) body.email = ctx.input.email;
+    if (ctx.input.name === undefined && ctx.input.email === undefined)
+      throw createApiServiceError('Provide a name or email to update the contact.');
+    let body = pickDefined({ name: ctx.input.name, email: ctx.input.email });
 
     let contact = await client.updateContact(ctx.input.contactId, body);
     return {
-      output: {
-        contactId: contact.id,
-        name: contact.name,
-        email: contact.email,
-        createdAt: contact.created_at,
-        updatedAt: contact.updated_at
-      },
+      output: mapContact(contact),
       message: `Updated contact **${contact.name}**.`
     };
   })

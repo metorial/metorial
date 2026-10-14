@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { eventIdSchema, overrideLocationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getEvent = SlateTool.create(spec, {
   name: 'Get Event',
   key: 'get_event',
-  description: `Retrieve detailed information about a specific Humanitix event by its ID. Returns the full event object including name, dates, location, ticket types, pricing, capacity, and publication status.`,
+  description: `Retrieve details about a specific Humanitix event by its ID, including dates, location, ticket types, pricing, capacity, and publication status. Call list_events to discover event IDs.`,
   instructions: [
     'The event ID is the unique string found in the console URL: console.humanitix.com/console/my-events/{eventId}'
   ],
@@ -16,13 +17,19 @@ export let getEvent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      eventId: z.string().describe('The unique event ID from Humanitix')
+      eventId: eventIdSchema,
+      overrideLocation: overrideLocationSchema
     })
   )
   .output(
     z.object({
       eventId: z.string().describe('Unique identifier for the event'),
       name: z.string().optional().describe('Name of the event'),
+      url: z.string().optional().describe('Public event URL'),
+      dates: z
+        .array(z.any())
+        .optional()
+        .describe('Event date entries including IDs for eventDateId filters'),
       slug: z.string().optional().describe('URL slug for the event'),
       description: z.string().optional().describe('Description of the event'),
       startDate: z.string().optional().describe('Start date of the event'),
@@ -60,12 +67,16 @@ export let getEvent = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let event = await client.getEvent(ctx.input.eventId);
+    let event = await client.getEvent(ctx.input.eventId, {
+      overrideLocation: ctx.input.overrideLocation
+    });
 
     return {
       output: {
         eventId: event._id,
         name: event.name,
+        url: event.url,
+        dates: event.dates,
         slug: event.slug,
         description: event.description,
         startDate: event.startDate,

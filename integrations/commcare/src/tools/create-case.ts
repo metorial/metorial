@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let createCase = SlateTool.create(spec, {
   description: `Create a new case in CommCare. Cases are the core data records used for longitudinal tracking (e.g., patients, households, facilities).
 Specify the case type, name, owner, and any custom properties. Optionally set relationships to other cases via indices.`,
   constraints: [
-    'Requires the Case API v2 (v0.6) endpoint. Your project must have API access enabled.'
+    'Requires Case API v2 access. caseName and ownerId must be provided for creation.'
   ],
   tags: {
     destructive: false
@@ -20,16 +20,30 @@ Specify the case type, name, owner, and any custom properties. Optionally set re
       caseType: z
         .string()
         .describe('The type of case to create (e.g., "patient", "household")'),
-      caseName: z.string().optional().describe('Human-readable name for the case'),
-      ownerId: z.string().optional().describe('User or group ID that owns this case'),
+      caseName: z
+        .string()
+        .optional()
+        .describe(
+          'Human-readable name for the case; required by CommCare when creating a case'
+        ),
+      ownerId: z
+        .string()
+        .optional()
+        .describe(
+          'Owner user or group ID; required for creation. Discover it with list_mobile_workers or list_groups.'
+        ),
       externalId: z
         .string()
         .optional()
-        .describe('External system identifier for upsert operations'),
+        .describe(
+          'External system identifier. Creating a case does not upsert by this value.'
+        ),
       properties: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Custom case properties as key-value pairs'),
+        .describe(
+          'Custom case properties as key-value pairs; CommCare requires string values'
+        ),
       indices: z
         .record(
           z.string(),
@@ -82,7 +96,12 @@ Specify the case type, name, owner, and any custom properties. Optionally set re
       indices
     });
 
-    let caseId = result?.case_id || result?.id || '';
+    let caseId = result.case?.case_id;
+    if (!caseId) {
+      throw createApiServiceError(
+        'CommCare did not return the created case ID. Check the case in CommCare before retrying.'
+      );
+    }
 
     return {
       output: {

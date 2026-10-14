@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getFirstResult, getResponseRecords, ReferralRockClient } from '../lib/client';
+import { referralQuery } from '../lib/queries';
 import { spec } from '../spec';
 
 export let updateReferral = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let updateReferral = SlateTool.create(spec, {
   key: 'update_referral',
   description: `Update an existing referral's details or status. Identify the referral by ID, email (with program), external ID (with program), or phone number (with program). Use this to progress referrals through the approval workflow.`,
   instructions: [
-    'Provide either referralId, or both email and programId, or both externalIdentifier and programId.'
+    'Provide referralId, or programId with email, externalIdentifier, or phoneNumber. Use list_programs and list_referrals to find IDs.'
   ],
   tags: {
     destructive: false,
@@ -62,25 +63,26 @@ export let updateReferral = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
-    let query: Record<string, unknown> = {};
-
-    if (ctx.input.referralId) {
-      query = {
-        primaryInfo: { referralId: ctx.input.referralId }
-      };
-    } else {
-      query = {
-        secondaryInfo: {
-          ...(ctx.input.email && { email: ctx.input.email }),
-          ...(ctx.input.externalIdentifier && {
-            externalIdentifier: ctx.input.externalIdentifier
-          }),
-          ...(ctx.input.phoneNumber && { phoneNumber: ctx.input.phoneNumber })
-        },
-        tertiaryInfo: {
-          ...(ctx.input.programId && { ProgramId: ctx.input.programId })
-        }
-      };
+    let query = referralQuery(ctx.input);
+    let referralId = ctx.input.referralId;
+    if (!referralId) {
+      let matches = await client.listReferrals({
+        programId: ctx.input.programId,
+        query: ctx.input.email || ctx.input.externalIdentifier
+      });
+      let referrals = getResponseRecords(matches.referrals, 'referral lookup').filter(
+        referral =>
+          (!ctx.input.email || referral.email === ctx.input.email) &&
+          (!ctx.input.externalIdentifier ||
+            referral.externalIdentifier === ctx.input.externalIdentifier) &&
+          (!ctx.input.phoneNumber || referral.phoneNumber === ctx.input.phoneNumber)
+      );
+      if (referrals.length !== 1 || typeof referrals[0]?.id !== 'string') {
+        throw createApiServiceError(
+          'The referral query must match exactly one referral. Use list_referrals to find its referralId.'
+        );
+      }
+      referralId = referrals[0].id;
     }
 
     let referralUpdate: Record<string, unknown> = {};
@@ -100,18 +102,17 @@ export let updateReferral = SlateTool.create(spec, {
 
     let result = await client.updateReferrals([{ query, referral: referralUpdate }]);
 
-    let results = result as unknown as Record<string, unknown>[];
-    let first = Array.isArray(results) ? results[0] : result;
+    let first = getFirstResult(result);
     let resultInfo = (first?.resultInfo || {}) as Record<string, unknown>;
     let referral = (first?.referral || {}) as Record<string, unknown>;
 
     return {
       output: {
-        referralId: (referral.id || ctx.input.referralId || '') as string,
+        referralId: (referral.id || referralId) as string,
         status: resultInfo.Status as string | undefined,
         statusMessage: resultInfo.Message as string | undefined
       },
-      message: `Referral update: ${resultInfo.Message || 'Completed'}${ctx.input.status ? ` — status set to **${ctx.input.status}**` : ''}.`
+      message: `Referral update result: ${resultInfo.Message || resultInfo.Status || 'Request processed'}${ctx.input.status ? ` — requested status **${ctx.input.status}**` : ''}.`
     };
   })
   .build();

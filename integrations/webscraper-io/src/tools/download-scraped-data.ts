@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let downloadScrapedData = SlateTool.create(spec, {
   name: 'Download Scraped Data',
   key: 'download_scraped_data',
-  description: `Download the scraped data from a completed scraping job. Returns data as JSON records or raw CSV text based on the chosen format.`,
+  description: `Download the scraped data from a completed scraping job as a JSONL or CSV file. Also returns JSON records or CSV text for compatibility.`,
   instructions: [
     'The scraping job must be in "finished" status for data to be available.',
     'JSON format returns structured records. CSV format returns raw text.'
@@ -38,10 +38,23 @@ export let downloadScrapedData = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
+    let job = await client.getScrapingJob(ctx.input.scrapingJobId);
+    if (job.status !== 'finished') {
+      throw createApiServiceError(
+        `Scraping job ${ctx.input.scrapingJobId} is ${job.status}. Wait until it is finished before downloading the completed dataset.`
+      );
+    }
 
     if (ctx.input.format === 'csv') {
       let csvContent = await client.downloadScrapedDataCsv(ctx.input.scrapingJobId);
       let lineCount = csvContent.split('\n').filter((l: string) => l.trim().length > 0).length;
+      await ctx.addAttachment({
+        type: 'url',
+        url: `https://api.webscraper.io/api/v1/scraping-job/${ctx.input.scrapingJobId}/csv`,
+        headers: { Authorization: `Bearer ${ctx.auth.token}` },
+        mimeType: 'text/csv',
+        filename: `scraping-job-${ctx.input.scrapingJobId}.csv`
+      });
 
       return {
         output: {
@@ -54,6 +67,13 @@ export let downloadScrapedData = SlateTool.create(spec, {
     }
 
     let records = await client.downloadScrapedDataJson(ctx.input.scrapingJobId);
+    await ctx.addAttachment({
+      type: 'url',
+      url: `https://api.webscraper.io/api/v1/scraping-job/${ctx.input.scrapingJobId}/json`,
+      headers: { Authorization: `Bearer ${ctx.auth.token}` },
+      mimeType: 'application/jsonl',
+      filename: `scraping-job-${ctx.input.scrapingJobId}.jsonl`
+    });
 
     return {
       output: {

@@ -1,16 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let issueCredential = SlateTool.create(spec, {
   name: 'Issue Credential',
   key: 'issue_credential',
   description: `Issue a verifiable credential to a holder. Supports three methods:
-- **openid4vc**: Creates an OpenID4VC issuance offer with a scannable URI/QR code for SD-JWT VC credentials.
+- **openid4vc**: Creates an OpenID4VC issuance offer with a scannable URI/QR code for SD-JWT VC and mDOC credentials.
 - **didcomm**: Creates a DIDComm issuance offer for AnonCreds credentials via invitation or existing connection.
 - **direct**: Directly signs and returns an SD-JWT VC credential without an exchange protocol.`,
   instructions: [
+    'Call list_projects to choose the projectId for this operation.',
     'For openid4vc: provide credentialTemplateId and attributes in the credentials array.',
     'For didcomm: provide a single credential with credentialTemplateId and attributes, plus either a didcommConnectionId or set createInvitation to true.',
     'For direct: provide a single credentialTemplateId and attributes; the signed credential is returned immediately.'
@@ -18,6 +20,7 @@ export let issueCredential = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       method: z.enum(['openid4vc', 'didcomm', 'direct']).describe('Issuance method to use'),
       credentials: z
         .array(
@@ -66,9 +69,41 @@ export let issueCredential = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
+    if (!ctx.input.credentials.length) {
+      throw createApiServiceError('Provide at least one credential to issue.');
+    }
+    if (ctx.input.method !== 'openid4vc' && ctx.input.credentials.length !== 1) {
+      throw createApiServiceError(
+        'didcomm and direct issuance require exactly one credential.'
+      );
+    }
+    if (
+      ctx.input.expirationInMinutes !== undefined &&
+      (ctx.input.expirationInMinutes < 1 || ctx.input.expirationInMinutes > 10080)
+    ) {
+      throw createApiServiceError('expirationInMinutes must be between 1 and 10080.');
+    }
+    if (ctx.input.method !== 'openid4vc' && ctx.input.expirationInMinutes !== undefined) {
+      throw createApiServiceError(
+        'expirationInMinutes is supported only for openid4vc issuance.'
+      );
+    }
+    if (
+      ctx.input.method !== 'didcomm' &&
+      (ctx.input.didcommConnectionId || ctx.input.createInvitation !== undefined)
+    ) {
+      throw createApiServiceError(
+        'didcommConnectionId and createInvitation are supported only for didcomm issuance.'
+      );
+    }
+    if (ctx.input.didcommConnectionId && ctx.input.createInvitation !== undefined) {
+      throw createApiServiceError(
+        'Provide didcommConnectionId or createInvitation, not both.'
+      );
+    }
     if (ctx.input.method === 'openid4vc') {
       let result = await client.createOpenId4VcIssuanceOffer({
         credentials: ctx.input.credentials,

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -40,6 +40,9 @@ export let startBuild = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.branchId) === Boolean(ctx.input.branchName)) {
+      throw createApiServiceError('Provide exactly one of branchId or branchName.');
+    }
     let client = createClient(ctx);
     let result: any;
 
@@ -60,7 +63,7 @@ export let startBuild = SlateTool.create(spec, {
         ctx.input.environmentVariables
       );
     } else {
-      throw new Error('Either branchId or branchName must be provided');
+      throw createApiServiceError('Either branchId or branchName must be provided');
     }
 
     return {

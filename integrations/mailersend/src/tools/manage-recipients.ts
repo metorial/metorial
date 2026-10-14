@@ -34,7 +34,19 @@ export let listRecipients = SlateTool.create(spec, {
           })
         )
         .describe('List of recipients.'),
-      total: z.number().describe('Total number of recipients.')
+      total: z
+        .number()
+        .describe(
+          'Provider total when available; otherwise the number of entries on this page.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider pagination metadata.'),
+      links: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider links to adjacent result pages.')
     })
   )
   .handleInvocation(async ctx => {
@@ -55,7 +67,7 @@ export let listRecipients = SlateTool.create(spec, {
       ((result.meta as Record<string, unknown>)?.total as number) ?? recipients.length;
 
     return {
-      output: { recipients, total },
+      output: { recipients, total, pagination: result.meta, links: result.links },
       message: `Found **${total}** recipients.`
     };
   })

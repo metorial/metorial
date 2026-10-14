@@ -1,18 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listIssuedCredentials = SlateTool.create(spec, {
   name: 'List Issued Credentials',
   key: 'list_issued_credentials',
   description: `Retrieve metadata about issued credentials in a Paradym project. Use this to track the status of credentials, filter by format or revocation status, and find credential IDs for revocation.`,
+  instructions: ['Call list_projects to choose the projectId for this operation.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      pageBefore: z.string().optional().describe('Cursor for fetching the previous page'),
+      projectId: projectIdSchema,
       pageSize: z.number().optional().describe('Number of credentials to return per page'),
       pageAfter: z.string().optional().describe('Cursor for fetching the next page'),
       filterStatus: z
@@ -31,6 +35,10 @@ export let listIssuedCredentials = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      metadata: z
+        .any()
+        .optional()
+        .describe('Provider pagination metadata, including next and previous page URLs'),
       credentials: z
         .array(
           z.object({
@@ -51,7 +59,7 @@ export let listIssuedCredentials = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
     let filter: Record<string, string> = {};
@@ -62,6 +70,7 @@ export let listIssuedCredentials = SlateTool.create(spec, {
 
     let result = await client.listIssuedCredentials({
       pageSize: ctx.input.pageSize,
+      pageBefore: ctx.input.pageBefore,
       pageAfter: ctx.input.pageAfter,
       filter: Object.keys(filter).length > 0 ? filter : undefined
     });
@@ -76,7 +85,7 @@ export let listIssuedCredentials = SlateTool.create(spec, {
     }));
 
     return {
-      output: { credentials },
+      output: { credentials, metadata: result.meta },
       message: `Found **${credentials.length}** issued credential(s).`
     };
   })

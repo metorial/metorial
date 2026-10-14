@@ -1,23 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ImejisClient } from '../lib/client';
+import { imageFormatSchema, imageQualitySchema } from '../lib/render-schemas';
 import { spec } from '../spec';
 
 export let generateImageTool = SlateTool.create(spec, {
   name: 'Generate Image',
   key: 'generate_image',
   description: `Generate a custom image from a pre-designed Imejis.io template by providing dynamic overrides for text, colors, images, and other component properties.
-Renders a design template with the given overrides and returns either a URL to the generated image or the image as base64-encoded binary data.
+Renders a design template with the given overrides and provides a downloadable image or single-page PDF, together with either its hosted URL or base64-encoded data.
 Overrides can use **nested objects** (e.g. \`{ "title": { "text": "Hello", "color": "#ff0000" } }\`) or **dot notation** (e.g. \`{ "title.text": "Hello", "title.color": "#ff0000" }\`), or a combination of both.
 Only send properties you want to change; unspecified properties retain their template defaults.`,
   instructions: [
     'You need a designId from the Imejis.io platform — create or select a design at https://app.imejis.io and note its unique ID.',
     'Component names in overrides must match the component names defined in the design template.',
     'Supported override properties per component include: text, color, backgroundColor, textBackgroundColor, borderColor, strokeColor, image, opacity, and more depending on component type.',
-    'Use responseFormat "url" to get a hosted image URL, or "binary" to get base64-encoded PNG data.'
+    'Use responseFormat "url" to get a public hosted image URL, or "binary" to get base64-encoded file data.',
+    'Choose format "png", "jpeg", "webp", or "pdf"; JPEG is the default. The quality option applies only to JPEG.',
+    'Hosted URLs are public. Use generate_signed_image when the rendered file should have a private, expiring URL.'
   ],
   constraints: [
-    'Image generation is a paid operation — each render consumes API credits.',
+    "Each render consumes the provider's render quota or credits.",
     'The design template must exist and be accessible with your API key.'
   ],
   tags: {
@@ -38,7 +41,9 @@ Only send properties you want to change; unspecified properties retain their tem
       responseFormat: z
         .enum(['url', 'binary'])
         .default('url')
-        .describe('Whether to return a hosted image URL or base64-encoded binary image data.')
+        .describe('Whether to return a hosted image URL or base64-encoded binary image data.'),
+      format: imageFormatSchema.optional(),
+      quality: imageQualitySchema.optional()
     })
   )
   .output(
@@ -59,19 +64,35 @@ Only send properties you want to change; unspecified properties retain their tem
   )
   .handleInvocation(async ctx => {
     let client = new ImejisClient({ token: ctx.auth.token });
+    let options = { format: ctx.input.format, quality: ctx.input.quality };
 
     if (ctx.input.responseFormat === 'binary') {
-      let result = await client.generateImageBinary(ctx.input.designId, ctx.input.overrides);
+      let result = await client.generateImageBinary(
+        ctx.input.designId,
+        ctx.input.overrides,
+        options
+      );
+      await ctx.addAttachment({
+        type: 'content',
+        content: result.content,
+        filename: `design.${ctx.input.format ?? 'jpeg'}`,
+        mimeType: result.contentType
+      });
       return {
         output: {
           imageBase64: result.imageBase64,
           contentType: result.contentType
         },
-        message: `Generated image from design \`${ctx.input.designId}\` as binary data (${result.contentType}).`
+        message: `Generated a downloadable file from design \`${ctx.input.designId}\` (${result.contentType}).`
       };
     }
 
-    let result = await client.generateImageUrl(ctx.input.designId, ctx.input.overrides);
+    let result = await client.generateImageUrl(
+      ctx.input.designId,
+      ctx.input.overrides,
+      options
+    );
+    await ctx.addAttachment({ type: 'url', url: result.url });
     return {
       output: {
         imageUrl: result.url

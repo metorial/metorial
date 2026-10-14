@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTimestamp } from '../lib/output';
 import { spec } from '../spec';
 
 export let listMessagesTool = SlateTool.create(spec, {
@@ -15,7 +16,14 @@ export let listMessagesTool = SlateTool.create(spec, {
     z.object({
       conversationId: z.string().describe('Conversation ID to list messages for'),
       cursor: z.string().optional().describe('Pagination cursor'),
-      take: z.number().optional().describe('Number of messages to return')
+      take: z
+        .number()
+        .refine(
+          value => Number.isInteger(value) && value > 0,
+          'take must be a positive whole number'
+        )
+        .optional()
+        .describe('Number of messages to return')
     })
   )
   .output(
@@ -47,13 +55,13 @@ export let listMessagesTool = SlateTool.create(spec, {
       messageId: m.id,
       type: m.type,
       text: m.text,
-      createdAt: m.createdAt
+      createdAt: formatTimestamp(m.createdAt)
     }));
 
     return {
       output: {
         messages,
-        cursor: result.cursor,
+        cursor: result.cursor ?? undefined,
         count: messages.length
       },
       message: `Retrieved **${messages.length}** messages from conversation **${conversationId}**.`

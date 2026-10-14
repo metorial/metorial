@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AhaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -54,12 +54,13 @@ export let manageFeature = SlateTool.create(spec, {
   )
   .output(featureOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new AhaClient(ctx.config.subdomain, ctx.auth.token);
+    let client = AhaClient.fromContext(ctx);
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.releaseId) throw new Error('releaseId is required to create a feature');
-      if (!ctx.input.name) throw new Error('name is required to create a feature');
+      if (!ctx.input.releaseId)
+        throw createApiServiceError('releaseId is required to create a feature');
+      if (!ctx.input.name) throw createApiServiceError('name is required to create a feature');
 
       let feature = await client.createFeature(ctx.input.releaseId, {
         name: ctx.input.name,
@@ -90,7 +91,8 @@ export let manageFeature = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.featureId) throw new Error('featureId is required for this action');
+    if (!ctx.input.featureId)
+      throw createApiServiceError('featureId is required for this action');
 
     if (action === 'delete') {
       await client.deleteFeature(ctx.input.featureId);

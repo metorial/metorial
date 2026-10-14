@@ -3,7 +3,10 @@ import { spec } from './spec';
 import {
   generateReport,
   getCompany,
+  getCurrentUser,
+  listAccounts,
   listClients,
+  listEstimates,
   listExpenses,
   listInvoices,
   listProjects,
@@ -46,7 +49,10 @@ export let provider = Slate.create({
     manageEstimate,
     manageContact,
     generateReport,
-    getCompany
+    getCompany,
+    getCurrentUser,
+    listAccounts,
+    listEstimates
   ],
   triggers: []
 });

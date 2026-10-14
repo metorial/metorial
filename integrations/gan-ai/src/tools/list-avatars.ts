@@ -82,7 +82,7 @@ export let listAvatars = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
 
     if (ctx.input.avatarId) {
       let details = await client.getAvatarDetails(ctx.input.avatarId);

@@ -2,6 +2,10 @@
 
 Verify and validate email addresses for deliverability, safety, and accuracy. Perform single or bulk email verification to detect invalid addresses, spam traps, disposable emails, catch-all domains, and syntax errors. Find business email addresses by name and domain, search domains for associated email addresses, and enrich email data with profile details such as full name, gender, and email service provider. Upload CSV or text files for bulk verification, poll job status, and download verified results.
 
+Check available credits before starting a job, screen disposable domains, and download finished bulk results as CSV or XLSX with optional verification-status filters. Bulk uploads support standard or high verification quality and an optional Deep Scan of unresolved addresses.
+
+See the [official API documentation](https://api.emaillistverify.com/api-doc) for verification statuses, credit costs, and processing limits.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

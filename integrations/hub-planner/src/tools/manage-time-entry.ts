@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -50,46 +50,56 @@ When creating, **resourceId**, **projectId**, **date**, and **minutes** are requ
     let { action, timeEntryId, resourceId, projectId, ...fields } = ctx.input;
 
     if (action === 'create') {
+      if (
+        !ctx.input.resourceId?.trim() ||
+        !ctx.input.projectId?.trim() ||
+        !ctx.input.date?.trim() ||
+        ctx.input.minutes === undefined
+      ) {
+        throw createApiServiceError(
+          'resourceId, projectId, date, minutes are required for create.'
+        );
+      }
       let body: Record<string, any> = { ...fields, resource: resourceId, project: projectId };
       let result = await client.createTimeEntry(body);
       return {
         output: {
           timeEntryId: result._id,
-          resourceId: result.resource,
-          projectId: result.project,
-          date: result.date,
-          minutes: result.minutes,
-          status: result.status,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          resourceId: result.resource ?? undefined,
+          projectId: result.project ?? undefined,
+          date: result.date ?? undefined,
+          minutes: result.minutes ?? undefined,
+          status: result.status ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Created time entry (ID: \`${result._id}\`) for **${result.minutes}** minutes.`
       };
     }
 
     if (action === 'update') {
-      if (!timeEntryId) throw new Error('timeEntryId is required for update');
+      if (!timeEntryId) throw createApiServiceError('timeEntryId is required for update');
       let existing = await client.getTimeEntry(timeEntryId);
-      let body: Record<string, any> = { ...existing, ...fields };
+      let body: Record<string, any> = { ...existing, ...pickDefined(fields) };
       if (resourceId) body.resource = resourceId;
       if (projectId) body.project = projectId;
       let result = await client.updateTimeEntry(timeEntryId, body);
       return {
         output: {
           timeEntryId: result._id,
-          resourceId: result.resource,
-          projectId: result.project,
-          date: result.date,
-          minutes: result.minutes,
-          status: result.status,
-          createdDate: result.createdDate,
-          updatedDate: result.updatedDate
+          resourceId: result.resource ?? undefined,
+          projectId: result.project ?? undefined,
+          date: result.date ?? undefined,
+          minutes: result.minutes ?? undefined,
+          status: result.status ?? undefined,
+          createdDate: result.createdDate ?? undefined,
+          updatedDate: result.updatedDate ?? undefined
         },
         message: `Updated time entry \`${result._id}\`.`
       };
     }
 
-    if (!timeEntryId) throw new Error('timeEntryId is required for delete');
+    if (!timeEntryId) throw createApiServiceError('timeEntryId is required for delete');
     await client.deleteTimeEntry(timeEntryId);
     return {
       output: { timeEntryId },

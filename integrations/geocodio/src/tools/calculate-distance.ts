@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,10 @@ export let calculateDistance = SlateTool.create(spec, {
   description: `Calculates driving distance/time and straight-line distance from a single origin to one or more destinations. Accepts both addresses and coordinates as the origin.
 
 Destinations are provided as an array of address strings or "latitude,longitude" strings. The origin is geocoded and distances are returned for each destination.`,
-  constraints: ['Up to 100 destinations per request.'],
+  constraints: [
+    'Up to 100 destinations per request.',
+    'Requires Distance API access enabled on the API key.'
+  ],
   tags: {
     readOnly: true
   }
@@ -18,24 +21,31 @@ Destinations are provided as an array of address strings or "latitude,longitude"
     z.object({
       originAddress: z
         .string()
+        .trim()
         .optional()
         .describe(
           'Origin as a street address. Provide this OR originLatitude/originLongitude.'
         ),
       originLatitude: z
         .number()
+        .min(-90)
+        .max(90)
         .optional()
         .describe(
           'Origin latitude. Use with originLongitude as an alternative to originAddress.'
         ),
       originLongitude: z
         .number()
+        .min(-180)
+        .max(180)
         .optional()
         .describe(
           'Origin longitude. Use with originLatitude as an alternative to originAddress.'
         ),
       destinations: z
-        .array(z.string())
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(100)
         .describe('Array of destination addresses or "latitude,longitude" strings'),
       distanceMode: z
         .enum(['driving', 'straight-line'])
@@ -97,6 +107,14 @@ Destinations are provided as an array of address strings or "latitude,longitude"
     })
   )
   .handleInvocation(async ctx => {
+    let hasAddress = Boolean(ctx.input.originAddress?.trim());
+    let hasLatitude = ctx.input.originLatitude !== undefined;
+    let hasLongitude = ctx.input.originLongitude !== undefined;
+    if (hasAddress ? hasLatitude || hasLongitude : !hasLatitude || !hasLongitude) {
+      throw createApiServiceError(
+        'Provide either originAddress or both originLatitude and originLongitude, not both.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let response = await client.geocodeWithDistance({
@@ -110,17 +128,37 @@ Destinations are provided as an array of address strings or "latitude,longitude"
     });
 
     let topResult = response.results?.[0];
+    if (!topResult) {
+      throw createApiServiceError(
+        'No matching origin was found. Use a more specific address or coordinates.'
+      );
+    }
     let originFormatted = topResult?.formatted_address;
     let originLocation = topResult?.location;
 
-    let distances = (ctx.input.destinations || []).map((dest: string, i: number) => {
-      let distResult = topResult?._distances?.[i];
+    let distances = (topResult.destinations || []).map((distResult: any) => {
       return {
-        destinationQuery: dest,
-        destinationFormattedAddress: distResult?.destination?.formatted_address,
-        destinationLocation: distResult?.destination?.location,
-        distance: distResult?.distance,
-        duration: distResult?.duration
+        destinationQuery: distResult.query,
+        destinationFormattedAddress:
+          distResult.geocode?.formatted_address ?? distResult.formatted_address ?? undefined,
+        destinationLocation: Array.isArray(distResult.location)
+          ? { lat: distResult.location[0], lng: distResult.location[1] }
+          : (distResult.location ?? undefined),
+        distance: {
+          miles: distResult.distance_miles ?? undefined,
+          km: distResult.distance_km ?? undefined,
+          meters:
+            typeof distResult.distance_km === 'number'
+              ? distResult.distance_km * 1000
+              : undefined
+        },
+        duration:
+          typeof distResult.duration_seconds === 'number'
+            ? {
+                seconds: distResult.duration_seconds,
+                minutes: distResult.duration_seconds / 60
+              }
+            : undefined
       };
     });
 
@@ -130,7 +168,7 @@ Destinations are provided as an array of address strings or "latitude,longitude"
         originLocation: originLocation,
         distances
       },
-      message: `Calculated distances from **${originFormatted || ctx.input.originAddress || `${ctx.input.originLatitude}, ${ctx.input.originLongitude}`}** to **${ctx.input.destinations.length}** destination(s).`
+      message: `Calculated distances from **${originFormatted || ctx.input.originAddress || `${ctx.input.originLatitude}, ${ctx.input.originLongitude}`}** to **${distances.length}** destination(s).`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CertCentralClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,6 +51,12 @@ export let manageOrganization = SlateTool.create(spec, {
         .array(z.enum(['ov', 'ev', 'cs', 'ev_cs']))
         .optional()
         .describe('Validation types to submit for'),
+      verifiedUserIds: z
+        .array(z.number().int().positive())
+        .optional()
+        .describe(
+          'Existing CertCentral users to designate as verified contacts when submitting EV, code signing, or EV code signing validation. Required for those types.'
+        ),
       includeValidation: z
         .boolean()
         .optional()
@@ -108,8 +114,19 @@ export let manageOrganization = SlateTool.create(spec, {
     };
 
     if (action === 'create') {
-      if (!ctx.input.name || !ctx.input.country) {
-        throw new Error('Organization name and country are required when creating');
+      if (
+        !ctx.input.name ||
+        !ctx.input.country ||
+        !ctx.input.address ||
+        !ctx.input.city ||
+        !ctx.input.state ||
+        !ctx.input.zip ||
+        !ctx.input.telephone ||
+        !ctx.input.organizationContact?.email
+      ) {
+        throw createApiServiceError(
+          'Creating an organization requires name, country, address, city, state, zip, telephone, and organizationContact with firstName, lastName, and email.'
+        );
       }
 
       ctx.progress('Creating organization...');
@@ -126,7 +143,12 @@ export let manageOrganization = SlateTool.create(spec, {
     }
 
     if (!ctx.input.organizationId) {
-      throw new Error('organizationId is required for this action');
+      throw createApiServiceError('organizationId is required for this action');
+    }
+    if (!/^\d+$/.test(ctx.input.organizationId) || Number(ctx.input.organizationId) < 1) {
+      throw createApiServiceError(
+        'organizationId must be a positive numeric ID. Use list_organizations to find the organization.'
+      );
     }
 
     if (action === 'update') {
@@ -167,12 +189,26 @@ export let manageOrganization = SlateTool.create(spec, {
 
     if (action === 'submit_for_validation') {
       if (!ctx.input.validationTypes || ctx.input.validationTypes.length === 0) {
-        throw new Error('validationTypes are required when submitting for validation');
+        throw createApiServiceError(
+          'validationTypes are required when submitting for validation'
+        );
+      }
+      if (
+        ctx.input.validationTypes.some(type => type !== 'ov') &&
+        !ctx.input.verifiedUserIds?.length
+      ) {
+        throw createApiServiceError(
+          'verifiedUserIds must include at least one existing CertCentral user when submitting EV, code signing, or EV code signing validation.'
+        );
       }
 
       ctx.progress('Submitting organization for validation...');
       await client.submitOrganizationForValidation(ctx.input.organizationId, {
-        validations: ctx.input.validationTypes.map(t => ({ type: t }))
+        validations: ctx.input.validationTypes.map(type => ({
+          type,
+          verified_users:
+            type === 'ov' ? undefined : ctx.input.verifiedUserIds?.map(id => ({ id }))
+        }))
       });
 
       return {
@@ -184,6 +220,6 @@ export let manageOrganization = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

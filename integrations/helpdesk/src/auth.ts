@@ -1,4 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,33 +23,8 @@ export let auth = SlateAuth.create()
     scopes: [
       {
         title: 'Account Read',
-        description: 'Read permission for your account',
+        description: 'Authenticate your HelpDesk account',
         scope: 'accounts--my:ro'
-      },
-      {
-        title: 'Account Read/Write',
-        description: 'Read and modify permission for your account',
-        scope: 'accounts--my:rw'
-      },
-      {
-        title: 'All Accounts Read',
-        description: 'Read permission for all accounts in the organization',
-        scope: 'accounts--all:ro'
-      },
-      {
-        title: 'All Accounts Read/Write',
-        description: 'Read and modify permission for all accounts',
-        scope: 'accounts--all:rw'
-      },
-      {
-        title: 'Webhooks Read/Write',
-        description: 'Read and write permission for all webhooks in the license',
-        scope: 'webhooks--all:rw'
-      },
-      {
-        title: 'Webhooks Read',
-        description: 'Read permission for all webhooks in the license',
-        scope: 'webhooks--all:ro'
       }
     ],
 
@@ -65,8 +46,13 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let http = createAxios({
-        baseURL: 'https://accounts.livechat.com'
+      let http = createAuthenticatedAxios({
+        baseURL: 'https://accounts.livechat.com',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'HelpDesk',
+            reason: 'helpdesk_oauth_error'
+          })
       });
 
       let response = await http.post('/v2/token', {
@@ -77,34 +63,32 @@ export let auth = SlateAuth.create()
         redirect_uri: ctx.redirectUri
       });
 
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-        token_type: string;
-      };
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'HelpDesk',
+          operation: 'OAuth token exchange'
+        })
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string; expiresAt?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No refresh token is available. Reconnect your HelpDesk account.'
+        );
       }
 
-      let http = createAxios({
-        baseURL: 'https://accounts.livechat.com'
+      let http = createAuthenticatedAxios({
+        baseURL: 'https://accounts.livechat.com',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'HelpDesk',
+            reason: 'helpdesk_oauth_error'
+          })
       });
 
       let response = await http.post('/v2/token', {
@@ -114,23 +98,12 @@ export let auth = SlateAuth.create()
         client_secret: ctx.clientSecret
       });
 
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'HelpDesk',
+          operation: 'OAuth token refresh',
+          previousRefreshToken: ctx.output.refreshToken
+        })
       };
     }
   })

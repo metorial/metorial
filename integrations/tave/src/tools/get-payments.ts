@@ -1,10 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TavePublicClient } from '../lib/client';
+import { numberField, TavePublicClient, textField } from '../lib/client';
 import { spec } from '../spec';
 
 let paymentSchema = z.object({
   paymentId: z.string().describe('ID of the payment'),
+  jobId: z.string().optional().describe('ID of the job associated with the payment'),
   jobType: z.string().optional().describe('Type of job associated with the payment'),
   brand: z.string().optional().describe('Brand associated with the payment'),
   amount: z.number().optional().describe('Payment amount'),
@@ -24,10 +25,21 @@ export let getPayments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      brand: z.string().optional().describe('Filter payments by brand name'),
-      jobType: z.string().optional().describe('Filter payments by job type'),
+      brand: z
+        .string()
+        .optional()
+        .describe('Filter payments by exact brand name or ID from get_brands'),
+      jobType: z
+        .string()
+        .optional()
+        .describe('Filter payments by exact job type name or ID from get_job_types'),
       page: z.number().optional().describe('Page number for pagination'),
-      perPage: z.number().optional().describe('Number of results per page')
+      perPage: z
+        .number()
+        .optional()
+        .describe(
+          'Results per page: 10–100 for an unfiltered list, or 1–100 for filtered results'
+        )
     })
   )
   .output(
@@ -37,7 +49,7 @@ export let getPayments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TavePublicClient(ctx.auth.token);
+    let client = new TavePublicClient(ctx.auth);
 
     ctx.info('Fetching payments from Tave');
 
@@ -48,19 +60,18 @@ export let getPayments = SlateTool.create(spec, {
       perPage: ctx.input.perPage
     });
 
-    let items = Array.isArray(result) ? result : (result?.data ?? result?.payments ?? []);
-
-    let payments = items.map((p: any) => ({
-      paymentId: String(p.id ?? p.payment_id ?? ''),
-      jobType: p.job_type ?? undefined,
-      brand: p.brand ?? undefined,
-      amount: p.amount ?? p.total ?? undefined,
-      status: p.status ?? undefined,
-      createdAt: p.created_at ?? p.created ?? undefined,
+    let payments = result.items.map(p => ({
+      paymentId: String(p.id ?? ''),
+      jobId: textField(p, 'jobId'),
+      jobType: textField(p, 'jobTypeName', 'job_type'),
+      brand: textField(p, 'brandName', 'brand'),
+      amount: numberField(p, 'amount', 'total'),
+      status: textField(p, 'status'),
+      createdAt: textField(p, 'created', 'created_at'),
       raw: p
     }));
 
-    let totalCount = result?.total ?? result?.meta?.total ?? payments.length;
+    let totalCount = result.meta.totalItems;
 
     return {
       output: {

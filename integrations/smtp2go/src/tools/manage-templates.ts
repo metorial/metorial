@@ -23,14 +23,25 @@ export let createTemplate = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      templateName: z.string().describe('Name for the template'),
+      templateName: z.string().min(1).max(64).describe('Name for the template'),
+      templateId: z
+        .string()
+        .min(5)
+        .max(24)
+        .optional()
+        .describe('Case-sensitive template ID; a unique ID is generated when omitted'),
       htmlBody: z
         .string()
         .optional()
         .describe('HTML body content with optional Handlebars variables'),
       textBody: z.string().optional().describe('Plain text body content'),
       subject: z.string().optional().describe('Default subject line'),
-      sender: z.string().optional().describe('Default sender email address')
+      sender: z
+        .string()
+        .optional()
+        .describe(
+          'Sender is not supported for templates; set it when sending and omit this field'
+        )
     })
   )
   .output(templateSchema)
@@ -45,8 +56,8 @@ export let createTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        templateId: data.template_id ?? '',
-        templateName: data.template_name ?? ctx.input.templateName,
+        templateId: data.id ?? data.template_id ?? '',
+        templateName: data.template_name ?? data.name ?? ctx.input.templateName,
         subject: data.subject,
         sender: data.sender,
         htmlBody: data.html_body,
@@ -73,7 +84,12 @@ export let editTemplate = SlateTool.create(spec, {
       htmlBody: z.string().optional().describe('Updated HTML body content'),
       textBody: z.string().optional().describe('Updated plain text body content'),
       subject: z.string().optional().describe('Updated default subject line'),
-      sender: z.string().optional().describe('Updated default sender email address')
+      sender: z
+        .string()
+        .optional()
+        .describe(
+          'Sender is not supported for templates; set it when sending and omit this field'
+        )
     })
   )
   .output(templateSchema)
@@ -88,8 +104,8 @@ export let editTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        templateId: data.template_id ?? ctx.input.templateId,
-        templateName: data.template_name ?? '',
+        templateId: data.id ?? data.template_id ?? ctx.input.templateId,
+        templateName: data.name ?? data.template_name ?? '',
         subject: data.subject,
         sender: data.sender,
         htmlBody: data.html_body,
@@ -147,7 +163,12 @@ export let searchTemplates = SlateTool.create(spec, {
   .input(
     z.object({
       templateName: z.string().optional().describe('Filter templates by name'),
-      limit: z.number().optional().describe('Maximum number of results'),
+      limit: z
+        .number()
+        .min(1)
+        .refine(Number.isSafeInteger, 'Limit must be a whole number')
+        .optional()
+        .describe('Maximum number of results'),
       continueToken: z.string().optional().describe('Continuation token for pagination')
     })
   )
@@ -167,8 +188,8 @@ export let searchTemplates = SlateTool.create(spec, {
     let data = result.data || result;
 
     let templates = (data.templates || []).map((t: any) => ({
-      templateId: t.template_id ?? '',
-      templateName: t.template_name ?? '',
+      templateId: t.id ?? t.template_id ?? '',
+      templateName: t.name ?? t.template_name ?? '',
       subject: t.subject,
       sender: t.sender,
       htmlBody: t.html_body,
@@ -178,7 +199,7 @@ export let searchTemplates = SlateTool.create(spec, {
     return {
       output: {
         templates,
-        continueToken: data.continue_token
+        continueToken: data.continue_token ?? undefined
       },
       message: `Found **${templates.length}** template(s).`
     };
@@ -210,14 +231,14 @@ export let viewTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        templateId: data.template_id ?? ctx.input.templateId,
-        templateName: data.template_name ?? '',
+        templateId: data.id ?? data.template_id ?? ctx.input.templateId,
+        templateName: data.name ?? data.template_name ?? '',
         subject: data.subject,
         sender: data.sender,
         htmlBody: data.html_body,
         textBody: data.text_body
       },
-      message: `Template **"${data.template_name ?? ctx.input.templateId}"** retrieved.`
+      message: `Template **"${data.name ?? data.template_name ?? ctx.input.templateId}"** retrieved.`
     };
   })
   .build();

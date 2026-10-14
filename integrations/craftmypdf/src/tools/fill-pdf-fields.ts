@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, downloadGeneratedFile } from '../lib/client';
 import { spec } from '../spec';
 
 export let fillPdfFields = SlateTool.create(spec, {
@@ -29,6 +29,7 @@ export let fillPdfFields = SlateTool.create(spec, {
               .describe('Font size for the field value in points.')
           })
         )
+        .min(1)
         .describe('List of form fields to fill with their values.'),
       expiration: z
         .number()
@@ -39,7 +40,10 @@ export let fillPdfFields = SlateTool.create(spec, {
   .output(
     z.object({
       fileUrl: z.string().describe('URL to download the filled PDF.'),
-      transactionRef: z.string().describe('Unique transaction reference.'),
+      transactionRef: z
+        .string()
+        .optional()
+        .describe('Transaction reference when returned by the provider.'),
       status: z.string().describe('Status of the fill request.'),
       fieldResults: z
         .array(
@@ -65,12 +69,19 @@ export let fillPdfFields = SlateTool.create(spec, {
       expiration: ctx.input.expiration
     });
 
+    await ctx.addAttachment({
+      type: 'content',
+      content: await downloadGeneratedFile(result.file),
+      mimeType: 'application/pdf',
+      filename: 'output.pdf'
+    });
+
     return {
       output: {
         fileUrl: result.file,
         transactionRef: result.transaction_ref,
         status: result.status,
-        fieldResults: (result.fields || []).map(f => ({
+        fieldResults: (result.field_statuses || []).map(f => ({
           fieldName: f.id,
           status: f.status
         }))

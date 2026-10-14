@@ -1,81 +1,40 @@
-Let me fetch the full API documentation to understand all available features.Now let me note that "Nozbe Teams" is specifically the Nozbe product (now rebranded to just "Nozbe"), not Microsoft Teams. The search results about Microsoft Teams webhooks are irrelevant. Let me check the Nozbe API documentation more closely for available endpoints.The page didn't render the actual API.md content. Let me fetch the raw version.Now I have enough information. Note that Nozbe Teams has been rebranded to just "Nozbe" but the API remains the same. There are two APIs to consider: the older JavaScript wrapper (`@nozbe/teams-api`) and the newer REST API at `api4.nozbe.com`. The REST API is the current one. Let me check if there's any webhook support from Nozbe itself.
+# Nozbe Teams API specification
 
-Based on my research, Nozbe Teams does not appear to offer native webhook or event subscription capabilities through its API. The Zapier triggers are polling-based, not webhook-based.
-
-# Slates Specification for Nozbe Teams
-
-## Overview
-
-Nozbe Teams (now rebranded as Nozbe) is a collaborative task and project management application for teams. It offers features like task management, project tracking, communication tools, and integration with popular apps. The API allows programmatic management of projects, tasks, comments, tags, and team members.
+Nozbe Teams, now branded as Nozbe, exposes task and project collaboration through
+its REST API at `https://api4.nozbe.com/v1/api`.
 
 ## Authentication
 
-Nozbe Teams uses **API token** authentication.
+Generate a token in Settings → API tokens. A space token accesses its space; a
+global token accesses all authorized spaces. Requests use
+`Authorization: apikey <API_TOKEN>`. Token setup checks access using `GET /teams`.
+The API documents accessible users, but no current-user or self endpoint, so the
+integration does not identify the token owner from an arbitrary user record.
 
-To generate your API token, hit the gear icon → Settings → API tokens and click "Add new token." You can name each token for organizational purposes and generate multiple tokens for different integrations.
+## Supported tools
 
-By default, the API tokens you add will give access only to the space you're creating them in. If you want to add a token that gives access to all of your spaces, toggle the "Add it as a global token" option.
+- Projects: `list_projects`, `get_project`, `create_project`, `update_project`,
+  `delete_project`, and `manage_project_section`.
+- Tasks: `list_tasks`, `get_task`, `create_task`, `update_task`, `delete_task`.
+- Comments: `list_comments`, `create_comment`, `update_comment`, `delete_comment`.
+- Tags: `list_tags`, `manage_tag`, `list_tag_assignments`, `assign_tag`.
+- Space discovery: `list_teams` and `list_team_members`.
 
-Each endpoint requires the API token to be provided as the Authorization header.
+Call `list_teams` to discover a space ID before creating a project or public tag.
+Call `list_tag_assignments` to discover an assignment ID before removing a tag.
+`get_project` exposes the project space and archive state without scanning lists.
 
-**Base URL:** `https://api4.nozbe.com/v1/api`
+List tools support provider pagination using `limit` (1–10000, default 100) and
+`offset` (0 or greater). `sortBy` accepts comma-separated fields with a `-` prefix
+for descending order. Favorite, completion, and priority filters are sent to the
+provider before pagination. Null-valued query filters are sent as the literal
+`null` string, following the provider examples. Timestamps use milliseconds.
 
-**Header format:**
+Comments support Markdown text and pinning. This integration does not currently
+expose file upload/download, task recurrence, or project access management tools.
 
-```
-Authorization: <API_TOKEN>
-```
+## Official references
 
-Example request:
-
-```
-curl -X 'GET' \
-  'https://api4.nozbe.com/v1/api/projects' \
-  -H 'accept: application/json' \
-  -H 'Authorization: <API_TOKEN>'
-```
-
-## Features
-
-### Project Management
-
-Create, read, update, and manage projects within your Nozbe Teams spaces. You can fetch all projects, add new projects, and update existing projects. Projects can be configured with attributes such as name, purpose/description, color, member access (open to all space members, invite-only, or private), and favorite status. Adding new projects is available for paid accounts only. Projects can be organized into groups and divided into sections.
-
-### Task Management
-
-You can create, read, update, and delete tasks. Tasks support a rich set of parameters including:
-
-- Assignment to a specific project and section
-- Responsibility (assigning to a team member)
-- Due dates and recurrence
-- Priority status
-- Tags
-- Time needed and time spent tracking
-- Reminders
-- Completion and abandonment states
-
-Results can be filtered by various task attributes such as project ID, due dates, priority, completion status, and more.
-
-### Comments and Attachments
-
-You can add comments to tasks with text content. Nozbe Teams renders comments in Markdown. You can also add comments with file attachments to a particular task. Comments can be updated (text modified) or deleted. Comments support pinning within tasks.
-
-### Tags
-
-Manage tags that categorize tasks across projects. Tags are used to categorize tasks by places or tools required for task completion. You can use them to group various tasks and do them in bundles unrelated to the project but related to a particular aspect. Tags can be configured with custom names, colors, and icons, and can be set as public (visible to space members) or private.
-
-### Team Management
-
-Retrieve information about teams and team members within your Nozbe Teams account. This includes viewing team member details and their roles within spaces.
-
-### Generic Record Operations
-
-The API supports creating arbitrary records in particular collections (tasks, projects, etc.). Similarly, you can update and remove records in any collection by ID, enabling access to features that may not be explicitly documented through higher-level endpoints.
-
-### Filtering, Field Selection, and Sorting
-
-Results can be filtered by query parameters using LHS brackets with operators such as `min`, `max`, `ne` (not equal), and equality checks. You can limit which fields are returned in responses using the `fields` parameter. Results can be sorted by multiple fields in ascending or descending order.
-
-## Events
-
-The provider does not support events. Nozbe Teams does not offer native webhook or event subscription mechanisms through its API. There is no built-in way to receive push notifications or subscribe to changes on resources.
+- [REST API guide](https://nozbe.help/advancedfeatures/api/)
+- [Interactive API documentation](https://api4.nozbe.com/v1/api)
+- [OpenAPI specification](https://api4.nozbe.com/v1/api/openapi.yaml)

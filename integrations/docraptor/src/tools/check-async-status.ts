@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let checkAsyncStatus = SlateTool.create(spec, {
   name: 'Check Async Document Status',
   key: 'check_async_status',
-  description: `Checks the status of an asynchronously created document. Returns the current processing status and, when completed, a download URL for retrieving the generated document. The download URL can be used up to 100 times and expires based on the account's data retention period.`,
+  description: `Checks the status of an asynchronously created document. Returns the current processing status and, when completed, a downloadable document and its download URL. Non-hosted async documents allow up to five downloads (once with the shortest data retention setting) and expire based on account retention. Hosted async documents follow their configured download limit and expiration, with unlimited downloads and hosting by default; test hosted documents allow five downloads and expire after one day.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -30,6 +30,12 @@ export let checkAsyncStatus = SlateTool.create(spec, {
         .describe(
           'URL to download the completed document. Only present when status is "completed".'
         ),
+      downloadId: z
+        .string()
+        .optional()
+        .describe(
+          'Download ID when returned by DocRaptor, including for expiring hosted documents.'
+        ),
       numberOfPages: z
         .number()
         .optional()
@@ -46,13 +52,23 @@ export let checkAsyncStatus = SlateTool.create(spec, {
 
     let result = await client.getAsyncStatus(ctx.input.statusId);
 
+    if (result.status === 'completed' && result.downloadUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.downloadId
+          ? `https://api.docraptor.com/download/${encodeURIComponent(result.downloadId)}`
+          : result.downloadUrl,
+        ...(result.downloadId ? { query: { user_credentials: ctx.auth.token } } : {})
+      });
+    }
+
     let statusMessage = `Document status: **${result.status}**`;
     if (result.status === 'completed' && result.downloadUrl) {
       statusMessage += `. Download URL: ${result.downloadUrl}`;
       if (result.numberOfPages) {
         statusMessage += ` (${result.numberOfPages} pages)`;
       }
-    } else if (result.status === 'failed') {
+    } else if (result.status === 'failed' || result.status === 'killed') {
       statusMessage += `. Error: ${result.validationErrors || result.message || 'Unknown error'}`;
     }
 

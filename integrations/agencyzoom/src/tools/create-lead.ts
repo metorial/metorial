@@ -10,7 +10,7 @@ export let createLead = SlateTool.create(spec, {
   instructions: [
     'Set type to "personal" for individual leads or "business" for commercial leads.',
     'Business-specific fields (companyName, fein, businessEntity, etc.) are only used when type is "business".',
-    'Optionally assign the lead to a producer, pipeline, stage, or lead source.'
+    'For personal leads, AgencyZoom requires email, country, agentId, pipelineId, stageId, and leadSourceId. Use list_reference_data to discover IDs.'
   ],
   tags: {
     destructive: false,
@@ -28,6 +28,10 @@ export let createLead = SlateTool.create(spec, {
       lastName: z.string().describe('Last name of the lead contact'),
       email: z.string().optional().describe('Email address of the lead'),
       phone: z.string().optional().describe('Phone number of the lead'),
+      country: z
+        .string()
+        .optional()
+        .describe('Country. Required by AgencyZoom when creating a personal lead.'),
       agentId: z
         .string()
         .optional()
@@ -76,11 +80,7 @@ export let createLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let data: Record<string, unknown> = {
       firstName: ctx.input.firstName,
@@ -89,6 +89,7 @@ export let createLead = SlateTool.create(spec, {
 
     if (ctx.input.email !== undefined) data.email = ctx.input.email;
     if (ctx.input.phone !== undefined) data.phone = ctx.input.phone;
+    if (ctx.input.country !== undefined) data.country = ctx.input.country;
     if (ctx.input.agentId !== undefined) data.agentId = ctx.input.agentId;
     if (ctx.input.pipelineId !== undefined) data.pipelineId = ctx.input.pipelineId;
     if (ctx.input.stageId !== undefined) data.stageId = ctx.input.stageId;

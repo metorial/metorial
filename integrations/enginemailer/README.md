@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Enginemailer
 
-Manage email marketing campaigns, subscribers, and transactional emails. Add, update, deactivate, or delete subscribers with custom fields and tags. Create and send email campaigns with HTML content. Send transactional emails with personalization, attachments, and templates. Set up autoresponders and automated email sequences. Track campaign performance including open rates, click-through rates, bounces, and unsubscribes.
+Manage subscribers and email campaigns, send transactional emails with templates, personalization, CC/BCC recipients, and files, and retrieve delivery and engagement statistics for delivered campaigns. Discover custom field keys and subcategory IDs before updating subscribers or selecting campaign recipients. Campaign operations require a paid EngineMailer account.
 
 ## License
 

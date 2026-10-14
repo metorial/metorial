@@ -1,4 +1,6 @@
+export * from './continue-domain-search';
 export * from './discover-subdomains';
+export * from './get-account-usage';
 export * from './get-associated-domains';
 export * from './get-dns-history';
 export * from './get-domain-info';

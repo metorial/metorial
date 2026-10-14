@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getApiDefinition = SlateTool.create(spec, {
   name: 'Get API Definition',
   key: 'get_api_definition',
-  description: `Retrieve an API definition from SwaggerHub. Returns the full OpenAPI or AsyncAPI specification for a given API version, along with its settings (published status, visibility, default version). Use this to inspect or download API specs.`,
+  description: `Inspect an API definition in SwaggerHub, or list its versions. Returns the specification for a given version and the default version when available. Use download_definition to get a downloadable file.`,
   tags: {
     readOnly: true
   }
@@ -57,7 +57,7 @@ export let getApiDefinition = SlateTool.create(spec, {
 
     let owner = ctx.input.owner || ctx.config.owner;
     if (!owner)
-      throw new Error(
+      throw createApiServiceError(
         'Owner is required. Provide it in the input or configure a default owner.'
       );
 
@@ -96,7 +96,10 @@ export let getApiDefinition = SlateTool.create(spec, {
 
     let definition: unknown;
     if (ctx.input.format === 'yaml') {
-      definition = await client.getApiDefinitionYaml(owner, apiName, ctx.input.version);
+      definition = await client.getApiDefinitionYaml(owner, apiName, ctx.input.version, {
+        resolved: ctx.input.resolved,
+        flatten: ctx.input.flatten
+      });
     } else {
       definition = await client.getApiDefinition(owner, apiName, ctx.input.version, {
         resolved: ctx.input.resolved,

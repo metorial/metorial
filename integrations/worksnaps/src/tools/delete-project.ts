@@ -6,8 +6,7 @@ import { spec } from '../spec';
 export let deleteProject = SlateTool.create(spec, {
   name: 'Delete Project',
   key: 'delete_project',
-  description: `Permanently delete a project from Worksnaps. This removes the project and all associated data including tasks, time entries, and assignments.`,
-  constraints: ['This action is irreversible. All project data will be permanently deleted.'],
+  description: `Archive a project in Worksnaps, making it inactive. Call list_projects to discover the project ID.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -15,12 +14,14 @@ export let deleteProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project to delete')
+      projectId: z
+        .string()
+        .describe('Project ID to archive. Call list_projects to discover available projects.')
     })
   )
   .output(
     z.object({
-      deleted: z.boolean().describe('Whether the project was successfully deleted')
+      deleted: z.boolean().describe('Whether the project was successfully archived')
     })
   )
   .handleInvocation(async ctx => {
@@ -29,7 +30,7 @@ export let deleteProject = SlateTool.create(spec, {
 
     return {
       output: { deleted: true },
-      message: `Deleted project **${ctx.input.projectId}**.`
+      message: `Archived project **${ctx.input.projectId}**.`
     };
   })
   .build();

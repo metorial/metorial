@@ -55,24 +55,25 @@ export let listContacts = SlateTool.create(spec, {
     };
 
     if (ctx.input.search) params.search = ctx.input.search;
-    if (ctx.input.modifiedSince) params.modified_since = ctx.input.modifiedSince;
-    if (ctx.input.includeDeleted) params.include_deleted = ctx.input.includeDeleted;
+    if (ctx.input.modifiedSince !== undefined) params.modified_since = ctx.input.modifiedSince;
+    if (ctx.input.includeDeleted !== undefined)
+      params.include_deleted = ctx.input.includeDeleted;
     if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
 
     let data = await client.listContacts(params);
     let contacts = (data.contacts || []).map((c: any) => ({
       contactId: c.id,
-      firstName: c.first_name,
-      lastName: c.last_name,
-      middleName: c.middle_name,
-      nickname: c.nickname,
-      notes: c.notes,
-      starred: c.starred,
-      emails: c.infos?.filter((i: any) => i.type === 'email').map((i: any) => i.address),
+      firstName: c.first_name ?? undefined,
+      lastName: c.last_name ?? undefined,
+      middleName: c.middle_name ?? undefined,
+      nickname: c.nickname ?? undefined,
+      notes: c.notes ?? undefined,
+      starred: c.starred ?? undefined,
+      emails: c.infos?.filter((i: any) => i.kind === 'email').map((i: any) => i.value),
       phoneNumbers: c.infos
-        ?.filter((i: any) => i.type === 'phone_number')
-        .map((i: any) => i.phone_number)
+        ?.filter((i: any) => i.kind === 'phone_number')
+        .map((i: any) => i.value)
     }));
 
     return {

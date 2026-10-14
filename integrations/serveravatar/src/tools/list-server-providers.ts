@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listServerProviders = SlateTool.create(spec, {
   name: 'List Server Providers',
   key: 'list_server_providers',
   description: `List connected cloud server provider accounts (DigitalOcean, Vultr, Linode, AWS Lightsail, Hetzner). Filter by provider name or search by email.
-Optionally retrieve available regions and instance sizes for a specific provider to help with server creation.`,
+Optionally retrieve available regions and instance sizes for a specific provider to help with server creation.
+${organizationScopeGuidance}`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,7 +17,7 @@ Optionally retrieve available regions and instance sizes for a specific provider
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       provider: z
         .string()
         .optional()
@@ -52,7 +54,8 @@ Optionally retrieve available regions and instance sizes for a specific provider
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     if (ctx.input.providerId && ctx.input.region) {
       let sizes = await client.getProviderSizes(orgId, ctx.input.providerId, ctx.input.region);

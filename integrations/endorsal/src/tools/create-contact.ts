@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,7 +52,7 @@ export let createContact = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (!ctx.input.email && !ctx.input.phone) {
-      throw new Error('You must provide either an email or phone number.');
+      throw createApiServiceError('You must provide either an email or phone number.');
     }
 
     let contact = await client.createContact(

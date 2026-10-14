@@ -1,4 +1,4 @@
-# Slates Specification for DocRaptor
+# DocRaptor Integration Specification
 
 ## Overview
 
@@ -41,7 +41,8 @@ Convert HTML/XML content into XLS or XLSX spreadsheet files. Excel files should 
 For very large or complex documents, asynchronous job creation extends the processing time to 600 seconds, queues the document for background creation, and returns a `status_id`. The status can be polled, and the completed document can be downloaded via a provided URL. A `callback_url` parameter can also be set so DocRaptor sends a POST request after successfully completing the job.
 
 - Statuses include: queued, working, completed, failed, and killed.
-- The download URL can be used to download your document up to 100 times, and will expire after your account's data retention period.
+- Non-hosted async documents allow up to five downloads (once with the shortest retention setting) and expire after the account's data retention period.
+- Hosted async documents follow `hosted_download_limit` and `hosted_expires_at`, with unlimited downloads and hosting by default. Test hosted documents allow five downloads and expire after one day.
 
 ### Document Hosting
 
@@ -50,6 +51,7 @@ With document hosting, the API publishes the new document at an unbranded URL. I
 - To create a hosted document, set the `hosted` parameter to true.
 - Configurable download limits (`hosted_download_limit`) and expiration dates (`hosted_expires_at`).
 - You may manually expire a hosted document at any time.
+- `create_hosted_async_document` queues complex hosted documents; `check_async_status` returns the completed public download URL and download ID when provided by DocRaptor.
 - Hosted documents have a file size limit.
 
 ### Document Listing

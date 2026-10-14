@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendbirdChatClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,6 +48,19 @@ export let moderateChannel = SlateTool.create(spec, {
     });
 
     let { channelType, channelUrl, action, targetUserId } = ctx.input;
+
+    if (action !== 'freeze' && action !== 'unfreeze' && !targetUserId?.trim()) {
+      throw createApiServiceError(
+        'Provide targetUserId for ban, unban, mute, and unmute actions.'
+      );
+    }
+    if (
+      (action === 'ban' || action === 'mute') &&
+      ctx.input.seconds !== undefined &&
+      (!Number.isSafeInteger(ctx.input.seconds) || ctx.input.seconds < -1)
+    ) {
+      throw createApiServiceError('seconds must be -1 or a non-negative whole number.');
+    }
 
     switch (action) {
       case 'ban':

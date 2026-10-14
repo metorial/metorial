@@ -1,6 +1,4 @@
-Now let me get more details on the API methods/features and OAuth scopes.Now let me get the webhook event types to complete the specification.Now I have comprehensive information to write the specification. Let me compile everything.
-
-# Slates Specification for Wrike
+# Wrike Integration Specification
 
 ## Overview
 
@@ -37,11 +35,11 @@ This is the recommended method for production applications, especially those use
 
 5. **Using the token:** All subsequent API requests must use the base URL `https://<host>/api/v4` and include the token via `Authorization: bearer <access_token>` header.
 
-6. **Refreshing:** POST to `https://login.wrike.com/oauth2/token` with `grant_type=refresh_token`, `client_id`, `client_secret`, `refresh_token`. Returns a new access/refresh token pair.
+6. **Refreshing:** POST to `https://<host>/oauth2/token` with `grant_type=refresh_token`, `client_id`, `client_secret`, `refresh_token`. Returns a new access/refresh token pair.
 
 **Important:** Wrike stores customer data in multiple data centers (US and EU). The `host` parameter returned during token exchange determines the correct base URL and must be used for all API requests.
 
-**Scopes:** Scopes can be requested during authorization to control access granularity. Supported scopes include: `Default`, `wsReadOnly`, `wsReadWrite`, `amReadOnlyWorkflow`, `amReadWriteWorkflow`, `amReadOnlyInvitation`, `amReadWriteInvitation`, `amReadOnlyGroup`, and others. Each API method specifies which scopes it requires.
+**Scopes:** Scopes can be requested during authorization to control access granularity. The connection requests `wsReadWrite` to cover the implemented workspace operations and workflow listing. Existing granted scopes remain usable. Each API method specifies its permitted scopes.
 
 ### 2. Permanent Access Token
 
@@ -187,3 +185,9 @@ Notifications about approval workflow changes:
 - **WorkItemTypeChanged** — A work item's Custom Item Type changed (e.g., plain task converted to a CIT).
 - **CreateFromBlueprintCompleted** — Creation from a blueprint template completed.
 - **ImportFromFileCompleted** — Import from an Excel or MS Project file completed.
+
+## Implemented Surface
+
+The integration provides task create/list/update/delete; folder/project create/list/update/delete; comment create/list/update/delete; timelog create/list/update/delete; contact, current-user, space, and workflow lookup; custom-field create/list; dependency create/list/delete; and attachment metadata listing. The feature catalog above describes Wrike API capabilities and does not imply every endpoint is exposed as an integration tool.
+
+Task listing supports provider pagination via `pageSize` and `nextPageToken`. Comment editing is available only during the first five minutes after creation. OAuth refresh preserves the regional host and previous refresh token when no replacement is returned. No live provider verification was performed for this refresh.

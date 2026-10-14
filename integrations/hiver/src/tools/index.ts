@@ -1,3 +1,4 @@
+export * from './create-tag';
 export * from './get-conversation';
 export * from './get-inbox';
 export * from './list-conversations';

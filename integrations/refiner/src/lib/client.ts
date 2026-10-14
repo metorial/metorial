@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationParams {
   page?: number;
@@ -47,13 +47,29 @@ export class RefinerClient {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.refiner.io/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      paramsSerializer: { indexes: false },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Refiner',
+          reason: 'refiner_api_error'
+        })
     });
+  }
+
+  private requireIdentifier(identifier: { id?: string; email?: string; uuid?: string }) {
+    if (![identifier.id, identifier.email, identifier.uuid].some(value => value?.trim())) {
+      throw createApiServiceError('Provide a user ID, email address, or contact UUID.', {
+        reason: 'missing_contact_identifier'
+      });
+    }
+  }
+
+  async getCurrentProject(): Promise<{ project_uuid: string; project_name: string }> {
+    let response = await this.axios.get('/');
+    return response.data;
   }
 
   // ---- Account ----
@@ -84,6 +100,7 @@ export class RefinerClient {
     email?: string;
     uuid?: string;
   }): Promise<Record<string, unknown>> {
+    this.requireIdentifier(identifier);
     let query: Record<string, unknown> = {};
     if (identifier.id) query.id = identifier.id;
     if (identifier.email) query.email = identifier.email;
@@ -98,6 +115,7 @@ export class RefinerClient {
     email?: string;
     uuid?: string;
   }): Promise<Record<string, unknown>> {
+    this.requireIdentifier(identifier);
     let query: Record<string, unknown> = {};
     if (identifier.id) query.id = identifier.id;
     if (identifier.email) query.email = identifier.email;
@@ -119,23 +137,19 @@ export class RefinerClient {
       traits?: Record<string, unknown>;
     };
   }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
+    this.requireIdentifier(params);
+    if (params.account && !params.account.id?.trim()) {
+      throw createApiServiceError('Provide accountId when grouping a user under an account.', {
+        reason: 'missing_account_identifier'
+      });
+    }
+    let body: Record<string, unknown> = { ...params.traits };
     if (params.id) body.id = params.id;
     if (params.email) body.email = params.email;
-    if (params.traits) {
-      for (let [key, value] of Object.entries(params.traits)) {
-        body[key] = value;
-      }
-    }
     if (params.account) {
-      let accountObj: Record<string, unknown> = {};
+      let accountObj: Record<string, unknown> = { ...params.account.traits };
       if (params.account.id) accountObj.id = params.account.id;
       if (params.account.name) accountObj.name = params.account.name;
-      if (params.account.traits) {
-        for (let [key, value] of Object.entries(params.account.traits)) {
-          accountObj[key] = value;
-        }
-      }
       body.account = accountObj;
     }
 
@@ -150,6 +164,7 @@ export class RefinerClient {
     email?: string;
     event: string;
   }): Promise<Record<string, unknown>> {
+    this.requireIdentifier(params);
     let body: Record<string, unknown> = { event: params.event };
     if (params.id) body.id = params.id;
     if (params.email) body.email = params.email;
@@ -166,9 +181,9 @@ export class RefinerClient {
     if (params?.pageCursor) query.page_cursor = params.pageCursor;
     if (params?.pageLength) query.page_length = params.pageLength;
     if (params?.formUuid) query.form_uuid = params.formUuid;
-    if (params?.formUuids) query['form_uuids[]'] = params.formUuids;
+    if (params?.formUuids) query.form_uuids = params.formUuids;
     if (params?.segmentUuid) query.segment_uuid = params.segmentUuid;
-    if (params?.segmentUuids) query['segment_uuids[]'] = params.segmentUuids;
+    if (params?.segmentUuids) query.segment_uuids = params.segmentUuids;
     if (params?.dateRangeStart) query.date_range_start = params.dateRangeStart;
     if (params?.dateRangeEnd) query.date_range_end = params.dateRangeEnd;
     if (params?.include) query.include = params.include;
@@ -182,24 +197,23 @@ export class RefinerClient {
   async storeResponse(params: {
     id?: string;
     email?: string;
+    uuid?: string;
     formUuid: string;
     date?: string;
     preventDuplicates?: boolean;
     responseData?: Record<string, unknown>;
   }): Promise<Record<string, unknown>> {
+    this.requireIdentifier(params);
     let body: Record<string, unknown> = {
+      ...params.responseData,
       form_uuid: params.formUuid
     };
     if (params.id) body.id = params.id;
     if (params.email) body.email = params.email;
+    if (params.uuid) body.uuid = params.uuid;
     if (params.date) body.date = params.date;
     if (params.preventDuplicates !== undefined)
       body.prevent_duplicates = params.preventDuplicates;
-    if (params.responseData) {
-      for (let [key, value] of Object.entries(params.responseData)) {
-        body[key] = value;
-      }
-    }
 
     let response = await this.axios.post('/responses', body);
     return response.data;
@@ -209,9 +223,14 @@ export class RefinerClient {
     responseUuid: string;
     tags: string[];
   }): Promise<Record<string, unknown>> {
+    if (params.tags.length > 20) {
+      throw createApiServiceError('A survey response can have at most 20 tags.', {
+        reason: 'too_many_response_tags'
+      });
+    }
     let response = await this.axios.post('/responses/tags', {
       uuid: params.responseUuid,
-      'tags[]': params.tags
+      tags: params.tags
     });
     return response.data;
   }
@@ -220,10 +239,18 @@ export class RefinerClient {
 
   async getReporting(params: ReportingParams): Promise<Record<string, unknown>> {
     let query: Record<string, unknown> = { type: params.type };
-    if (params.questionIdentifiers) query.question_identifiers = params.questionIdentifiers;
-    if (params.tagUuids) query.tag_uuids = params.tagUuids;
-    if (params.formUuids) query.form_uuids = params.formUuids;
-    if (params.segmentUuids) query.segment_uuids = params.segmentUuids;
+    for (let [key, value] of Object.entries({
+      question_identifiers: params.questionIdentifiers,
+      tag_uuids: params.tagUuids,
+      form_uuids: params.formUuids,
+      segment_uuids: params.segmentUuids
+    })) {
+      if (value)
+        query[key] = value
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean);
+    }
     if (params.dateRangeStart) query.date_range_start = params.dateRangeStart;
     if (params.dateRangeEnd) query.date_range_end = params.dateRangeEnd;
 
@@ -242,6 +269,29 @@ export class RefinerClient {
     if (params?.includeInfo) query.include_info = 1;
 
     let response = await this.axios.get('/forms', { params: query });
+    return response.data;
+  }
+
+  async listFormHistory(
+    formUuid: string,
+    params?: Pick<PaginationParams, 'page' | 'pageLength'>
+  ): Promise<{
+    items: {
+      uuid: string;
+      action: string;
+      snapshot: Record<string, unknown>;
+      created_at: string;
+    }[];
+    pagination: {
+      items_count: number;
+      current_page: number;
+      last_page: number;
+      page_length: number;
+    };
+  }> {
+    let response = await this.axios.get('/forms/history', {
+      params: { form_uuid: formUuid, page: params?.page, page_length: params?.pageLength }
+    });
     return response.data;
   }
 
@@ -287,6 +337,7 @@ export class RefinerClient {
     email?: string;
     segmentUuid: string;
   }): Promise<Record<string, unknown>> {
+    this.requireIdentifier(params);
     let body: Record<string, unknown> = { segment_uuid: params.segmentUuid };
     if (params.id) body.id = params.id;
     if (params.email) body.email = params.email;
@@ -300,6 +351,7 @@ export class RefinerClient {
     email?: string;
     segmentUuid: string;
   }): Promise<Record<string, unknown>> {
+    this.requireIdentifier(params);
     let body: Record<string, unknown> = { segment_uuid: params.segmentUuid };
     if (params.id) body.id = params.id;
     if (params.email) body.email = params.email;

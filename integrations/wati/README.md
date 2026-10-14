@@ -1,6 +1,8 @@
 # <img src="logo.jpeg" height="20"> Wati
 
-Send and receive WhatsApp messages, manage contacts, and run broadcast campaigns. Send session messages, template messages, interactive button and list messages, and file attachments. Manage contacts by adding, updating, and assigning them to teams. Retrieve conversation history and assign chats to operators. Create, retrieve, and delete WhatsApp message templates. Launch and manage chatbot flows for contacts. Run broadcast campaigns with targeted template messages. Access sales analytics and lead stage data. Send order details and track payment statuses via WhatsApp Pay. Configure webhooks to receive notifications for inbound messages, delivery statuses, template updates, and account events.
+Send WhatsApp session and approved template messages, manage contacts, retrieve contact counts and conversation history, assign conversations, inspect campaigns and their delivery statistics, discover additional channels, and start chatbot flows.
+
+Connect with a Wati API Bearer token and your HTTPS API host, such as `https://live-mt-server.wati.io`. V3 requests resolve the workspace from the token and do not use a tenant path. Template sends resolve the supplied template ID to its name; contact IDs are resolved to phone numbers. Those lookups require the corresponding read permissions. A successful send means Wati accepted the message; delivery remains asynchronous. Chatbot operations require the Pro plan or above.
 
 ## License
 

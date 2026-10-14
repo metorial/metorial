@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -66,22 +66,22 @@ export let manageLeads = SlateTool.create(spec, {
       return {
         output: {
           leadId: result.id,
-          firstName: result.firstName,
-          lastName: result.lastName,
-          emailAddress: result.emailAddress,
-          phoneNumber: result.phoneNumber,
-          status: result.status,
-          source: result.source,
-          accountName: result.accountName,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          firstName: result.firstName ?? undefined,
+          lastName: result.lastName ?? undefined,
+          emailAddress: result.emailAddress ?? undefined,
+          phoneNumber: result.phoneNumber ?? undefined,
+          status: result.status ?? undefined,
+          source: result.source ?? undefined,
+          accountName: result.accountName ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Lead **${result.firstName || ''} ${result.lastName || ''}** created successfully.`
       };
     }
 
     if (action === 'update') {
-      if (!leadId) throw new Error('leadId is required for update');
+      if (!leadId) throw createApiServiceError('leadId is required for update');
       let data: Record<string, any> = { ...fields, ...customFields };
       Object.keys(data).forEach(key => {
         if (data[key] === undefined) delete data[key];
@@ -90,22 +90,22 @@ export let manageLeads = SlateTool.create(spec, {
       return {
         output: {
           leadId: result.id,
-          firstName: result.firstName,
-          lastName: result.lastName,
-          emailAddress: result.emailAddress,
-          phoneNumber: result.phoneNumber,
-          status: result.status,
-          source: result.source,
-          accountName: result.accountName,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          firstName: result.firstName ?? undefined,
+          lastName: result.lastName ?? undefined,
+          emailAddress: result.emailAddress ?? undefined,
+          phoneNumber: result.phoneNumber ?? undefined,
+          status: result.status ?? undefined,
+          source: result.source ?? undefined,
+          accountName: result.accountName ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Lead **${result.firstName || ''} ${result.lastName || ''}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      if (!leadId) throw new Error('leadId is required for delete');
+      if (!leadId) throw createApiServiceError('leadId is required for delete');
       await client.deleteRecord('Lead', leadId);
       return {
         output: {
@@ -115,6 +115,6 @@ export let manageLeads = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

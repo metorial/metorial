@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, timeCampCreatedId } from '../lib/client';
 import { spec } from '../spec';
 
 export let createInvoice = SlateTool.create(spec, {
   name: 'Create Invoice',
   key: 'create_invoice',
-  description: `Create a new invoice in TimeCamp for a client. The invoice can be created from tracked billable time or as a blank template.`
+  description: `Create a new invoice in TimeCamp for a client. Provide the client, date, currency, and notes as needed.`
 })
   .input(
     z.object({
@@ -31,7 +31,7 @@ export let createInvoice = SlateTool.create(spec, {
       note: ctx.input.note
     });
 
-    let invoiceId = String(result?.invoiceId || result?.invoice_id || result?.id || '');
+    let invoiceId = timeCampCreatedId(result, ['invoiceId', 'invoice_id', 'id'], 'invoice');
 
     return {
       output: {

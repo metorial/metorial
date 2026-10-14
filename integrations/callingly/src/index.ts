@@ -5,8 +5,10 @@ import {
   deleteLead,
   getCall,
   getLead,
+  getTeam,
   listAgents,
   listCalls,
+  listClients,
   listLeads,
   listTeams,
   manageAgent,
@@ -29,12 +31,14 @@ export let provider = Slate.create({
     deleteLead,
     sendSms,
     listTeams,
+    getTeam,
     manageTeam,
     manageAgent,
     listAgents,
     manageAgentSchedule,
     manageTeamAgents,
-    manageClient
+    manageClient,
+    listClients
   ],
   triggers: []
 });

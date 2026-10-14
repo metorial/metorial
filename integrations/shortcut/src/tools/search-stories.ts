@@ -35,11 +35,19 @@ export let searchStories = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().describe('Search query using Shortcut search syntax'),
-      pageSize: z.number().optional().describe('Number of results to return (default 25)'),
+      pageSize: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .min(1)
+        .max(250)
+        .optional()
+        .describe('Number of results per page, from 1 to 250'),
       nextCursor: z
         .string()
         .optional()
-        .describe('Pagination cursor from a previous search result')
+        .describe(
+          'Next page token or API page URL returned as nextCursor by a previous search'
+        )
     })
   )
   .output(

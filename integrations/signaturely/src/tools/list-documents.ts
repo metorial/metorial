@@ -26,8 +26,23 @@ Use this to track document progress, find pending signatures, or review complete
         .enum(['ASC', 'DESC'])
         .optional()
         .describe('Sort direction. Defaults to DESC (newest first)'),
-      limit: z.number().optional().describe('Maximum number of documents to return'),
-      offset: z.number().optional().describe('Number of documents to skip for pagination')
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum number of documents to return; defaults to 25'),
+      offset: z
+        .number()
+        .optional()
+        .describe('Number of documents to skip; provide offset or page, not both'),
+      page: z
+        .number()
+        .optional()
+        .describe('One-based page number; provide page or offset, not both'),
+      searchTerm: z.string().optional().describe('Search text for document titles or signers'),
+      searchType: z
+        .enum(['documents', 'signers'])
+        .optional()
+        .describe('Whether searchTerm searches documents or signers; defaults to documents')
     })
   )
   .output(
@@ -65,22 +80,24 @@ Use this to track document progress, find pending signatures, or review complete
       orderingKey: ctx.input.orderingKey,
       orderingDirection: ctx.input.orderingDirection,
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      page: ctx.input.page,
+      searchTerm: ctx.input.searchTerm,
+      searchType: ctx.input.searchType
     });
 
-    let items = result.items || result || [];
-    let documents = (Array.isArray(items) ? items : []).map((doc: any) => ({
-      documentId: doc.id?.toString() || '',
-      title: doc.title || doc.name || undefined,
-      status: doc.status || undefined,
-      createdAt: doc.createdAt || undefined,
-      updatedAt: doc.updatedAt || undefined
+    let documents = result.items.map(doc => ({
+      documentId: doc.id,
+      title: doc.title ?? doc.name ?? undefined,
+      status: doc.status ?? undefined,
+      createdAt: doc.createdAt ?? undefined,
+      updatedAt: doc.updatedAt ?? undefined
     }));
 
     return {
       output: {
         documents,
-        totalCount: result.totalCount ?? result.total ?? documents.length
+        totalCount: result.totalCount
       },
       message: `Found **${documents.length}** document(s)${ctx.input.status ? ` with status "${ctx.input.status}"` : ''}.`
     };

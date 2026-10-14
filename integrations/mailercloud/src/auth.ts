@@ -1,9 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
 
-let axios = createAxios({
-  baseURL: 'https://cloudapi.mailercloud.com/v1'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -31,16 +29,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let response = await axios.get('/client/plan', {
-        headers: {
-          Authorization: ctx.output.token
-        }
-      });
+      let response = await new Client({ token: ctx.output.token }).getAccountPlan();
 
       return {
         profile: {
-          name: response.data?.data?.name ?? undefined,
-          email: response.data?.data?.email ?? undefined
+          name: response?.data?.name ?? undefined,
+          email: response?.data?.email ?? undefined
         }
       };
     }

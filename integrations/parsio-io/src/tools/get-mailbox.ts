@@ -40,21 +40,16 @@ export let getMailbox = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let mb = await client.getMailbox(ctx.input.mailboxId);
 
-    let tableFields: any[] = [];
-    try {
-      tableFields = await client.getTableFields(ctx.input.mailboxId);
-    } catch {
-      // Table fields may not be available
-    }
+    let tableFields = await client.getTableFields(ctx.input.mailboxId);
 
     return {
       output: {
         mailboxId: mb._id || mb.id,
-        name: mb.name,
-        email: mb.email,
-        processAttachments: mb.process_attachments,
-        collectEmails: mb.collect_emails,
-        alertEmailH: mb.alert_email_h,
+        name: mb.name ?? undefined,
+        email: mb.email ?? undefined,
+        processAttachments: mb.process_attachments ?? undefined,
+        collectEmails: mb.collect_emails ?? undefined,
+        alertEmailH: mb.alert_email_h ?? undefined,
         tableFields: Array.isArray(tableFields) ? tableFields : []
       },
       message: `Retrieved mailbox **${mb.name || mb._id || mb.id}**.`

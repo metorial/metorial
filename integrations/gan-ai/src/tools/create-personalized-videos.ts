@@ -9,14 +9,22 @@ export let createPersonalizedVideos = SlateTool.create(spec, {
   description: `Generate personalized videos in bulk for a project (Studio API). Each video is customized with per-recipient variable values (e.g., names, custom text). The variable keys depend on how the project was configured. Video generation is asynchronous -- use the returned inference IDs to check status or set up a webhook for notifications. Use **List Projects** to see available project tags/variables.`,
   constraints: [
     'Video generation is asynchronous -- URLs returned may not be functional immediately.',
-    'Each video entry must include a "uniqueId" field for tracking.',
+    'Each video entry must include a "unique_id" field for tracking.',
     'Variable keys are project-specific and must match the project configuration.'
   ]
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('Workspace ID containing the project'),
-      projectId: z.string().describe('Project ID to generate videos for'),
+      workspaceId: z
+        .string()
+        .describe(
+          'Workspace ID containing the project. Call list_workspaces to discover workspace IDs.'
+        ),
+      projectId: z
+        .string()
+        .describe(
+          'Project ID to generate videos for. Call list_projects to discover project IDs.'
+        ),
       videos: z
         .array(z.record(z.string(), z.string()))
         .describe(
@@ -41,7 +49,7 @@ export let createPersonalizedVideos = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new StudioClient(ctx.auth.token);
+    let client = new StudioClient(ctx.auth);
     let result = await client.createVideos({
       workspaceId: ctx.input.workspaceId,
       projectId: ctx.input.projectId,

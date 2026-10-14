@@ -9,7 +9,8 @@ export let sendEmail = SlateTool.create(spec, {
   description: `Send an email via SMTP2GO. Supports HTML and plain text bodies, CC/BCC recipients, file attachments, inline images, and email templates with personalization variables. At least one of **htmlBody**, **textBody**, or **templateId** must be provided.`,
   instructions: [
     'Attachments must have their content Base64-encoded in the fileblob field.',
-    'When using a template, pass templateData to populate template variables.'
+    'When using a template, pass templateData to populate template variables.',
+    'If countsAvailable is false, the zero counts and empty failures are placeholders. Track the accepted email using its identifiers and Search Email Activity; unavailable counts do not mean the submission failed.'
   ],
   constraints: [
     'Maximum of 100 recipients each for to, cc, and bcc fields.',
@@ -23,12 +24,22 @@ export let sendEmail = SlateTool.create(spec, {
   .input(
     z.object({
       sender: z.string().describe('Sender/from email address'),
-      to: z.array(z.string()).describe('Array of recipient email addresses'),
-      subject: z.string().describe('Email subject line'),
+      to: z.array(z.string()).min(1).max(100).describe('Array of recipient email addresses'),
+      subject: z
+        .string()
+        .describe('Email subject line; ignored when a saved template is used'),
       htmlBody: z.string().optional().describe('HTML-encoded email body'),
       textBody: z.string().optional().describe('Plain text email body'),
-      cc: z.array(z.string()).optional().describe('Array of CC recipient email addresses'),
-      bcc: z.array(z.string()).optional().describe('Array of BCC recipient email addresses'),
+      cc: z
+        .array(z.string())
+        .max(100)
+        .optional()
+        .describe('Array of CC recipient email addresses'),
+      bcc: z
+        .array(z.string())
+        .max(100)
+        .optional()
+        .describe('Array of BCC recipient email addresses'),
       customHeaders: z
         .array(
           z.object({
@@ -62,15 +73,43 @@ export let sendEmail = SlateTool.create(spec, {
       templateData: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Key-value pairs to populate template variables')
+        .describe('Key-value pairs to populate template variables'),
+      schedule: z
+        .string()
+        .optional()
+        .describe('Future send timestamp with timezone, within the next 3 days'),
+      fastAccept: z
+        .boolean()
+        .optional()
+        .describe('Queue the email immediately and process it in the background')
     })
   )
   .output(
     z.object({
-      succeeded: z.number().describe('Number of emails successfully queued'),
-      failed: z.number().describe('Number of emails that failed'),
-      failures: z.array(z.string()).describe('Details of any failures'),
-      emailId: z.string().describe('Unique identifier for the sent email')
+      succeeded: z
+        .number()
+        .describe(
+          'Provider-reported successful processing count; zero is a placeholder when countsAvailable is false'
+        ),
+      failed: z
+        .number()
+        .describe(
+          'Provider-reported failed processing count; zero is a placeholder when countsAvailable is false'
+        ),
+      failures: z
+        .array(z.string())
+        .describe(
+          'Provider-reported failures; empty is a placeholder when countsAvailable is false'
+        ),
+      countsAvailable: z.boolean().describe('Whether SMTP2GO returned processing counts'),
+      processingPending: z
+        .boolean()
+        .describe('Whether processing results are still unavailable'),
+      emailId: z.string().describe('Unique identifier for the sent email, when returned'),
+      scheduleId: z
+        .string()
+        .optional()
+        .describe('Identifier of the scheduled email, when returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -97,18 +136,27 @@ export let sendEmail = SlateTool.create(spec, {
         | Array<{ filename: string; fileblob: string; mimetype: string }>
         | undefined,
       templateId: ctx.input.templateId,
-      templateData: ctx.input.templateData as Record<string, string> | undefined
+      templateData: ctx.input.templateData as Record<string, string> | undefined,
+      schedule: ctx.input.schedule,
+      fastAccept: ctx.input.fastAccept
     });
     let data = result.data || result.email_response || result;
+    let countsAvailable =
+      typeof data.succeeded === 'number' && typeof data.failed === 'number';
 
     return {
       output: {
         succeeded: data.succeeded ?? 0,
         failed: data.failed ?? 0,
         failures: data.failures ?? [],
-        emailId: data.email_id ?? ''
+        countsAvailable,
+        processingPending: !countsAvailable,
+        emailId: data.email_id ?? '',
+        scheduleId: data.schedule_id
       },
-      message: `Email sent to **${ctx.input.to.join(', ')}** with subject "${ctx.input.subject}". ${data.succeeded ?? 0} succeeded, ${data.failed ?? 0} failed.`
+      message: countsAvailable
+        ? `Email submission processed for **${ctx.input.to.join(', ')}** with subject "${ctx.input.subject}". ${data.succeeded} succeeded, ${data.failed} failed.`
+        : `Email accepted for ${data.schedule_id ? 'scheduled sending' : 'background processing'}. Processing results are pending; use Search Email Activity to check delivery status.`
     };
   })
   .build();

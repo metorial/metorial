@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BlazeMeterClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,12 +48,13 @@ export let manageProject = SlateTool.create(spec, {
     let client = new BlazeMeterClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     if (ctx.input.action === 'list') {
       if (!ctx.input.workspaceId)
-        throw new Error('workspaceId is required for listing projects');
+        throw createApiServiceError('workspaceId is required for listing projects');
       let projects = await client.listProjects(ctx.input.workspaceId);
       let mapped = projects.map((p: any) => ({
         projectId: p.id,
@@ -70,7 +71,9 @@ export let manageProject = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.workspaceId || !ctx.input.name) {
-        throw new Error('workspaceId and name are required for creating a project');
+        throw createApiServiceError(
+          'workspaceId and name are required for creating a project'
+        );
       }
       let project = await client.createProject(ctx.input.workspaceId, ctx.input.name);
       return {
@@ -81,7 +84,7 @@ export let manageProject = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.projectId || !ctx.input.name) {
-        throw new Error('projectId and name are required for updating a project');
+        throw createApiServiceError('projectId and name are required for updating a project');
       }
       let project = await client.updateProject(ctx.input.projectId, ctx.input.name);
       return {
@@ -92,7 +95,7 @@ export let manageProject = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.projectId)
-        throw new Error('projectId is required for deleting a project');
+        throw createApiServiceError('projectId is required for deleting a project');
       await client.deleteProject(ctx.input.projectId);
       return {
         output: { projectId: ctx.input.projectId, deleted: true },
@@ -100,6 +103,6 @@ export let manageProject = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

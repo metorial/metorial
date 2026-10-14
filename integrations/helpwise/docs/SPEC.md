@@ -1,95 +1,39 @@
-Now let me get more details on the API endpoints/features:Now let me check the actual API reference for more details on authentication and available features:I now have enough information to write the specification. Let me compile it.
+# Helpwise API notes
 
-# Slates Specification for Helpwise
+The [official developer portal](https://helpwise.io/developers) redirects to [Helpwise's Postman reference](https://documenter.getpostman.com/view/29744652/2s9YC5yYKf).
 
-## Overview
+## Authentication and versions
 
-Helpwise is a shared inbox and customer service platform that centralizes team communication across email, SMS, WhatsApp, live chat, and social media (Facebook, Instagram, Twitter) into a single dashboard. It helps manage all customer communication from a single place, enabling team collaboration through shared inboxes, conversation assignment, internal notes, automation rules, and reporting.
+Obtain the API key and API secret at <https://app.helpwise.io/settings/api>.
 
-## Authentication
+- V1: `https://apis.helpwise.io`, using HTTP Basic authentication with the API key as username and API secret as password.
+- V0: `https://app.helpwise.io/dev-apis`, using `Authorization: API_KEY:API_SECRET`.
 
-Helpwise uses **API Key + API Secret** authentication.
+The saved credential format remains `API_KEY:API_SECRET`; the client constructs the appropriate header for each API. The authenticated identity endpoint is V0 `POST /users/me`.
 
-You must use a valid API Key and API Secret to send requests to the API endpoints. You can get your API key from Helpwise's Settings Page (API Key Section) at the integrations dashboard (`https://app.helpwise.io/settings/api`).
+## Documented workflows
 
-Alternatively, to obtain credentials, log in to your Helpwise account, click **Automation > API > Generate Credentials**, and copy the API Key and API Secret to a safe place.
+| Workflow | Endpoint and request |
+| --- | --- |
+| Discover inboxes | V0 `POST /mailboxes/list` with `page`, `limit`; `POST /mailboxes/get` with numeric `id` |
+| Discover users | V0 `POST /users/list`, with optional `mailboxId` mapped to `mailbox_id`; `POST /users/me` |
+| List conversations | V1 `GET /conversations` with `inboxIds[]`, `labelId`, `limit`, `pageToken`; response `threads`, `nextPageToken` |
+| Get conversation | V1 `GET /inboxes/{inboxId}/conversations/{conversationId}` with `labelId`, `limit`, `pageToken`; response includes `items` and `nextPageToken` |
+| Close or delete conversations | V1 `PUT /conversations/action/close` or `/delete` with numeric `ids`; fewer than 100 IDs per request |
+| List and search contacts | V1 `GET /contacts` with `limit`, `offset`; `GET /contacts/search` with `term`, `limit`, `offset`. List uses `results`, search uses `result`; both expose `nextPage` |
+| Get/create/update contact | V1 `GET /contacts/{id}`, `POST /contacts`, `PUT /contacts/{id}`. Existing `name` maps to `firstname`, `email` to `emails`, and `phone` to `phones` entries containing `phoneTxt`, `phoneNo`, `type` |
+| Read tags | V1 `GET /tags`, `GET /tags/{id}` |
+| Apply or remove tags | V1 `POST /tags/apply` or `/tags/remove`, with numeric `threadIds`, `tagIds` |
+| List emails | V0 `POST /emails/list` with numeric `mailboxId`, `threadId`, and optional `page`, `limit` |
+| Send email | V0 `POST /emails/send_mail` with numeric `mailbox_id`, `to`, `subject`, `body`, and optional `cc`, `reply_to` |
+| Add a note | V0 `POST /notes/add` with `thread_id`, `mailbox_id`, `message` |
 
-**How to authenticate requests:**
+For current conversation calls provide `mailboxId` from `list_mailboxes`. List filters without a V1 equivalent (query, tag, status other than closed, numbered pages above 1), or calls without `mailboxId`, retain the previous route. New `pageToken` and `labelId` fields cannot be combined with those legacy modes. Contact `offset` takes precedence over `page`; a supplied page uses a limit of 20 unless explicitly overridden.
 
-The API Key and API Secret are passed together in the `Authorization` header, formatted as `{API_KEY}:{API_SECRET}`. For example: `Authorization: your_api_key:your_api_secret`.
+## Compatibility and verification limits
 
-The API base URL is `https://app.helpwise.io/dev-apis/`.
+Existing tool keys and input field types remain available. The following existing routes are retained but have no confirmed contract in the retrieved official collection: mailbox writes, teams, contact deletion, note list/delete, tag update/delete, templates, webhook management, and legacy conversation retrieval/filtering. Omission from the reference does not establish that these endpoints have been removed.
 
-## Features
+Email BCC and thread replies retain the previous `/dev-apis/v1/messages` route; their payloads are not documented in this collection. The new `replyTo` input applies to documented new-email calls without BCC or a conversation ID. Inbox-scoped user discovery should supply `mailboxId`; the user-list entry provides an example payload without a required-field declaration. V0 note creation explicitly requires `mailbox_id`, `thread_id`, and `message`; provide `mailboxId` to use it. Note creation without `mailboxId` retains the previous `/dev-apis/v1/conversations/{id}/notes` route for existing connections.
 
-### Mailbox Management
-
-Create, list, retrieve, update, and delete mailboxes. You can list mailboxes, get details of a specific mailbox, and create new mailboxes. Mailboxes represent the shared inboxes (e.g., support@, sales@) that your team collaborates on.
-
-### Conversation Management
-
-List, retrieve, and monitor conversations (threads) within your mailboxes. You can retrieve details of a specific conversation or get a list of conversations. Conversations can also be deleted.
-
-### Email / Messaging
-
-List emails and send new emails from your Helpwise mailboxes. You can also update existing messages or delete individual messages within conversations.
-
-### Contact Management
-
-Create, list, retrieve, search, update, and delete contacts. Contacts are automatically created when customers interact via any channel but can also be managed programmatically. Search allows querying across all contacts.
-
-### Notes
-
-Add notes to conversations for internal team collaboration. You can also retrieve notes for a conversation and delete them.
-
-### Attachments
-
-Upload files as attachments to conversations and retrieve attachment metadata.
-
-### Tags
-
-Retrieve, update, and delete tags used to categorize and organize conversations.
-
-### Teams
-
-Retrieve details of specific teams or list all teams in your Helpwise account.
-
-### Users
-
-Retrieve the list of Helpwise users in your account.
-
-### Email Templates
-
-Retrieve and update email templates (canned responses). Templates can also be deleted.
-
-### Email Signatures
-
-Delete email signatures via the API. Signature management allows maintaining consistent branding.
-
-### Webhook Management
-
-Create, retrieve, list, and delete webhooks programmatically via the API.
-
-## Events
-
-The Webhook Integration allows you to listen to Helpwise events in real-time without the need of continuously polling the API. To listen to events you need to set up your callback URL where you want to receive the event.
-
-Helpwise provides 9 webhook event types.
-
-### Conversation Lifecycle Events
-
-- **Conversation Created** — Triggered when an agent replies to a customer or a customer sends a message to a Helpwise mailbox.
-- **Conversation Closed** — Triggered when an agent or admin closes a conversation.
-- **Conversation Reopened** — Triggered when an agent or admin reopens a conversation.
-- **Conversation Deleted** — Triggered when an agent or admin deletes a conversation.
-
-### Conversation Activity Events
-
-- **Conversation Assigned** — Triggered when an agent or admin is assigned to a conversation.
-- **Note Added** — Triggered when an agent or admin adds a note to a conversation.
-- **Tag Applied** — Triggered when an agent or admin applies a tag to a conversation.
-
-### Message Events
-
-- **Agent Reply** — Triggered when an agent or admin replies to a customer.
-- **Customer Reply** — Triggered when a customer replies to an email.
+This refresh is checked against public documentation and the package build. Authenticated provider behavior, provider response variants for V0 endpoints, and account/plan availability have not been verified.

@@ -9,7 +9,9 @@ let projectSchema = z.object({
   color: z.string().describe('Project color'),
   parentId: z.string().nullable().describe('Parent project ID'),
   order: z.number().describe('Display order'),
-  commentCount: z.number().describe('Number of comments'),
+  commentCount: z
+    .number()
+    .describe('Legacy comment count; current API returns 0 when unavailable'),
   isShared: z.boolean().describe('Whether project is shared'),
   isFavorite: z.boolean().describe('Whether project is favorited'),
   isInboxProject: z.boolean().describe('Whether this is the inbox'),

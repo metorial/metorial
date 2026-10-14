@@ -32,18 +32,12 @@ export let sendFeedbackRequest = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let data = await client.sendFeedbackRequest({
+    await client.sendFeedbackRequest({
       customerId: ctx.input.customerId,
       ratingRevision: ctx.input.ratingRevision === false ? 0 : 1,
       checkThreshold: ctx.input.checkThreshold ? 1 : 0,
       jobId: ctx.input.jobId
     });
-
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to send feedback request: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
 
     return {
       output: { success: true },

@@ -30,7 +30,7 @@ export let reverseImageSearch = SlateTool.create(spec, {
   description: `Find where and how a specific image appears online using Google's reverse image search. Useful for brand monitoring, copyright compliance, and content tracking. The image must be publicly accessible via URL.`,
   instructions: [
     'The image must be publicly available through a URL.',
-    'Use `start` for pagination to retrieve additional matches.'
+    'Zenserp currently does not support `start` pagination for reverse image searches; omit it or use 0.'
   ],
   tags: {
     readOnly: true
@@ -56,7 +56,7 @@ export let reverseImageSearch = SlateTool.create(spec, {
       start: ctx.input.start
     });
 
-    let organicResults = results.organic ?? [];
+    let organicResults = results.reverse_image_results?.organic ?? results.organic ?? [];
 
     return {
       output: {

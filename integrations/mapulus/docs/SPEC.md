@@ -1,86 +1,27 @@
-Now I have enough information to compile the specification. Let me also check for the Zapier triggers/actions more carefully and the location collection widget webhook feature.
-
-# Slates Specification for Mapulus
-
-## Overview
-
-Mapulus is a GIS (Geographic Information System) platform based in Brisbane, Australia, that provides location-based insights for businesses. It allows users to plot locations on maps, define travel boundaries (isochrones), manage territories, visualize data through heat maps and clustering, and overlay demographic, traffic, and points-of-interest data. The platform offers a REST API, Zapier integration, and an embeddable location collection widget.
+# Mapulus API integration
 
 ## Authentication
 
-Mapulus uses **API key-based authentication** via Bearer tokens.
+Mapulus Studio uses an API key as a Bearer token. Create one in Profile > API Keys and grant the map/location permissions needed for your workflow. Keys can have an expiry date; replace an expired or revoked key by reconnecting.
 
-- **Method:** Bearer token in the `Authorization` header.
-- **Header format:** `Authorization: Bearer <API_KEY>`
-- **Base URL:** `https://api.mapulus.com/api/v1/`
+The integration uses the concrete Studio paths in the current [official OpenAPI reference](https://developer.mapulus.com/v1/openapi.json): `https://api.mapulus.com/api/v1/maps` and `/locations`. The reference overview also lists a different Studio prefix; endpoint definitions and examples use `/api/v1`.
 
-To obtain an API key, users must have a Mapulus account. The API key can be used across multiple domains and usage is pooled across all implementations.
+## Tools
 
-**Example request:**
+- `list_maps` and `get_map` discover maps and optionally expand their layers with `expand[]=layer`. Map titles are returned in the existing `name` field.
+- `create_location`, `get_location`, `update_location`, and `delete_location` manage locations. Public latitude/longitude fields are translated to `lat`/`lon`. Custom attribute objects are translated to the API's named attribute array. Metadata-only updates first retrieve the existing layer and source location; this requires read access as well as update access.
+- `find_locations` filters by map, layer, or external ID. A location ID retrieves the specific resource. The existing address and coordinate filter parameters are preserved, but the current reference does not document them.
+- `search_nearby` requests nearest locations by driving, cycling, or walking, sorted by time or distance. An optional radius requires source coordinates and filters the returned candidates by direct geographic distance; it does not enumerate every location in the radius.
+- `add_travel_boundary` updates the location's travel contour. The current reference documents positive travel time in minutes for driving, cycling, or walking. Unsupported modes or units produce a clear validation error.
+- `lookup_territory` retains its existing endpoint and inputs for compatibility. Its `/maps/{id}/territory` endpoint is not described in the current reference, so its availability remains unverified.
 
-```
-GET https://api.mapulus.com/api/v1/maps
-Authorization: Bearer YOUR_API_KEY
-```
+Studio lists are paginated. This integration currently returns their first page; the reference exposes page metadata but does not document a page-selection parameter. No identity endpoint is documented for Studio, so there is no current-user tool.
 
-## Features
+## Sources
 
-### Map Management
+- [Official developer reference](https://developer.mapulus.com/v1/docs)
+- [Official OpenAPI schema](https://developer.mapulus.com/v1/openapi.json)
+- [API key setup](https://www.mapulus.com/support/connecting-zapier-to-mapulus)
+- [Nearest-location query example](https://www.mapulus.com/support/finding-the-nearst-location-with-zapier-and-mapulus-api)
 
-Create and manage maps within Mapulus. Maps serve as the top-level organizational unit that contains layers and locations. You can list all maps associated with your account.
-
-### Layer Management
-
-Organize map data using layers, which enable you to categorize and group location markers, making it easier to manage and visualize data. Layers exist within a map and contain locations.
-
-### Location Management
-
-Create new locations and update existing locations in Mapulus. Locations are added to a specific layer within a map. Each location includes:
-
-- **Title** — a name or label for the location.
-- **Latitude and Longitude** — geographic coordinates.
-- **Address** — the street address of the location.
-- **Custom attributes** — store essential details and search for relevant information for your business and each location.
-
-### Nearby Location Search
-
-The API offers a feature for finding locations nearby a specified latitude/longitude or address, enabling automated location searches.
-
-### Travel Boundaries (Isochrones)
-
-Add travel ranges (also known as drive time or travel isochrones) to a location on your map. By defining a travel range, you can visualise areas within a certain distance or time from a specific location.
-
-### Territory and Boundary Lookup
-
-Identify which locations fall within a specific territory. This feature is accessible through the map interface and via the API for more automated, programmatic access. Mapulus has official local Australian boundaries built into its system, encompassing suburbs, postcodes, government Local Government Areas (LGAs), and more.
-
-### Location Collection Widget
-
-An embeddable JavaScript widget that collects addresses from end users and enriches them with contextual data. Enriched location data is sent to your webhook or API endpoint in real-time for immediate action. Enrichment includes:
-
-- Population density, age distribution, income levels, household composition.
-- Drive times to key locations, public transport access, walkability scores.
-- Nearby competitors, market saturation, service gaps in the area.
-- Configurable data points specific to your business needs.
-
-### Bulk Data Import
-
-Mapulus simplifies data management with its bulk upload feature and user-friendly API, allowing you to integrate large datasets into the system effortlessly.
-
-## Events
-
-Mapulus supports limited event mechanisms through its Zapier integration and webhook delivery from the Location Collection Widget:
-
-### New Location Trigger
-
-Triggers when a new Location is added to a Map. Available via Zapier. Can be used to detect when locations are created in Mapulus and trigger downstream workflows.
-
-### New Map Trigger
-
-Triggers when a new Map is created. Available via Zapier. Can be used to detect when new maps are set up in the account.
-
-### Location Collection Webhook
-
-Real-time webhook delivery to your CRM, database, or analytics platform. Fires when an end user submits a location through the embeddable Location Collection Widget, delivering enriched location data to a configured endpoint.
-
-Note: These event mechanisms are primarily available through Zapier's polling-based triggers and the widget's webhook delivery. There is no documented native webhook subscription API for general map or location change events.
+The separate Data API is outside this Studio-focused refresh. No live-provider verification has been performed.

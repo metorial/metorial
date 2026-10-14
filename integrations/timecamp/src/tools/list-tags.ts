@@ -11,13 +11,23 @@ export let listTags = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      tagListId: z
+        .number()
+        .optional()
+        .describe(
+          'Tag list ID from list_tag_lists. Omit to retrieve tags from all visible tag lists.'
+        )
+    })
+  )
   .output(
     z.object({
       tags: z.array(
         z.object({
           tagId: z.string().describe('Tag ID'),
-          name: z.string().describe('Tag name')
+          name: z.string().describe('Tag name'),
+          tagListId: z.string().describe('Containing tag list ID')
         })
       )
     })
@@ -25,18 +35,11 @@ export let listTags = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let rawTags = await client.getTags();
-
-    let tagList: any[] = [];
-    if (Array.isArray(rawTags)) {
-      tagList = rawTags;
-    } else if (rawTags && typeof rawTags === 'object') {
-      tagList = Object.values(rawTags);
-    }
-
-    let mapped = tagList.map((t: any) => ({
-      tagId: String(t.tag_id || t.id || ''),
-      name: t.name || ''
+    let tags = await client.getTags(ctx.input.tagListId);
+    let mapped = tags.map(tag => ({
+      tagId: String(tag.id ?? tag.tag_id ?? ''),
+      name: String(tag.name ?? ''),
+      tagListId: String(tag.tagListId)
     }));
 
     return {

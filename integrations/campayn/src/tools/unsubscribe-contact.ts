@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,14 +16,17 @@ export let unsubscribeContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.string().describe('ID of the list to unsubscribe the contact from'),
+      listId: z.string().describe('List ID. Call list_lists to discover available lists.'),
       email: z
         .string()
         .optional()
         .describe(
           'Email address to unsubscribe (unsubscribes all matching contacts on the list)'
         ),
-      contactId: z.string().optional().describe('Specific contact ID to unsubscribe')
+      contactId: z
+        .string()
+        .optional()
+        .describe('Contact ID. Call list_contacts for the chosen list to find contacts.')
     })
   )
   .output(
@@ -36,8 +39,13 @@ export let unsubscribeContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
     let input = ctx.input;
+
+    if ((!input.email && !input.contactId) || (input.email && input.contactId)) {
+      throw createApiServiceError('Provide exactly one of email or contactId.');
+    }
+
+    let client = new Client({ token: ctx.auth.token });
 
     if (input.contactId) {
       let result = await client.unsubscribeById(input.listId, input.contactId);
@@ -58,6 +66,6 @@ export let unsubscribeContact = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('Either email or contactId must be provided.');
+    throw createApiServiceError('Provide exactly one of email or contactId.');
   })
   .build();

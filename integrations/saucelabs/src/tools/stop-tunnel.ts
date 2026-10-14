@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -24,6 +24,11 @@ export let stopTunnel = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
     let result = await client.stopTunnel(ctx.input.tunnelId);
+    if (result?.result !== true) {
+      throw createApiServiceError(
+        'Sauce Labs did not confirm that the tunnel was stopped. Check its status with get_tunnel before retrying.'
+      );
+    }
 
     return {
       output: {

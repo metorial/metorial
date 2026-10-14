@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageDistribution = SlateTool.create(spec, {
@@ -53,11 +53,11 @@ export let manageDistribution = SlateTool.create(spec, {
           page: ctx.input.page,
           size: ctx.input.size
         });
-        let items = Array.isArray(versions) ? versions : [];
+        let items = getAppcircleList(versions, 'list');
         return { output: items, message: `Found **${items.length}** app version(s).` };
       }
       case 'get_app_version': {
-        if (!ctx.input.appVersionId) throw new Error('appVersionId is required');
+        if (!ctx.input.appVersionId) throw createApiServiceError('appVersionId is required');
         let version = await client.getDistributionAppVersion(
           ctx.input.profileId,
           ctx.input.appVersionId
@@ -68,9 +68,34 @@ export let manageDistribution = SlateTool.create(spec, {
         };
       }
       case 'send_to_testing': {
-        if (!ctx.input.appVersionId) throw new Error('appVersionId is required');
+        if (!ctx.input.appVersionId) throw createApiServiceError('appVersionId is required');
+        let testers: string[] | undefined;
+        if (ctx.input.testingGroupIds?.length) {
+          let groups = await Promise.all(
+            ctx.input.testingGroupIds.map(id => client.getTestingGroup(id))
+          );
+          let emails = new Set<string>();
+          for (let group of groups) {
+            let members = group?.testers ?? [];
+            if (
+              !Array.isArray(members) ||
+              members.some((email: unknown) => typeof email !== 'string')
+            ) {
+              throw createApiServiceError(
+                'Appcircle returned an unexpected testing-group membership response.'
+              );
+            }
+            for (let email of members) emails.add(email);
+          }
+          if (!emails.size) {
+            throw createApiServiceError(
+              'The selected testing groups have no testers. Add testers before sending this version.'
+            );
+          }
+          testers = [...emails];
+        }
         let result = await client.sendToTesting(ctx.input.profileId, ctx.input.appVersionId, {
-          testingGroupIds: ctx.input.testingGroupIds,
+          testers,
           message: ctx.input.message
         });
         return {
@@ -79,7 +104,7 @@ export let manageDistribution = SlateTool.create(spec, {
         };
       }
       case 'get_download_link': {
-        if (!ctx.input.appVersionId) throw new Error('appVersionId is required');
+        if (!ctx.input.appVersionId) throw createApiServiceError('appVersionId is required');
         let link = await client.getDistributionDownloadLink(
           ctx.input.profileId,
           ctx.input.appVersionId
@@ -90,7 +115,7 @@ export let manageDistribution = SlateTool.create(spec, {
         };
       }
       case 'delete_app_version': {
-        if (!ctx.input.appVersionId) throw new Error('appVersionId is required');
+        if (!ctx.input.appVersionId) throw createApiServiceError('appVersionId is required');
         await client.deleteDistributionAppVersion(ctx.input.profileId, ctx.input.appVersionId);
         return {
           output: { success: true },

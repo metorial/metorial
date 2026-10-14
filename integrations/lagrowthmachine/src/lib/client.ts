@@ -1,11 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
-let http = createAxios({
-  baseURL: 'https://apiv2.lagrowthmachine.com/flow'
-});
-
-export interface LeadData {
-  audience?: string;
+export interface LeadIdentifiers {
   leadId?: string;
   firstname?: string;
   lastname?: string;
@@ -13,14 +13,20 @@ export interface LeadData {
   persoEmail?: string;
   linkedinUrl?: string;
   twitter?: string;
-  phone?: string;
+  crmId?: string;
   companyName?: string;
   companyUrl?: string;
+}
+
+export interface LeadData extends LeadIdentifiers {
+  audience?: string;
+  phone?: string;
   jobTitle?: string;
   location?: string;
   industry?: string;
   gender?: string;
   bio?: string;
+  note?: string;
   profilePicture?: string;
   customAttribute1?: string;
   customAttribute2?: string;
@@ -37,6 +43,7 @@ export interface LeadData {
 export interface SearchLeadParams {
   email?: string;
   leadId?: string;
+  crmId?: string;
   linkedinUrl?: string;
   firstname?: string;
   lastname?: string;
@@ -44,29 +51,15 @@ export interface SearchLeadParams {
   companyUrl?: string;
 }
 
-export interface UpdateLeadStatusParams {
+export interface UpdateLeadStatusParams extends LeadIdentifiers {
   email?: string;
-  leadId?: string;
-  linkedinUrl?: string;
-  firstname?: string;
-  lastname?: string;
-  companyName?: string;
-  companyUrl?: string;
   campaignId: string;
   status: string;
 }
 
-export interface RemoveLeadParams {
+export interface RemoveLeadParams extends LeadIdentifiers {
   audience: string | string[];
   email?: string;
-  leadId?: string;
-  linkedinUrl?: string;
-  twitter?: string;
-  crmId?: string;
-  firstname?: string;
-  lastname?: string;
-  companyName?: string;
-  companyUrl?: string;
 }
 
 export interface CreateInboxWebhookParams {
@@ -81,6 +74,7 @@ export interface SendLinkedInMessageParams {
   linkedinUrl?: string;
   message: string;
   identityId: string;
+  memberId?: string;
 }
 
 export interface ImportLinkedInParams {
@@ -92,110 +86,218 @@ export interface ImportLinkedInParams {
   linkedinPostCategory?: string;
 }
 
+export interface CurrentMember {
+  id: string;
+  email: string;
+}
+
+let hasValue = (value?: string) => Boolean(value?.trim());
+
+let requireLeadIdentifier = (data: LeadIdentifiers) => {
+  if (
+    hasValue(data.leadId) ||
+    hasValue(data.proEmail) ||
+    hasValue(data.persoEmail) ||
+    hasValue(data.linkedinUrl) ||
+    hasValue(data.twitter) ||
+    hasValue(data.crmId) ||
+    (hasValue(data.firstname) &&
+      hasValue(data.lastname) &&
+      (hasValue(data.companyName) || hasValue(data.companyUrl)))
+  )
+    return;
+
+  throw createApiServiceError(
+    'Provide a lead ID, email, LinkedIn URL, Twitter handle, CRM ID, or first and last names with a company name or URL.'
+  );
+};
+
 export class Client {
-  private token: string;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
-
-  private get params() {
-    return { apikey: this.token };
+    if (!hasValue(config.token)) {
+      throw createApiServiceError(
+        'A La Growth Machine API key is required. Reconnect with a valid key.'
+      );
+    }
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://apiv2.lagrowthmachine.com/flow',
+      timeout: 30000,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'La Growth Machine',
+          reason: 'lagrowthmachine_api_error'
+        })
+    });
   }
 
   async searchLead(searchParams: SearchLeadParams): Promise<any> {
-    let response = await http.get('/leads/search', {
-      params: { ...this.params, ...searchParams }
-    });
+    requireLeadIdentifier({ ...searchParams, proEmail: searchParams.email });
+    let response = await this.http.get('/leads/search', { params: pickDefined(searchParams) });
     return response.data;
   }
 
   async createOrUpdateLead(leadData: LeadData): Promise<any> {
-    let response = await http.post('/leads', leadData, {
-      params: this.params
-    });
+    requireLeadIdentifier(leadData);
+    let { crmId, ...data } = leadData;
+    let response = await this.http.post('/leads', pickDefined({ ...data, crm_id: crmId }));
     return response.data;
   }
 
+  private async resolveMutationIdentifiers(
+    data: LeadIdentifiers & { email?: string },
+    resolveLeadId: boolean
+  ) {
+    let { email, leadId, crmId, ...identifiers } = data;
+    if ((resolveLeadId && hasValue(leadId)) || hasValue(email)) {
+      let result = await this.searchLead(hasValue(leadId) ? { leadId } : { email });
+      let lead = result?.lead;
+      if (!lead) {
+        throw createApiServiceError(
+          'No matching lead was returned. Use search_lead to find a valid lead.'
+        );
+      }
+      if (!resolveLeadId) {
+        if (!hasValue(lead.id)) {
+          throw createApiServiceError(
+            'The matching lead has no ID. Use a professional or personal email instead.'
+          );
+        }
+        return { leadId: lead.id };
+      }
+      identifiers = {
+        proEmail: lead.proEmail ?? undefined,
+        persoEmail: lead.persoEmail ?? undefined,
+        linkedinUrl: lead.linkedinUrl ?? undefined,
+        twitter: lead.twitter ?? undefined,
+        firstname: lead.firstname ?? undefined,
+        lastname: lead.lastname ?? undefined,
+        companyName: lead.companyName ?? undefined,
+        companyUrl: lead.companyUrl ?? undefined
+      };
+      crmId = lead.crm_id ?? undefined;
+      leadId = undefined;
+    }
+    requireLeadIdentifier({ ...identifiers, leadId, crmId });
+    return pickDefined({
+      ...identifiers,
+      ...(resolveLeadId ? {} : { leadId }),
+      crm_id: crmId
+    });
+  }
+
   async removeLeadFromAudiences(data: RemoveLeadParams): Promise<any> {
-    let response = await http.delete('/leads', {
-      params: this.params,
-      data
+    let { audience, ...identifiers } = data;
+    if (
+      Array.isArray(audience)
+        ? !audience.length || audience.some(value => !hasValue(value))
+        : !hasValue(audience)
+    ) {
+      throw createApiServiceError('Provide at least one audience name or ID, or "all".');
+    }
+    let resolved = await this.resolveMutationIdentifiers(identifiers, true);
+    let response = await this.http.post('/leads/removefromaudience', {
+      audience,
+      ...resolved
     });
     return response.data;
   }
 
   async updateLeadStatus(data: UpdateLeadStatusParams): Promise<any> {
-    let response = await http.put('/leads/status', data, {
-      params: this.params
+    let { campaignId, status, ...identifiers } = data;
+    let resolved = await this.resolveMutationIdentifiers(identifiers, false);
+    let response = await this.http.post('/leads/status', {
+      campaign: campaignId,
+      status,
+      ...resolved
     });
     return response.data;
   }
 
-  async getCampaigns(skip?: number, limit?: number): Promise<any> {
-    let response = await http.get('/campaigns', {
-      params: {
-        ...this.params,
-        ...(skip !== undefined ? { skip } : {}),
-        ...(limit !== undefined ? { limit } : {})
-      }
+  async getCampaigns(
+    skip?: number,
+    limit = 25,
+    status?: string,
+    search?: string
+  ): Promise<any> {
+    let response = await this.http.get('/campaigns', {
+      params: pickDefined({ skip, limit, status, search })
     });
+    return response.data;
+  }
+
+  async getCampaignStats(campaignId: string): Promise<any> {
+    let response = await this.http.get(`/campaigns/${encodeURIComponent(campaignId)}/stats`);
+    return response.data;
+  }
+
+  async createAudience(name: string): Promise<{ audience: { id: string; name: string } }> {
+    let response = await this.http.post('/audiences/create', { name });
+    return response.data;
+  }
+
+  async getCurrentUser(): Promise<CurrentMember> {
+    let response = await this.http.get('/me');
     return response.data;
   }
 
   async listAudiences(): Promise<any> {
-    let response = await http.get('/audiences', {
-      params: this.params
-    });
+    let response = await this.http.get('/audiences');
     return response.data;
   }
 
   async listIdentities(): Promise<any> {
-    let response = await http.get('/identities', {
-      params: this.params
-    });
+    let response = await this.http.get('/identities');
     return response.data;
   }
 
   async listMembers(): Promise<any> {
-    let response = await http.get('/members', {
-      params: this.params
-    });
+    let response = await this.http.get('/members');
     return response.data;
   }
 
   async createInboxWebhook(data: CreateInboxWebhookParams): Promise<any> {
-    let response = await http.post('/inbox-webhooks', data, {
-      params: this.params
-    });
+    if (data.campaigns?.length === 0) {
+      throw createApiServiceError(
+        'Omit campaignIds for all campaigns, or provide at least one campaign ID. An empty list never receives events.'
+      );
+    }
+    let response = await this.http.post('/inboxWebhooks', pickDefined(data));
     return response.data;
   }
 
   async listInboxWebhooks(): Promise<any> {
-    let response = await http.get('/inbox-webhooks', {
-      params: this.params
-    });
+    let response = await this.http.get('/inboxWebhooks');
     return response.data;
   }
 
   async deleteInboxWebhook(webhookId: string): Promise<any> {
-    let response = await http.delete(`/inbox-webhooks/${webhookId}`, {
-      params: this.params
-    });
+    let response = await this.http.delete(`/inboxWebhooks/${encodeURIComponent(webhookId)}`);
     return response.data;
   }
 
   async sendLinkedInMessage(data: SendLinkedInMessageParams): Promise<any> {
-    let response = await http.post('/linkedin/message', data, {
-      params: this.params
-    });
+    if (!hasValue(data.leadId) && !hasValue(data.linkedinUrl)) {
+      throw createApiServiceError('Provide a lead ID or LinkedIn URL for the recipient.');
+    }
+    if (!hasValue(data.message)) {
+      throw createApiServiceError('Provide a non-empty LinkedIn message.');
+    }
+    let memberId = data.memberId ?? (await this.getCurrentUser()).id;
+    let response = await this.http.post('/inbox/linkedin', pickDefined({ ...data, memberId }));
     return response.data;
   }
 
   async importFromLinkedIn(data: ImportLinkedInParams): Promise<any> {
-    let response = await http.post('/linkedin/import', data, {
-      params: this.params
-    });
+    if (
+      data.linkedinPostCategory &&
+      !['like', 'comment'].includes(data.linkedinPostCategory)
+    ) {
+      throw createApiServiceError('linkedinPostCategory must be "like" or "comment".');
+    }
+    let response = await this.http.post('/audiences', pickDefined(data));
     return response.data;
   }
 }

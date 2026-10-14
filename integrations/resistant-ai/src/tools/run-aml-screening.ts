@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let runAmlScreening = SlateTool.create(spec, {
   name: 'Run AML Screening',
   key: 'run_aml_screening',
-  description: `Runs Anti-Money Laundering (AML) screening on an individual. Checks against PEP (Politically Exposed Person) lists, sanctions databases, and adverse media sources. Screenings can be run individually or as a combined AML check. Typically performed after identity verification, using the name and date of birth extracted from the ID document.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Runs Anti-Money Laundering (AML) screening on an individual. Checks against PEP (Politically Exposed Person) lists, sanctions databases, and adverse media sources. Screenings can be run individually or as a combined AML check. Typically performed after identity verification, using the name and date of birth extracted from the ID document.`,
   instructions: [
     'Provide the full legal name as it appears on the identity document for best matching accuracy.',
     'Date of birth improves matching precision and reduces false positives.',
@@ -58,7 +58,7 @@ export let runAmlScreening = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.createAmlScreening({
       firstName: ctx.input.firstName,

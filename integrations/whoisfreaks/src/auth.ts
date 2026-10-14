@@ -12,7 +12,11 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      apiKey: z.string().describe('Your WhoisFreaks API key from the billing dashboard')
+      apiKey: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Your WhoisFreaks API key from the billing dashboard')
     }),
     getOutput: async ctx => {
       return {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,7 @@ export let listContributions = SlateTool.create(spec, {
 export let createContribution = SlateTool.create(spec, {
   name: 'Create Contribution',
   key: 'create_contribution',
-  description: `Record a new contribution (donation) in ChMeetings. Requires a person ID, date, and at least one fund allocation. Supports specifying payment method, batch number, check number, and notes.`
+  description: `Record a contribution in ChMeetings with a person ID, date, payment method name or ID, and fund allocations. Supports a batch number or ID, notes, and a unique client reference to prevent duplicate retries.`
 })
   .input(
     z.object({
@@ -74,10 +74,30 @@ export let createContribution = SlateTool.create(spec, {
       paymentMethod: z
         .string()
         .optional()
-        .describe('Payment method (e.g., Cash, Check, Online, Credit Card)'),
+        .describe('Payment method name; provide this or paymentMethodId'),
+      paymentMethodId: z
+        .number()
+        .optional()
+        .describe('Provider payment method ID; provide this or paymentMethod'),
+      batchId: z.number().optional().describe('Existing contribution batch ID'),
+      referenceId: z
+        .string()
+        .max(100)
+        .optional()
+        .describe('Unique client reference to prevent duplicate contributions on retries'),
       batchNumber: z.string().optional().describe('Batch number for grouping contributions'),
-      checkNumber: z.string().optional().describe('Check number (if payment method is check)'),
-      transactionId: z.string().optional().describe('External transaction ID'),
+      checkNumber: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy field; check numbers are not writable through the contributions API'
+        ),
+      transactionId: z
+        .string()
+        .optional()
+        .describe(
+          'External transaction ID; compatibility alias for referenceId, up to 100 characters'
+        ),
       notes: z.string().optional().describe('Additional notes for the contribution')
     })
   )
@@ -89,6 +109,31 @@ export let createContribution = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.checkNumber !== undefined) {
+      throw createApiServiceError(
+        'The contributions API does not support writing check numbers. Record the check number in notes instead.'
+      );
+    }
+    if (!ctx.input.paymentMethod && ctx.input.paymentMethodId === undefined) {
+      throw createApiServiceError(
+        'Provide paymentMethod or paymentMethodId for the contribution.'
+      );
+    }
+    if (
+      ctx.input.referenceId &&
+      ctx.input.transactionId &&
+      ctx.input.referenceId !== ctx.input.transactionId
+    ) {
+      throw createApiServiceError(
+        'referenceId and transactionId must match when both are provided.'
+      );
+    }
+    if (((ctx.input.referenceId ?? ctx.input.transactionId)?.length ?? 0) > 100) {
+      throw createApiServiceError(
+        'The contribution reference must have no more than 100 characters.'
+      );
+    }
+
     let result = await client.createContribution({
       person_id: ctx.input.personId,
       date: ctx.input.date,
@@ -97,8 +142,10 @@ export let createContribution = SlateTool.create(spec, {
         amount: f.amount
       })),
       payment_method: ctx.input.paymentMethod,
+      payment_method_id: ctx.input.paymentMethodId,
+      batch_id: ctx.input.batchId,
+      reference_id: ctx.input.referenceId,
       batch_number: ctx.input.batchNumber,
-      check_number: ctx.input.checkNumber,
       transaction_id: ctx.input.transactionId,
       notes: ctx.input.notes
     });

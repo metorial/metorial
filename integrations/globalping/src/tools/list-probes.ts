@@ -82,22 +82,7 @@ Returns probe details including geographic location, network information, and ta
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let allProbes = (await client.listProbes()) as Array<{
-      version?: string;
-      location: {
-        continent: string;
-        region: string;
-        country: string;
-        state?: string | null;
-        city: string;
-        asn: number;
-        network: string;
-        latitude: number;
-        longitude: number;
-      };
-      tags?: string[];
-      resolvers?: string[];
-    }>;
+    let allProbes = await client.listProbes();
 
     let totalOnline = allProbes.length;
     let filtered = allProbes;

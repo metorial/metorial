@@ -49,8 +49,8 @@ export let createSchema = SlateTool.create(spec, {
 
     let result = await client.createSchema(body);
 
-    let schemaId = result?.data?.id || result?.id;
-    let jobId = result?.id;
+    let schemaId = result?.data?.id || result?.schemaId;
+    let jobId = result?.id || result?.jobId;
 
     return {
       output: {
@@ -58,7 +58,7 @@ export let createSchema = SlateTool.create(spec, {
         jobId: jobId ? String(jobId) : undefined,
         schema: result?.data || result
       },
-      message: `Created schema **${ctx.input.schemaName}**${schemaId ? ` with ID ${schemaId}` : ''}.`
+      message: `Submitted creation of schema **${ctx.input.schemaName}**${schemaId ? ` with ID ${schemaId}` : ''}.${jobId ? ` Check get_job with job ID **${jobId}** for completion.` : ''}`
     };
   })
   .build();

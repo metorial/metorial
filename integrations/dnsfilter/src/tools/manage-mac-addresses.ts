@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -50,7 +50,8 @@ export let manageMacAddresses = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.macAddressId) throw new Error('macAddressId is required for delete');
+      if (!ctx.input.macAddressId)
+        throw createApiServiceError('macAddressId is required for delete');
       await client.deleteMacAddress(ctx.input.macAddressId);
       return {
         output: { deleted: true },
@@ -59,7 +60,7 @@ export let manageMacAddresses = SlateTool.create(spec, {
     }
 
     let params: Record<string, any> = {};
-    if (ctx.input.macAddress) params.mac_address = ctx.input.macAddress;
+    if (ctx.input.macAddress) params.address = ctx.input.macAddress;
     if (ctx.input.organizationId) params.organization_id = ctx.input.organizationId;
     if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
 
@@ -71,7 +72,8 @@ export let manageMacAddresses = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.macAddressId) throw new Error('macAddressId is required for update');
+    if (!ctx.input.macAddressId)
+      throw createApiServiceError('macAddressId is required for update');
     let macAddress = await client.updateMacAddress(ctx.input.macAddressId, params);
     return {
       output: { macAddress },

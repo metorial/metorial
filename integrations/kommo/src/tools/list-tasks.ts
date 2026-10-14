@@ -21,7 +21,12 @@ export let listTasksTool = SlateTool.create(spec, {
         .enum(['leads', 'contacts', 'companies'])
         .optional()
         .describe('Filter by linked entity type'),
-      entityIds: z.array(z.number()).optional().describe('Filter by linked entity IDs'),
+      entityIds: z
+        .array(z.number())
+        .optional()
+        .describe(
+          'Filter by linked entity IDs; entityType is required when using this filter'
+        ),
       taskIds: z.array(z.number()).optional().describe('Filter by specific task IDs'),
       orderBy: z.enum(['created_at', 'updated_at', 'id']).optional().describe('Sort field'),
       orderDir: z.enum(['asc', 'desc']).optional().describe('Sort direction'),

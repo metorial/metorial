@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -85,6 +85,18 @@ Use this for text generation, code generation, reasoning, question answering, an
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.messages.length === 0) {
+      throw createApiServiceError('Provide at least one conversation message.');
+    }
+    if (
+      ctx.input.maxTokens !== undefined &&
+      (!Number.isInteger(ctx.input.maxTokens) || ctx.input.maxTokens < 1)
+    ) {
+      throw createApiServiceError('Maximum tokens must be a positive whole number.');
+    }
+    if (ctx.input.stop && ctx.input.stop.length > 4) {
+      throw createApiServiceError('Provide no more than four stop sequences.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       baseUrl: ctx.config.baseUrl

@@ -67,6 +67,7 @@ export let listCustomers = SlateTool.create(spec, {
       phoneNumber: c.phoneNumber ?? null,
       mobileNumber: c.mobileNumber ?? null,
       status: c.status,
+      chasing: c.chasing,
       groups: c.groups,
       addresses: c.addresses,
       paymentPortalLink: c.paymentPortalLink ?? null,

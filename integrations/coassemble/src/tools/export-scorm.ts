@@ -7,7 +7,7 @@ export let exportScorm = SlateTool.create(spec, {
   name: 'Export SCORM Package',
   key: 'export_scorm',
   description: `Export a Coassemble course as a SCORM package for use in third-party LMS platforms. Supports SCORM 1.2 and 2004, with dynamic or static package types.`,
-  constraints: ['Requires Headless course creation access on your workspace.'],
+  constraints: ['Requires partner SCORM export access on your workspace.'],
   tags: {
     readOnly: true
   }
@@ -36,6 +36,16 @@ export let exportScorm = SlateTool.create(spec, {
     let result = await client.exportScorm(ctx.input.courseId, {
       version: ctx.input.version,
       type: ctx.input.packageType
+    });
+
+    let download = client.getScormDownload(ctx.input.courseId, {
+      version: ctx.input.version,
+      type: ctx.input.packageType
+    });
+    await ctx.addAttachment({
+      type: 'url',
+      ...download,
+      mimeType: 'application/zip'
     });
 
     return {

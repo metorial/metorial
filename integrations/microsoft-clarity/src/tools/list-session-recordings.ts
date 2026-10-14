@@ -15,6 +15,7 @@ export let listSessionRecordings = SlateTool.create(spec, {
 Returns a sample of session recordings matching the specified criteria, useful for reviewing user behavior on specific pages or segments.`,
   instructions: [
     'Dates must be in UTC ISO 8601 format (e.g. "2025-01-15T00:00:00Z").',
+    'Results are a sample, not a complete paginated recording export. count defaults to 100 and cannot exceed 250.',
     'Use filters to narrow results to specific user segments or pages.'
   ],
   tags: {
@@ -36,7 +37,9 @@ Returns a sample of session recordings matching the specified criteria, useful f
       deviceTypes: z
         .array(z.string())
         .optional()
-        .describe('Filter by device types (e.g. "Desktop", "Mobile", "Tablet")'),
+        .describe(
+          'Filter by device types: PC (Desktop is also accepted), Mobile, Tablet, Email, or Other'
+        ),
       browsers: z
         .array(z.string())
         .optional()
@@ -44,11 +47,21 @@ Returns a sample of session recordings matching the specified criteria, useful f
       operatingSystems: z
         .array(z.string())
         .optional()
-        .describe('Filter by operating systems (e.g. "Windows", "macOS", "Android")'),
+        .describe(
+          'Filter by operating systems (e.g. Windows, MacOS, Android; macOS is also accepted)'
+        ),
       countries: z.array(z.string()).optional().describe('Filter by country names'),
       cities: z.array(z.string()).optional().describe('Filter by city names'),
-      sortBy: z.string().optional().describe('Sort criteria for recordings'),
-      count: z.number().optional().describe('Maximum number of recordings to return')
+      sortBy: z
+        .string()
+        .optional()
+        .describe(
+          'Sort by SessionStart_DESC (default), SessionStart_ASC, SessionDuration_ASC, SessionDuration_DESC, SessionClickCount_ASC, SessionClickCount_DESC, PageCount_ASC, or PageCount_DESC. Numeric strings 0 through 7 are also accepted in that order.'
+        ),
+      count: z
+        .number()
+        .optional()
+        .describe('Number of recordings to sample, from 1 to 250. Defaults to 100.')
     })
   )
   .output(
@@ -79,14 +92,12 @@ Returns a sample of session recordings matching the specified criteria, useful f
       }
     });
 
-    let recordingsList = Array.isArray(recordings) ? recordings : [];
-
     return {
       output: {
-        recordings: recordingsList,
-        totalCount: recordingsList.length
+        recordings,
+        totalCount: recordings.length
       },
-      message: `Retrieved **${recordingsList.length}** session recording(s) from **${ctx.input.startDate}** to **${ctx.input.endDate}**.`
+      message: `Retrieved **${recordings.length}** session recording(s) from **${ctx.input.startDate}** to **${ctx.input.endDate}**.`
     };
   })
   .build();

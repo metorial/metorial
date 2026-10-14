@@ -29,10 +29,10 @@ export let stopSuiteRun = SlateTool.create(spec, {
 
     return {
       output: {
-        suiteRunId: result.suiteRunId,
+        suiteRunId: result.id,
         status: result.status
       },
-      message: `Suite run **${result.suiteRunId}** stopped. Status: **${result.status}**.`
+      message: `Suite run **${result.id}** stopped. Status: **${result.status}**.`
     };
   })
   .build();

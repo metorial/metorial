@@ -28,7 +28,14 @@ export let listTickets = SlateTool.create(spec, {
         .describe('Sort field, prefix with - for descending (e.g. -createdAt, priority)'),
       limit: z.number().optional().describe('Maximum number of tickets to return'),
       skip: z.number().optional().describe('Number of tickets to skip for pagination'),
-      archived: z.boolean().optional().describe('Filter by archived status'),
+      archived: z
+        .boolean()
+        .optional()
+        .describe('Filter by archived status; true includes archived tickets'),
+      ignoreArchived: z
+        .boolean()
+        .optional()
+        .describe('Include archived tickets in the results'),
       isSpam: z.boolean().optional().describe('Filter spam tickets')
     })
   )
@@ -42,7 +49,8 @@ export let listTickets = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let result = await client.listTickets({
@@ -53,7 +61,8 @@ export let listTickets = SlateTool.create(spec, {
       limit: ctx.input.limit,
       skip: ctx.input.skip,
       archived: ctx.input.archived,
-      isSpam: ctx.input.isSpam
+      isSpam: ctx.input.isSpam,
+      ignoreArchived: ctx.input.ignoreArchived
     });
 
     return {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let autoScheduledSchema = z
@@ -40,7 +41,7 @@ let taskOutputSchema = z.object({
   labels: z.array(z.any()).optional().describe('Labels attached to the task'),
   assignees: z.array(z.any()).optional().describe('Users assigned to the task'),
   projectId: z.string().optional().describe('Associated project ID'),
-  workspaceId: z.string().optional().describe('Workspace the task belongs to'),
+  workspaceId: workspaceIdSchema.optional(),
   scheduledStart: z.string().optional().describe('Auto-scheduled start time'),
   scheduledEnd: z.string().optional().describe('Auto-scheduled end time'),
   schedulingIssue: z
@@ -63,7 +64,7 @@ export let createTask = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Title of the task'),
-      workspaceId: z.string().describe('ID of the workspace to create the task in'),
+      workspaceId: workspaceIdSchema,
       dueDate: z
         .string()
         .optional()
@@ -98,6 +99,10 @@ export let createTask = SlateTool.create(spec, {
   )
   .output(taskOutputSchema)
   .handleInvocation(async ctx => {
+    if (ctx.input.autoScheduled && !ctx.input.dueDate) {
+      throw createApiServiceError('Provide dueDate when enabling task auto-scheduling.');
+    }
+
     let client = new MotionClient({ token: ctx.auth.token });
 
     let task = await client.createTask({

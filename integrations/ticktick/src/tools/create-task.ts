@@ -1,13 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { checklistItemSchema, mapTask, taskOutputSchema } from '../lib/schemas';
+import {
+  checklistItemSchema,
+  mapTask,
+  projectIdSchema,
+  taskOutputSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createTask = SlateTool.create(spec, {
   name: 'Create Task',
   key: 'create_task',
-  description: `Create a new task in TickTick. Tasks can include subtasks (checklist items), reminders, recurrence rules, due dates, tags, and priority levels. If no project is specified, the task is added to the inbox.`,
+  description: `Create a new task in TickTick. Tasks can include subtasks (checklist items), reminders, recurrence rules, due dates, tags, and priority levels. Call list_projects to discover a project ID before creating tasks.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -18,10 +23,7 @@ export let createTask = SlateTool.create(spec, {
       title: z.string().describe('Task title'),
       content: z.string().optional().describe('Task description/content'),
       desc: z.string().optional().describe('Checklist description'),
-      projectId: z
-        .string()
-        .optional()
-        .describe('Project ID to add the task to. Omit to add to inbox'),
+      projectId: projectIdSchema.optional(),
       isAllDay: z.boolean().optional().describe('Whether this is an all-day task'),
       startDate: z
         .string()

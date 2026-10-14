@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let groupOutputSchema = z.object({
@@ -12,9 +12,9 @@ let groupOutputSchema = z.object({
 
 let mapGroup = (g: any) => ({
   groupId: String(g.id),
-  name: g.name,
+  name: g.name ?? undefined,
   recipientCount: g.recipients != null ? Number(g.recipients) : undefined,
-  created: g.created
+  created: g.created ?? undefined
 });
 
 // ---- List Groups ----
@@ -40,7 +40,7 @@ export let listGroups = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listGroups({
       offset: ctx.input.offset,
@@ -78,7 +78,7 @@ export let createGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.createGroup(ctx.input.name);
     let groupId = typeof result === 'object' ? String(result.id) : String(result);
@@ -116,7 +116,7 @@ export let deleteGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.deleteGroup(ctx.input.groupId, ctx.input.deleteRecipients);
 
@@ -150,7 +150,7 @@ export let addRecipientsToGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.addRecipientsToGroup(ctx.input.groupId, ctx.input.recipientIds);
     let addedCount = typeof result === 'number' ? result : Number(result) || 0;
@@ -187,7 +187,7 @@ export let removeRecipientsFromGroup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.removeRecipientsFromGroup(
       ctx.input.groupId,

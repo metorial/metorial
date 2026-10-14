@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { PublicApiClient } from './lib/public-api-client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -23,7 +24,19 @@ export let auth = SlateAuth.create()
       password: z.string().describe('Web Scraping API password from the Decodo dashboard')
     }),
     getOutput: async (ctx: { input: { username: string; password: string } }) => {
-      let encoded = btoa(`${ctx.input.username}:${ctx.input.password}`);
+      if (
+        !ctx.input.username.trim() ||
+        !ctx.input.password ||
+        ctx.input.username.includes(':')
+      ) {
+        throw createApiServiceError(
+          'Provide a non-empty Web Scraping API username and password; the username cannot contain a colon.'
+        );
+      }
+      let encoded = Buffer.from(
+        `${ctx.input.username}:${ctx.input.password}`,
+        'utf8'
+      ).toString('base64');
       return {
         output: {
           token: encoded,
@@ -35,8 +48,7 @@ export let auth = SlateAuth.create()
       output: { token: string; authMethod: string };
       input: { username: string; password: string };
     }) => {
-      let decoded = atob(ctx.output.token);
-      let username = decoded.split(':')[0];
+      let username = ctx.input.username;
       return {
         profile: {
           name: username
@@ -65,24 +77,10 @@ export let auth = SlateAuth.create()
       output: { token: string; authMethod: string };
       input: { token: string };
     }) => {
-      let axiosInstance = createAxios({
-        baseURL: 'https://api.decodo.com/v2',
-        headers: {
-          Authorization: ctx.output.token
-        }
-      });
-      try {
-        let response = await axiosInstance.get('/subscriptions');
-        let subscriptions = response.data;
-        return {
-          profile: {
-            subscriptions
-          }
-        };
-      } catch {
-        return {
-          profile: {}
-        };
-      }
+      let subscriptions = await new PublicApiClient(
+        ctx.output.token,
+        ctx.output.authMethod
+      ).getSubscriptions();
+      return { profile: { subscriptions } };
     }
   });

@@ -3,6 +3,13 @@ import { z } from 'zod';
 import { HereClient } from '../lib/client';
 import { spec } from '../spec';
 
+let normalizeForecasts = (
+  blocks: { forecasts?: unknown[] } | { forecasts?: unknown[] }[] | undefined
+) =>
+  Array.isArray(blocks)
+    ? { forecasts: blocks.flatMap(block => block.forecasts ?? []) }
+    : blocks;
+
 export let getWeather = SlateTool.create(spec, {
   name: 'Get Weather',
   key: 'get_weather',
@@ -60,6 +67,12 @@ export let getWeather = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      report: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Complete weather report, including location metadata and all requested products'
+        ),
       places: z
         .array(
           z.object({
@@ -143,9 +156,9 @@ export let getWeather = SlateTool.create(spec, {
         pressure: obs.pressure,
         iconName: obs.iconName
       })),
-      dailyForecasts: place.dailyForecasts,
-      hourlyForecasts: place.hourlyForecasts,
-      astronomyForecasts: place.astronomyForecasts,
+      dailyForecasts: normalizeForecasts(place.dailyForecasts),
+      hourlyForecasts: normalizeForecasts(place.hourlyForecasts),
+      astronomyForecasts: normalizeForecasts(place.astronomyForecasts),
       alerts: place.alerts,
       nwsAlerts: place.nwsAlerts
     }));
@@ -156,7 +169,7 @@ export let getWeather = SlateTool.create(spec, {
     let tempStr = obs?.temperature !== undefined ? `, **${obs.temperature}°**` : '';
 
     return {
-      output: { places: outputPlaces },
+      output: { places: outputPlaces, report: response },
       message: `Retrieved weather for **${locationLabel}** (${ctx.input.products.join(', ')})${tempStr}.`
     };
   })

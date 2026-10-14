@@ -1,14 +1,14 @@
-# Slates Specification for DataForSEO
+# DataForSEO Integration Specification
 
 ## Overview
 
-DataForSEO is an API-first platform that provides SEO, SEM, ecommerce, business, app, content, and AI optimization data. This integration exposes a practical DataForSEO API v3 surface for common Slates workflows rather than every endpoint in the catalog.
+DataForSEO is an API-first platform that provides SEO, SEM, ecommerce, business, app, content, and AI optimization data. This integration exposes DataForSEO API v3 capabilities for practical research and auditing workflows.
 
 ## Authentication
 
 DataForSEO uses Basic Authentication.
 
-Your unique API token should be passed in the `Authorization` header within the request in the following format: `Authorization: Basic login:password`. Instead of "login" and "password", use your API credentials encoded in Base64.
+Pass your API credentials in the `Authorization` header as `Basic <base64(login:password)>`.
 
 Your API login is the same as the email address you use to create an account with DataForSEO. The API password is generated automatically by DataForSEO and is different from your account password. You can find your API login and password in the API Access section of the Dashboard.
 
@@ -30,9 +30,15 @@ Where `bG9naW46cGFzc3dvcmQ=` is the Base64-encoded string of `login:password`.
 
 Retrieve organic live advanced results for Google, Bing, Yahoo, and YouTube by keyword, location, language, device, and OS.
 
+List SERP Locations discovers Google location codes and full names, with optional country filtering and local name search/pagination.
+
 ### Keyword Data
 
-Obtain Google Ads keyword metrics including search volume, CPC, competition, and monthly trends. The Keywords For Site endpoint relies on Google Ads data and DataForSEO's proprietary SERP database to provide keywords that are relevant to the target domain.
+Obtain Google Ads keyword metrics including search volume, CPC, competition labels, competition index, and monthly trends. Keywords for Site retrieves Google Ads suggestions for a website or webpage, with optional provider sorting. Its limit and offset paginate the fetched list of up to 2,000 suggestions. Use Ranked Keywords for organic ranking data.
+
+### Account Identity
+
+Get Current User identifies the connected API login and reports its timezone and available account balance. Account identity and Google location discovery do not consume API credits.
 
 ### DataForSEO Labs (Keyword & Domain Intelligence)
 
@@ -77,6 +83,8 @@ DataForSEO has two main methods to deliver results: Standard and Live. This inte
 ## Implemented Tools
 
 - `serp_search`
+- `get_current_user`
+- `list_serp_locations`
 - `keyword_research`
 - `keywords_for_site`
 - `keyword_suggestions`

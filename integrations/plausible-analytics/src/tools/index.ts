@@ -1,4 +1,6 @@
+export * from './check-api-health';
 export * from './get-realtime-visitors';
+export * from './get-tracker-installation';
 export * from './list-teams';
 export * from './manage-custom-properties';
 export * from './manage-goals';

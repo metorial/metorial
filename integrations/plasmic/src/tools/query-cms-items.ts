@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmsClient } from '../lib/cms-client';
+import { cmsModelIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let queryCmsItems = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let queryCmsItems = SlateTool.create(spec, {
   description: `Query items from a Plasmic CMS model with optional filtering, pagination, and ordering. Supports a JSON-based query syntax with logical operators (\`$and\`, \`$or\`, \`$not\`) and conditional operators for filtering by field values. Can load draft or published versions and localized content.`,
   instructions: [
     'The `where` field uses a MongoDB-style query syntax. Keys are field names, values are conditions.',
-    'Use conditional operators like `$gt`, `$gte`, `$lt`, `$lte`, `$ne`, `$in` within field conditions.',
+    'Use conditional operators like `$gt`, `$ge`, `$lt`, `$le`, `$in`, `$regex` within field conditions.',
     'Combine conditions with `$and`, `$or`, `$not` logical operators.',
     'Loading draft items requires the CMS secret token to be configured.'
   ],
@@ -19,16 +20,24 @@ export let queryCmsItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      modelId: z.string().describe('Unique identifier of the CMS model/table to query'),
+      modelId: cmsModelIdSchema,
       where: z
         .record(z.string(), z.unknown())
         .optional()
         .describe(
           'Filter conditions as a JSON object. Keys are field names, values are match conditions or operator objects'
         ),
-      limit: z.number().optional().describe('Maximum number of items to return'),
-      offset: z.number().optional().describe('Number of items to skip for pagination'),
-      order: z.string().optional().describe('Field name to order results by'),
+      limit: z.number().nonnegative().optional().describe('Maximum number of items to return'),
+      offset: z
+        .number()
+        .nonnegative()
+        .optional()
+        .describe('Number of items to skip for pagination'),
+      order: z.string().optional().describe('Field identifier to order results by'),
+      orderDirection: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe('Sort direction; defaults to ascending'),
       locale: z.string().optional().describe('Locale code for loading localized content'),
       draft: z
         .boolean()
@@ -46,8 +55,8 @@ export let queryCmsItems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.cmsId || !ctx.auth.cmsPublicToken) {
-      throw new Error('CMS ID and CMS public token are required to query items');
+    if (!ctx.auth.cmsId || !(ctx.auth.cmsPublicToken || ctx.auth.cmsSecretToken)) {
+      throw createApiServiceError('CMS ID and a CMS token are required to query items');
     }
 
     let client = new CmsClient({
@@ -62,6 +71,7 @@ export let queryCmsItems = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       order: ctx.input.order,
+      orderDirection: ctx.input.orderDirection,
       locale: ctx.input.locale,
       draft: ctx.input.draft
     });

@@ -1,16 +1,24 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class MiroClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token)
+      throw createApiServiceError('Connect your Miro account before using this tool.');
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.miro.com/v2',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Miro', reason: 'miro_api_error' })
     });
+  }
+
+  async getCurrentUser() {
+    let response = await this.axios.get('/v1/oauth-token', {
+      baseURL: 'https://api.miro.com'
+    });
+    return response.data;
   }
 
   // ── Boards ────────────────────────────────────────────────────────
@@ -36,7 +44,7 @@ export class MiroClient {
     let body: Record<string, any> = {
       name: params.name
     };
-    if (params.description) body.description = params.description;
+    if (params.description !== undefined) body.description = params.description;
     if (params.teamId) body.teamId = params.teamId;
     if (params.policy) body.policy = params.policy;
 
@@ -101,7 +109,9 @@ export class MiroClient {
       teamId?: string;
     }
   ) {
-    let response = await this.axios.put(`/boards/${boardId}/copy`, params || {});
+    let response = await this.axios.put('/boards', params || {}, {
+      params: { copy_from: boardId }
+    });
     return response.data;
   }
 
@@ -646,11 +656,11 @@ export class MiroClient {
       cursor?: string;
     }
   ) {
-    let queryParams: Record<string, any> = {};
-    if (params?.limit) queryParams.limit = params.limit;
+    let queryParams: Record<string, any> = { parent_item_id: frameId };
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
     if (params?.cursor) queryParams.cursor = params.cursor;
 
-    let response = await this.axios.get(`/boards/${boardId}/frames/${frameId}/items`, {
+    let response = await this.axios.get(`/boards/${boardId}/items`, {
       params: queryParams
     });
     return response.data;
@@ -800,12 +810,16 @@ export class MiroClient {
   }
 
   async attachTag(boardId: string, itemId: string, tagId: string) {
-    await this.axios.post(`/boards/${boardId}/items/${itemId}/tags`, { tagId });
+    await this.axios.post(`/boards/${boardId}/items/${itemId}`, undefined, {
+      params: { tag_id: tagId }
+    });
     return { success: true };
   }
 
   async detachTag(boardId: string, itemId: string, tagId: string) {
-    await this.axios.delete(`/boards/${boardId}/items/${itemId}/tags/${tagId}`);
+    await this.axios.delete(`/boards/${boardId}/items/${itemId}`, {
+      params: { tag_id: tagId }
+    });
   }
 
   async getItemTags(boardId: string, itemId: string) {

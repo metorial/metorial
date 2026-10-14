@@ -1,74 +1,57 @@
-Now let me check the webhooks documentation:# Slates Specification for Autobound
-
-## Overview
-
-Autobound is a B2B sales intelligence platform that monitors 250M+ contacts and 50M+ companies for buying signals (job changes, funding, news, SEC filings, hiring trends, tech stack changes, etc.) and uses AI to generate personalized sales outreach content. It offers a REST API for content generation, prospect insight enrichment, signal data feeds, and a B2B contact/company database.
+# Autobound Integration
 
 ## Authentication
 
-Autobound uses API key authentication. All API requests require an API key passed in the `X-API-KEY` header.
+Requests use `X-API-KEY`. Content generation and AI Studio imports use the Content API key from [Autobound settings](https://app2.autobound.ai/settings/api-keys). Content generation requires provider-authorized access under a sales agreement.
 
-To generate an API key, navigate to **Settings > API** in your Autobound account. Add this key to your API requests.
+The [Signal API portal](https://signalapi.autobound.ai) issues a separate key for company/contact enrichment, account lookup, and signal-type discovery. Choose `signal_api_key` for a signal-only connection. The existing `api_key` method accepts an optional `signalApiKey` for connections that use both API families. Existing connections retain their original token fallback.
 
-The API key is included as a header in every request:
+## Tools
 
-```
-X-API-KEY: YOUR-API-KEY
-```
+| Tool key | Endpoint | Behavior |
+| --- | --- | --- |
+| `generate_content` | `POST https://api.autobound.ai/api/external/generate-content/v3.6` | Generate outreach content for an identified prospect and seller. |
+| `generate_insights` | `POST https://api.autobound.ai/api/external/generate-insights/v1.4` | Legacy seller-ranked insights; provider retirement is announced for October 30, 2026. |
+| `import_campaign_contact` | `POST https://api.autobound.ai/api/workflows/campaigns/{campaignId}/execute/` | Import named contact fields and optional custom key-value inputs into an existing campaign. Configure field mappings in AI Studio. |
+| `enrich_company` | `POST https://signals.autobound.ai/v1/companies/enrich` | Retrieve domain-based company signals with optional type, subtype, and date filters. |
+| `enrich_contact` | `POST https://signals.autobound.ai/v1/contacts/enrich` | Retrieve signals and resolved entities for an email address or LinkedIn profile. |
+| `get_account` | `GET https://signals.autobound.ai/v1/account` | Return the authenticated account identifier, name, rate limit, and running credit balance. |
+| `list_signal_types` | `GET https://signals.autobound.ai/v1/signals/types` | Discover current types, subtype vocabulary, metadata, and optional row counts. |
 
-Self-serve API keys can be generated directly within your Autobound account. Free credits are included with new API keys.
+## Content generation
 
-No OAuth2 or other authentication methods are supported. There are no scopes or additional credentials required beyond the API key.
+Provide `contactEmail` or `contactLinkedinUrl`, and `userEmail` or `userLinkedinUrl`. Company URLs override resolved company information. Existing company-domain fields remain accepted and also populate the corresponding company URL override.
 
-## Features
+All existing content types remain available. Optional `customWritingStyle` works with `writingStyle: custom`; `n` requests one to three alternatives except for sequences; `userCompanyUrl` supplies the seller company override. The existing `sonnet` model value is mapped to the documented `sonnet_3.5` value; additional documented model values are accepted.
 
-### Personalized Content Generation
+The existing string outputs remain strings, using an empty string when the provider reports an unresolved contact field. Existing required content-item insight arrays remain arrays. Sequence steps, character counts, per-item sales assets/value propositions, and sequence insights are exposed additively. `rawResponse` preserves the complete original response, including nullable and additional fields.
 
-Generate AI-powered personalized sales content in multiple formats: single emails (with subject line), multi-step email sequences, call scripts with talking points and objection handling, LinkedIn connection requests (max 300 characters), and SMS messages. Additionally, you can generate email openers (opening lines) and fully custom content by defining your own output format using natural language instructions.
+## Signals
 
-- **Contact resolution**: Identify the prospect via `contactEmail`, `contactLinkedinUrl`, or `contactCompanyUrl`.
-- **Writing style**: Configurable styles such as `challenger_sale` and others to control the tone and approach.
-- **Word count**: Override default lengths for any content type.
-- **Additional context**: Provide freeform context (e.g., "I just left a voicemail") to influence output.
-- **Sales assets**: Attach relevant collateral (case studies, product pages) for the AI to reference.
-- **Insight control**: Enable or suppress specific insight categories (e.g., funding, hiring, social media) used in content generation.
-- **Model selection**: Choose from multiple AI models (e.g., `opus`, `gpt4o`, `sonnet`, `fine_tuned`) trading off quality and speed.
-- **Template rewriting**: Provide a "template to enrich," allowing Autobound to rewrite existing content rather than generate from scratch.
-- **Sequence configuration**: For email sequences, specify the number of emails (defaults to 3).
+The public camel-case filters are sent as the documented `signal_types`, `signal_subtypes`, and `detected_after` request fields. Enrichment `limit` is a whole number from 1 to 500, with provider default 20. At most 25 subtypes can be supplied. Discover current company/contact associations and subtype values with `list_signal_types`.
 
-### Prospect Insight Enrichment
+Company output retains `domain`, normalized `signals`, and `signalCount`, plus additive company, summary, coverage, warnings, and complete provider response fields. Existing `variables` values are preserved; when absent, that field retains the complete original signal. Contact output includes the original signal records and the complete provider response. Contact signal coverage may be sparse; use the resolved employer domain with `enrich_company` for company signals.
 
-Retrieve up to 25 ranked, personalized insights for any prospect with a single API call, delivered in structured JSON. Insights cover both contact-level and company-level data.
+The catalog supports string-based default results and object-based counted results without flattening either variant. Account credits may contain null numeric fields for exempt keys.
 
-- **Company signals**: SEC filings (10-K, 10-Q, 8-K, 6-K, 20-F), earnings transcripts, news events, competitor news, hiring velocity/trends, employee growth, tech stack, financial signals, GitHub activity, Reddit mentions, patent filings, Glassdoor reviews, Product Hunt launches, SEO/traffic data, blog posts, LinkedIn/Twitter posts, and more.
-- **Contact signals**: Job changes, LinkedIn posts/comments, Twitter posts, podcast appearances, work milestones, shared experiences with the seller, behavioral profiles, and YouTube videos.
-- Optionally provide `userEmail` to improve insight ranking based on relevance to the seller.
-- Filter by specific insight subtypes.
+## Legacy insights
 
-### Campaign Contact Import
+`generate_insights` remains registered with its existing key, handler, input schema, and output schema. It is tagged deprecated and points to company/contact enrichment. The provider announces HTTP 410 with code 4006 from October 30, 2026; no retirement or live response has been inferred before that date. Signal enrichment returns structured events rather than seller-ranked insight prose.
 
-Import prospects into AI Studio campaigns via API. Create a campaign in AI Studio, then use the campaign's unique ID to push contacts via API requests.
+## Errors and limits
 
-- Provide parameters to control what data is imported and used for content generation.
+HTTP failures use the shared structured API error handling. Provider-specific content `errorCode` values and numeric nested error codes are captured before HTTP error normalization. Documented recovery hints, next steps, and validation details remain in error data and messages, including nested retry bodies. Local invalid combinations use service errors without narrowing existing number schemas.
 
-### Signal Data (Bulk)
+No tools here generate downloadable files. Rate limits, credits, endpoint availability, and contact coverage remain provider-controlled. Unused historical webhook client methods are not registered as tools or triggers.
 
-License 25+ proprietary signal types (400+ subtypes) for your platform via API, GCS, or flat file delivery. Signal types include SEC filing analysis, earnings transcripts, Reddit sentiment, hiring data, GitHub activity, and more.
+## Official documentation
 
-### B2B Contact and Company Database
-
-Access to a database of 270M+ contacts and 11M+ companies for CRM enrichment and lead scoring, available via flat file delivery.
-
-## Events
-
-Autobound supports webhooks via its Signal API to push signal events to your endpoint in real time.
-
-### Signal Events
-
-When Autobound detects new signals matching your subscription criteria, it delivers them as HTTP POST requests to your registered endpoint. Each event contains the full signal payload including signal type, subtype, associated company/contact data, and detection timestamp.
-
-- **Signal type filtering**: Subscribe to specific signal types (e.g., `work-milestones`, `news`, `8k`) or receive all types by omitting the filter.
-- **Signature verification**: Each delivery includes an `x-autobound-signature` header (HMAC SHA-256) for payload authenticity verification using a signing secret provided at subscription creation.
-- **Historical backfill**: Replay historical signals matching your subscription's filter to your endpoint from a specified date.
-- **Delivery management**: View delivery logs, inspect failures, and replay individual failed deliveries. Failed deliveries that exhaust retries are stored in a dead-letter queue.
-- **Subscription management**: Create, list, update (including pause/resume), and delete webhook subscriptions. Signing secrets can be rotated if compromised.
+- [Content request and response reference](https://autobound-api.readme.io/reference/generate-personalized-content)
+- [Content parameters](https://autobound-api.readme.io/docs/parameters)
+- [Legacy insight parameters](https://autobound-api.readme.io/docs/parameters-for-generate-insights)
+- [AI Studio imports](https://autobound-api.readme.io/docs/add-contact-to-ai-studio-via-api)
+- [Company enrichment](https://autobound-api.readme.io/reference/enrichcompany)
+- [Contact enrichment](https://autobound-api.readme.io/reference/enrichcontact)
+- [Signal types](https://autobound-api.readme.io/reference/listsignaltypes)
+- [Account details](https://autobound-api.readme.io/reference/getaccount)
+- [Insights retirement announcement](https://autobound-api.readme.io/changelog/generate-insights-api-retires-move-to-the-signal-api)

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getBot = SlateTool.create(spec, {
   name: 'Get Bot',
   key: 'get_bot',
-  description: `Retrieves detailed information about a specific bot by its user ID, including identity, configuration, AI settings, and callback URL.`,
+  description: `Retrieves detailed information about a specific bot by its user ID, including identity, callback URL, and channel invitation settings.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,12 +14,12 @@ export let getBot = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botUserId: z.string().describe('User ID of the bot to retrieve')
+      botUserId: z.string().min(1).max(80).describe('User ID of the bot to retrieve')
     })
   )
   .output(
     z.object({
-      botUserId: z.string().describe('Unique user ID of the bot'),
+      botUserId: z.string().min(1).max(80).describe('Unique user ID of the bot'),
       botNickname: z.string().describe('Display nickname'),
       botProfileUrl: z.string().optional().describe('Profile image URL'),
       botType: z.string().optional().describe('Category of the bot'),
@@ -40,24 +40,24 @@ export let getBot = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     let result = await client.getBot(ctx.input.botUserId);
 
-    let bot = (result.bot || {}) as Record<string, unknown>;
+    let bot = result.bot;
     return {
       output: {
-        botUserId: (bot.bot_userid as string) ?? ctx.input.botUserId,
-        botNickname: bot.bot_nickname as string,
-        botProfileUrl: bot.bot_profile_url as string | undefined,
-        botType: bot.bot_type as string | undefined,
-        botToken: bot.bot_token as string | undefined,
-        botCallbackUrl: result.bot_callback_url as string | undefined,
-        isPrivacyMode: result.is_privacy_mode as boolean | undefined,
-        enableMarkAsRead: result.enable_mark_as_read as boolean | undefined,
-        showMember: result.show_member as boolean | undefined,
-        channelInvitationPreference: result.channel_invitation_preference as number | undefined
+        botUserId: bot.bot_userid ?? ctx.input.botUserId,
+        botNickname: bot.bot_nickname,
+        botProfileUrl: bot.bot_profile_url,
+        botType: bot.bot_type,
+        botToken: bot.bot_token,
+        botCallbackUrl: result.bot_callback_url,
+        isPrivacyMode: result.is_privacy_mode,
+        enableMarkAsRead: result.enable_mark_as_read,
+        showMember: result.show_member,
+        channelInvitationPreference: result.channel_invitation_preference
       },
       message: `Retrieved bot **${bot.bot_nickname || ctx.input.botUserId}**.`
     };

@@ -1,6 +1,4 @@
-Let me get more details on the webhook event scopes and the API feature areas.Now let me check what API Key authentication looks like:Now I have enough information to write the specification.
-
-# Slates Specification for Appcircle
+# Appcircle API Specification
 
 ## Overview
 
@@ -19,7 +17,7 @@ The Appcircle API supports authentication with a Personal Access Key. The key fo
   - **Endpoint:** `POST https://auth.appcircle.io/auth/v3/token`
   - **Content-Type:** `application/x-www-form-urlencoded`
   - **Body parameter:** `personalAccessKey=<your_access_key>`
-- Use the generated PAT in an `Authorization` header on all subsequent API requests.
+- Use the generated PAT as `Authorization: Bearer <access_token>` on all subsequent API requests.
 
 ### 2. API Key (Organization-level)
 
@@ -30,7 +28,7 @@ The Appcircle API also supports authentication with an API Key. API Keys are typ
   - **Endpoint:** `POST https://auth.appcircle.io/auth/v1/api-key/token`
   - **Content-Type:** `application/x-www-form-urlencoded`
   - **Body parameters:** `name=<api_key_name>`, `secret=<api_key_secret>`, optionally `organizationId=<org_id>` for sub-organizations.
-- Use the returned access token in the `Authorization` header for subsequent API calls.
+- Use the returned access token as `Authorization: Bearer <access_token>` for subsequent API calls.
 
 **Base URLs:**
 

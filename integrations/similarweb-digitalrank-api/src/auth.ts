@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,13 +15,17 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Your SimilarWeb API key. Generate one from Settings > Account > API page in your SimilarWeb dashboard.'
+          'Your active Similarweb API key. Account admins can generate one under Settings > Account > API > Standard API / Batch API.'
         )
     }),
     getOutput: async ctx => {
+      let token = ctx.input.apiKey.trim();
+      if (!token) {
+        throw createApiServiceError('Provide an active Similarweb API key.');
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token
         }
       };
     }

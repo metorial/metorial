@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createJobTool = SlateTool.create(spec, {
   name: 'Create Job',
   key: 'create_job',
-  description: `Create a new job in AccuLynx. The job will be created in the "Lead (Unassigned)" milestone. Requires a contact ID for an existing contact. Optionally set trade type, work type, lead source, estimated value, and description.`,
+  description: `Create a new job in AccuLynx in the Lead milestone with no assigned representative. Requires an existing contact. Optionally set trade types, work type, lead source, category, priority, and notes. Use get_company_settings to discover classification IDs or names.`,
   instructions: [
     'A contact must already exist in AccuLynx before creating a job. Use the Search Contacts or Create Contact tools first if needed.'
   ],
@@ -17,12 +17,43 @@ export let createJobTool = SlateTool.create(spec, {
   .input(
     z.object({
       contactId: z.string().describe('ID of the existing contact to associate with this job'),
-      tradeType: z.string().optional().describe('Trade type for the job'),
-      workType: z.string().optional().describe('Work type for the job'),
+      tradeType: z.string().optional().describe('Trade type name or ID for the job'),
+      workType: z.string().optional().describe('Work type name or numeric ID for the job'),
       leadSource: z.string().optional().describe('Lead source name'),
-      leadSourceChild: z.string().optional().describe('Child lead source name'),
-      estimatedJobValue: z.number().optional().describe('Estimated value of the job'),
-      description: z.string().optional().describe('Description of the job')
+      leadSourceChild: z
+        .string()
+        .optional()
+        .describe('Legacy field unsupported by the job creation API; omit this field'),
+      estimatedJobValue: z
+        .number()
+        .optional()
+        .describe('Legacy field unsupported by the job creation API; omit this field'),
+      description: z
+        .string()
+        .max(1000)
+        .optional()
+        .describe('Notes for the job, up to 1000 characters'),
+      tradeTypeIds: z
+        .array(z.string())
+        .optional()
+        .describe('Trade type IDs from get_company_settings; takes precedence over tradeType'),
+      workTypeId: z
+        .number()
+        .int()
+        .optional()
+        .describe('Work type ID from get_company_settings; takes precedence over workType'),
+      leadSourceId: z
+        .string()
+        .optional()
+        .describe(
+          'Lead source ID from get_company_settings; takes precedence over leadSource'
+        ),
+      jobCategoryId: z
+        .number()
+        .int()
+        .optional()
+        .describe('Job category ID from get_company_settings'),
+      priority: z.enum(['Urgent', 'High', 'Normal']).optional().describe('Priority of the job')
     })
   )
   .output(
@@ -40,7 +71,12 @@ export let createJobTool = SlateTool.create(spec, {
       leadSource: ctx.input.leadSource,
       leadSourceChild: ctx.input.leadSourceChild,
       estimatedJobValue: ctx.input.estimatedJobValue,
-      description: ctx.input.description
+      description: ctx.input.description,
+      tradeTypeIds: ctx.input.tradeTypeIds,
+      workTypeId: ctx.input.workTypeId,
+      leadSourceId: ctx.input.leadSourceId,
+      jobCategoryId: ctx.input.jobCategoryId,
+      priority: ctx.input.priority
     });
 
     return {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TombaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -53,6 +53,15 @@ export let emailFinder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.domain?.trim() && !ctx.input.company?.trim()) {
+      throw createApiServiceError('Provide a domain or company name to find an email.');
+    }
+    if (
+      !ctx.input.fullName?.trim() &&
+      !(ctx.input.firstName?.trim() && ctx.input.lastName?.trim())
+    ) {
+      throw createApiServiceError('Provide a full name or both first and last names.');
+    }
     let client = new TombaClient({
       apiKey: ctx.auth.apiKey,
       apiSecret: ctx.auth.apiSecret

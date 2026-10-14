@@ -1,6 +1,4 @@
-The most likely "Engage" as a standalone product for an integration platform is **Engage** (engage.so) — a customer messaging and automation platform. Let me research it further.Now let me check the Engage.so website for more about its features and whether it supports webhooks.Based on my research, Engage (engage.so) is a customer engagement platform. It does not appear to offer outbound webhooks or event subscriptions via its API — it primarily consumes data from other services via webhooks (e.g., Paystack, FastSpring) rather than providing its own webhook/event system for external consumers. Let me check the batch requests page for completeness.Now I have comprehensive information to write the specification.
-
-# Slates Specification for Engage
+# Engage Integration
 
 ## Overview
 
@@ -26,7 +24,7 @@ On some endpoints, you can use just your API key (as username) and leave the sec
 Create, retrieve, update, list, archive, and delete customers and accounts. The Engage API lets you interact with data and resources through REST. Users can have standard attributes (first name, last name, email, phone number) and custom metadata attributes (key-value pairs of strings, numbers, or booleans). Users can be converted between Customer and Account types. Customers can be added to Accounts with optional roles. Users can be merged together, combining their data into a single profile.
 
 - Each user is identified by a `uid` (your application's unique user identifier) which should be stable (not an email or other mutable field).
-- Device tokens (for push notifications) can be managed per user, supporting Android and iOS platforms.
+- Device tokens (for push notifications) can be added or removed per user, supporting Android and iOS platforms. Custom metadata attributes can also be deleted.
 - Users can be filtered by email when listing.
 
 ### Accounts
@@ -39,7 +37,7 @@ Create, retrieve, update, and archive subscription lists. Lists group customers 
 
 - Lists support double opt-in confirmation emails for new subscribers.
 - Lists can have a redirect URL for post-subscription behavior.
-- Users can be subscribed, unsubscribed, or removed from lists. Unsubscribing preserves the user in the list but stops engagements; removing deletes them entirely.
+- Users can be subscribed, unsubscribed, or removed from lists. Unsubscribing preserves their list membership but stops engagements; removal deletes the membership while preserving the user profile.
 
 ### Event Tracking
 
@@ -66,7 +64,7 @@ The API documentation indicates push notification sending is planned but not yet
 
 ### Batch Operations
 
-Multiple user creation, attribute update, and event tracking operations can be combined into a single batch API call. Batch requests are processed asynchronously and return a queued status without validating individual items upfront.
+Engage offers a separate batch API for user creation, attribute updates, and event tracking. Batch requests are not exposed by this integration. Multiple operations can be combined into a single batch API call. Batch requests are processed asynchronously and return a queued status without validating individual items upfront.
 
 ## Events
 

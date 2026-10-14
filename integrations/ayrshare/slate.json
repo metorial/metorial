@@ -1,18 +1,21 @@
 {
   "name": "@metorial/ayrshare",
-  "description": "Publish, schedule, and manage social media posts across 13 platforms (Facebook, X/Twitter, Instagram, LinkedIn, TikTok, YouTube, Reddit, Telegram, Pinterest, Snapchat, Google Business Profile, Threads, and Bluesky) through a single unified API. Retrieve post and account-level analytics including likes, clicks, and engagement. Manage comments by retrieving, posting, replying to, and deleting them. Send and receive direct messages on Facebook and Instagram. Get, respond to, and delete reviews on Facebook Pages and Google Business Profile. Upload and host media files for use in posts. Auto-generate hashtags, shorten links, and validate content before publishing. Create Facebook ads by boosting posts. Monitor brand presence across platforms. Subscribe to RSS feeds for automatic posting. Manage multiple user profiles and their linked social accounts.",
+  "description": "Publish, schedule, and manage social media posts across 13 networks through Ayrshare. Check post history and publication status, retry failed posts, retrieve post and account analytics, retrieve, post, and delete comments, send and retrieve direct messages on Facebook, Instagram, and X/Twitter, and read reviews from Facebook Pages and Google Business Profile. Upload and host media, generate hashtags, shorten post links, and validate content before publishing. Manage user profiles and RSS feed subscriptions, and discover the current profile and its linked social accounts.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
   "skills": [
     "publish social media posts",
     "schedule future posts",
-    "retrieve post analytics",
-    "manage comments and replies",
-    "send direct messages",
-    "manage reviews",
+    "retrieve post and account analytics",
+    "manage post comments",
+    "send and retrieve direct messages",
+    "retrieve reviews",
     "upload and host media",
     "auto-generate hashtags",
-    "create Facebook ads",
-    "monitor brand mentions"
+    "manage user profiles",
+    "retrieve post history",
+    "retry failed posts",
+    "validate post content",
+    "manage RSS feed subscriptions"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/ayrshare.png"
 }

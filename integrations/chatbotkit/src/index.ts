@@ -2,7 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   conversationFeedbackTool,
+  getTaskTool,
   listMessagesTool,
+  listModelsTool,
   listResourcesTool,
   manageBotTool,
   manageContactTool,
@@ -28,7 +30,9 @@ export let provider = Slate.create({
     manageSpaceTool,
     listResourcesTool,
     listMessagesTool,
-    conversationFeedbackTool
+    conversationFeedbackTool,
+    listModelsTool,
+    getTaskTool
   ],
   triggers: []
 });

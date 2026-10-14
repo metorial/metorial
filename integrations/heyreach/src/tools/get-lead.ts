@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getLead = SlateTool.create(spec, {
   name: 'Get Lead',
   key: 'get_lead',
-  description: `Retrieve detailed information about a lead by their LinkedIn profile URL. Returns the lead's profile data, campaign associations, and any custom fields.`,
+  description: `Retrieve detailed information about a lead by their LinkedIn profile URL. Returns the lead's profile and enrichment data.`,
   tags: {
     readOnly: true
   }

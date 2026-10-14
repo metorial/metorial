@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CustomGPTClient } from '../lib/client';
 import { spec } from '../spec';
@@ -23,14 +23,44 @@ export let manageDocuments = SlateTool.create(spec, {
       action: z
         .enum(['list', 'delete', 'reindex', 'get_metadata', 'update_metadata', 'set_labels'])
         .describe('Action to perform'),
-      projectId: z.number().describe('ID of the agent'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
       pageId: z
         .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
         .optional()
         .describe('Page/document ID (required for all actions except list)'),
-      page: z.number().optional().describe('Page number for list pagination'),
-      limit: z.number().optional().describe('Number of results per page (for list)'),
+      page: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .optional()
+        .describe('Page number for list pagination'),
+      limit: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .optional()
+        .describe('Number of results per page (for list)'),
       order: z.enum(['asc', 'desc']).optional().describe('Sort direction (for list)'),
+      search: z
+        .string()
+        .optional()
+        .describe(
+          'Filter documents by URL or filename (for list). Supports * and ? wildcards.'
+        ),
       crawlStatus: z
         .enum(['all', 'ok', 'failed', 'n/a', 'queued', 'limited'])
         .optional()
@@ -43,7 +73,17 @@ export let manageDocuments = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .optional()
         .describe('Metadata to update (for update_metadata)'),
-      labelIds: z.array(z.number()).optional().describe('Label IDs to assign (for set_labels)')
+      labelIds: z
+        .array(
+          z
+            .number()
+            .refine(
+              value => Number.isSafeInteger(value) && value > 0,
+              'Must be a positive whole number'
+            )
+        )
+        .optional()
+        .describe('Label IDs to assign (for set_labels)')
     })
   )
   .output(
@@ -80,6 +120,7 @@ export let manageDocuments = SlateTool.create(spec, {
         page: ctx.input.page,
         limit: ctx.input.limit,
         order: ctx.input.order,
+        search: ctx.input.search,
         crawlStatus: ctx.input.crawlStatus,
         indexStatus: ctx.input.indexStatus
       });
@@ -103,7 +144,7 @@ export let manageDocuments = SlateTool.create(spec, {
     }
 
     if (!pageId) {
-      throw new Error('pageId is required for this action');
+      throw createApiServiceError('pageId is required for this action');
     }
 
     if (action === 'delete') {
@@ -132,7 +173,7 @@ export let manageDocuments = SlateTool.create(spec, {
 
     if (action === 'update_metadata') {
       if (!ctx.input.metadata) {
-        throw new Error('metadata is required for update_metadata action');
+        throw createApiServiceError('metadata is required for update_metadata action');
       }
       let metadata = await client.updatePageMetadata(projectId, pageId, ctx.input.metadata);
       return {
@@ -143,7 +184,7 @@ export let manageDocuments = SlateTool.create(spec, {
 
     // set_labels
     if (!ctx.input.labelIds) {
-      throw new Error('labelIds is required for set_labels action');
+      throw createApiServiceError('labelIds is required for set_labels action');
     }
     await client.setPageLabels(projectId, pageId, ctx.input.labelIds);
     return {

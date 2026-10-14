@@ -33,6 +33,12 @@ let blockSchema = z.object({
     .union([z.string(), z.number(), z.boolean()])
     .optional()
     .describe('Value for field blocks. The expected type depends on the block type.'),
+  values: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Multiple selected values for select or checkbox blocks. Omit value when using values.'
+    ),
   properties: z
     .record(z.string(), z.string())
     .optional()
@@ -49,11 +55,12 @@ export let submitForm = SlateTool.create(spec, {
 Supports all block types: **sender** (email, name, phone, company), **tracking** (UTM parameters), and field blocks like **text**, **number**, **email**, **phone**, **url**, **date**, **rating**, **select**, **radio**, **checkbox**, and **country**.`,
   instructions: [
     'Object blocks (sender, tracking) use "properties" and should have at most 1 per submission.',
-    'Field blocks require a unique "name" and a "value".',
-    'Maximum 50 field blocks per submission, maximum 20 blocks of the same type.'
+    'Field blocks require a unique "name" and a "value", or "values" for multi-choice select and checkbox blocks.',
+    'Maximum 100 field blocks per submission, maximum 50 blocks of the same type.'
   ],
   constraints: [
     'File uploads are not supported via this tool (requires multipart/form-data).',
+    'Protected forms require a Forminit API key and apiVersion v2. Legacy Getform tokens authenticate retrieval only.',
     'Rate limits apply: 1 request per 5 seconds without API key, 5 per second with API key.'
   ],
   tags: {

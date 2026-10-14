@@ -50,12 +50,12 @@ export let listFormFields = SlateTool.create(spec, {
 
     let fields = result.results.map(f => ({
       fieldKey: f.key,
-      title: f.title,
-      description: f.description,
+      title: f.title ?? null,
+      description: f.description ?? null,
       type: f.type,
-      required: f.required,
-      customKey: f.custom_key,
-      placeholder: f.placeholder
+      required: f.required ?? null,
+      customKey: f.custom_key ?? null,
+      placeholder: f.placeholder ?? null
     }));
 
     return {

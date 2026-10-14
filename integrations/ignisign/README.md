@@ -1,6 +1,8 @@
 # Ignisign
 
-Create, manage, and verify legally binding electronic and digital signatures on documents. Upload PDFs, DOCX, images, and raw data for signing. Configure signature profiles with multiple signature levels (Simple, Advanced, Qualified) compliant with eIDAS, ESIGN, and UETA regulations. Create and launch signature requests, manage signers and their required identity inputs, and track signature progress through real-time webhooks. Retrieve signature proofs including XAdES files, ASiC-E containers, proof PDFs, and signature images. Automate corporate electronic seals for machine-to-machine document sealing. Embed signature sessions into applications or use Ignisign-managed email-based signing flows. Manage webhook endpoints to receive notifications for signer, signature request, proof, and document events.
+Create and publish electronic signature requests, manage signers and documents, and track signing progress. Use one-call signing to submit document files and signer email addresses together, or build a request through the draft workflow. Download original documents, signed proofs, and signature images, and apply corporate electronic seals using an M2M emitter.
+
+Connect with a current API key beginning with `skv2_` from the IgniSign Console. The application and environment are identified automatically. Existing stored connections retain their legacy application configuration as a fallback.
 
 ## License
 

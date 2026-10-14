@@ -35,11 +35,17 @@ export let createAutomation = SlateTool.create(spec, {
       dataSourceName: ctx.input.dataSourceName,
       docTemplateLink: ctx.input.docTemplateLink
     });
+    let automation = result.newAutomation ?? result;
 
     return {
       output: {
-        automationId: result._id || result.id || result.docId || result.automationId,
-        title: result.title || ctx.input.title
+        automationId:
+          automation._id ||
+          automation.id ||
+          automation.docId ||
+          automation.automationId ||
+          undefined,
+        title: automation.title || ctx.input.title
       },
       message: `Created automation **${ctx.input.title}**.`
     };

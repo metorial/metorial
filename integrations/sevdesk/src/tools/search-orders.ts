@@ -70,8 +70,8 @@ export let searchOrders = SlateTool.create(spec, {
       contactName: o.contact?.name || undefined,
       orderDate: o.orderDate ?? undefined,
       status: o.status != null ? String(o.status) : undefined,
-      totalNet: o.sumNet ?? undefined,
-      totalGross: o.sumGross ?? undefined,
+      totalNet: o.sumNet != null ? String(o.sumNet) : undefined,
+      totalGross: o.sumGross != null ? String(o.sumGross) : undefined,
       currency: o.currency ?? undefined,
       createdAt: o.create ?? undefined
     }));

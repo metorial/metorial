@@ -38,7 +38,8 @@ export let createTicket = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let { sessionId, ...rest } = ctx.input;

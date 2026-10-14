@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -42,9 +42,19 @@ export let manageOrderPayments = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.orderId && !ctx.input.orderExternalId) {
+        throw createApiServiceError(
+          'Either orderId or orderExternalId is required for create action.'
+        );
+      }
+      if (!ctx.input.type) {
+        throw createApiServiceError('type is required for create action.');
+      }
       let payment: Record<string, any> = {};
-      if (ctx.input.orderId) payment.order = { id: ctx.input.orderId };
-      if (ctx.input.orderExternalId) payment.order = { externalId: ctx.input.orderExternalId };
+      payment.order = {
+        id: ctx.input.orderId,
+        externalId: ctx.input.orderExternalId
+      };
       if (ctx.input.type) payment.type = ctx.input.type;
       if (ctx.input.status) payment.status = ctx.input.status;
       if (ctx.input.amount !== undefined) payment.amount = ctx.input.amount;
@@ -60,7 +70,8 @@ export let manageOrderPayments = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'edit') {
-      if (!ctx.input.paymentId) throw new Error('paymentId is required for edit action.');
+      if (!ctx.input.paymentId)
+        throw createApiServiceError('paymentId is required for edit action.');
       let payment: Record<string, any> = {};
       if (ctx.input.type) payment.type = ctx.input.type;
       if (ctx.input.status) payment.status = ctx.input.status;
@@ -77,7 +88,8 @@ export let manageOrderPayments = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.paymentId) throw new Error('paymentId is required for delete action.');
+      if (!ctx.input.paymentId)
+        throw createApiServiceError('paymentId is required for delete action.');
       await client.deleteOrderPayment(ctx.input.paymentId);
       return {
         output: { deleted: true },
@@ -85,6 +97,6 @@ export let manageOrderPayments = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

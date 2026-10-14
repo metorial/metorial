@@ -59,36 +59,44 @@ export let getProductivityStats = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let stats = await client.getProductivityStats();
 
+    let dailyStreak = stats.goals?.current_daily_streak;
+    let weeklyStreak = stats.goals?.current_weekly_streak;
+    let completedToday = stats.days_items?.at(-1)?.total_completed;
+    let completedThisWeek = stats.week_items?.at(-1)?.total_completed;
+
     return {
       output: {
         karmaScore: stats.karma,
         karmaLastUpdate: stats.karma_last_update,
-        karmaDisabled: stats.karma_disabled,
-        completedToday: stats.completed_today,
-        completedThisWeek: stats.completed_this_week,
+        karmaDisabled:
+          stats.goals?.karma_disabled === undefined
+            ? undefined
+            : Boolean(stats.goals.karma_disabled),
+        completedToday,
+        completedThisWeek,
         daysItems: stats.days_items?.map((d: any) => ({
           date: d.date,
           totalCompleted: d.total_completed
         })),
         weekItems: stats.week_items?.map((w: any) => ({
-          date: w.date,
+          date: w.from,
           totalCompleted: w.total_completed
         })),
-        currentDailyStreak: stats.current_daily_streak
+        currentDailyStreak: dailyStreak
           ? {
-              count: stats.current_daily_streak.count,
-              startDate: stats.current_daily_streak.start_date,
-              endDate: stats.current_daily_streak.end_date
+              count: dailyStreak.count,
+              startDate: dailyStreak.start ?? undefined,
+              endDate: dailyStreak.end ?? undefined
             }
           : undefined,
-        currentWeeklyStreak: stats.current_weekly_streak
+        currentWeeklyStreak: weeklyStreak
           ? {
-              count: stats.current_weekly_streak.count,
-              startDate: stats.current_weekly_streak.start_date,
-              endDate: stats.current_weekly_streak.end_date
+              count: weeklyStreak.count,
+              startDate: weeklyStreak.start ?? undefined,
+              endDate: weeklyStreak.end ?? undefined
             }
           : undefined
       },
-      message: `Karma: **${stats.karma || 0}**, completed today: **${stats.completed_today || 0}**.`
+      message: `Karma: **${stats.karma || 0}**, completed today: **${completedToday ?? 0}**.`
     };
   });

@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listBackups = SlateTool.create(spec, {
   name: 'List Backups',
   key: 'list_backups',
-  description: `List all backups across an organization with pagination. Returns backup details including status, size, storage provider, and associated application/database information.`,
+  description: `List all backups across an organization with pagination. Returns backup details including status, size, storage provider, and associated application/database information.
+${organizationScopeGuidance}`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +16,7 @@ export let listBackups = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       page: z.number().optional().describe('Page number for pagination')
     })
   )
@@ -27,7 +29,8 @@ export let listBackups = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let result = await client.listBackups(orgId, ctx.input.page);
     return {

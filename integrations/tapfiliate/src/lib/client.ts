@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 let BASE_URL = 'https://api.tapfiliate.com/1.6';
 
@@ -6,12 +11,14 @@ export class TapfiliateClient {
   private http;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': config.token
-      }
+      authHeader: { name: 'X-Api-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Tapfiliate',
+          reason: 'tapfiliate_api_error'
+        })
     });
   }
 
@@ -41,7 +48,7 @@ export class TapfiliateClient {
   }
 
   async getAffiliate(affiliateId: string) {
-    let res = await this.http.get(`/affiliates/${affiliateId}/`);
+    let res = await this.http.get(`/affiliates/${encodeURIComponent(affiliateId)}/`);
     return res.data;
   }
 
@@ -60,6 +67,7 @@ export class TapfiliateClient {
       country?: string;
     };
     metaData?: Record<string, any>;
+    customFields?: Record<string, string>;
   }) {
     let body: Record<string, any> = {
       firstname: data.firstname,
@@ -75,71 +83,99 @@ export class TapfiliateClient {
         postal_code: data.address.postalCode,
         city: data.address.city,
         state: data.address.state,
-        country: data.address.country
+        country:
+          data.address.country === undefined ? undefined : { code: data.address.country }
       };
     }
     if (data.metaData) body.meta_data = data.metaData;
+    if (data.customFields) body.custom_fields = data.customFields;
 
     let res = await this.http.post('/affiliates/', body);
     return res.data;
   }
 
   async deleteAffiliate(affiliateId: string) {
-    await this.http.delete(`/affiliates/${affiliateId}/`);
+    await this.http.delete(`/affiliates/${encodeURIComponent(affiliateId)}/`);
   }
 
   async getAffiliateMetaData(affiliateId: string) {
-    let res = await this.http.get(`/affiliates/${affiliateId}/meta-data/`);
+    let res = await this.http.get(`/affiliates/${encodeURIComponent(affiliateId)}/meta-data/`);
     return res.data;
   }
 
   async setAffiliateMetaData(affiliateId: string, metaData: Record<string, any>) {
-    let res = await this.http.put(`/affiliates/${affiliateId}/meta-data/`, metaData);
+    let res = await this.http.put(
+      `/affiliates/${encodeURIComponent(affiliateId)}/meta-data/`,
+      metaData
+    );
     return res.data;
   }
 
   async setAffiliateMetaDataKey(affiliateId: string, key: string, value: string) {
-    let res = await this.http.put(`/affiliates/${affiliateId}/meta-data/${key}/`, { value });
+    let res = await this.http.put(
+      `/affiliates/${encodeURIComponent(affiliateId)}/meta-data/${encodeURIComponent(key)}/`,
+      { value }
+    );
     return res.data;
   }
 
   async deleteAffiliateMetaDataKey(affiliateId: string, key: string) {
-    await this.http.delete(`/affiliates/${affiliateId}/meta-data/${key}/`);
+    await this.http.delete(
+      `/affiliates/${encodeURIComponent(affiliateId)}/meta-data/${encodeURIComponent(key)}/`
+    );
   }
 
   async setAffiliateGroup(affiliateId: string, groupId: string) {
-    let res = await this.http.put(`/affiliates/${affiliateId}/group/`, { group: groupId });
+    let res = await this.http.put(`/affiliates/${encodeURIComponent(affiliateId)}/group/`, {
+      group_id: groupId
+    });
     return res.data;
   }
 
   async removeAffiliateGroup(affiliateId: string) {
-    let res = await this.http.delete(`/affiliates/${affiliateId}/group/`);
+    let res = await this.http.delete(`/affiliates/${encodeURIComponent(affiliateId)}/group/`);
     return res.data;
   }
 
-  async getAffiliatePayoutMethod(affiliateId: string) {
-    let res = await this.http.get(`/affiliates/${affiliateId}/payout-method/`);
+  async getAffiliatePayoutMethod(affiliateId: string, payoutMethodId: string) {
+    let res = await this.http.get(
+      `/affiliates/${encodeURIComponent(affiliateId)}/payout-methods/${encodeURIComponent(payoutMethodId)}/`
+    );
     return res.data;
   }
 
-  async setAffiliatePayoutMethod(affiliateId: string, payoutMethod: Record<string, any>) {
-    let res = await this.http.put(`/affiliates/${affiliateId}/payout-method/`, payoutMethod);
+  async listAffiliatePayoutMethods(affiliateId: string) {
+    let res = await this.http.get(
+      `/affiliates/${encodeURIComponent(affiliateId)}/payout-methods/`
+    );
+    return res.data;
+  }
+
+  async setAffiliatePayoutMethod(
+    affiliateId: string,
+    payoutMethodId: string,
+    payoutMethod: Record<string, any>
+  ) {
+    let res = await this.http.put(
+      `/affiliates/${encodeURIComponent(affiliateId)}/payout-methods/${encodeURIComponent(payoutMethodId)}/`,
+      payoutMethod
+    );
     return res.data;
   }
 
   async setMlmParent(affiliateId: string, parentAffiliateId: string) {
-    let res = await this.http.put(`/affiliates/${affiliateId}/mlm/parent/`, {
-      parent_id: parentAffiliateId
+    let res = await this.http.post(`/affiliates/${encodeURIComponent(affiliateId)}/parent/`, {
+      affiliate_id: parentAffiliateId
     });
     return res.data;
   }
 
   async removeMlmParent(affiliateId: string) {
-    await this.http.delete(`/affiliates/${affiliateId}/mlm/parent/`);
+    await this.http.delete(`/affiliates/${encodeURIComponent(affiliateId)}/parent/`);
   }
 
   async getAffiliateBalances(affiliateId: string) {
-    let res = await this.http.get(`/affiliates/${affiliateId}/balances/`);
+    let res = await this.http.get(`/affiliates/${encodeURIComponent(affiliateId)}/balances/`);
     return res.data;
   }
 
@@ -156,7 +192,7 @@ export class TapfiliateClient {
   }
 
   async updateAffiliateGroup(groupId: string, data: { title?: string }) {
-    let res = await this.http.patch(`/affiliate-groups/${groupId}/`, data);
+    let res = await this.http.patch(`/affiliate-groups/${encodeURIComponent(groupId)}/`, data);
     return res.data;
   }
 
@@ -173,7 +209,7 @@ export class TapfiliateClient {
   }
 
   async getAffiliateProspect(prospectId: string) {
-    let res = await this.http.get(`/affiliate-prospects/${prospectId}/`);
+    let res = await this.http.get(`/affiliate-prospects/${encodeURIComponent(prospectId)}/`);
     return res.data;
   }
 
@@ -190,14 +226,14 @@ export class TapfiliateClient {
       lastname: data.lastname
     };
     if (data.programId) body.program_id = data.programId;
-    if (data.groupId) body.group_id = data.groupId;
+    if (data.groupId) body.affiliate_group_id = data.groupId;
 
     let res = await this.http.post('/affiliate-prospects/', body);
     return res.data;
   }
 
   async deleteAffiliateProspect(prospectId: string) {
-    await this.http.delete(`/affiliate-prospects/${prospectId}/`);
+    await this.http.delete(`/affiliate-prospects/${encodeURIComponent(prospectId)}/`);
   }
 
   // ─── Programs ────────────────────────────────────────────────
@@ -210,7 +246,7 @@ export class TapfiliateClient {
   }
 
   async getProgram(programId: string) {
-    let res = await this.http.get(`/programs/${programId}/`);
+    let res = await this.http.get(`/programs/${encodeURIComponent(programId)}/`);
     return res.data;
   }
 
@@ -221,7 +257,7 @@ export class TapfiliateClient {
       page?: number;
     }
   ) {
-    let res = await this.http.get(`/programs/${programId}/affiliates/`, {
+    let res = await this.http.get(`/programs/${encodeURIComponent(programId)}/affiliates/`, {
       params: {
         affiliate_id: params?.affiliateId,
         page: params?.page
@@ -244,7 +280,10 @@ export class TapfiliateClient {
     if (data.approved !== undefined) body.approved = data.approved;
     if (data.coupon) body.coupon = data.coupon;
 
-    let res = await this.http.post(`/programs/${programId}/affiliates/`, body);
+    let res = await this.http.post(
+      `/programs/${encodeURIComponent(programId)}/affiliates/`,
+      body
+    );
     return res.data;
   }
 
@@ -256,36 +295,55 @@ export class TapfiliateClient {
       approved?: boolean;
     }
   ) {
-    let res = await this.http.patch(`/programs/${programId}/affiliates/${affiliateId}/`, data);
-    return res.data;
+    if (data.coupon === undefined && data.approved === undefined) {
+      throw createApiServiceError(
+        'Provide coupon or approved when updating a program affiliate.'
+      );
+    }
+    let result: { approved?: boolean | null; coupon?: string | null } | undefined;
+    if (data.coupon !== undefined) {
+      let res = await this.http.patch(
+        `/programs/${encodeURIComponent(programId)}/affiliates/${encodeURIComponent(affiliateId)}/`,
+        { coupon: data.coupon }
+      );
+      result = res.data;
+    }
+    if (data.approved !== undefined) {
+      result = data.approved
+        ? await this.approveAffiliateForProgram(programId, affiliateId)
+        : await this.disapproveAffiliateForProgram(programId, affiliateId);
+    }
+    return result;
   }
 
   async approveAffiliateForProgram(programId: string, affiliateId: string) {
     let res = await this.http.put(
-      `/programs/${programId}/affiliates/${affiliateId}/approval/`
+      `/programs/${encodeURIComponent(programId)}/affiliates/${encodeURIComponent(affiliateId)}/approved/`
     );
     return res.data;
   }
 
   async disapproveAffiliateForProgram(programId: string, affiliateId: string) {
     let res = await this.http.delete(
-      `/programs/${programId}/affiliates/${affiliateId}/approval/`
+      `/programs/${encodeURIComponent(programId)}/affiliates/${encodeURIComponent(affiliateId)}/approved/`
     );
     return res.data;
   }
 
   async listProgramCommissionTypes(programId: string) {
-    let res = await this.http.get(`/programs/${programId}/commission-types/`);
+    let res = await this.http.get(
+      `/programs/${encodeURIComponent(programId)}/commission-types/`
+    );
     return res.data;
   }
 
   async listProgramMlmLevels(programId: string) {
-    let res = await this.http.get(`/programs/${programId}/mlm-levels/`);
+    let res = await this.http.get(`/programs/${encodeURIComponent(programId)}/levels/`);
     return res.data;
   }
 
   async listProgramBonuses(programId: string) {
-    let res = await this.http.get(`/programs/${programId}/bonuses/`);
+    let res = await this.http.get(`/programs/${encodeURIComponent(programId)}/bonuses/`);
     return res.data;
   }
 
@@ -343,8 +401,8 @@ export class TapfiliateClient {
     if (data.trackingId) body.tracking_id = data.trackingId;
     if (data.clickId) body.click_id = data.clickId;
     if (data.coupon) body.coupon = data.coupon;
-    if (data.customerId) body.customer_id = data.customerId;
-    if (data.externalId) body.external_id = data.externalId;
+    if (data.customerId !== undefined) body.customer_id = data.customerId;
+    if (data.externalId !== undefined) body.external_id = data.externalId;
     if (data.amount !== undefined) body.amount = data.amount;
     if (data.currency) body.currency = data.currency;
     if (data.commissionType) body.commission_type = data.commissionType;
@@ -379,7 +437,7 @@ export class TapfiliateClient {
   ) {
     let body: Record<string, any> = {};
     if (data.amount !== undefined) body.amount = data.amount;
-    if (data.externalId) body.external_id = data.externalId;
+    if (data.externalId !== undefined) body.external_id = data.externalId;
     if (data.metaData) body.meta_data = data.metaData;
 
     let res = await this.http.patch(`/conversions/${conversionId}/`, body, {
@@ -405,7 +463,7 @@ export class TapfiliateClient {
       conversion_sub_amount: data.conversionSubAmount
     };
     if (data.commissionType) body.commission_type = data.commissionType;
-    if (data.comment) body.comment = data.comment;
+    if (data.comment !== undefined) body.comment = data.comment;
 
     let res = await this.http.post(`/conversions/${conversionId}/commissions/`, body);
     return res.data;
@@ -429,6 +487,8 @@ export class TapfiliateClient {
     commissionId?: number;
     approved?: boolean;
     pending?: boolean;
+    status?: 'approved' | 'disapproved' | 'pending';
+    paid?: boolean;
     dateFrom?: string;
     dateTo?: string;
     page?: number;
@@ -438,14 +498,24 @@ export class TapfiliateClient {
         program_id: params?.programId,
         affiliate_id: params?.affiliateId,
         commission_id: params?.commissionId,
-        approved: params?.approved,
-        pending: params?.pending,
+        status:
+          params?.status ??
+          (params?.pending === true
+            ? 'pending'
+            : params?.approved === true
+              ? 'approved'
+              : params?.approved === false
+                ? 'disapproved'
+                : undefined),
+        paid: params?.paid === undefined ? undefined : params.paid ? 1 : 0,
         date_from: params?.dateFrom,
         date_to: params?.dateTo,
         page: params?.page
       }
     });
-    return res.data;
+    return params?.pending === false
+      ? res.data.filter((commission: any) => commission.approved !== null)
+      : res.data;
   }
 
   async getCommission(commissionId: number) {
@@ -462,19 +532,19 @@ export class TapfiliateClient {
   ) {
     let body: Record<string, any> = {};
     if (data.amount !== undefined) body.amount = data.amount;
-    if (data.comment) body.comment = data.comment;
+    if (data.comment !== undefined) body.comment = data.comment;
 
     let res = await this.http.patch(`/commissions/${commissionId}/`, body);
     return res.data;
   }
 
   async approveCommission(commissionId: number) {
-    let res = await this.http.put(`/commissions/${commissionId}/approval/`);
+    let res = await this.http.put(`/commissions/${commissionId}/approved/`);
     return res.data;
   }
 
   async disapproveCommission(commissionId: number) {
-    let res = await this.http.delete(`/commissions/${commissionId}/approval/`);
+    let res = await this.http.delete(`/commissions/${commissionId}/approved/`);
     return res.data;
   }
 
@@ -502,7 +572,7 @@ export class TapfiliateClient {
   }
 
   async getCustomer(customerId: string) {
-    let res = await this.http.get(`/customers/${customerId}/`);
+    let res = await this.http.get(`/customers/${encodeURIComponent(customerId)}/`);
     return res.data;
   }
 
@@ -548,43 +618,52 @@ export class TapfiliateClient {
     }
   ) {
     let body: Record<string, any> = {};
-    if (data.customerId) body.customer_id = data.customerId;
+    if (data.customerId !== undefined) body.customer_id = data.customerId;
     if (data.metaData) body.meta_data = data.metaData;
 
-    let res = await this.http.patch(`/customers/${customerId}/`, body);
+    let res = await this.http.patch(`/customers/${encodeURIComponent(customerId)}/`, body);
     return res.data;
   }
 
   async deleteCustomer(customerId: string) {
-    await this.http.delete(`/customers/${customerId}/`);
+    await this.http.delete(`/customers/${encodeURIComponent(customerId)}/`);
   }
 
   async cancelCustomer(customerId: string) {
-    let res = await this.http.delete(`/customers/${customerId}/status/`);
+    let res = await this.http.delete(`/customers/${encodeURIComponent(customerId)}/status/`);
     return res.data;
   }
 
   async uncancelCustomer(customerId: string) {
-    let res = await this.http.put(`/customers/${customerId}/status/`);
+    let res = await this.http.put(`/customers/${encodeURIComponent(customerId)}/status/`);
     return res.data;
   }
 
   async getCustomerMetaData(customerId: string) {
-    let res = await this.http.get(`/customers/${customerId}/meta-data/`);
+    let res = await this.http.get(`/customers/${encodeURIComponent(customerId)}/meta-data/`);
     return res.data;
   }
 
   async setCustomerMetaData(customerId: string, metaData: Record<string, any>) {
-    let res = await this.http.put(`/customers/${customerId}/meta-data/`, metaData);
+    let res = await this.http.put(
+      `/customers/${encodeURIComponent(customerId)}/meta-data/`,
+      metaData
+    );
     return res.data;
   }
 
   // ─── Payments ────────────────────────────────────────────────
 
   async listBalances(params?: { affiliateId?: string }) {
-    let res = await this.http.get('/payments/balances/', {
-      params: { affiliate_id: params?.affiliateId }
-    });
+    if (params?.affiliateId) {
+      return [
+        {
+          affiliate_id: params.affiliateId,
+          balances: await this.getAffiliateBalances(params.affiliateId)
+        }
+      ];
+    }
+    let res = await this.http.get('/balances/');
     return res.data;
   }
 
@@ -594,29 +673,43 @@ export class TapfiliateClient {
     dateTo?: string;
     page?: number;
   }) {
-    let res = await this.http.get('/payments/', {
-      params: {
-        affiliate_id: params?.affiliateId,
-        date_from: params?.dateFrom,
-        date_to: params?.dateTo,
-        page: params?.page
+    let res = await this.http.get(
+      params?.affiliateId
+        ? `/affiliates/${encodeURIComponent(params.affiliateId)}/payments/`
+        : '/payments/',
+      {
+        params: {
+          affiliate_id: params?.affiliateId,
+          date_from: params?.dateFrom,
+          date_to: params?.dateTo,
+          page: params?.page
+        }
       }
+    );
+    return res.data;
+  }
+
+  async getPayment(paymentId: string | number) {
+    let res = await this.http.get(`/payments/${encodeURIComponent(String(paymentId))}/`);
+    return res.data;
+  }
+
+  async createPayment(affiliateId: string, amount: number, currency: string) {
+    let res = await this.http.post('/payments/', {
+      affiliate_id: affiliateId,
+      amount,
+      currency
     });
-    return res.data;
+    let payment = Array.isArray(res.data) ? res.data[0] : res.data;
+    if (!payment)
+      throw createApiServiceError(
+        'Tapfiliate did not return the recorded payment. Check payment history before retrying.'
+      );
+    return payment;
   }
 
-  async getPayment(paymentId: number) {
-    let res = await this.http.get(`/payments/${paymentId}/`);
-    return res.data;
-  }
-
-  async createPayment(affiliateId: string) {
-    let res = await this.http.post('/payments/', { affiliate_id: affiliateId });
-    return res.data;
-  }
-
-  async cancelPayment(paymentId: number) {
-    await this.http.delete(`/payments/${paymentId}/`);
+  async cancelPayment(paymentId: string | number) {
+    await this.http.delete(`/payments/${encodeURIComponent(String(paymentId))}/`);
   }
 
   // ─── Clicks ──────────────────────────────────────────────────
@@ -645,7 +738,7 @@ export class TapfiliateClient {
   }
 
   async getClick(clickId: string) {
-    let res = await this.http.get(`/clicks/${clickId}/`);
+    let res = await this.http.get(`/clicks/${encodeURIComponent(clickId)}/`);
     return res.data;
   }
 
@@ -655,6 +748,9 @@ export class TapfiliateClient {
     sourceId?: string;
     userAgent?: string;
     ip?: string;
+    referrer?: string;
+    landingPage?: string;
+    metaData?: Record<string, string>;
   }) {
     let body: Record<string, any> = {
       referral_code: data.referralCode
@@ -664,6 +760,14 @@ export class TapfiliateClient {
     if (data.userAgent) body.user_agent = data.userAgent;
     if (data.ip) body.ip = data.ip;
 
+    Object.assign(
+      body,
+      pickDefined({
+        referrer: data.referrer,
+        landing_page: data.landingPage,
+        meta_data: data.metaData
+      })
+    );
     let res = await this.http.post('/clicks/', body);
     return res.data;
   }

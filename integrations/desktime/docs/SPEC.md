@@ -1,56 +1,44 @@
-Let me get the actual API documentation page.# Slates Specification for DeskTime
+# DeskTime integration specification
 
-## Overview
-
-DeskTime is an automated time tracking and productivity monitoring software for teams. It tracks employee work hours, application/website usage, productivity levels, and supports project time tracking, shift scheduling, and absence management.
+DeskTime tracks employee work hours, application and website usage, productivity, and project activity.
 
 ## Authentication
 
-DeskTime uses API keys for authentication.
+Use the API key from [DeskTime API settings](https://desktime.com/app/api). Requests send the key in the `X-API-Key` header, as required by the [current authentication documentation](https://help.desktime.com/hc/en-us/articles/25494558790685-Introduction-to-the-DeskTime-API). Some individual endpoint articles still show older query authentication examples. The base URL is `https://desktime.com/api/v2/json`.
 
-- **Method:** API Key passed as a query parameter.
-- **Parameter name:** `apiKey`
-- **How to obtain:** You can get your API Key from https://desktime.com/app/api (also accessible via Settings > API in the DeskTime web app).
-- **Usage:** The API key is included as a query parameter in every request. For example:
-  ```
-  https://desktime.com/api/v2/json/company?apiKey={your_api_key}
-  ```
-- **Base URL:** `https://desktime.com/api/v2/json/`
-- The API key is tied to a specific user account and determines the scope of data accessible (e.g., admin keys can access all employee data).
-- There are no OAuth flows or scopes; a single API key grants access based on the account's role and permissions.
+The connected employee is resolved with `GET /employee/basic` without an employee ID. Account permissions determine which employee and company information is accessible. There is no OAuth token refresh flow.
 
-## Features
+## Tools
 
-### Company Information
+| Key | Provider request | Behavior |
+| --- | --- | --- |
+| `get_current_user` | `GET /employee/basic` | API key owner ID, name, email, and today's tracking information. |
+| `get_company_info` | `GET /company` | Company account metadata and work settings, plus the complete response. |
+| `get_employee` | `GET /employee` | Existing employee tracking lookup by ID or email; omit both for the connected user. |
+| `get_employees` | `GET /employees` | Company tracking data grouped by date and employee ID, with optional date and `day` or `month` period. |
+| `get_projects` | `GET /projects` | Active projects and related tasks; excludes archived projects. |
+| `get_employee_projects` | `GET /employee/projects` | Employee tracking information and tracked project activity for a date. |
+| `create_project` | `POST /create-project` | Project creation with optional task, sent as query parameters; resolves the project response envelope and exposes the created project ID. |
+| `start_project_tracking` | `GET /start-project` | Project/task names in query parameters; requires a confirmed `started: true` response. |
+| `stop_project_tracking` | `GET /stop-project` | Project/task names in query parameters; requires a confirmed `stopped: true` response. |
 
-- Retrieve company-level settings and metadata including company name, work start/end times, work duration, working days, tracking schedule, and timezone.
+Date inputs require real dates in `YYYY-MM-DD` format. Omitted dates use today. Call `get_employees` to discover employee IDs and `get_projects` to discover project and task names. Selecting both employee ID and email is rejected rather than silently ignoring one.
 
-### Employee Data & Productivity Tracking
+## Compatibility and limits
 
-- The Get Employee endpoint allows you to retrieve information about a single employee to return user tracking data for a specific date.
-- The Get Employees endpoint allows you to retrieve information about all employees in your company, with an optional period parameter to return user tracking data for a specific day or month, starting with the given date.
-- Parameters include `date` (format: `Y-m-d`), `period` (`day` or `month`), and optional `employeeId`.
-- If no date parameter is included in the request URL, it will return information for today's date.
-- Tracking data includes productive, neutral, and unproductive time breakdowns, arrival/departure times, and app/website usage.
-- Employees can also be looked up by email address.
-- **Limitation:** The API can't access the User's profile data (i.e., work starts, work ends and work duration) — user profile/shift schedule configuration is not available via the API.
+The existing `/employee` request and email lookup are preserved. The current employee article documents `/employee/basic` and only an ID selector, so continued legacy route/email support needs live verification; omission alone does not establish a removed endpoint. New identity behavior uses the currently documented route.
 
-### Project & Task Management
+All tools retain the complete provider response. Company work settings map the current `work_starts`, `work_ends`, `work_start_tracking`, `work_stop_tracking`, and `timezone_identifier` names, with legacy field fallbacks. Existing optional company fields retain their declared types and omit values that do not match those types. Employee counts deduplicate employee IDs across date groups. Project activity also preserves the full employee response because the provider's public project example omits the detailed project shape.
 
-- Create a new project with an optional task in DeskTime.
-- Starts tracking time for a given project and optionally a task.
-- Stop tracking time for a given project and optionally a task.
-- These endpoints allow programmatic control over project time tracking, enabling integration with external project management or invoicing tools.
+HTTP errors, invalid input, explicit API errors, invalid response shapes, and unconfirmed tracking changes are reported as service errors. Requests have a 30-second timeout. No live provider calls or automated provider tests were performed for this refresh.
 
-### Attendance & Work Hours
+## Official sources
 
-- Retrieve employee check-in and check-out times and daily work hour summaries via employee data endpoints.
-- Useful for compiling attendance reports and integrating with payroll systems.
-
-### Custom API on Request
-
-- Custom API on request — Request custom API adjustments for specific needs is available on higher-tier plans.
-
-## Events
-
-The provider does not support events. DeskTime's API does not offer webhooks, event subscriptions, or any built-in push notification mechanism for real-time event delivery. The API is read/write REST-based and requires active polling or direct API calls to retrieve updated data.
+- [API and authentication](https://help.desktime.com/hc/en-us/articles/25494558790685-Introduction-to-the-DeskTime-API)
+- [Company account](https://help.desktime.com/hc/en-us/articles/25494763327901-Using-the-Account-endpoint-via-API)
+- [Employee data and current user](https://help.desktime.com/hc/en-us/articles/25494877861789-Retrieving-employee-data-via-API)
+- [All company employees](https://help.desktime.com/hc/en-us/articles/25495139812637-Retrieving-all-company-employees-via-API)
+- [Active projects](https://help.desktime.com/hc/en-us/articles/25495195415453-Retrieving-projects-via-API)
+- [Employee project activity](https://help.desktime.com/hc/en-us/articles/25494912262301-Retrieving-employee-projects-data-via-API)
+- [Create projects](https://help.desktime.com/hc/en-us/articles/25495264299293-Creating-a-project-via-API)
+- [Start and stop tracking](https://help.desktime.com/hc/en-us/articles/25495406925853-Starting-and-stopping-a-project-and-task-via-API)

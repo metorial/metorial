@@ -10,7 +10,7 @@ export let createAction = SlateTool.create(spec, {
   description: `Create a new action (task) for a contact. Actions are completable tasks that appear in the Action Stream, ordered by priority: ASAP first, then by due date, then waiting/queued.`,
   instructions: [
     'Set status to "asap" for urgent tasks, "date" for scheduled tasks, "waiting" for blocked tasks, or "queued" for tasks without a date.',
-    'Provide a date in YYYY-MM-DD format when status is "date".'
+    'Use status "date_time" when supplying exactTime; date values use YYYY-MM-DD.'
   ],
   tags: {
     destructive: false,
@@ -23,9 +23,12 @@ export let createAction = SlateTool.create(spec, {
       text: z.string().describe('Description of the action/task'),
       assigneeId: z.string().optional().describe('ID of the user to assign this action to'),
       date: z.string().optional().describe('Due date (YYYY-MM-DD)'),
-      exactTime: z.number().optional().describe('Exact due time as Unix timestamp'),
+      exactTime: z
+        .number()
+        .optional()
+        .describe('Exact due time as Unix timestamp; requires status date_time'),
       status: z
-        .enum(['asap', 'date', 'waiting', 'queued'])
+        .enum(['asap', 'date', 'date_time', 'waiting', 'queued', 'queued_with_date'])
         .optional()
         .describe('Action priority status')
     })

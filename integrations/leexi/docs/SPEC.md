@@ -1,80 +1,42 @@
-Now let me try to fetch the webhooks page directly:I have enough information from the initial fetch and searches to compile the specification.
+# Leexi API capabilities
 
-# Slates Specification for Leexi
+The integration uses the [Leexi public REST API](https://docs.public-api.leexi.ai/reference/public-api) at `https://public-api.leexi.ai/v1`.
 
-## Overview
+## Authentication and access
 
-Leexi is an AI notetaker that transcribes, analyzes, and summarizes your calls and meetings. It is a conversational intelligence platform based on call transcription technology, supporting video conferencing platforms (Zoom, Google Meet, Microsoft Teams) and VoIP integrations. It automates the capture and summarization of meetings in over 120 languages.
+An administrator creates an API Key ID and API Key Secret in Leexi settings. Requests authenticate with HTTP Basic authentication using the base64 encoding of `KEY_ID:KEY_SECRET`. API keys have permission scopes and a configurable call access scope. A scoped key returns only accessible calls and returns 404 for inaccessible calls; the same access boundary applies to call notes. Newly created keys have `read_calls`; an administrator must grant other permissions explicitly.
 
-## Authentication
+The documented API has no current-user or current-company identity endpoint. `list_users` discovers workspace user UUIDs; it does not identify a human owner of the API key.
 
-Authentication is based on API Key ID and Key Secret. The API Key ID and Key Secret is passed via HTTP Basic Authentication. This means Leexi expects to find an Authorization header with "Basic " and then KEY_ID:KEY_SECRET encoded in base 64.
+## Calls and recordings
 
-**Generating credentials:**
-You can generate an API key/secret pair by going to Leexi → Settings → Company Settings → API Keys, and clicking on _add_ (requires a Leexi admin account).
+- [List calls](https://docs.public-api.leexi.ai/reference/list-calls): filter by dates, source, users, customers, or conversation type. Optional simple transcripts can be included.
+- [Get call](https://docs.public-api.leexi.ai/reference/get-call): retrieve metadata, paragraph and word timestamps, speakers, chapters, AI topics, customers, and prompt completions. Existing legacy call topics and customer fields remain available.
+- [Request a presigned URL](https://docs.public-api.leexi.ai/reference/request-a-presigned-url): request an upload URL for a recording extension. Upload with a single HTTP PUT using the returned headers, including `x-amz-tagging: temporary=true`. This is an upload destination. Unused uploaded files expire after three days.
+- [Create a call](https://docs.public-api.leexi.ai/reference/create-a-call): submit the uploaded recording key, external ID, direction, performed time, and licensed owner user UUID. Processing is asynchronous. Optional `customers` and `participatingUserUuids` provide richer participant information; do not combine them with the retained legacy `emails` or `rawPhoneNumber` fields. Each customer needs at least one attribute. An existing customer UUID takes precedence over other supplied attributes; unknown UUIDs are skipped by Leexi.
 
-**Base URL:** `https://public-api.leexi.ai/v1/`
+Read operations require `read_calls`; recording uploads and creation require `write_calls`. Recording URLs can be null when recordings are archived or retention is disabled. AI completions may appear only after processing finishes.
 
-**Example:**
+## Call notes
 
-```
-Authorization: Basic <base64(KEY_ID:KEY_SECRET)>
-```
+- [List call notes](https://docs.public-api.leexi.ai/reference/list-call-notes): requires a call UUID, with optional prompt UUID and pagination.
+- [Get a call note](https://docs.public-api.leexi.ai/reference/get-a-call-note): retrieves the note's call association, prompt, and translations by note UUID.
+- [Update a call note](https://docs.public-api.leexi.ai/reference/update-a-call-note): updates translated text for a locale. The source note text is unchanged.
 
-Where `KEY_ID:KEY_SECRET` is base64-encoded. For example, if your Key ID is `KEY_ID` and Key Secret is `KEY_SECRET`, the base64 encoding of `KEY_ID:KEY_SECRET` is `S0VZX0lEOktFWV9TRUNSRVQ=`, and the header becomes:
+List and get require `read_calls`; update requires `write_calls`. Notes expose stable note, call, prompt, and translation UUIDs for follow-up operations.
 
-```
-Authorization: Basic S0VZX0lEOktFWV9TRUNSRVQ=
-```
+## Meeting events
 
-Note: API keys are not subject to access rules and give access to all calls in the related company account.
+- [List meeting events](https://docs.public-api.leexi.ai/reference/list-meeting-events): date and ordering filters, plus creation origin. The `createdBy` tool field maps to the API's `origin` parameter.
+- [Get a meeting event](https://docs.public-api.leexi.ai/reference/get-a-meeting-event): retrieve participants, scheduling and recording status, and bot runs.
+- [Create a meeting event](https://docs.public-api.leexi.ai/reference/create-a-meeting-event): supply timing, organizer, meeting URL, user UUID, and recording preference. Optional `owned` and `internal` tool inputs default to false and are always sent as booleans.
+- [Delete a meeting event](https://docs.public-api.leexi.ai/reference/delete-a-meeting-event): remove a scheduled event.
+- [Launch a meeting assistant](https://docs.public-api.leexi.ai/reference/launch-a-meeting-assistant): launch the bot, or use `stopBot` to stop it.
 
-## Features
+Reads require `read_meeting_events`; writes require `write_meeting_events`. Returned organizer and attendee objects are exposed as their email addresses.
 
-### User Management
+## Users, teams, and pagination
 
-List all users in your Leexi workspace. Use the "LIST users" endpoint to find the user_uuid to use in other requests. Users are identified by UUID.
+[List users](https://docs.public-api.leexi.ai/reference/list-users) requires `read_users`; [list teams](https://docs.public-api.leexi.ai/reference/list-teams) requires `read_teams`. User UUIDs are needed for call and meeting creation.
 
-### Team Management
-
-List all teams in your Leexi workspace. Useful for understanding organizational structure and filtering data by team.
-
-### Call and Meeting Retrieval
-
-List all calls and meetings in your workspace. Getting a single call or meeting returns call topics and the call transcript. The simple_transcript has paragraph-level timestamps, while the transcript also has word-level timestamps.
-
-- Prompt completions (summary, chaptering, etc.) are not immediately available on call creation, but get added later on.
-- You can retrieve transcripts, summaries, and other AI-generated content.
-
-### Call Creation
-
-Create a call or meeting asynchronously (creation time is typically a few minutes). You must first finish uploading the recording of the call using a presigned recording URL retrieved with the presigned URL endpoint.
-
-- The workflow requires first requesting a presigned URL, uploading the recording file to that URL, and then creating the call record referencing the uploaded recording.
-- Requires a valid `user_uuid` (obtainable from the users endpoint).
-
-### Presigned URL for Recording Upload
-
-Request a presigned URL for uploading a call recording before creating the call. This is a prerequisite step for creating calls with audio recordings.
-
-### Meeting Event Management
-
-Manage meeting events that represent scheduled meetings where the Leexi assistant should join. You can:
-
-- List and retrieve meeting events in your workspace.
-- Create a new meeting event in Leexi with timing, participants, and recording preferences. Parameters include meeting URL, start/end time, organizer, attendees, title, description, and flags for ownership, internal status, and recording preference.
-- Delete a specific meeting event by UUID.
-
-### Launch Meeting Assistant
-
-Trigger the Leexi meeting assistant to join an active meeting. This allows programmatic control over when the AI notetaker joins a conference.
-
-## Events
-
-Leexi supports webhooks for receiving real-time notifications about activity in your account. Based on the API documentation, the following webhook event is available:
-
-### Call Processed
-
-A webhook event that fires when a call has been fully processed by Leexi. This is useful for being notified when transcripts, summaries, and other AI-generated content become available for a call, since these are generated asynchronously after call creation.
-
-Webhook configuration details (such as the registration endpoint or setup process) are managed through the Leexi API's webhooks section. The webhook delivers event data via HTTP POST to a registered URL.
+List routes use `page` and `items`; `items` ranges from 1 to 100 with a default of 10. Responses include `page`, `items`, `count`, and `pages`. Stop when the current page reaches the total pages. Existing numeric input schemas are retained; pagination is validated at runtime as whole numbers. The API limit is 50 requests per minute, with 10 per minute for call creation.

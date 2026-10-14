@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -33,17 +34,8 @@ export let auth = SlateAuth.create()
       output: { token: string; domain: string };
       input: { token: string; domain: string };
     }) => {
-      let http = createAxios({
-        baseURL: `https://${ctx.output.domain}.mocoapp.com/api/v1`
-      });
-
-      let headers = {
-        Authorization: `Token token=${ctx.output.token}`,
-        'Content-Type': 'application/json'
-      };
-
-      let sessionResponse = await http.get('/session', { headers });
-      let session = sessionResponse.data;
+      let client = new Client(ctx.output);
+      let session = await client.getSession();
 
       return {
         profile: {

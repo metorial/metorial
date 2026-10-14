@@ -4,6 +4,7 @@ import {
   createUpdatedAnswer,
   deleteUpdatedAnswer,
   getAccount,
+  getAnalytics,
   getChatbotSettings,
   getConversations,
   getLeads,
@@ -27,7 +28,8 @@ export let provider = Slate.create({
     getSuggestedMessages,
     getSources,
     listChatbots,
-    getAccount
+    getAccount,
+    getAnalytics
   ],
   triggers: []
 });

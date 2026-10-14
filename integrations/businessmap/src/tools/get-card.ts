@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getCardTool = SlateTool.create(spec, {
   name: 'Get Card',
   key: 'get_card',
-  description: `Retrieve full details of a specific card, including its properties, custom fields, subtasks, comments, and tags.`,
+  description: `Retrieve full details of a specific card, including its properties, custom fields and optional subtasks and comments.`,
   tags: {
     readOnly: true
   }
@@ -40,7 +40,10 @@ export let getCardTool = SlateTool.create(spec, {
       priority: z.number().optional().nullable().describe('Card priority'),
       size: z.number().optional().nullable().describe('Card size'),
       deadline: z.string().optional().nullable().describe('Card deadline'),
-      section: z.number().optional().describe('Section (1=Backlog, 2=In Progress, 3=Done)'),
+      section: z
+        .number()
+        .optional()
+        .describe('Section (1=Backlog, 2=Requested, 3=In Progress, 4=Done, 5=Archive)'),
       position: z.number().optional().describe('Position in column'),
       isBlocked: z.number().optional().describe('Whether the card is blocked (0 or 1)'),
       createdAt: z.string().optional().nullable().describe('Card creation timestamp'),
@@ -83,10 +86,7 @@ export let getCardTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     let card = await client.getCard(ctx.input.cardId);
 
@@ -143,12 +143,17 @@ export let getCardTool = SlateTool.create(spec, {
           subtaskId: s.subtask_id,
           description: s.description,
           ownerUserId: s.owner_user_id,
-          isFinished: s.is_finished
+          isFinished: s.is_finished ?? (s.finished_at ? 1 : 0)
         })),
         comments: comments?.map((c: any) => ({
           commentId: c.comment_id,
           text: c.text,
-          authorUserId: c.author_user_id ?? c.user_id,
+          authorUserId:
+            c.author?.type === 'internal'
+              ? c.author.value
+              : c.sender?.type === 'internal'
+                ? c.sender.value
+                : (c.author_user_id ?? c.user_id),
           createdAt: c.created_at
         }))
       },

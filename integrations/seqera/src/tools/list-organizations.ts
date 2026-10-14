@@ -31,19 +31,19 @@ export let listOrganizations = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
       workspaceId: ctx.config.workspaceId
     });
 
     let orgs = await client.listOrganizations();
 
     let organizations = orgs.map(o => ({
-      orgId: o.orgId,
-      name: o.name,
-      fullName: o.fullName,
-      description: o.description,
-      website: o.website,
-      memberRole: o.memberRole
+      orgId: o.orgId ?? undefined,
+      name: o.name ?? undefined,
+      fullName: o.fullName ?? undefined,
+      description: o.description ?? undefined,
+      website: o.website ?? undefined,
+      memberRole: o.memberRole ?? undefined
     }));
 
     return {

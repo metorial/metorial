@@ -1,17 +1,20 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
-  private apiBaseUrl: string;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; apiBaseUrl: string }) {
-    this.apiBaseUrl = config.apiBaseUrl;
-    this.http = createAxios({
-      baseURL: config.apiBaseUrl,
-      headers: {
-        Authorization: config.token,
-        Accept: 'application/json'
-      }
+    if (!config.token?.trim())
+      throw createApiServiceError('Reconnect Appcircle to obtain an access token.');
+    this.http = createAuthenticatedAxios({
+      baseURL: config.apiBaseUrl.replace(/\/+$/, ''),
+      authHeader: { value: `Bearer ${config.token.replace(/^Bearer\s+/i, '')}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Appcircle',
+          reason: 'appcircle_api_error'
+        })
     });
   }
 
@@ -23,17 +26,22 @@ export class Client {
   }
 
   async getBuildProfile(profileId: string) {
-    let response = await this.http.get(`/build/v2/profiles/${profileId}`);
+    let response = await this.http.get(`/build/v2/profiles/${encodeURIComponent(profileId)}`);
     return response.data;
   }
 
   async updateBuildProfile(profileId: string, data: { name?: string; pinned?: boolean }) {
-    let response = await this.http.patch(`/build/v2/profiles/${profileId}`, data);
+    let response = await this.http.patch(
+      `/build/v2/profiles/${encodeURIComponent(profileId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteBuildProfile(profileId: string) {
-    let response = await this.http.delete(`/build/v2/profiles/${profileId}`);
+    let response = await this.http.delete(
+      `/build/v2/profiles/${encodeURIComponent(profileId)}`
+    );
     return response.data;
   }
 
@@ -67,7 +75,7 @@ export class Client {
     envVars?: Record<string, string>
   ) {
     let response = await this.http.put(
-      `/build/v2/profiles/${profileId}/branch/${branchId}/workflow/${workflowId}`,
+      `/build/v2/profiles/${encodeURIComponent(profileId)}/branch/${encodeURIComponent(branchId)}/workflow/${encodeURIComponent(workflowId)}`,
       envVars ?? {},
       {
         params: {
@@ -87,7 +95,7 @@ export class Client {
     envVars?: Record<string, string>
   ) {
     let response = await this.http.put(
-      `/build/v2/profiles/${profileId}/workflow/${workflowId}`,
+      `/build/v2/profiles/${encodeURIComponent(profileId)}/workflow/${encodeURIComponent(workflowId)}`,
       envVars ?? {},
       {
         params: {
@@ -110,57 +118,78 @@ export class Client {
     if (workflowId) body.workflowId = workflowId;
     if (configurationId) body.configurationId = configurationId;
 
-    let response = await this.http.post(`/build/v2/commits/${commitHash}`, body, {
-      params: { action: 'build' }
-    });
+    let response = await this.http.post(
+      `/build/v2/commits/${encodeURIComponent(commitHash)}`,
+      body,
+      {
+        params: { action: 'build' }
+      }
+    );
     return response.data;
   }
 
   async getBuildStatus(commitId: string, buildId: string) {
     let response = await this.http.get(
-      `/build/v2/commits/${commitId}/builds/${buildId}/status`
+      `/build/v2/commits/${encodeURIComponent(commitId)}/builds/${encodeURIComponent(buildId)}/status`
     );
     return response.data;
   }
 
   async cancelBuild(taskId: string) {
-    let response = await this.http.get(`/build/v1/queue/${taskId}`, {
-      params: { action: 'cancel' }
-    });
+    let response = await this.http.post(
+      `/build/v3/queue/${encodeURIComponent(taskId)}/cancel`
+    );
     return response.data;
   }
 
   async downloadBuildArtifacts(commitId: string, buildId: string) {
-    let response = await this.http.get(`/build/v2/commits/${commitId}/builds/${buildId}`, {
-      responseType: 'arraybuffer'
-    });
+    let response = await this.http.get(
+      `/build/v2/commits/${encodeURIComponent(commitId)}/builds/${encodeURIComponent(buildId)}`,
+      {
+        responseType: 'arraybuffer'
+      }
+    );
     return response.data;
   }
 
   async getBuildLogs(commitId: string, buildId: string) {
-    let response = await this.http.get(`/build/v2/commits/${commitId}/builds/${buildId}/logs`);
+    let response = await this.http.get(
+      `/build/v2/commits/${encodeURIComponent(commitId)}/builds/${encodeURIComponent(buildId)}/logs`
+    );
     return response.data;
   }
 
   // ─── Workflows ───────────────────────────────────────────
 
   async listWorkflows(profileId: string) {
-    let response = await this.http.get(`/build/v2/profiles/${profileId}/workflows`);
+    let response = await this.http.get(
+      `/build/v2/profiles/${encodeURIComponent(profileId)}/workflows`
+    );
+    return response.data;
+  }
+
+  async getWorkflow(profileId: string, workflowId: string) {
+    let response = await this.http.get(
+      `/build/v2/profiles/${encodeURIComponent(profileId)}/workflows/${encodeURIComponent(workflowId)}`
+    );
     return response.data;
   }
 
   // ─── Configurations ──────────────────────────────────────
 
   async listConfigurations(profileId: string, branchId?: string) {
-    let response = await this.http.get(`/build/v2/profiles/${profileId}/configurations`, {
-      params: branchId ? { branchId } : undefined
-    });
+    let response = await this.http.get(
+      `/build/v2/profiles/${encodeURIComponent(profileId)}/configurations`,
+      {
+        params: branchId ? { branchId } : undefined
+      }
+    );
     return response.data;
   }
 
   async getConfiguration(profileId: string, configurationId: string) {
     let response = await this.http.get(
-      `/build/v2/profiles/${profileId}/configurations/${configurationId}`
+      `/build/v2/profiles/${encodeURIComponent(profileId)}/configurations/${encodeURIComponent(configurationId)}`
     );
     return response.data;
   }
@@ -181,13 +210,15 @@ export class Client {
   }
 
   async deleteVariableGroup(variableGroupId: string) {
-    let response = await this.http.delete(`/build/v2/variable-groups/${variableGroupId}`);
+    let response = await this.http.delete(
+      `/build/v2/variable-groups/${encodeURIComponent(variableGroupId)}`
+    );
     return response.data;
   }
 
   async renameVariableGroup(variableGroupId: string, name: string) {
     let response = await this.http.patch(
-      `/build/v2/variable-groups/${variableGroupId}`,
+      `/build/v2/variable-groups/${encodeURIComponent(variableGroupId)}`,
       null,
       {
         params: { name }
@@ -198,7 +229,7 @@ export class Client {
 
   async listVariables(variableGroupId: string) {
     let response = await this.http.get(
-      `/build/v2/variable-groups/${variableGroupId}/variables`
+      `/build/v2/variable-groups/${encodeURIComponent(variableGroupId)}/variables`
     );
     return response.data;
   }
@@ -208,7 +239,7 @@ export class Client {
     data: { key: string; value: string; isSecret?: boolean }
   ) {
     let response = await this.http.post(
-      `/build/v2/variable-groups/${variableGroupId}/variables`,
+      `/build/v2/variable-groups/${encodeURIComponent(variableGroupId)}/variables`,
       data
     );
     return response.data;
@@ -216,7 +247,7 @@ export class Client {
 
   async updateVariable(variableGroupId: string, data: { key: string; value: string }) {
     let response = await this.http.patch(
-      `/build/v2/variable-groups/${variableGroupId}/variables`,
+      `/build/v2/variable-groups/${encodeURIComponent(variableGroupId)}/variables`,
       data
     );
     return response.data;
@@ -224,7 +255,7 @@ export class Client {
 
   async deleteVariables(variableGroupId: string, keys: string[]) {
     let response = await this.http.delete(
-      `/build/v2/variable-groups/${variableGroupId}/variables`,
+      `/build/v2/variable-groups/${encodeURIComponent(variableGroupId)}/variables`,
       {
         data: keys
       }
@@ -245,17 +276,25 @@ export class Client {
   }
 
   async getDistributionProfile(profileId: string, params?: { page?: number; size?: number }) {
-    let response = await this.http.get(`/distribution/v2/profiles/${profileId}`, { params });
+    let response = await this.http.get(
+      `/distribution/v2/profiles/${encodeURIComponent(profileId)}`,
+      { params }
+    );
     return response.data;
   }
 
   async updateDistributionProfile(profileId: string, data: Record<string, unknown>) {
-    let response = await this.http.patch(`/distribution/v2/profiles/${profileId}`, data);
+    let response = await this.http.patch(
+      `/distribution/v2/profiles/${encodeURIComponent(profileId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteDistributionProfile(profileId: string) {
-    let response = await this.http.delete(`/distribution/v2/profiles/${profileId}`);
+    let response = await this.http.delete(
+      `/distribution/v2/profiles/${encodeURIComponent(profileId)}`
+    );
     return response.data;
   }
 
@@ -265,22 +304,25 @@ export class Client {
     profileId: string,
     params?: { page?: number; size?: number; platform?: string }
   ) {
-    let response = await this.http.get(`/distribution/v2/profiles/${profileId}/app-versions`, {
-      params
-    });
+    let response = await this.http.get(
+      `/distribution/v2/profiles/${encodeURIComponent(profileId)}/app-versions`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
   async getDistributionAppVersion(profileId: string, appVersionId: string) {
     let response = await this.http.get(
-      `/distribution/v2/profiles/${profileId}/app-versions/${appVersionId}`
+      `/distribution/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}`
     );
     return response.data;
   }
 
   async deleteDistributionAppVersion(profileId: string, appVersionId: string) {
     let response = await this.http.delete(
-      `/distribution/v2/profiles/${profileId}/app-versions/${appVersionId}`
+      `/distribution/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}`
     );
     return response.data;
   }
@@ -291,7 +333,7 @@ export class Client {
     testingData: Record<string, unknown>
   ) {
     let response = await this.http.post(
-      `/distribution/v2/profiles/${profileId}/app-versions/${appVersionId}`,
+      `/distribution/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}`,
       testingData,
       { params: { action: 'sendToTesting' } }
     );
@@ -300,7 +342,7 @@ export class Client {
 
   async getDistributionDownloadLink(profileId: string, appVersionId: string) {
     let response = await this.http.get(
-      `/distribution/v2/profiles/${profileId}/app-versions/${appVersionId}/download`
+      `/distribution/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}/download`
     );
     return response.data;
   }
@@ -318,18 +360,22 @@ export class Client {
   }
 
   async getTestingGroup(groupId: string) {
-    let response = await this.http.get(`/distribution/v2/testing-groups/${groupId}`);
+    let response = await this.http.get(
+      `/distribution/v2/testing-groups/${encodeURIComponent(groupId)}`
+    );
     return response.data;
   }
 
   async deleteTestingGroup(groupId: string) {
-    let response = await this.http.delete(`/distribution/v2/testing-groups/${groupId}`);
+    let response = await this.http.delete(
+      `/distribution/v2/testing-groups/${encodeURIComponent(groupId)}`
+    );
     return response.data;
   }
 
   async addTestersToGroup(groupId: string, emails: string[]) {
     let response = await this.http.post(
-      `/distribution/v2/testing-groups/${groupId}/testers`,
+      `/distribution/v3/testing-groups/${encodeURIComponent(groupId)}/testers`,
       emails
     );
     return response.data;
@@ -337,7 +383,7 @@ export class Client {
 
   async removeTestersFromGroup(groupId: string, emails: string[]) {
     let response = await this.http.delete(
-      `/distribution/v2/testing-groups/${groupId}/testers`,
+      `/distribution/v2/testing-groups/${encodeURIComponent(groupId)}/testers`,
       {
         data: emails
       }
@@ -370,12 +416,16 @@ export class Client {
   }
 
   async getKeystore(keystoreId: string) {
-    let response = await this.http.get(`/signing-identity/v2/keystores/${keystoreId}`);
+    let response = await this.http.get(
+      `/signing-identity/v2/keystores/${encodeURIComponent(keystoreId)}`
+    );
     return response.data;
   }
 
   async deleteKeystore(keystoreId: string) {
-    let response = await this.http.delete(`/signing-identity/v2/keystores/${keystoreId}`);
+    let response = await this.http.delete(
+      `/signing-identity/v2/keystores/${encodeURIComponent(keystoreId)}`
+    );
     return response.data;
   }
 
@@ -386,15 +436,28 @@ export class Client {
 
   async getProvisioningProfile(profileId: string) {
     let response = await this.http.get(
-      `/signing-identity/v2/provisioning-profiles/${profileId}`
+      `/signing-identity/v2/provisioning-profiles/${encodeURIComponent(profileId)}`
     );
     return response.data;
+  }
+
+  private getPublishPlatform(platformType: string) {
+    // Preserve the original marketplace values while using the API's OS path values.
+    if (platformType === 'ios' || platformType === '0') return 'ios';
+    if (platformType === 'android' || platformType === '1' || platformType === '2')
+      return 'android';
+    throw createApiServiceError(
+      'Use platformType ios or android. For Microsoft Intune, choose the target operating system.'
+    );
   }
 
   // ─── Publish Profiles ───────────────────────────────────
 
   async listPublishProfiles(platformType: string, params?: { page?: number; size?: number }) {
-    let response = await this.http.get(`/publish/v2/profiles/${platformType}`, { params });
+    let response = await this.http.get(
+      `/publish/v2/profiles/${this.getPublishPlatform(platformType)}`,
+      { params }
+    );
     return response.data;
   }
 
@@ -403,14 +466,19 @@ export class Client {
     profileId: string,
     params?: { page?: number; size?: number }
   ) {
-    let response = await this.http.get(`/publish/v2/profiles/${platformType}/${profileId}`, {
-      params
-    });
+    let response = await this.http.get(
+      `/publish/v2/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
   async deletePublishProfile(platformType: string, profileId: string) {
-    let response = await this.http.delete(`/publish/v2/profiles/${platformType}/${profileId}`);
+    let response = await this.http.delete(
+      `/publish/v2/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}`
+    );
     return response.data;
   }
 
@@ -420,7 +488,7 @@ export class Client {
     params?: { page?: number; size?: number }
   ) {
     let response = await this.http.get(
-      `/publish/v2/profiles/${platformType}/${profileId}/app-versions`,
+      `/publish/v2/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}/app-versions`,
       { params }
     );
     return response.data;
@@ -428,7 +496,7 @@ export class Client {
 
   async getPublishDetails(platformType: string, profileId: string, appVersionId: string) {
     let response = await this.http.get(
-      `/publish/v2/profiles/${platformType}/${profileId}/app-versions/${appVersionId}/publish`
+      `/publish/v2/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}/publish`
     );
     return response.data;
   }
@@ -440,41 +508,37 @@ export class Client {
     stepId?: string
   ) {
     let response = await this.http.post(
-      `/publish/v2/profiles/${platformType}/${profileId}/publish/${publishId}`,
+      `/publish/v3/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}/publish/${encodeURIComponent(publishId)}/start`,
       undefined,
-      { params: { action: 'start', ...(stepId ? { stepId } : {}) } }
+      { params: stepId ? { stepId } : undefined }
     );
     return response.data;
   }
 
   async cancelPublish(platformType: string, profileId: string, publishId: string) {
     let response = await this.http.post(
-      `/publish/v2/profiles/${platformType}/${profileId}/publish/${publishId}`,
-      undefined,
-      { params: { action: 'cancel' } }
+      `/publish/v3/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}/publish/${encodeURIComponent(publishId)}/cancel`
     );
     return response.data;
   }
 
   async restartPublish(platformType: string, profileId: string, publishId: string) {
     let response = await this.http.post(
-      `/publish/v2/profiles/${platformType}/${profileId}/publish/${publishId}`,
-      undefined,
-      { params: { action: 'restart' } }
+      `/publish/v3/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}/publish/${encodeURIComponent(publishId)}/restart`
     );
     return response.data;
   }
 
   async listPublishFlows(platformType: string, profileId: string) {
     let response = await this.http.get(
-      `/publish/v2/profiles/${platformType}/${profileId}/publishflows`
+      `/publish/v2/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}/publishflows`
     );
     return response.data;
   }
 
   async getPublishFlow(platformType: string, profileId: string, publishFlowId: string) {
     let response = await this.http.get(
-      `/publish/v2/profiles/${platformType}/${profileId}/publishflows/${publishFlowId}`
+      `/publish/v2/profiles/${this.getPublishPlatform(platformType)}/${encodeURIComponent(profileId)}/publishflows/${encodeURIComponent(publishFlowId)}`
     );
     return response.data;
   }
@@ -490,7 +554,9 @@ export class Client {
     profileId: string,
     params?: { page?: number; size?: number }
   ) {
-    let response = await this.http.get(`/store/v2/profiles/${profileId}`, { params });
+    let response = await this.http.get(`/store/v2/profiles/${encodeURIComponent(profileId)}`, {
+      params
+    });
     return response.data;
   }
 
@@ -498,15 +564,18 @@ export class Client {
     profileId: string,
     params?: { page?: number; size?: number }
   ) {
-    let response = await this.http.get(`/store/v2/profiles/${profileId}/app-versions`, {
-      params
-    });
+    let response = await this.http.get(
+      `/store/v2/profiles/${encodeURIComponent(profileId)}/app-versions`,
+      {
+        params
+      }
+    );
     return response.data;
   }
 
   async getEnterpriseStoreAppVersion(profileId: string, appVersionId: string) {
     let response = await this.http.get(
-      `/store/v2/profiles/${profileId}/app-versions/${appVersionId}`
+      `/store/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}`
     );
     return response.data;
   }
@@ -517,29 +586,33 @@ export class Client {
     data: { publishType?: string; summary?: string; releaseNotes?: string }
   ) {
     let response = await this.http.patch(
-      `/store/v2/profiles/${profileId}/app-versions/${appVersionId}/publish`,
-      data
+      `/store/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}/publish`,
+      {
+        ...data,
+        publishType:
+          data.publishType === 'Beta' ? 1 : data.publishType === 'Live' ? 2 : undefined
+      }
     );
     return response.data;
   }
 
   async unpublishEnterpriseStoreAppVersion(profileId: string, appVersionId: string) {
     let response = await this.http.patch(
-      `/store/v2/profiles/${profileId}/app-versions/${appVersionId}/unpublish`
+      `/store/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}/unpublish`
     );
     return response.data;
   }
 
   async deleteEnterpriseStoreAppVersion(profileId: string, appVersionId: string) {
     let response = await this.http.delete(
-      `/store/v2/profiles/${profileId}/app-versions/${appVersionId}`
+      `/store/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}`
     );
     return response.data;
   }
 
   async getEnterpriseStoreDownloadLink(profileId: string, appVersionId: string) {
     let response = await this.http.get(
-      `/store/v2/profiles/${profileId}/app-versions/${appVersionId}/download-link`
+      `/store/v2/profiles/${encodeURIComponent(profileId)}/app-versions/${encodeURIComponent(appVersionId)}/download-link`
     );
     return response.data;
   }
@@ -577,7 +650,9 @@ export class Client {
   }
 
   async getWebhook(webhookId: string) {
-    let response = await this.http.get(`/webhook/v2/webhooks/${webhookId}`);
+    let response = await this.http.get(
+      `/webhook/v2/webhooks/${encodeURIComponent(webhookId)}`
+    );
     return response.data;
   }
 
@@ -593,18 +668,23 @@ export class Client {
       profileId?: string;
     }
   ) {
-    let response = await this.http.patch(`/webhook/v2/webhooks/${webhookId}`, data);
+    let response = await this.http.patch(
+      `/webhook/v2/webhooks/${encodeURIComponent(webhookId)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteWebhook(webhookId: string) {
-    let response = await this.http.delete(`/webhook/v2/webhooks/${webhookId}`);
+    let response = await this.http.delete(
+      `/webhook/v2/webhooks/${encodeURIComponent(webhookId)}`
+    );
     return response.data;
   }
 
   async getWebhookHistory(webhookId?: string, params?: { page?: number; size?: number }) {
     let url = webhookId
-      ? `/webhook/v2/webhooks/history/${webhookId}`
+      ? `/webhook/v2/webhooks/history/${encodeURIComponent(webhookId)}`
       : '/webhook/v2/webhooks/history';
     let response = await this.http.get(url, { params });
     return response.data;

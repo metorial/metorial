@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { ownerIds, recordId } from '../lib/records';
 import { spec } from '../spec';
 
 let financialDocumentSchema = z.object({
@@ -52,7 +53,7 @@ export let listFinancialDocuments = SlateTool.create(spec, {
     let mustClauses: any[] = [];
 
     if (ctx.input.parentRecordId) {
-      mustClauses.push({ term: { primary: ctx.input.parentRecordId } });
+      mustClauses.push({ term: { 'related.id': ctx.input.parentRecordId } });
     }
     if (ctx.input.statusName) {
       mustClauses.push({ term: { status_name: ctx.input.statusName } });
@@ -69,16 +70,16 @@ export let listFinancialDocuments = SlateTool.create(spec, {
     let documents = (result.results || []).map((d: any) => ({
       documentId: d.jnid,
       documentType: ctx.input.documentType,
-      number: d.number,
-      statusName: d.status_name,
-      recordTypeName: d.record_type_name,
-      parentRecordId: d.primary,
-      customerNote: d.customer_note,
-      internalNote: d.internal_note,
-      salesRep: d.sales_rep,
-      createdByName: d.created_by_name,
-      dateCreated: d.date_created,
-      dateUpdated: d.date_updated
+      number: d.number ?? undefined,
+      statusName: d.status_name ?? undefined,
+      recordTypeName: d.record_type_name ?? undefined,
+      parentRecordId: recordId(d.primary) ?? ownerIds(d.related)?.[0],
+      customerNote: d.note ?? d.customer_note ?? undefined,
+      internalNote: d.internal_note ?? undefined,
+      salesRep: d.sales_rep ?? undefined,
+      createdByName: d.created_by_name ?? undefined,
+      dateCreated: d.date_created ?? undefined,
+      dateUpdated: d.date_updated ?? undefined
     }));
 
     return {

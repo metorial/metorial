@@ -25,7 +25,7 @@ export let scrapeWebpage = SlateTool.create(spec, {
       renderJs: z
         .boolean()
         .optional()
-        .describe('Enable JavaScript rendering for dynamic pages. Defaults to false.'),
+        .describe('Enable JavaScript rendering for dynamic pages. Defaults to true.'),
       premiumProxy: z
         .boolean()
         .optional()

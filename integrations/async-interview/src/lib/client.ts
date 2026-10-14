@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://app.asyncinterview.ai/api';
 
@@ -77,21 +82,49 @@ export class Client {
   private http;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    if (!config.token?.trim()) {
+      throw createApiServiceError('An Async Interview API token is required.', {
+        reason: 'missing_api_token'
+      });
+    }
+
+    this.http = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Async Interview',
+          reason: 'api_request_failed'
+        })
     });
   }
 
-  async listJobs(): Promise<unknown[]> {
+  async listJobs(): Promise<Record<string, unknown>[]> {
     let response = await this.http.get('/jobs');
+    if (!Array.isArray(response.data) || !response.data.every(isApiErrorRecord)) {
+      throw createApiServiceError('Async Interview returned an unexpected jobs response.', {
+        reason: 'invalid_api_response'
+      });
+    }
     return response.data;
   }
 
   async listInterviewResponses(): Promise<RawInterviewResponse[]> {
     let response = await this.http.get('/interview_responses');
+    if (
+      !Array.isArray(response.data) ||
+      !response.data.every(
+        item =>
+          isApiErrorRecord(item) &&
+          (item.attempts == null ||
+            (Array.isArray(item.attempts) && item.attempts.every(isApiErrorRecord)))
+      )
+    ) {
+      throw createApiServiceError(
+        'Async Interview returned an unexpected interview responses response.',
+        { reason: 'invalid_api_response' }
+      );
+    }
     return response.data;
   }
 

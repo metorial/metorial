@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -23,8 +23,19 @@ export let manageIpAddresses = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('IP address record ID (required for update/delete)'),
-      ipAddress: z.string().optional().describe('IP address value (for create)'),
-      networkId: z.string().optional().describe('Network ID to associate with (for create)'),
+      ipAddress: z.string().optional().describe('IP address value (for create/update/verify)'),
+      networkId: z
+        .string()
+        .optional()
+        .describe(
+          'Network ID to associate with (for create/verify). Call list_networks to discover network IDs.'
+        ),
+      organizationId: z
+        .string()
+        .optional()
+        .describe(
+          'Organization ID (for create/verify). Call list_organizations to discover organization IDs.'
+        ),
       attributes: z.record(z.string(), z.any()).optional().describe('Additional attributes')
     })
   )
@@ -54,7 +65,9 @@ export let manageIpAddresses = SlateTool.create(spec, {
     if (action === 'my_ip') {
       let result = await client.getMyIp();
       let currentIp =
-        typeof result === 'string' ? result : (result?.ip ?? JSON.stringify(result));
+        typeof result === 'string'
+          ? result
+          : (result?.myip ?? result?.ip ?? JSON.stringify(result));
       return {
         output: { currentIp },
         message: `Your current IP is **${currentIp}**.`
@@ -62,7 +75,16 @@ export let manageIpAddresses = SlateTool.create(spec, {
     }
 
     if (action === 'verify') {
-      let result = await client.verifyIpAddress();
+      let params: Record<string, any> = { ...ctx.input.attributes };
+      if (ctx.input.ipAddress) params.address = ctx.input.ipAddress;
+      if (ctx.input.networkId) params.network_id = ctx.input.networkId;
+      if (ctx.input.organizationId) params.organization_id = ctx.input.organizationId;
+      if (!params.address || !params.network_id || !params.organization_id) {
+        throw createApiServiceError(
+          'Provide ipAddress, networkId, and organizationId to verify the address.'
+        );
+      }
+      let result = await client.verifyIpAddress(params);
       return {
         output: { ipAddress: result },
         message: `IP verification result retrieved.`
@@ -70,7 +92,8 @@ export let manageIpAddresses = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.ipAddressId) throw new Error('ipAddressId is required for delete');
+      if (!ctx.input.ipAddressId)
+        throw createApiServiceError('ipAddressId is required for delete');
       await client.deleteIpAddress(ctx.input.ipAddressId);
       return {
         output: { deleted: true },
@@ -80,8 +103,9 @@ export let manageIpAddresses = SlateTool.create(spec, {
 
     if (action === 'create') {
       let params: Record<string, any> = {};
-      if (ctx.input.ipAddress) params.ip_address = ctx.input.ipAddress;
+      if (ctx.input.ipAddress) params.address = ctx.input.ipAddress;
       if (ctx.input.networkId) params.network_id = ctx.input.networkId;
+      if (ctx.input.organizationId) params.organization_id = ctx.input.organizationId;
       if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
       let ipAddress = await client.createIpAddress(params);
       return {
@@ -91,10 +115,12 @@ export let manageIpAddresses = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.ipAddressId) throw new Error('ipAddressId is required for update');
+    if (!ctx.input.ipAddressId)
+      throw createApiServiceError('ipAddressId is required for update');
     let params: Record<string, any> = {};
-    if (ctx.input.ipAddress) params.ip_address = ctx.input.ipAddress;
+    if (ctx.input.ipAddress) params.address = ctx.input.ipAddress;
     if (ctx.input.networkId) params.network_id = ctx.input.networkId;
+    if (ctx.input.organizationId) params.organization_id = ctx.input.organizationId;
     if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
     let ipAddress = await client.updateIpAddress(ctx.input.ipAddressId, params);
     return {

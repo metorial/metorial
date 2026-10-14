@@ -12,6 +12,14 @@ Cancel a scheduled appointment. Optionally include a cancellation note and suppr
 
 Check available dates for a given month or available time slots for a specific date. Provide a **month** to get available dates, or a **date** to get specific time slots. Both require an appointment type ID.
 
+### List Class Availability
+
+Find group class sessions and remaining seats by month or date range. Returns appointment type IDs, calendar IDs, and times for booking.
+
+### List Certificates
+
+Find package codes by client email, product, order, or appointment type before booking.
+
 ### Create Appointment
 
 Book a new appointment. Requires the appointment datetime, appointment type, and client details. Optionally provide a calendar, custom intake form field values, add-ons, and coupon/certificate codes.
@@ -34,7 +42,7 @@ Retrieve all configured appointment types (service offerings) including their du
 
 ### List Appointments
 
-Retrieve a list of scheduled appointments. Filter by date range, calendar, appointment type, client name, email, or phone. Returns up to 100 appointments per request.
+Retrieve a list of scheduled appointments. Filter by date range, calendar, appointment type, client name, email, or phone. Defaults to 100 results. Set `max` to change the limit; use `canceled` to retrieve canceled appointments or `showAll` to include both states.
 
 ### List Calendars
 
@@ -71,6 +79,10 @@ Reschedule an existing appointment to a new date and time. Optionally change the
 ### Update Appointment
 
 Update an existing appointment's client details, notes, or intake form field values. To change the appointment time, use the Reschedule Appointment tool instead.
+
+Client updates use `currentFirstName` and `currentLastName`, with `currentPhone` to distinguish clients with the same name. Client deletion uses `firstName`, `lastName`, and optional `phone`. Call List Clients first to discover these values; numeric client IDs are not used by Acuity's update or delete API.
+
+Appointment notes and certificate updates require explicit `admin: true`. Administrator booking and rescheduling bypass availability validation, so check availability first. The `noEmail` option suppresses email and SMS notifications when creating, canceling, or rescheduling appointments. Availability checks support add-ons and, for a specific date, ignored appointment IDs when rescheduling to an overlapping slot.
 
 ## License
 

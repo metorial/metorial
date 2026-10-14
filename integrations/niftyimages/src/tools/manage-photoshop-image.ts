@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,9 @@ You can show/hide layers and set colors for text and shape layers based on data 
 })
   .input(
     z.object({
-      imageId: z.string().describe('The ID of the Photoshop-based image.'),
+      imageId: z
+        .string()
+        .describe('Numeric Photoshop image ID, or the image URL returned by List Images.'),
       action: z
         .enum(['get_layers', 'update'])
         .describe('Whether to get layer details or update layers.'),
@@ -23,7 +25,7 @@ You can show/hide layers and set colors for text and shape layers based on data 
         .record(z.string(), z.any())
         .optional()
         .describe(
-          'Layer update data — key-value pairs mapping layer names to their new values (required for update action).'
+          'Layer names mapped to text values, booleans (true hides the layer), or objects with provider properties such as TextValue, TextColor, ShapeColor, Hide, or ImageUrl (required for update action).'
         )
     })
   )
@@ -51,7 +53,7 @@ You can show/hide layers and set colors for text and shape layers based on data 
     }
 
     if (!ctx.input.layers) {
-      throw new Error('Layer data is required for the update action.');
+      throw createApiServiceError('Layer data is required for the update action.');
     }
 
     let updateResult = await client.updatePhotoshopImage(ctx.input.imageId, ctx.input.layers);

@@ -31,7 +31,8 @@ export let assessPortFraudRisk = SlateTool.create(spec, {
 
     return {
       output: {
-        fraudRisk: result.port_fraud || result.fraud_risk || result.risk,
+        fraudRisk:
+          result.port_fraud ?? result.fraud_risk ?? result.risk ?? result.port_fraud_risk,
         status: result.status,
         statusMessage: result.status_message,
         rawResponse: result

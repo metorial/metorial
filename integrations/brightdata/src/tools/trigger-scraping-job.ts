@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let triggerScrapingJob = SlateTool.create(spec, {
   name: 'Trigger Scraping Job',
   key: 'trigger_scraping_job',
-  description: `Start an asynchronous data collection job using one of Bright Data's 120+ pre-built scrapers. Provide target URLs or keywords and receive a snapshot ID to track progress and download results later. Supports delivery via webhook or API download.`,
+  description: `Start an asynchronous data collection job using Bright Data's pre-built scrapers. Provide target URLs or keywords and receive a snapshot ID to track progress and download results later. Supports delivery via webhook or API download.`,
   instructions: [
-    'Find your dataset/scraper ID in the Bright Data dashboard under Web Scraper API.',
+    'Use list_scrapers to discover dataset IDs, supported collection methods, and required input fields.',
     'For URL-based scrapers, provide inputs as objects with a "url" key. For discovery scrapers, use "keyword" keys.',
     'Use the returned snapshotId with the "Get Scraping Job Status" and "Download Snapshot" tools to monitor and retrieve results.',
     'Optionally configure a webhook endpoint for automatic data delivery upon job completion.'
@@ -25,7 +25,9 @@ export let triggerScrapingJob = SlateTool.create(spec, {
     z.object({
       datasetId: z
         .string()
-        .describe('ID of the pre-built scraper/dataset to use (e.g., "gd_abc123").'),
+        .describe(
+          'ID of the pre-built scraper/dataset to use. Call list_scrapers to discover IDs.'
+        ),
       inputs: z
         .array(z.record(z.string(), z.string()))
         .describe(
@@ -43,6 +45,12 @@ export let triggerScrapingJob = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('URL to receive a lightweight notification when the collection finishes.'),
+      notifyOnCompletion: z
+        .boolean()
+        .optional()
+        .describe(
+          'Enable or disable completion notifications using the current API notification flag. Do not combine with notify.'
+        ),
       endpoint: z
         .string()
         .optional()
@@ -57,7 +65,7 @@ export let triggerScrapingJob = SlateTool.create(spec, {
         .describe('Send webhook data uncompressed (default is compressed).'),
       type: z.string().optional().describe('Set to "discover_new" to enable discovery phase.'),
       discoverBy: z
-        .enum(['keyword', 'best_sellers_url', 'category_url', 'location'])
+        .enum(['keyword', 'best_sellers_url', 'category_url', 'location', 'user_name'])
         .optional()
         .describe('Discovery method when using discovery mode.'),
       includeErrors: z.boolean().optional().describe('Include error reports in the output.')
@@ -81,6 +89,7 @@ export let triggerScrapingJob = SlateTool.create(spec, {
       format: ctx.input.format,
       limitPerInput: ctx.input.limitPerInput,
       notify: ctx.input.notify,
+      notifyOnCompletion: ctx.input.notifyOnCompletion,
       endpoint: ctx.input.endpoint,
       authHeader: ctx.input.authHeader,
       uncompressedWebhook: ctx.input.uncompressedWebhook,

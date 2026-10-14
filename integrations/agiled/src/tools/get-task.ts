@@ -12,6 +12,7 @@ export let getTask = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       taskId: z

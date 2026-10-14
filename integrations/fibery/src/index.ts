@@ -4,7 +4,9 @@ import {
   batchCreateOrUpdateTool,
   createEntityTool,
   deleteEntityTool,
+  getCurrentUserTool,
   getSchemaTool,
+  listUsersTool,
   manageCollectionTool,
   manageDocumentTool,
   queryEntitiesTool,
@@ -14,7 +16,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUserTool,
     getSchemaTool,
+    listUsersTool,
     queryEntitiesTool,
     createEntityTool,
     updateEntityTool,

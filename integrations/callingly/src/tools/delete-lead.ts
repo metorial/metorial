@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -28,7 +28,10 @@ export let deleteLead = SlateTool.create(spec, {
       accountId: ctx.config.accountId
     });
 
-    await client.deleteLead(ctx.input.leadId);
+    let result = await client.deleteLead(ctx.input.leadId);
+    if (result?.success === false) {
+      throw createApiServiceError('Callingly did not confirm that the lead was deleted.');
+    }
 
     return {
       output: { success: true },

@@ -60,7 +60,7 @@ export let getAvatarInference = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
 
     if (ctx.input.inferenceId) {
       let details = await client.getAvatarInferenceDetails(ctx.input.inferenceId);

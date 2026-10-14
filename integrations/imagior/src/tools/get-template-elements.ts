@@ -17,7 +17,11 @@ export let getTemplateElements = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      templateId: z.string().describe('The ID of the design template to inspect'),
+      templateId: z
+        .string()
+        .describe(
+          'The ID of the design template to inspect. Call list_templates to discover template IDs.'
+        ),
       detailLevel: z
         .enum(['full', 'basic'])
         .optional()

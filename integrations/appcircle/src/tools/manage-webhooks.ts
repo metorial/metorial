@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageWebhooks = SlateTool.create(spec, {
@@ -64,17 +64,17 @@ export let manageWebhooks = SlateTool.create(spec, {
           page: ctx.input.page,
           size: ctx.input.size
         });
-        let items = Array.isArray(webhooks) ? webhooks : [];
+        let items = getAppcircleList(webhooks, 'list');
         return { output: items, message: `Found **${items.length}** webhook(s).` };
       }
       case 'get': {
-        if (!ctx.input.webhookId) throw new Error('webhookId is required');
+        if (!ctx.input.webhookId) throw createApiServiceError('webhookId is required');
         let webhook = await client.getWebhook(ctx.input.webhookId);
         return { output: webhook, message: `Retrieved webhook **${ctx.input.webhookId}**.` };
       }
       case 'create': {
         if (!ctx.input.postUrl || !ctx.input.actions?.length)
-          throw new Error('postUrl and actions are required');
+          throw createApiServiceError('postUrl and actions are required');
         let created = await client.createWebhook({
           name: ctx.input.name,
           postUrl: ctx.input.postUrl,
@@ -87,7 +87,7 @@ export let manageWebhooks = SlateTool.create(spec, {
         return { output: created, message: `Created webhook for **${ctx.input.postUrl}**.` };
       }
       case 'update': {
-        if (!ctx.input.webhookId) throw new Error('webhookId is required');
+        if (!ctx.input.webhookId) throw createApiServiceError('webhookId is required');
         let updated = await client.updateWebhook(ctx.input.webhookId, {
           name: ctx.input.name,
           postUrl: ctx.input.postUrl,
@@ -100,7 +100,7 @@ export let manageWebhooks = SlateTool.create(spec, {
         return { output: updated, message: `Updated webhook **${ctx.input.webhookId}**.` };
       }
       case 'delete': {
-        if (!ctx.input.webhookId) throw new Error('webhookId is required');
+        if (!ctx.input.webhookId) throw createApiServiceError('webhookId is required');
         await client.deleteWebhook(ctx.input.webhookId);
         return {
           output: { success: true },
@@ -116,7 +116,7 @@ export let manageWebhooks = SlateTool.create(spec, {
           page: ctx.input.page,
           size: ctx.input.size
         });
-        let items = Array.isArray(history) ? history : [];
+        let items = getAppcircleList(history, 'list');
         return { output: items, message: `Found **${items.length}** delivery record(s).` };
       }
     }

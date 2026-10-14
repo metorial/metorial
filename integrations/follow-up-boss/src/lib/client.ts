@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -20,7 +20,7 @@ export interface ListMetadata {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: ClientConfig) {
     let headers: Record<string, string> = {
@@ -36,7 +36,12 @@ export class Client {
       headers.Authorization = `Basic ${basicAuth}`;
     }
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Follow Up Boss',
+          reason: 'follow_up_boss_api_error'
+        }),
       baseURL: 'https://api.followupboss.com/v1',
       headers
     });
@@ -63,7 +68,7 @@ export class Client {
   }
 
   async createPerson(data: Record<string, any>) {
-    let response = await this.axios.post('/people', data);
+    let response = await this.axios.post('/people', data, { params: { deduplicate: true } });
     return response.data;
   }
 
@@ -98,8 +103,7 @@ export class Client {
   // ===== Events (Lead Ingestion) =====
 
   async createEvent(data: Record<string, any>) {
-    let response = await this.axios.post('/events', data);
-    return response.data;
+    return this.axios.post('/events', data);
   }
 
   async listEvents(params?: PaginationParams & Record<string, any>) {

@@ -1,13 +1,16 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelBooking,
+  getAvailableTimeSlots,
   getBooking,
   listBookingCalendars,
   listBookingPages,
   listBookings,
   listEventTypes,
   listTeams,
-  listUsers
+  listUsers,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -18,7 +21,10 @@ export let provider = Slate.create({
     listBookingPages,
     listEventTypes,
     listUsers,
-    listTeams
+    listTeams,
+    whoAmI,
+    cancelBooking,
+    getAvailableTimeSlots
   ],
   triggers: []
 });

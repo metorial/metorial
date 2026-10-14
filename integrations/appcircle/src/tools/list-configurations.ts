@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listConfigurations = SlateTool.create(spec, {
@@ -22,11 +22,11 @@ export let listConfigurations = SlateTool.create(spec, {
       z
         .object({
           configurationId: z.string().optional(),
-          configurationName: z.string().optional(),
+          configurationName: z.string().nullish(),
           platformType: z.string().optional(),
-          autoBuild: z.boolean().optional(),
-          autoDistribute: z.boolean().optional(),
-          autoPublish: z.boolean().optional()
+          autoBuild: z.boolean().nullish(),
+          autoDistribute: z.boolean().nullish(),
+          autoPublish: z.boolean().nullish()
         })
         .passthrough()
     )
@@ -35,10 +35,13 @@ export let listConfigurations = SlateTool.create(spec, {
     let client = createClient(ctx);
     let configs = await client.listConfigurations(ctx.input.profileId, ctx.input.branchId);
 
-    let items = Array.isArray(configs) ? configs : [];
+    let items = getAppcircleList(configs, 'list');
 
     return {
-      output: items,
+      output: items.map(item => ({
+        ...item,
+        platformType: item.platformType == null ? undefined : String(item.platformType)
+      })),
       message: `Found **${items.length}** configuration(s) for profile **${ctx.input.profileId}**.`
     };
   })

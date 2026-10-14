@@ -130,11 +130,11 @@ Use this to find the Enigma ID for a business when you have partial identifying 
 
     if (Array.isArray(result)) {
       matches = result.map((m: Record<string, unknown>) => ({
-        enigmaId: m.enigma_id,
-        matchConfidence: m.match_confidence,
-        isMatched: m.is_matched,
+        enigmaId: m.enigma_id ?? undefined,
+        matchConfidence: m.match_confidence ?? undefined,
+        isMatched: m.is_matched ?? undefined,
         matchedFields: m.matched_fields,
-        businessLocationEnigmaIds: m.business_location_enigma_ids,
+        businessLocationEnigmaIds: m.business_location_enigma_ids ?? undefined,
         names: m.names,
         addresses: m.addresses,
         websites: m.websites
@@ -142,11 +142,11 @@ Use this to find the Enigma ID for a business when you have partial identifying 
     } else if (result && typeof result === 'object') {
       matches = [
         {
-          enigmaId: result.enigma_id,
-          matchConfidence: result.match_confidence,
-          isMatched: result.is_matched,
+          enigmaId: result.enigma_id ?? undefined,
+          matchConfidence: result.match_confidence ?? undefined,
+          isMatched: result.is_matched ?? undefined,
           matchedFields: result.matched_fields,
-          businessLocationEnigmaIds: result.business_location_enigma_ids,
+          businessLocationEnigmaIds: result.business_location_enigma_ids ?? undefined,
           names: result.names,
           addresses: result.addresses,
           websites: result.websites
@@ -155,7 +155,7 @@ Use this to find the Enigma ID for a business when you have partial identifying 
     }
 
     let matchedCount = matches.filter(m => m.isMatched).length;
-    let topMatch = matches[0];
+    let topMatch = matches.find(match => match.isMatched) ?? matches[0];
     let summary =
       matchedCount > 0
         ? `Found **${matchedCount}** match(es). Top match: Enigma ID \`${topMatch?.enigmaId}\` with confidence **${topMatch?.matchConfidence}**.`

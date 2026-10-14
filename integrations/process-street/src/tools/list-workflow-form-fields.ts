@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorSchema, getNextCursor, nextCursorSchema } from '../lib/pagination';
 import { spec } from '../spec';
 
 let formFieldSchema = z.object({
@@ -24,18 +25,20 @@ export let listWorkflowFormFields = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorSchema,
       workflowId: z.string().describe('ID of the workflow to list form fields for')
     })
   )
   .output(
     z.object({
+      nextCursor: nextCursorSchema,
       formFields: z.array(formFieldSchema).describe('List of form field definitions')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let data = await client.listWorkflowFormFields(ctx.input.workflowId);
-    let formFields = (data.formFields || []).map((f: any) => ({
+    let data = await client.listWorkflowFormFields(ctx.input.workflowId, ctx.input.cursor);
+    let formFields = (data.fields || data.formFields || []).map((f: any) => ({
       formFieldId: f.id,
       taskId: f.taskId,
       fieldType: f.fieldType,
@@ -44,7 +47,7 @@ export let listWorkflowFormFields = SlateTool.create(spec, {
       dataSetLinked: f.dataSetLinked
     }));
     return {
-      output: { formFields },
+      output: { formFields, nextCursor: getNextCursor(data) },
       message: `Found **${formFields.length}** form field(s).`
     };
   })

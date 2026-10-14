@@ -1,11 +1,11 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://app.jobnimbus.com/api1';
 
 export interface ListParams {
   from?: number;
   size?: number;
-  filter?: Record<string, any>;
+  filter?: Record<string, unknown>;
 }
 
 export interface ListResponse<T> {
@@ -17,19 +17,29 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'JobNimbus',
+          reason: 'jobnimbus_api_error'
+        })
     });
   }
 
   private buildQueryParams(params?: ListParams): Record<string, string> {
     let query: Record<string, string> = {};
-    if (params?.from !== undefined) query.from = String(params.from);
-    if (params?.size !== undefined) query.size = String(params.size);
+    let from = params?.from ?? 0;
+    let size = params?.size ?? 25;
+    if (!Number.isInteger(from) || from < 0) {
+      throw createApiServiceError('Pagination from must be a non-negative integer.');
+    }
+    if (!Number.isInteger(size) || size < 1 || size > 200) {
+      throw createApiServiceError('Pagination size must be an integer from 1 to 200.');
+    }
+    query.from = String(from);
+    query.size = String(size);
     if (params?.filter) query.filter = JSON.stringify(params.filter);
     return query;
   }
@@ -44,7 +54,7 @@ export class Client {
   }
 
   async getContact(contactId: string): Promise<any> {
-    let response = await this.axios.get(`/contacts/${contactId}`);
+    let response = await this.axios.get(`/contacts/${encodeURIComponent(contactId)}`);
     return response.data;
   }
 
@@ -54,12 +64,12 @@ export class Client {
   }
 
   async updateContact(contactId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/contacts/${contactId}`, data);
+    let response = await this.axios.put(`/contacts/${encodeURIComponent(contactId)}`, data);
     return response.data;
   }
 
   async deleteContact(contactId: string): Promise<void> {
-    await this.axios.delete(`/contacts/${contactId}`);
+    await this.axios.put(`/contacts/${encodeURIComponent(contactId)}`, { is_active: false });
   }
 
   // ── Jobs ──
@@ -72,7 +82,7 @@ export class Client {
   }
 
   async getJob(jobId: string): Promise<any> {
-    let response = await this.axios.get(`/jobs/${jobId}`);
+    let response = await this.axios.get(`/jobs/${encodeURIComponent(jobId)}`);
     return response.data;
   }
 
@@ -82,7 +92,7 @@ export class Client {
   }
 
   async updateJob(jobId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/jobs/${jobId}`, data);
+    let response = await this.axios.put(`/jobs/${encodeURIComponent(jobId)}`, data);
     return response.data;
   }
 
@@ -96,7 +106,7 @@ export class Client {
   }
 
   async getTask(taskId: string): Promise<any> {
-    let response = await this.axios.get(`/tasks/${taskId}`);
+    let response = await this.axios.get(`/tasks/${encodeURIComponent(taskId)}`);
     return response.data;
   }
 
@@ -106,13 +116,15 @@ export class Client {
   }
 
   async updateTask(taskId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/tasks/${taskId}`, data);
+    let response = await this.axios.put(`/tasks/${encodeURIComponent(taskId)}`, data);
     return response.data;
   }
 
   // ── Activities ──
 
-  async listActivities(params?: ListParams): Promise<ListResponse<any>> {
+  async listActivities(
+    params?: ListParams
+  ): Promise<{ count: number; activity?: any[]; results?: any[] }> {
     let response = await this.axios.get('/activities', {
       params: this.buildQueryParams(params)
     });
@@ -120,7 +132,7 @@ export class Client {
   }
 
   async getActivity(activityId: string): Promise<any> {
-    let response = await this.axios.get(`/activities/${activityId}`);
+    let response = await this.axios.get(`/activities/${encodeURIComponent(activityId)}`);
     return response.data;
   }
 
@@ -132,48 +144,51 @@ export class Client {
   // ── Estimates ──
 
   async listEstimates(params?: ListParams): Promise<ListResponse<any>> {
-    let response = await this.axios.get('/estimates', {
+    let response = await this.axios.get('/v2/estimates', {
       params: this.buildQueryParams(params)
     });
     return response.data;
   }
 
   async getEstimate(estimateId: string): Promise<any> {
-    let response = await this.axios.get(`/estimates/${estimateId}`);
+    let response = await this.axios.get(`/v2/estimates/${encodeURIComponent(estimateId)}`);
     return response.data;
   }
 
   async createEstimate(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/estimates', data);
+    let response = await this.axios.post('/v2/estimates', data);
     return response.data;
   }
 
   async updateEstimate(estimateId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/estimates/${estimateId}`, data);
+    let response = await this.axios.put(
+      `/v2/estimates/${encodeURIComponent(estimateId)}`,
+      data
+    );
     return response.data;
   }
 
   // ── Invoices ──
 
   async listInvoices(params?: ListParams): Promise<ListResponse<any>> {
-    let response = await this.axios.get('/invoices', {
+    let response = await this.axios.get('/v2/invoices', {
       params: this.buildQueryParams(params)
     });
     return response.data;
   }
 
   async getInvoice(invoiceId: string): Promise<any> {
-    let response = await this.axios.get(`/invoices/${invoiceId}`);
+    let response = await this.axios.get(`/v2/invoices/${encodeURIComponent(invoiceId)}`);
     return response.data;
   }
 
   async createInvoice(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/invoices', data);
+    let response = await this.axios.post('/v2/invoices', data);
     return response.data;
   }
 
   async updateInvoice(invoiceId: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/invoices/${invoiceId}`, data);
+    let response = await this.axios.put(`/v2/invoices/${encodeURIComponent(invoiceId)}`, data);
     return response.data;
   }
 
@@ -187,12 +202,22 @@ export class Client {
   }
 
   async getFile(fileId: string): Promise<any> {
-    let response = await this.axios.get(`/files/${fileId}`);
+    let response = await this.axios.get(`/files/${encodeURIComponent(fileId)}`);
     return response.data;
   }
 
   async createFile(data: Record<string, any>): Promise<any> {
     let response = await this.axios.post('/files', data);
+    return response.data;
+  }
+
+  async getAccountSettings(): Promise<any> {
+    let response = await this.axios.get('/account/settings');
+    return response.data;
+  }
+
+  async listUsers(): Promise<any> {
+    let response = await this.axios.get('/account/users');
     return response.data;
   }
 }

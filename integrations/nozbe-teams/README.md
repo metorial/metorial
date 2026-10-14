@@ -1,6 +1,8 @@
 # Nozbe Teams
 
-Create, read, update, and delete tasks and projects for team collaboration. Manage task attributes including assignments, due dates, recurrence, priority, tags, and time tracking. Add comments with Markdown text and file attachments to tasks. Organize projects with sections, member access controls, and color coding. Manage tags to categorize tasks across projects. Retrieve team member information and roles. Filter, sort, and select specific fields in query results.
+Manage Nozbe projects, tasks, comments, and tags. Discover authorized spaces and members, organize project sections, assign tasks, set due dates and priority, and track time. List tag assignments to remove existing task labels. List results support filtering, sorting, and pagination.
+
+Create an API token in Settings → API tokens. Space tokens access one space; global tokens access all authorized spaces. See the [API specification](./docs/SPEC.md) for supported tools and official documentation.
 
 ## License
 

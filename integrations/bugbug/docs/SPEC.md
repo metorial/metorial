@@ -1,50 +1,20 @@
-Let me fetch the Swagger API documentation and check for webhook support.Let me try to access the actual Swagger/API docs in a machine-readable format:Let me try to find the Pipedream integration page to understand what API endpoints are available:Now I have enough information to write the specification. Based on my research, BugBug is a low-code test automation tool with a public API that uses token-based authentication. The API allows running tests/suites and retrieving project data. There's no evidence of webhook support.
+# BugBug API capabilities
 
-# Slates Specification for Bugbug
+BugBug provides cloud test automation for web applications. This integration uses API v2 and a project API token from the Integrations page, API tab. Requests authenticate with `Authorization: Token <api-token>`. Public API access requires a paid plan.
 
-## Overview
+The integration supports discovering tests, suites, profiles, and authorized projects; running tests or suites; reviewing and stopping runs; and downloading JUnit XML reports. Run profile IDs come from `list_profiles`; project IDs and names can be checked with `list_projects`.
 
-BugBug is a codeless test automation tool designed for web application testing. It enables users to create, edit, and execute automated end-to-end tests directly in a web browser—without writing code. The tool supports both local and cloud execution, making it suitable for individuals and scaling teams.
+Run requests send `testId` or `suiteId`, optional `runProfileId`, and optional variable overrides as a `variables` array of `{ key, value }` objects. Run creation and stopping return a state object whose `id` is exposed as the existing `testRunId` or `suiteRunId` output.
 
-## Authentication
+API v2 run results use `name`, `ended`, and `profileName`. The integration maps these to the existing test/suite name, `finished`, and `runProfileName` output keys. Duration remains a number of milliseconds; formatted provider durations are converted, with start/end timestamps as a fallback. Deleted tests or suites can leave run resource IDs null. Suite result counts are derived from the returned `testRuns`.
 
-BugBug uses API token authentication. You need to take the API token of the project you want to work with. You will find that key in the BugBug web app in the Integration tab.
+Metadata that the API does not always expose, including creation timestamps, favorite flags, profile variables, and browser configuration, is optional in tool outputs. No placeholder values are invented for absent fields. Test group IDs and nested steps are returned when the provider supplies their structured data.
 
-When making API requests, the API key must be provided with the `Token` prefix, e.g. `"Token abcde12345"`. This value is passed in the `Authorization` header.
+JUnit downloads use the documented GET endpoints `/testruns/{id}/report/junit/` and `/suiteruns/{id}/report/junit/`. JSON and CSV report downloads are not advertised by this integration.
 
-The API base URL is `https://app.bugbug.io`.
+Official references:
 
-- **Method**: API Token
-- **Header**: `Authorization: Token <your-api-token>`
-- **Where to find it**: BugBug web app → Integrations tab in the side menu
-- **Scope**: Each token is scoped to a specific project
-
-API access is available on paid plans (PRO and above).
-
-## Features
-
-### Test Management
-
-You can run tests and suites in the cloud using BugBug's public API. The API allows you to list tests within a project, retrieve test details, and trigger individual test runs in the cloud. You can pass a specific test ID, profile name, and custom variables (key-value pairs) when triggering a run.
-
-- Tests can be run with variable overrides to test different data combinations.
-- Cloud Runner is only available on paid plans.
-
-### Suite Management
-
-You can organize tests into Suites to quickly run several tests at once. By default BugBug has one suite called "All tests", where you will find all tests created in a project. All newly created tests are automatically added to this suite. The API allows listing suites, retrieving suite details, and triggering suite runs in the cloud.
-
-- Suites can be scheduled to run in the cloud and are useful for working with different environments.
-- Profile names can be specified to run suites with different variable configurations (e.g., different environments or languages).
-
-### Test Run Results
-
-The API allows retrieving test run and suite run results, including pass/fail status and run IDs. Reports can be exported in JUnit XML format. Data can also be exported in formats including JSON and CSV.
-
-### Project Data Access
-
-The API provides an easy way to check your project data outside of the BugBug Web App. You can retrieve information about tests, suites, and their configurations within a project.
-
-## Events
-
-The provider does not support events. BugBug does not offer webhooks or purpose-built polling mechanisms through its API. Notifications for test results are handled via email and Slack (through Zapier), but these are not programmable event subscriptions.
+- [Public API and token authentication](https://docs.bugbug.io/integrations/public-api)
+- [API v2 Swagger reference](https://app.bugbug.io/docs/swagger/?version=v2)
+- [API v2 machine-readable schema](https://app.bugbug.io/docs/schema/?version=v2)
+- [Official SDK reference](https://app.bugbug.io/sdk/docs/index.html)

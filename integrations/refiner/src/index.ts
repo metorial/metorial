@@ -4,11 +4,13 @@ import {
   deleteContact,
   getAccount,
   getContact,
+  getCurrentProject,
   getReporting,
   identifyUser,
   listContacts,
   listResponses,
   listSegments,
+  listSurveyHistory,
   listSurveys,
   manageSegment,
   manageSurvey,
@@ -32,7 +34,9 @@ export let provider = Slate.create({
     listSegments,
     manageSegment,
     getReporting,
-    getAccount
+    getAccount,
+    getCurrentProject,
+    listSurveyHistory
   ],
   triggers: []
 });

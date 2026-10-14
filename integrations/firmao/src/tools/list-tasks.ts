@@ -73,17 +73,19 @@ export let listTasks = SlateTool.create(spec, {
     let tasks = result.data.map((t: any) => ({
       taskId: t.id,
       name: t.name,
-      description: t.description,
-      taskType: t.taskType,
-      status: t.status,
-      priority: t.priority,
-      plannedStartDate: t.plannedStartDate,
-      plannedEndDate: t.plannedEndDate,
-      estimatedHours: t.estimatedHours,
-      projectId: typeof t.project === 'object' ? t.project?.id : t.project,
-      projectName: typeof t.project === 'object' ? t.project?.name : undefined,
-      creationDate: t.creationDate,
-      lastModificationDate: t.lastModificationDate
+      description: t.description ?? undefined,
+      taskType: t.taskType ?? undefined,
+      status: (typeof t.status === 'object' ? t.status?.key : t.status) ?? undefined,
+      priority: t.priority == null ? undefined : String(t.priority),
+      plannedStartDate: t.plannedStartDate ?? undefined,
+      plannedEndDate: t.plannedEndDate ?? undefined,
+      estimatedHours: t.estimatedHours ?? undefined,
+      projectId: (typeof t.project === 'object' ? t.project?.id : t.project) ?? undefined,
+      projectName:
+        (typeof t.project === 'object' ? (t.project?.name ?? t.project?.label) : undefined) ??
+        undefined,
+      creationDate: t.creationDate ?? undefined,
+      lastModificationDate: t.lastModificationDate ?? t.lastUpdateDate ?? undefined
     }));
 
     return {

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, downloadGeneratedFile } from '../lib/client';
 import { spec } from '../spec';
 
 export let addWatermark = SlateTool.create(spec, {
@@ -64,6 +64,13 @@ export let addWatermark = SlateTool.create(spec, {
       hexColor: ctx.input.hexColor,
       fontFamily: ctx.input.fontFamily,
       expiration: ctx.input.expiration
+    });
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: await downloadGeneratedFile(result.file),
+      mimeType: 'application/pdf',
+      filename: 'output.pdf'
     });
 
     return {

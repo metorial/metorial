@@ -4,9 +4,12 @@ import {
   addCustomFieldToContact,
   createEmailCampaign,
   createOrUpdateContact,
+  getCampaignStatistics,
   getContactFields,
   getContacts,
+  getCurrentAccount,
   getEmailCampaigns,
+  listSenders,
   manageContactListMembers,
   manageContactLists,
   manageTags,
@@ -17,6 +20,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentAccount,
+    listSenders,
+    getCampaignStatistics,
     createOrUpdateContact,
     getContacts,
     searchContacts,

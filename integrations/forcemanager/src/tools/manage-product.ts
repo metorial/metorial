@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -47,7 +47,7 @@ Products include model names, pricing, cost, category/family classification, and
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.fields) {
-        throw new Error('Fields are required for creating a product');
+        throw createApiServiceError('Fields are required for creating a product');
       }
       let result = await client.createProduct(ctx.input.fields);
       let productId = result?.id;
@@ -60,7 +60,7 @@ Products include model names, pricing, cost, category/family classification, and
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.productId) {
-        throw new Error('productId is required for updating a product');
+        throw createApiServiceError('productId is required for updating a product');
       }
       await client.updateProduct(ctx.input.productId, ctx.input.fields || {});
       let product = await client.getProduct(ctx.input.productId);
@@ -76,7 +76,7 @@ Products include model names, pricing, cost, category/family classification, and
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.productId) {
-        throw new Error('productId is required for deleting a product');
+        throw createApiServiceError('productId is required for deleting a product');
       }
       await client.deleteProduct(ctx.input.productId);
       return {
@@ -85,6 +85,6 @@ Products include model names, pricing, cost, category/family classification, and
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

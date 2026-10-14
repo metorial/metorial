@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createContentItem = SlateTool.create(spec, {
   name: 'Create Content Item',
   key: 'create_content_item',
-  description: `Creates a new content item in Kontent.ai. Content items are wrappers for language variants - after creation, upsert a language variant to add actual content. You can optionally set an initial language variant with element values during creation.`,
+  description: `Creates a new content item in Kontent.ai. Content items are wrappers for language variants; after creation, use upsert_language_variant to add actual content.`,
   instructions: [
     'The content type codename must reference an existing content type in the environment.',
     'After creating an item, use the "Upsert Language Variant" tool to add content in specific languages.'
@@ -14,6 +15,7 @@ export let createContentItem = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      environmentId: environmentIdInput,
       name: z.string().describe('Name of the content item'),
       contentTypeCodename: z
         .string()
@@ -44,7 +46,7 @@ export let createContentItem = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
     let item = await client.createContentItem({

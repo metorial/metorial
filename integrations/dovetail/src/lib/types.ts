@@ -11,6 +11,7 @@ export interface PaginationResponse {
 
 export interface DovetailProject {
   id: string;
+  overview?: string;
   author: { id: string; name: string | null } | null;
   title: string;
   type: string;
@@ -21,7 +22,9 @@ export interface DovetailProject {
 
 export interface DovetailNote {
   id: string;
+  files?: { id: string }[];
   result_type?: string;
+  project?: { id: string; title?: string } | null;
   preview_text?: string | null;
   title: string;
   content?: string;
@@ -30,15 +33,17 @@ export interface DovetailNote {
   project_id?: string | null;
   project_title?: string | null;
   created_at: string;
-  updated_at: string;
-  fields?: { label: string; value: string | null }[];
+  updated_at?: string;
+  fields?: DovetailField[];
 }
 
 export interface DovetailData {
   id: string;
+  files?: { id: string }[];
   type: string;
   title: string;
   project?: { id: string; title: string } | null;
+  fields?: DovetailField[];
   created_at: string;
   deleted: boolean;
   folder?: { id: string } | null;
@@ -47,6 +52,8 @@ export interface DovetailData {
 
 export interface DovetailInsight {
   id: string;
+  files?: { id: string }[];
+  project?: { id: string | null; title?: string } | null;
   title: string;
   preview_text?: string | null;
   content?: string;
@@ -58,8 +65,8 @@ export interface DovetailInsight {
   published_at?: string | null;
   contributors?: string[];
   created_at: string;
-  updated_at: string;
-  fields?: { label: string; value: string | null }[];
+  updated_at?: string;
+  fields?: DovetailField[];
 }
 
 export interface DovetailHighlight {
@@ -74,7 +81,7 @@ export interface DovetailHighlight {
   project_title?: string | null;
   created_at: string;
   updated_at: string;
-  tags: { title: string | null; highlight_count: number | null }[];
+  tags: { id?: string; title: string | null; highlight_count?: number | null }[];
 }
 
 export interface DovetailTag {
@@ -83,22 +90,24 @@ export interface DovetailTag {
   author_id?: string | null;
   title: string;
   color?: string | null;
-  highlight_count: number;
+  highlight_count?: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface DovetailContact {
   id: string;
-  name: string;
-  email?: string;
+  name: string | null;
+  email?: string | null;
+  fields?: DovetailField[];
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   [key: string]: unknown;
 }
 
 export interface DovetailDoc {
   id: string;
+  files?: { id: string }[];
   type?: string;
   title: string;
   content?: string;
@@ -108,7 +117,7 @@ export interface DovetailDoc {
   deleted?: boolean;
   folder?: { id: string } | null;
   authors?: string[];
-  fields?: { label: string; value: string | null }[];
+  fields?: DovetailField[];
 }
 
 export interface DovetailChannel {
@@ -149,7 +158,7 @@ export interface DovetailFolderContent {
 export interface SearchResults {
   total: number;
   highlights: DovetailHighlight[];
-  tags: DovetailTag[];
+  tags: (DovetailTag & { highlight_count: number })[];
   notes: DovetailNote[];
   insights: DovetailInsight[];
   channels: {
@@ -158,15 +167,15 @@ export interface SearchResults {
     author_id: string | null;
     title: string;
     created_at: string;
-    updated_at: string;
+    updated_at?: string;
   }[];
   themes: {
     id: string;
     result_type: string;
-    title: string;
-    summary: string;
+    title: string | null;
+    summary: string | null;
     created_at: string;
-    updated_at: string;
+    updated_at?: string;
   }[];
   offset: number;
   limit: number;
@@ -175,4 +184,17 @@ export interface SearchResults {
 export interface SummarizeResult {
   summary: string;
   citations: { id: string; type: string; citation_id: number }[];
+}
+
+export interface DovetailField {
+  label: string;
+  value: string | boolean | number | string[] | null;
+  type?: string;
+}
+
+export interface DovetailExport {
+  id: string;
+  title: string;
+  content_html?: string;
+  content_markdown?: string;
 }

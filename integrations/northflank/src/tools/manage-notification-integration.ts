@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageNotificationIntegration = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       action: z
         .enum(['list', 'create', 'get', 'update', 'delete'])
         .describe('Operation to perform'),
@@ -44,7 +46,9 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
       events: z
         .record(z.string(), z.boolean())
         .optional()
-        .describe('Event types to enable, e.g. { "build:start": true, "job:success": true }'),
+        .describe(
+          'Event types to enable, e.g. { "trigger:build:start": true, "trigger:job-run:success": true }. Required for create.'
+        ),
       page: z.number().optional().describe('Page number for list pagination'),
       perPage: z.number().optional().describe('Results per page for list (max 100)')
     })
@@ -74,7 +78,9 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId:
+        ctx.input.teamId ??
+        (typeof ctx.config.teamId === 'string' ? ctx.config.teamId : undefined)
     });
 
     let { action, notificationId } = ctx.input;
@@ -84,7 +90,7 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
         page: ctx.input.page,
         perPage: ctx.input.perPage
       });
-      let integrations = (result.data?.integrations || []).map((i: any) => ({
+      let integrations = (result.data?.notificationIntegrations || []).map((i: any) => ({
         notificationId: i.id,
         name: i.name,
         integrationType: i.type,
@@ -101,11 +107,20 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating an integration');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for creating an integration');
       if (!ctx.input.integrationType)
-        throw new Error('integrationType is required for creating an integration');
+        throw createApiServiceError('integrationType is required for creating an integration');
       if (!ctx.input.webhookUrl)
-        throw new Error('webhookUrl is required for creating an integration');
+        throw createApiServiceError('webhookUrl is required for creating an integration');
+      if (!ctx.input.events)
+        throw createApiServiceError(
+          'events is required for creating an integration. Select the notification events to enable.'
+        );
+      if (ctx.input.integrationType === 'SLACK')
+        throw createApiServiceError(
+          'API creation supports RAW_WEBHOOK, DISCORD, TEAMS, or TEAMS_WORKFLOWS. Choose one of these webhook integration types.'
+        );
 
       let createData: any = {
         name: ctx.input.name,
@@ -115,7 +130,7 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
       if (ctx.input.secret) createData.secret = ctx.input.secret;
       if (ctx.input.projectIds) {
         createData.restricted = true;
-        createData.restrictions = { projects: ctx.input.projectIds };
+        createData.projects = ctx.input.projectIds;
       }
       if (ctx.input.events) createData.events = ctx.input.events;
 
@@ -132,7 +147,7 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!notificationId) throw new Error('notificationId is required');
+      if (!notificationId) throw createApiServiceError('notificationId is required');
       let result = await client.getNotificationIntegration(notificationId);
       return {
         output: {
@@ -146,15 +161,16 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!notificationId) throw new Error('notificationId is required for update');
+      if (!notificationId)
+        throw createApiServiceError('notificationId is required for update');
       let updateData: any = {};
       if (ctx.input.name) updateData.name = ctx.input.name;
       if (ctx.input.webhookUrl) updateData.webhook = ctx.input.webhookUrl;
-      if (ctx.input.secret) updateData.secret = ctx.input.secret;
+      if (ctx.input.secret !== undefined) updateData.secret = ctx.input.secret;
       if (ctx.input.events) updateData.events = ctx.input.events;
       if (ctx.input.projectIds) {
         updateData.restricted = true;
-        updateData.restrictions = { projects: ctx.input.projectIds };
+        updateData.projects = ctx.input.projectIds;
       }
       let result = await client.updateNotificationIntegration(notificationId, updateData);
       return {
@@ -169,7 +185,8 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!notificationId) throw new Error('notificationId is required for delete');
+      if (!notificationId)
+        throw createApiServiceError('notificationId is required for delete');
       await client.deleteNotificationIntegration(notificationId);
       return {
         output: {
@@ -180,6 +197,6 @@ export let manageNotificationIntegration = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

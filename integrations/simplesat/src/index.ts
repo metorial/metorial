@@ -2,8 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getAnswers,
+  getCustomer,
   getResponses,
   getTeamMember,
+  listCustomers,
   listQuestions,
   listSurveys,
   listTeamMembers,
@@ -17,6 +19,8 @@ export let provider = Slate.create({
     listQuestions,
     getAnswers,
     getResponses,
+    listCustomers,
+    getCustomer,
     upsertCustomer,
     sendSurveyEmail,
     getTeamMember,

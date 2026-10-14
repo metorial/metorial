@@ -1,6 +1,6 @@
 # Paperform
 
-Manage online forms, submissions, and eSignature documents. Retrieve and update forms, fields, and submissions. Create and manage products, coupons, and translations for forms. Organize forms into spaces. Access partial (incomplete) submissions. Send documents for eSignature via Papersign, track signing progress, copy and cancel documents, and organize them into folders.
+Manage Paperform forms, submissions, products, coupons, and spaces. Read individual field configurations, product details, and incomplete submissions. Send, copy, move, and cancel Papersign eSignature documents, and organize them into folders. API access depends on the account's Standard, Business, or Papersign plan. Product creation requires a product field key; when the form has exactly one product field, it is selected automatically.
 
 ## License
 

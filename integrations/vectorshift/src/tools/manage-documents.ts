@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createApiClient, deleteDocuments, listDocuments } from '../lib/client';
 import { spec } from '../spec';
@@ -50,7 +50,7 @@ export let manageDocumentsTool = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.documentIds || ctx.input.documentIds.length === 0) {
-        throw new Error('documentIds is required for the delete action');
+        throw createApiServiceError('documentIds is required for the delete action.');
       }
       await deleteDocuments(api, ctx.input.knowledgeBaseId, ctx.input.documentIds);
       return {

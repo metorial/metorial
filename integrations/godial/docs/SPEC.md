@@ -1,55 +1,33 @@
-Now let me look at the Stoplight API documentation and webhooks details:Now let me check the Stoplight API docs for more detail on available endpoints:Let me try to access the Stoplight docs directly to see the API endpoints:Now I have enough information to create the specification. Let me compile everything.
+# GoDial Specification
 
-# Slates Specification for Godial
-
-## Overview
-
-GoDial is a mobile-first auto dialer and CRM platform designed for outbound calling operations. It provides an all-in-one calling solution with autodialer, CRM, and WhatsApp Business API integration. The API provides programmatic access to this functionality, allowing you to trigger calls, manage contacts, and automate call logging.
+GoDial Enterprise organizes outbound calling around teams, member accounts, calling lists, and contacts. This integration exposes seven tools for discovering those resources and adding contacts or members.
 
 ## Authentication
 
-GoDial uses API key-based authentication via an access token.
+Obtain an API access token from **Dashboard → Integration → External API** using a manager account. The integration sends `access_token` as a query parameter with every request to `https://enterprise.godial.cc/meta/api/externals`.
 
-For all your queries you will need an accessToken, to get this, go to Dashboard -> Integration -> External API. Every API you access has to have the `access_token=XXXXXXXXXXX` as a query parameter.
+The [official API guide](https://godial.cc/blog/integrating-your-website-or-crm-with-godial-using-api/) and the [developer documentation introduction](https://godial.stoplight.io/) specify query-parameter authentication. The [newer data-entry guide](https://godial.cc/blog/how-to-add-data-through-apis/) mentions an authorization header but does not give its format. Query authentication is retained according to the explicit API examples.
 
-The base URL for all API requests is `https://enterprise.godial.cc/meta/api/externals/`.
+## Tools
 
-Example request:
+| Tool | Request | Output |
+| --- | --- | --- |
+| `list_lists` | `GET /lists/list` | Calling list records in `lists` |
+| `list_contacts` | `GET /contact/list/{listId}` | Contact records in `contacts` |
+| `add_contact` | `POST /contact/add` | Provider response in `contact` |
+| `list_teams` | `GET /team/list` | Team records in `teams` |
+| `add_member` | `POST /accounts/add` | Provider response in `member` |
+| `list_accounts` | `GET /accounts/list` | Account records in `accounts` |
+| `remove_account` | `POST /accounts/remove`, body `{ "id": accountId }` | Provider response in `result` |
 
-```
-GET https://enterprise.godial.cc/meta/api/externals/lists/list?access_token=YOUR_ACCESS_TOKEN
-```
+Call `list_lists`, `list_teams`, or `list_accounts` to discover the resource IDs required by subsequent tools. `remove_account` is destructive.
 
-There is no OAuth flow or additional scopes. The single access token provides full access to the account's API capabilities.
+The official API guide explicitly documents `/lists/list` and `/contact/add`. Contact creation sends the existing `listId`, `phone`, `name`, `email`, `secondPhone`, `companyName`, `note`, `remarks`, `extra`, and `assignmentMode` JSON fields. Optional fields are omitted when absent; `assignmentMode` remains an unrestricted optional string, with `default` shown in the guide.
 
-## Features
+Member creation retains the existing `teamsId`, `name`, `username`, `password`, `role`, and optional `email` fields. The existing `role` values are `SubManager` and `Agent`. Non-empty required values and at least one team ID are validated before requests. List IDs used in a URL path are encoded as a single path segment.
 
-### Contact/Lead Management
+## Response and documentation limits
 
-Create, update, and manage contacts (leads) within GoDial. All contacts are part of a list, and for creating a new contact/lead, you need to send the contact details along with the list ID. Contacts support fields such as name, email, phone, secondary phone, company name, notes, remarks, and extra data. An `assignmentMode` parameter controls how the contact is distributed to agents.
+List tools retain their array outputs and all record properties. Creation and removal tools retain the complete provider response under their existing output fields. HTTP and transport failures are reported as service errors; list responses that are not arrays are rejected instead of being reported as empty collections.
 
-### List Management
-
-Retrieve and manage calling lists. You can create multiple lists and build workflows with automation and pipeline. Lists serve as the primary organizational unit for contacts and are required when adding new contacts.
-
-### Team and Agent Management
-
-You can create your team, agents, add lists, add contacts, etc. via the APIs. This includes managing user accounts and agent assignments within the organization.
-
-### Account Management
-
-Retrieve account information. The API exposes an accounts listing endpoint for querying account-level data.
-
-## Events
-
-GoDial supports outbound webhooks that fire when specific actions occur within the platform.
-
-You can call your own API when a certain action happens in GoDial, for example after every call or after a contact is updated in GoDial. Webhooks are configured via Integrations -> Web Hook where you put your own URL and choose your event.
-
-### Call Events
-
-Triggered after a call is completed. Can be used to sync call details (disposition, duration, outcome) to external systems or trigger follow-up actions such as SMS or WhatsApp messages.
-
-### Contact Update Events
-
-Triggered when a contact is updated in GoDial. Can be used to keep external CRMs or databases in sync with contact changes made within GoDial.
+On 2026-10-14, the developer introduction remained reachable, but its linked detailed reference at `https://godial.stoplight.io/docs/godial/` returned HTTP 404. The available official guides do not document response schemas, pagination, the contact-list endpoint, or detailed member, account-removal, and team payloads. These existing contracts are retained without assuming the endpoints were removed. Additional tools and a current-account identity tool are deferred until official endpoint contracts are available.

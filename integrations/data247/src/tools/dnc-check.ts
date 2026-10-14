@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let dncResultSchema = z.object({
+  status: z.string().optional().describe('Provider query status; OK indicates success'),
   phone: z.string().optional().describe('The queried phone number'),
   dnc: z.string().optional().describe('Do-Not-Call status'),
   federalDnc: z
@@ -17,6 +18,7 @@ let dncResultSchema = z.object({
 });
 
 let mapResult = (raw: Record<string, string>) => ({
+  status: raw.status,
   phone: raw.phone,
   dnc: raw.dnc,
   federalDnc: raw.federal_dnc || raw.fed_dnc,

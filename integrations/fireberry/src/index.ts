@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   createRecord,
   deleteRecord,
+  getFieldMetadata,
   getPicklistValues,
   getRecord,
   getRelatedRecords,
@@ -10,6 +11,7 @@ import {
   listObjects,
   listRecords,
   queryRecords,
+  queryRecordsV3,
   updateRecord
 } from './tools';
 export let provider = Slate.create({
@@ -21,10 +23,12 @@ export let provider = Slate.create({
     updateRecord,
     deleteRecord,
     queryRecords,
+    queryRecordsV3,
     getRelatedRecords,
     listObjects,
     listObjectFields,
-    getPicklistValues
+    getPicklistValues,
+    getFieldMetadata
   ],
   triggers: []
 });

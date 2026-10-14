@@ -42,7 +42,13 @@ let stepSchema = z.object({
   linkedinMessage: z
     .string()
     .optional()
-    .describe('Message text for LinkedIn message/connect steps')
+    .describe('Message text for LinkedIn message/connect steps'),
+  linkedinAccountId: z
+    .number()
+    .optional()
+    .describe(
+      'LinkedIn account ID. Use list_linkedin_accounts to discover connected accounts.'
+    )
 });
 
 export let createCampaign = SlateTool.create(spec, {
@@ -79,7 +85,10 @@ export let createCampaign = SlateTool.create(spec, {
         .optional()
         .describe('Include GDPR-compliant unsubscribe link'),
       listUnsubscribe: z.boolean().optional().describe('Include List-Unsubscribe header'),
-      trackOpens: z.boolean().optional().describe('Enable open tracking at campaign level'),
+      trackOpens: z
+        .boolean()
+        .optional()
+        .describe('Enable open tracking for all email versions and recipient providers'),
       steps: z.array(stepSchema).min(1).describe('Campaign steps in sequence order')
     })
   )
@@ -96,33 +105,44 @@ export let createCampaign = SlateTool.create(spec, {
       companyId: ctx.config.companyId
     });
 
-    let buildStep = (step: (typeof ctx.input.steps)[0], isFirst: boolean) => {
+    let buildStep = (step: (typeof ctx.input.steps)[0]) => {
       let body: any = {};
 
       if (step.type === 'EMAIL' || !step.type) {
         body.versions = (step.versions ?? []).map(v => ({
           subject: v.subject,
           message: v.message,
-          signature: v.signature ?? 'SENDER',
-          track_opens: v.trackOpens ?? true
+          signature: v.signature === 'NONE' ? 'NO_SIGNATURE' : (v.signature ?? 'SENDER'),
+          track_opens: ctx.input.trackOpens ?? v.trackOpens ?? true
         }));
       }
 
-      if (step.linkedinMessage) {
-        body.message = step.linkedinMessage;
+      let isLinkedIn = step.type?.startsWith('LINKEDIN_');
+      if (isLinkedIn) {
+        let actions = {
+          LINKEDIN_VIEW_PROFILE: 'VISIT_PROFILE',
+          LINKEDIN_CONNECT: 'CONNECTION_REQUEST',
+          LINKEDIN_MESSAGE: 'DIRECT_MESSAGE'
+        };
+        body.action_type = actions[step.type as keyof typeof actions];
+        body.linkedin_account_id = step.linkedinAccountId;
+        if (step.type !== 'LINKEDIN_VIEW_PROFILE') {
+          body.versions = [{ message: step.linkedinMessage ?? '' }];
+        }
       }
 
       let result: any = {
-        type: step.type ?? 'EMAIL',
+        type: isLinkedIn ? 'LINKEDIN' : (step.type ?? 'EMAIL'),
         body
       };
 
       if (step.deliveryTime) {
-        result.delivery_time = step.deliveryTime;
-      }
-
-      if (!isFirst && step.delayDays) {
-        result.followup_after = { range: 'DAY', value: step.delayDays };
+        result.delivery_time = Object.fromEntries(
+          Object.entries(step.deliveryTime).map(([day, intervals]) => [
+            day.toUpperCase(),
+            intervals
+          ])
+        );
       }
 
       return result;
@@ -131,9 +151,13 @@ export let createCampaign = SlateTool.create(spec, {
     // Build nested step structure (Woodpecker uses nested followup pattern)
     let stepsPayload: any = null;
     for (let i = ctx.input.steps.length - 1; i >= 0; i--) {
-      let step = buildStep(ctx.input.steps[i]!, i === 0);
+      let step = buildStep(ctx.input.steps[i]!);
       if (stepsPayload !== null) {
         step.followup = stepsPayload;
+        let delay = ctx.input.steps[i + 1]?.delayDays;
+        if (delay !== undefined) {
+          step.followup_after = { range: 'DAY', value: delay };
+        }
       }
       stepsPayload = step;
     }
@@ -161,7 +185,9 @@ export let createCampaign = SlateTool.create(spec, {
     if (ctx.input.listUnsubscribe !== undefined)
       settings.list_unsubscribe = ctx.input.listUnsubscribe;
     if (ctx.input.trackOpens !== undefined)
-      settings.open_disabled_list = !ctx.input.trackOpens;
+      settings.open_disabled_list = ctx.input.trackOpens
+        ? []
+        : ['google.com', 'outlook.com', 'OTHER_PROVIDER'];
 
     if (Object.keys(settings).length > 0) {
       payload.settings = settings;

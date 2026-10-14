@@ -1,4 +1,4 @@
-# Slates Specification for Feathery
+# Feathery Integration Specification
 
 ## Overview
 
@@ -27,7 +27,7 @@ The base URL depends on the region your account is hosted in:
 | Europe       | `https://api-eu.feathery.io` |
 | Australia    | `https://api-au.feathery.io` |
 
-API keys can be rotated via the API, which returns the old and new key.
+Select the account region together with your API key when connecting. The selected region is saved with the connection; existing stored region settings remain supported. Use get_account to inspect the authorized team and members.
 
 ## Features
 
@@ -37,7 +37,7 @@ Create, list, retrieve, update, copy, and delete forms. Forms can be created fro
 
 ### Form Submissions
 
-Create, update, and list form submissions. Submissions are associated with users and can include field values, completion status, and document generation. Submissions can be searched by field values, time ranges, completion status, and fuzzy search with trigram similarity scoring. Submissions can be exported as PDFs.
+Create, update, and list form submissions. Submissions are associated with users and can include field values, completion status, and document generation. Submissions can be searched by field values, time ranges, completion status, and fuzzy search with trigram similarity scoring. Submissions can be exported as downloadable PDFs. list_submissions returns nextPageUrl; pass it as pageUrl with the same formId to continue. For spreadsheet document generation, provide spreadsheetLocation with sheet and cell, or the legacy JSON-encoded outputLocation string. The optional generatedDocuments result contains document IDs, spreadsheet coordinates, and calculated outputValue values returned by Feathery.
 
 ### User Management
 
@@ -45,19 +45,19 @@ Create, list, retrieve, and delete users (form submitters). Each user has a uniq
 
 ### Document Intelligence (AI Extraction)
 
-Extract structured data from uploaded documents using AI. Extractions must be pre-configured in the Feathery dashboard. You can submit files for extraction and list extraction runs with their results, approval status, and extracted data points.
+Extract structured data from uploaded documents using AI. Extractions must be pre-configured in the Feathery dashboard. You can list extraction runs with their results, approval status, and extracted data points. Document Intelligence must be enabled on the account.
 
 ### Document Templates
 
-Fill and sign document templates (PDF, DOCX, XLSX) with field values via API. Documents can be routed to specified email addresses for signature. You can list document templates (filterable by name and tags), list generated document envelopes (filled documents), and track their view/sign status.
+Fill and sign document templates (PDF, DOCX, XLSX) with field values via API. Documents can be routed to specified email addresses for signature. You can list document templates (filterable by name and tags), list generated document envelopes (filled documents), track their view/sign status, and delete generated envelopes using delete_document_envelope.
 
 ### Account Management
 
-Retrieve account information, invite new team members with specific roles (admin, editor, viewer) and granular permissions (edit form results, invite collaborators, edit logic, edit themes, etc.), edit account settings, and remove accounts from a team.
+Retrieve account information, invite new team members with specific roles (admin, editor, viewer) and granular permissions (edit form results, invite collaborators, edit logic, edit themes, etc.), and remove accounts from a team.
 
 ### White-Label Workspaces
 
-Create and manage isolated workspaces for white-labeling. Workspaces support custom branding (logo, colors, favicon, brand name), feature limits (live forms, submissions), restricted UI tabs/elements/integrations, and arbitrary metadata. You can generate JWT login tokens for workspace accounts and populate workspaces with template forms.
+Create and manage isolated workspaces for white-labeling. Workspaces support custom branding (logo, colors, favicon, brand name), feature limits (live forms, submissions), restricted UI tabs/elements/integrations, and arbitrary metadata. These tools require Feathery white-label access. The colors input accepts primary and secondary hex codes; disabledTabs accepts global or form editor tabs.
 
 ### Hidden Fields
 
@@ -65,7 +65,7 @@ Create and list hidden fields that store data not visible on forms but accessibl
 
 ### Logs
 
-Access recent logs for API connector errors, emails sent from forms, forwarded AI extraction emails, email delivery issues (bounces/complaints), and Quik integration requests.
+Access recent logs for API connector errors, emails sent from forms, and email delivery issues (bounces/complaints).
 
 ## Events
 

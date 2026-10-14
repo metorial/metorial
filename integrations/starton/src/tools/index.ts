@@ -1,8 +1,11 @@
 export * from './deploy-smart-contract';
+export { getBalance } from './get-balance';
 export * from './get-transactions';
 export * from './import-smart-contract';
 export * from './interact-smart-contract';
 export * from './list-ipfs-pins';
+export { listKms } from './list-kms';
+export { listNetworks } from './list-networks';
 export * from './list-smart-contracts';
 export * from './list-templates';
 export * from './manage-wallets';

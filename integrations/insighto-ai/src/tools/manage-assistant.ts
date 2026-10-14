@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageAssistant = SlateTool.create(spec, {
@@ -60,6 +60,12 @@ export let manageAssistant = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.action === 'create' && (!ctx.input.assistantType || !ctx.input.llmModel)) {
+      throw createApiServiceError(
+        'assistantType and llmModel are required to create an assistant.'
+      );
+    }
+
     if (ctx.input.action === 'create') {
       let result = await client.createAssistant({
         assistant_type: ctx.input.assistantType!,
@@ -75,15 +81,15 @@ export let manageAssistant = SlateTool.create(spec, {
         show_images: ctx.input.showImages,
         conversation_flow_id: ctx.input.conversationFlowId ?? undefined
       });
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
           assistantId: data.id,
-          name: data.name,
-          description: data.description,
-          assistantType: data.assistant_type,
-          llmModel: data.llm_model,
-          systemPrompt: data.system_prompt
+          name: data.name ?? undefined,
+          description: data.description ?? undefined,
+          assistantType: data.assistant_type ?? undefined,
+          llmModel: data.llm_model ?? undefined,
+          systemPrompt: data.system_prompt ?? undefined
         },
         message: `Created assistant **${data.name || data.id}** (type: ${data.assistant_type}, model: ${data.llm_model}).`
       };
@@ -103,15 +109,15 @@ export let manageAssistant = SlateTool.create(spec, {
         show_images: ctx.input.showImages,
         conversation_flow_id: ctx.input.conversationFlowId
       });
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
           assistantId: data.id,
-          name: data.name,
-          description: data.description,
-          assistantType: data.assistant_type,
-          llmModel: data.llm_model,
-          systemPrompt: data.system_prompt
+          name: data.name ?? undefined,
+          description: data.description ?? undefined,
+          assistantType: data.assistant_type ?? undefined,
+          llmModel: data.llm_model ?? undefined,
+          systemPrompt: data.system_prompt ?? undefined
         },
         message: `Updated assistant **${data.name || ctx.input.assistantId}**.`
       };

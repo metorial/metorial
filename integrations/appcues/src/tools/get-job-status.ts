@@ -22,7 +22,7 @@ export let getJobStatus = SlateTool.create(spec, {
       name: z.string().optional().describe('Name/type of the job'),
       status: z.string().optional().describe('Current status of the job'),
       startedAt: z.string().optional().describe('When the job started'),
-      url: z.string().optional().describe('URL for retrieving job results'),
+      url: z.string().optional().describe('URL for the job resource'),
       events: z.array(z.any()).optional().describe('Detailed progress events for the job')
     })
   )

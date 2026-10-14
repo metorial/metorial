@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -42,7 +42,7 @@ export let managePortfolio = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.portfolioId) {
-        throw new Error('portfolioId is required for "get" action');
+        throw createApiServiceError('portfolioId is required for "get" action');
       }
       let portfolio = await client.getPortfolio(ctx.input.portfolioId);
       return {
@@ -53,7 +53,7 @@ export let managePortfolio = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required when creating a portfolio');
+        throw createApiServiceError('name is required when creating a portfolio');
       }
       let result = await client.createPortfolio({
         name: ctx.input.name,
@@ -68,7 +68,7 @@ export let managePortfolio = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.portfolioId) {
-        throw new Error('portfolioId is required for "update" action');
+        throw createApiServiceError('portfolioId is required for "update" action');
       }
       await client.updatePortfolio(ctx.input.portfolioId, {
         name: ctx.input.name,
@@ -81,7 +81,7 @@ export let managePortfolio = SlateTool.create(spec, {
     }
 
     if (!ctx.input.portfolioId) {
-      throw new Error('portfolioId is required for "delete" action');
+      throw createApiServiceError('portfolioId is required for "delete" action');
     }
     await client.deletePortfolio(ctx.input.portfolioId);
     return {

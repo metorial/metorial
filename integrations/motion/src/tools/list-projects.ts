@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listProjects = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().optional().describe('Filter projects to a specific workspace'),
+      workspaceId: workspaceIdSchema.optional(),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )

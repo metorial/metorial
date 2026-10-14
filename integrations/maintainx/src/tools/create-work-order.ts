@@ -1,12 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createWorkOrder = SlateTool.create(spec, {
   name: 'Create Work Order',
   key: 'create_work_order',
-  description: `Creates a new work order in MaintainX. Work orders can be reactive (one-off repairs) or preventive (recurring/scheduled maintenance). Supports setting priority, assignees, associated assets, locations, categories, and due dates.`,
+  description: `Creates a new work order in MaintainX. Work orders can be reactive (one-off repairs) or preventive maintenance. Supports setting priority, assignees, associated assets, locations, categories, and due dates. For multi-organization keys, call list_organizations and pass organizationId.`,
+  instructions: [
+    'A non-OPEN status is applied after creation. If that request fails, the work order may already exist; use the workOrderId in the error with get_work_order, then retry only update_work_order with that ID and status if needed. Do not repeat creation.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +18,7 @@ export let createWorkOrder = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       title: z.string().describe('Title of the work order'),
       description: z
         .string()
@@ -26,7 +31,9 @@ export let createWorkOrder = SlateTool.create(spec, {
       status: z
         .enum(['OPEN', 'IN_PROGRESS', 'ON_HOLD', 'DONE'])
         .optional()
-        .describe('Initial status of the work order'),
+        .describe(
+          'Requested status; non-OPEN status uses a separate request after creation. If it fails, the work order already exists; retrieve its ID from the error and retry only its status, never creation'
+        ),
       workOrderType: z
         .enum(['REACTIVE', 'PREVENTIVE'])
         .optional()
@@ -39,7 +46,7 @@ export let createWorkOrder = SlateTool.create(spec, {
       locationId: z.number().optional().describe('Location ID for this work order'),
       categories: z.array(z.string()).optional().describe('Category names to apply'),
       dueDate: z.string().optional().describe('Due date in ISO 8601 format'),
-      procedureId: z.number().optional().describe('Procedure/checklist ID to attach'),
+      procedureId: z.number().optional().describe('Procedure template ID to attach'),
       teamId: z.number().optional().describe('Team ID to assign')
     })
   )
@@ -50,10 +57,7 @@ export let createWorkOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.createWorkOrder({
       title: ctx.input.title,

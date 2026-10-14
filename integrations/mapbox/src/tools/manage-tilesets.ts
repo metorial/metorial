@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -60,7 +60,7 @@ export let manageTilesetsTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter jobs by stage: "processing", "queued", "complete", "failed" (for jobs)'
+          'Filter jobs by stage: "processing", "queued", "success", "failed", "superseded" (for jobs)'
         )
     })
   )
@@ -81,6 +81,10 @@ export let manageTilesetsTool = SlateTool.create(spec, {
         .describe('Tileset processing jobs (for jobs)'),
       recipe: z.any().optional().describe('Tileset recipe (for recipe)'),
       published: z.boolean().optional().describe('Whether the tileset was published'),
+      jobId: z
+        .string()
+        .optional()
+        .describe('Queued publish job ID; inspect jobs to confirm completion'),
       deleted: z.boolean().optional().describe('Whether the tileset was deleted')
     })
   )
@@ -120,7 +124,8 @@ export let manageTilesetsTool = SlateTool.create(spec, {
     }
 
     if (action === 'metadata') {
-      if (!ctx.input.tilesetId) throw new Error('tilesetId is required for metadata');
+      if (!ctx.input.tilesetId)
+        throw createApiServiceError('tilesetId is required for metadata');
       let meta = await client.getTilesetMetadata(ctx.input.tilesetId);
       return {
         output: {
@@ -139,16 +144,17 @@ export let manageTilesetsTool = SlateTool.create(spec, {
     }
 
     if (action === 'publish') {
-      if (!ctx.input.tilesetId) throw new Error('tilesetId is required for publish');
-      await client.publishTileset(ctx.input.tilesetId);
+      if (!ctx.input.tilesetId)
+        throw createApiServiceError('tilesetId is required for publish');
+      let job = await client.publishTileset(ctx.input.tilesetId);
       return {
-        output: { published: true },
-        message: `Published tileset **${ctx.input.tilesetId}**.`
+        output: { published: true, jobId: job.jobId },
+        message: `Queued publication of tileset **${ctx.input.tilesetId}**. Check jobs to confirm completion.`
       };
     }
 
     if (action === 'jobs') {
-      if (!ctx.input.tilesetId) throw new Error('tilesetId is required for jobs');
+      if (!ctx.input.tilesetId) throw createApiServiceError('tilesetId is required for jobs');
       let jobs = await client.listTilesetJobs(ctx.input.tilesetId, {
         stage: ctx.input.jobStage,
         limit: ctx.input.limit
@@ -156,7 +162,7 @@ export let manageTilesetsTool = SlateTool.create(spec, {
       let mapped = (jobs || []).map((j: any) => ({
         jobId: j.id,
         stage: j.stage,
-        created: j.created,
+        created: typeof j.created === 'number' ? new Date(j.created).toISOString() : j.created,
         tilesetId: j.tilesetId
       }));
       return {
@@ -166,7 +172,8 @@ export let manageTilesetsTool = SlateTool.create(spec, {
     }
 
     if (action === 'recipe') {
-      if (!ctx.input.tilesetId) throw new Error('tilesetId is required for recipe');
+      if (!ctx.input.tilesetId)
+        throw createApiServiceError('tilesetId is required for recipe');
       let recipe = await client.getTilesetRecipe(ctx.input.tilesetId);
       return {
         output: { recipe },
@@ -175,7 +182,8 @@ export let manageTilesetsTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.tilesetId) throw new Error('tilesetId is required for delete');
+      if (!ctx.input.tilesetId)
+        throw createApiServiceError('tilesetId is required for delete');
       await client.deleteTileset(ctx.input.tilesetId);
       return {
         output: { deleted: true },
@@ -183,5 +191,5 @@ export let manageTilesetsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

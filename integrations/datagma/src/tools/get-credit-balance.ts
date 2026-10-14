@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseDatagmaNumber } from '../lib/response';
 import { spec } from '../spec';
 
 export let getCreditBalance = SlateTool.create(spec, {
@@ -23,11 +24,19 @@ export let getCreditBalance = SlateTool.create(spec, {
 
     let result = await client.getCreditBalance();
 
-    let credits = result?.id ?? result?.credits ?? 0;
+    let credits = parseDatagmaNumber(
+      result?.currentCredit ?? result?.id ?? result?.credits,
+      'credit balance'
+    );
+    if (credits === undefined) {
+      throw createApiServiceError('Datagma did not return a credit balance.', {
+        reason: 'datagma_invalid_response'
+      });
+    }
 
     return {
       output: {
-        credits: typeof credits === 'number' ? credits : Number(credits)
+        credits
       },
       message: `Current credit balance: **${credits}** credits.`
     };

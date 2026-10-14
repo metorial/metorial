@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,7 @@ let addressSchema = z
 export let updatePerson = SlateTool.create(spec, {
   name: 'Update Person',
   key: 'update_person',
-  description: `Update an existing person's profile in ChMeetings. Only provide the fields you want to change; omitted fields remain unchanged.`
+  description: `Update a person's profile by reading the current profile and merging supplied fields before sending the replacement. Omitted fields exposed by the current profile are preserved. Avoid concurrent edits to the person during this operation.`
 })
   .input(
     z.object({
@@ -37,7 +37,12 @@ export let updatePerson = SlateTool.create(spec, {
       baptismDate: z.string().optional().describe('Baptism date (YYYY-MM-DD)'),
       doNotText: z.boolean().optional().describe('Opt out of text messages'),
       doNotEmail: z.boolean().optional().describe('Opt out of emails'),
-      envelopeNumber: z.number().optional().describe('Envelope number for contributions'),
+      envelopeNumber: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy field; the People API does not support changing contribution envelope numbers'
+        ),
       address: addressSchema
     })
   )
@@ -47,6 +52,11 @@ export let updatePerson = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.envelopeNumber !== undefined) {
+      throw createApiServiceError(
+        'The People API does not support setting envelope numbers. Set the envelope number in ChMeetings instead.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let updateData: Record<string, unknown> = {};
@@ -65,15 +75,13 @@ export let updatePerson = SlateTool.create(spec, {
     if (ctx.input.baptismDate !== undefined) updateData.baptism_date = ctx.input.baptismDate;
     if (ctx.input.doNotText !== undefined) updateData.do_not_text = ctx.input.doNotText;
     if (ctx.input.doNotEmail !== undefined) updateData.do_not_email = ctx.input.doNotEmail;
-    if (ctx.input.envelopeNumber !== undefined)
-      updateData.envelope_number = ctx.input.envelopeNumber;
     if (ctx.input.address !== undefined) {
       updateData.address = {
         country: ctx.input.address.country,
         city: ctx.input.address.city,
         address_line: ctx.input.address.addressLine,
         zip_code: ctx.input.address.zipCode,
-        building_no: ctx.input.address.buildingNo,
+        building: ctx.input.address.buildingNo,
         state: ctx.input.address.state
       };
     }

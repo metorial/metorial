@@ -1,12 +1,27 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+
+type MuralAuthOutput = {
+  token: string;
+  refreshToken?: string;
+  expiresAt?: string;
+  authType?: 'oauth' | 'apikey';
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      authType: z.enum(['oauth', 'apikey']).optional()
     })
   )
   .addOauth({
@@ -27,6 +42,11 @@ export let auth = SlateAuth.create()
     ],
 
     scopes: [
+      {
+        title: 'Invite Workspace Members',
+        description: 'Invite collaborators to workspaces.',
+        scope: 'workspaces:write'
+      },
       {
         title: 'Read Identity',
         description: "View a user's name, avatar, and company information.",
@@ -90,76 +110,81 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let axios = createAxios({
-        baseURL: 'https://app.mural.co/api/public/v1'
-      });
-
-      let response = await axios.post('/authorization/oauth2/token', {
-        grant_type: 'authorization_code',
-        code: ctx.code,
-        redirect_uri: ctx.redirectUri,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
-
-      let data = response.data;
-
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let axios = createAxios({
-        baseURL: 'https://app.mural.co/api/public/v1'
-      });
-
-      let response = await axios.post('/authorization/oauth2/token', {
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
-
-      let data = response.data;
-
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let axios = createAxios({
+      let axios = createAuthenticatedAxios({
         baseURL: 'https://app.mural.co/api/public/v1',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Mural OAuth',
+            reason: 'mural_oauth_error'
+          })
       });
-
-      let response = await axios.get('/users/me');
-      let user = response.data.value;
-
+      let response = await axios.post(
+        '/authorization/oauth2/token',
+        new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: ctx.code,
+          redirect_uri: ctx.redirectUri,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret
+        }).toString()
+      );
+      return {
+        output: {
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Mural',
+            required: true
+          }),
+          authType: 'oauth' as const
+        }
+      };
+    },
+    handleTokenRefresh: async (ctx: {
+      output: MuralAuthOutput;
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken)
+        throw createApiServiceError(
+          'A Mural refresh token is missing. Reconnect using OAuth.'
+        );
+      let axios = createAuthenticatedAxios({
+        baseURL: 'https://app.mural.co/api/public/v1',
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Mural OAuth',
+            reason: 'mural_oauth_error'
+          })
+      });
+      let response = await axios.post(
+        '/authorization/oauth2/token',
+        new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: ctx.output.refreshToken,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret
+        }).toString()
+      );
+      return {
+        output: {
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'Mural',
+            required: true,
+            previousRefreshToken: ctx.output.refreshToken
+          }),
+          authType: 'oauth' as const
+        }
+      };
+    },
+    getProfile: async (ctx: { output: MuralAuthOutput }) => {
+      let user = await new Client(ctx.output).getCurrentUser();
       return {
         profile: {
           id: user.id,
           email: user.email,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          name:
+            [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || user.id,
           imageUrl: user.avatar
         }
       };
@@ -173,13 +198,16 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
-        .describe('Enterprise API key from Mural dashboard (Manage company > API keys)')
+        .describe(
+          'Enterprise API key from Manage company > API keys. Canvas tools require the OAuth connection instead.'
+        )
     }),
 
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey,
+          authType: 'apikey' as const
         }
       };
     }

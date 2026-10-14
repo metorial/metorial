@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HabiticaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ export let manageInventory = SlateTool.create(spec, {
     'For "purchase", type is the item category and key is the specific item.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -51,12 +51,14 @@ export let manageInventory = SlateTool.create(spec, {
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     if (ctx.input.action === 'equip') {
       if (!ctx.input.equipType || !ctx.input.itemKey)
-        throw new Error('equipType and itemKey are required for equip action');
+        throw createApiServiceError('equipType and itemKey are required for equip action');
       await client.equipItem(ctx.input.equipType, ctx.input.itemKey);
       return {
         output: { success: true },
@@ -65,7 +67,8 @@ export let manageInventory = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'buy-gear') {
-      if (!ctx.input.itemKey) throw new Error('itemKey is required for buy-gear action');
+      if (!ctx.input.itemKey)
+        throw createApiServiceError('itemKey is required for buy-gear action');
       await client.buyGear(ctx.input.itemKey);
       return {
         output: { success: true },
@@ -75,7 +78,7 @@ export let manageInventory = SlateTool.create(spec, {
 
     if (ctx.input.action === 'hatch') {
       if (!ctx.input.egg || !ctx.input.hatchingPotion)
-        throw new Error('egg and hatchingPotion are required for hatch action');
+        throw createApiServiceError('egg and hatchingPotion are required for hatch action');
       await client.hatchPet(ctx.input.egg, ctx.input.hatchingPotion);
       return {
         output: { success: true },
@@ -85,17 +88,17 @@ export let manageInventory = SlateTool.create(spec, {
 
     if (ctx.input.action === 'feed') {
       if (!ctx.input.pet || !ctx.input.food)
-        throw new Error('pet and food are required for feed action');
+        throw createApiServiceError('pet and food are required for feed action');
       let result = await client.feedPet(ctx.input.pet, ctx.input.food);
       return {
-        output: { success: true, message: typeof result === 'string' ? result : undefined },
+        output: { success: true, message: result.message },
         message: `Fed **${ctx.input.pet}** with **${ctx.input.food}**`
       };
     }
 
     if (ctx.input.action === 'purchase') {
       if (!ctx.input.itemType || !ctx.input.itemKey)
-        throw new Error('itemType and itemKey are required for purchase action');
+        throw createApiServiceError('itemType and itemKey are required for purchase action');
       await client.purchaseItem(ctx.input.itemType, ctx.input.itemKey);
       return {
         output: { success: true },
@@ -105,7 +108,7 @@ export let manageInventory = SlateTool.create(spec, {
 
     if (ctx.input.action === 'sell') {
       if (!ctx.input.itemType || !ctx.input.itemKey)
-        throw new Error('itemType and itemKey are required for sell action');
+        throw createApiServiceError('itemType and itemKey are required for sell action');
       await client.sellItem(ctx.input.itemType, ctx.input.itemKey);
       return {
         output: { success: true },
@@ -113,6 +116,6 @@ export let manageInventory = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

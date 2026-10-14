@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageFirewall = SlateTool.create(spec, {
   name: 'Manage Firewall',
   key: 'manage_firewall',
   description: `Manage firewall rules on a server: toggle the firewall on/off, list existing rules, create new rules, or delete rules.
-Firewall must be enabled before listing or creating rules.`,
+Firewall must be enabled before listing or creating rules.
+${organizationScopeGuidance}`,
   tags: {
     destructive: true,
     readOnly: false
@@ -15,7 +17,7 @@ Firewall must be enabled before listing or creating rules.`,
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       action: z.enum(['toggle', 'list', 'create', 'destroy']).describe('Action to perform'),
       firewallRuleId: z
@@ -46,7 +48,8 @@ Firewall must be enabled before listing or creating rules.`,
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId, action } = ctx.input;
 
@@ -72,9 +75,12 @@ Firewall must be enabled before listing or creating rules.`,
     }
 
     if (action === 'create') {
-      if (!ctx.input.startPort) throw new Error('startPort is required for create action');
-      if (!ctx.input.traffic) throw new Error('traffic is required for create action');
-      if (!ctx.input.protocol) throw new Error('protocol is required for create action');
+      if (!ctx.input.startPort)
+        throw createApiServiceError('startPort is required for create action');
+      if (!ctx.input.traffic)
+        throw createApiServiceError('traffic is required for create action');
+      if (!ctx.input.protocol)
+        throw createApiServiceError('protocol is required for create action');
 
       let result = await client.createFirewallRule(orgId, serverId, {
         startPort: ctx.input.startPort,
@@ -99,7 +105,7 @@ Firewall must be enabled before listing or creating rules.`,
 
     if (action === 'destroy') {
       if (!ctx.input.firewallRuleId)
-        throw new Error('firewallRuleId is required for destroy action');
+        throw createApiServiceError('firewallRuleId is required for destroy action');
 
       let result = await client.destroyFirewallRule(orgId, serverId, ctx.input.firewallRuleId);
       return {
@@ -113,6 +119,6 @@ Firewall must be enabled before listing or creating rules.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

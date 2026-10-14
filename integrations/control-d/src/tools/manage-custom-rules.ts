@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { actionDescription, createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -73,8 +73,8 @@ export let manageCustomRules = SlateTool.create(spec, {
 
     if (operation === 'create') {
       if (!hostnames || hostnames.length === 0)
-        throw new Error('hostnames is required for create');
-      if (action === undefined) throw new Error('action is required for create');
+        throw createApiServiceError('hostnames is required for create');
+      if (action === undefined) throw createApiServiceError('action is required for create');
       await client.createCustomRule(profileId, {
         hostnames,
         action,
@@ -103,8 +103,8 @@ export let manageCustomRules = SlateTool.create(spec, {
 
     if (operation === 'update') {
       if (!hostnames || hostnames.length === 0)
-        throw new Error('hostnames is required for update');
-      if (action === undefined) throw new Error('action is required for update');
+        throw createApiServiceError('hostnames is required for update');
+      if (action === undefined) throw createApiServiceError('action is required for update');
       await client.modifyCustomRule(profileId, {
         hostnames,
         action,
@@ -132,7 +132,7 @@ export let manageCustomRules = SlateTool.create(spec, {
     }
 
     if (operation === 'delete') {
-      if (!hostname) throw new Error('hostname is required for delete');
+      if (!hostname) throw createApiServiceError('hostname is required for delete');
       await client.deleteCustomRule(profileId, hostname);
       return {
         output: { rules: [] },

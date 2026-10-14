@@ -14,7 +14,11 @@ export let createContactRecord = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      contactId: z.string().describe('ID of the contact to add the record to'),
+      contactId: z
+        .string()
+        .describe(
+          'ID of the contact to add the record to. Call list_contacts to discover contact IDs.'
+        ),
       message: z.string().describe('Message or note for the activity record'),
       commentType: z
         .string()

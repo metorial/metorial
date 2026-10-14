@@ -1,40 +1,75 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 export interface SendloopClientConfig {
   token: string;
-  subdomain: string;
+  subdomain?: string;
 }
 
 export class SendloopClient {
   private token: string;
   private baseUrl: string;
+  private axios = createAxios();
 
   constructor(config: SendloopClientConfig) {
+    let subdomain = config.subdomain || 'app';
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(subdomain)) {
+      throw createApiServiceError(
+        'Enter a Sendloop account subdomain without a URL or domain suffix.'
+      );
+    }
     this.token = config.token;
-    this.baseUrl = `https://${config.subdomain}.sendloop.com/api/v3`;
+    this.baseUrl = `https://${subdomain}.sendloop.com/api/v3`;
   }
 
   private async request(command: string, params: Record<string, string> = {}): Promise<any> {
-    let axios = createAxios();
+    let formParams = new URLSearchParams({ APIKey: this.token, ...params });
 
-    let formParams = new URLSearchParams({
-      APIKey: this.token,
-      ...params
-    });
-
-    let response = await axios.post(`${this.baseUrl}/${command}/json`, formParams.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
-
-    let data = response.data;
-
-    if (data && data.Success === false) {
-      let errorMessage =
-        data.ErrorMessage || data.ErrorText || data.Error || 'Unknown Sendloop API error';
-      throw new Error(`Sendloop API error: ${errorMessage}`);
+    try {
+      let response = await this.axios.post(
+        `${this.baseUrl}/${command}/json`,
+        formParams.toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      let data = response.data;
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw createApiServiceError('Sendloop returned an invalid API response.', {
+          reason: 'invalid_response'
+        });
+      }
+      if (
+        data.Success === false ||
+        data.Success === 0 ||
+        data.Success === 'false' ||
+        data.Success === '0'
+      ) {
+        throw createApiServiceError(
+          `Sendloop API error: ${data.ErrorMessage || data.ErrorText || data.Error || 'Request failed'}`,
+          {
+            reason: 'upstream_error',
+            upstreamCode: data.ErrorCode === undefined ? undefined : String(data.ErrorCode)
+          }
+        );
+      }
+      if (
+        data.Success !== true &&
+        data.Success !== 1 &&
+        data.Success !== 'true' &&
+        data.Success !== '1'
+      ) {
+        throw createApiServiceError(
+          'Sendloop returned a response without confirmed success.',
+          { reason: 'invalid_response' }
+        );
+      }
+      return data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Sendloop',
+        reason: 'upstream_error',
+        operation: command,
+        detailKeys: ['ErrorMessage', 'ErrorText', 'Error', 'message']
+      });
     }
-
-    return data;
   }
 
   // ---- Account ----
@@ -61,9 +96,11 @@ export class SendloopClient {
     notifyEmail?: string;
   }): Promise<any> {
     let requestParams: Record<string, string> = {
-      ListName: params.name
+      Name: params.name
     };
-    if (params.optInMode) requestParams.OptInMode = params.optInMode;
+    if (params.optInMode)
+      requestParams.OptInMode =
+        params.optInMode.toLowerCase() === 'double' ? 'Double' : 'Single';
     if (params.notifyOnSubscribe) requestParams.NotifyOnSubscribe = params.notifyOnSubscribe;
     if (params.notifyOnUnsubscribe)
       requestParams.NotifyOnUnsubscribe = params.notifyOnUnsubscribe;
@@ -85,8 +122,10 @@ export class SendloopClient {
     let requestParams: Record<string, string> = {
       ListID: listId
     };
-    if (params.name) requestParams.ListName = params.name;
-    if (params.optInMode) requestParams.OptInMode = params.optInMode;
+    if (params.name !== undefined) requestParams.Name = params.name;
+    if (params.optInMode)
+      requestParams.OptInMode =
+        params.optInMode.toLowerCase() === 'double' ? 'Double' : 'Single';
     if (params.notifyOnSubscribe) requestParams.NotifyOnSubscribe = params.notifyOnSubscribe;
     if (params.notifyOnUnsubscribe)
       requestParams.NotifyOnUnsubscribe = params.notifyOnUnsubscribe;
@@ -173,14 +212,16 @@ export class SendloopClient {
     fields?: Record<string, string>;
   }): Promise<any> {
     let requestParams: Record<string, string> = {
-      SubscriberListID: params.listId,
+      ListID: params.listId,
       EmailAddress: params.emailAddress,
       SubscriptionIP: params.subscriptionIp || '127.0.0.1'
     };
 
     if (params.fields) {
       for (let [fieldId, value] of Object.entries(params.fields)) {
-        requestParams[`Fields[${fieldId}]`] = value;
+        requestParams[
+          `Fields[${fieldId.startsWith('CustomField') ? fieldId : `CustomField${fieldId}`}]`
+        ] = value;
       }
     }
 
@@ -215,21 +256,38 @@ export class SendloopClient {
 
     if (params.fields) {
       for (let [fieldId, value] of Object.entries(params.fields)) {
-        requestParams[`Fields[${fieldId}]`] = value;
+        requestParams[
+          `Fields[${fieldId.startsWith('CustomField') ? fieldId : `CustomField${fieldId}`}]`
+        ] = value;
       }
     }
 
     return this.request('Subscriber.Update', requestParams);
   }
 
+  async importSubscribers(
+    listId: string,
+    subscribers: { emailAddress: string; fields?: Record<string, string> }[]
+  ): Promise<any> {
+    let params: Record<string, string> = { ListID: listId };
+    for (let [index, subscriber] of subscribers.entries()) {
+      params[`Subscribers[${index}][EmailAddress]`] = subscriber.emailAddress;
+      for (let [fieldId, value] of Object.entries(subscriber.fields ?? {})) {
+        let field = fieldId.startsWith('CustomField') ? fieldId : `CustomField${fieldId}`;
+        params[`Subscribers[${index}][${field}]`] = value;
+      }
+    }
+    return this.request('Subscriber.Import', params);
+  }
+
   // ---- Suppression List ----
 
   async getSuppressionList(): Promise<any> {
-    return this.request('SuppressionList.GetList');
+    return this.request('Suppression.List.GetList', { ListID: '0' });
   }
 
   async addToSuppressionList(emailAddress: string): Promise<any> {
-    return this.request('SuppressionList.Add', { EmailAddress: emailAddress });
+    return this.request('Suppression.List.Add', { ListID: '0', EmailAddress: emailAddress });
   }
 
   // ---- Segments ----
@@ -300,19 +358,32 @@ export class SendloopClient {
     scheduleType?: string;
     scheduleDateTime?: string;
   }): Promise<any> {
+    if (params.scheduleType !== undefined || params.scheduleDateTime !== undefined) {
+      throw createApiServiceError(
+        'Create the campaign first, then use send_campaign with sendDate to schedule delivery.'
+      );
+    }
     let requestParams: Record<string, string> = {
-      CampaignName: params.campaignName,
+      Version: '2',
+      Name: params.campaignName,
       FromName: params.fromName,
       FromEmail: params.fromEmail,
       Subject: params.subject
     };
-    if (params.replyToName) requestParams.ReplyToName = params.replyToName;
-    if (params.replyToEmail) requestParams.ReplyToEmail = params.replyToEmail;
-    if (params.htmlContent) requestParams.HTMLContent = params.htmlContent;
-    if (params.plainTextContent) requestParams.PlainTextContent = params.plainTextContent;
-    if (params.targetListIds) requestParams.TargetListIDs = params.targetListIds;
-    if (params.scheduleType) requestParams.ScheduleType = params.scheduleType;
-    if (params.scheduleDateTime) requestParams.ScheduleDateTime = params.scheduleDateTime;
+    if (params.replyToName !== undefined) requestParams.ReplyToName = params.replyToName;
+    if (params.replyToEmail !== undefined) requestParams.ReplyToEmail = params.replyToEmail;
+    if (params.htmlContent !== undefined) requestParams.HTMLContent = params.htmlContent;
+    if (params.plainTextContent !== undefined)
+      requestParams.PlainContent = params.plainTextContent;
+    if (params.targetListIds) {
+      for (let [index, listId] of params.targetListIds
+        .split(',')
+        .map(id => id.trim())
+        .filter(Boolean)
+        .entries()) {
+        requestParams[`Recipients[${index}]`] = listId;
+      }
+    }
 
     return this.request('Campaign.Create', requestParams);
   }
@@ -334,15 +405,24 @@ export class SendloopClient {
     let requestParams: Record<string, string> = {
       CampaignID: campaignId
     };
-    if (params.campaignName) requestParams.CampaignName = params.campaignName;
-    if (params.fromName) requestParams.FromName = params.fromName;
-    if (params.fromEmail) requestParams.FromEmail = params.fromEmail;
-    if (params.replyToName) requestParams.ReplyToName = params.replyToName;
-    if (params.replyToEmail) requestParams.ReplyToEmail = params.replyToEmail;
-    if (params.subject) requestParams.Subject = params.subject;
-    if (params.htmlContent) requestParams.HTMLContent = params.htmlContent;
-    if (params.plainTextContent) requestParams.PlainTextContent = params.plainTextContent;
-    if (params.targetListIds) requestParams.TargetListIDs = params.targetListIds;
+    if (params.campaignName !== undefined) requestParams.CampaignName = params.campaignName;
+    if (params.fromName !== undefined) requestParams.FromName = params.fromName;
+    if (params.fromEmail !== undefined) requestParams.FromEmail = params.fromEmail;
+    if (params.replyToName !== undefined) requestParams.ReplyToName = params.replyToName;
+    if (params.replyToEmail !== undefined) requestParams.ReplyToEmail = params.replyToEmail;
+    if (params.subject !== undefined) requestParams.Subject = params.subject;
+    if (params.htmlContent !== undefined) requestParams.HTMLContent = params.htmlContent;
+    if (params.plainTextContent !== undefined)
+      requestParams.PlainContent = params.plainTextContent;
+    if (params.targetListIds) {
+      for (let [index, listId] of params.targetListIds
+        .split(',')
+        .map(id => id.trim())
+        .filter(Boolean)
+        .entries()) {
+        requestParams[`TargetListIDs[${index}]`] = listId;
+      }
+    }
 
     return this.request('Campaign.Update', requestParams);
   }
@@ -351,8 +431,8 @@ export class SendloopClient {
     return this.request('Campaign.Delete', { CampaignID: campaignId });
   }
 
-  async sendCampaign(campaignId: string): Promise<any> {
-    return this.request('Campaign.Send', { CampaignID: campaignId });
+  async sendCampaign(campaignId: string, sendDate = 'NOW'): Promise<any> {
+    return this.request('Campaign.Send', { CampaignID: campaignId, SendDate: sendDate });
   }
 
   async pauseCampaign(campaignId: string): Promise<any> {
@@ -377,28 +457,59 @@ export class SendloopClient {
     return this.request('Report.Campaign.Bounces', { CampaignID: campaignId });
   }
 
-  async getCampaignEmailOpens(campaignId: string): Promise<any> {
-    return this.request('Data.Campaign.EmailOpens', { CampaignID: campaignId });
+  async getCampaignLinkClicks(
+    campaignId: string,
+    pagination: { page?: number; limit?: number } = {}
+  ): Promise<any> {
+    return this.request('Data.Campaign.LinkClicks', {
+      CampaignID: campaignId,
+      Page: String(pagination.page ?? 1),
+      Limit: String(pagination.limit ?? 10)
+    });
   }
 
-  async getCampaignLinkClicks(campaignId: string): Promise<any> {
-    return this.request('Data.Campaign.LinkClicks', { CampaignID: campaignId });
+  async getCampaignUnsubscriptions(
+    campaignId: string,
+    pagination: { page?: number; limit?: number } = {}
+  ): Promise<any> {
+    return this.request('Data.Campaign.Unsubscriptions', {
+      CampaignID: campaignId,
+      Page: String(pagination.page ?? 1),
+      Limit: String(pagination.limit ?? 10)
+    });
   }
 
-  async getCampaignUnsubscriptions(campaignId: string): Promise<any> {
-    return this.request('Data.Campaign.Unsubscriptions', { CampaignID: campaignId });
+  async getCampaignOpenLocations(
+    campaignId: string,
+    pagination: { page?: number; limit?: number } = {}
+  ): Promise<any> {
+    return this.request('Data.Campaign.OpenLocations', {
+      CampaignID: campaignId,
+      Page: String(pagination.page ?? 1),
+      Limit: String(pagination.limit ?? 10)
+    });
   }
 
-  async getCampaignOpenLocations(campaignId: string): Promise<any> {
-    return this.request('Data.Campaign.OpenLocations', { CampaignID: campaignId });
+  async getCampaignForwards(
+    campaignId: string,
+    pagination: { page?: number; limit?: number } = {}
+  ): Promise<any> {
+    return this.request('Data.Campaign.Forwards', {
+      CampaignID: campaignId,
+      Page: String(pagination.page ?? 1),
+      Limit: String(pagination.limit ?? 10)
+    });
   }
 
-  async getCampaignForwards(campaignId: string): Promise<any> {
-    return this.request('Data.Campaign.Forwards', { CampaignID: campaignId });
-  }
-
-  async getCampaignBounceDetails(campaignId: string): Promise<any> {
-    return this.request('Data.Campaign.Bounces', { CampaignID: campaignId });
+  async getCampaignBounceDetails(
+    campaignId: string,
+    pagination: { page?: number; limit?: number } = {}
+  ): Promise<any> {
+    return this.request('Data.Campaign.Bounces', {
+      CampaignID: campaignId,
+      Page: String(pagination.page ?? 1),
+      Limit: String(pagination.limit ?? 10)
+    });
   }
 
   async getListOverallReport(listId: string): Promise<any> {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,8 +14,46 @@ export let searchContacts = SlateTool.create(spec, {
   .input(
     z.object({
       search: z.string().optional().describe('Search query (email, domain, or name)'),
-      filter: z.enum(['A-Z', 'popular', 'recent']).optional().describe('Sort/filter mode'),
-      all: z.boolean().optional().describe('Return all contacts (no pagination)'),
+      filter: z
+        .enum([
+          'A-Z',
+          'popular',
+          'recent',
+          'a',
+          'b',
+          'c',
+          'd',
+          'e',
+          'f',
+          'g',
+          'h',
+          'i',
+          'j',
+          'k',
+          'l',
+          'm',
+          'n',
+          'o',
+          'p',
+          'q',
+          'r',
+          's',
+          't',
+          'u',
+          'v',
+          'w',
+          'x',
+          'y',
+          'z'
+        ])
+        .optional()
+        .describe(
+          'Filter by popularity, recency, or initial letter. Cannot combine a provider filter with search. A-Z sorts returned results alphabetically.'
+        ),
+      all: z
+        .boolean()
+        .optional()
+        .describe('Include duplicate contacts instead of deduplicating results'),
       includeTeams: z.boolean().optional().describe('Include team contacts in results')
     })
   )
@@ -37,12 +75,18 @@ export let searchContacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.search && ctx.input.filter && ctx.input.filter !== 'A-Z') {
+      throw createApiServiceError(
+        'Use search or filter, not both. A-Z sorting can be combined with search.'
+      );
+    }
     let client = new Client(ctx.auth.token);
     let data = await client.searchContacts({
       search: ctx.input.search,
-      filter: ctx.input.filter,
-      all: ctx.input.all,
-      includeTeams: ctx.input.includeTeams
+      filter: ctx.input.filter === 'A-Z' ? undefined : ctx.input.filter,
+      all: ctx.input.all === undefined ? undefined : Number(ctx.input.all),
+      includeTeams:
+        ctx.input.includeTeams === undefined ? undefined : Number(ctx.input.includeTeams)
     });
 
     let contacts = Array.isArray(data) ? data : data?.contacts || data?.results || [];
@@ -54,11 +98,16 @@ export let searchContacts = SlateTool.create(spec, {
       organization: c.organization || c.company,
       raw: c
     }));
+    if (ctx.input.filter === 'A-Z') {
+      mapped.sort((a: { name?: string }, b: { name?: string }) =>
+        (a.name ?? '').localeCompare(b.name ?? '')
+      );
+    }
 
     return {
       output: {
         contacts: mapped,
-        totalCount: data?.total || data?.count || mapped.length
+        totalCount: data?.total ?? data?.count ?? mapped.length
       },
       message: `Found **${mapped.length}** contact(s)${ctx.input.search ? ` matching "${ctx.input.search}"` : ''}.`
     };

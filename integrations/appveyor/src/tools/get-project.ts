@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -34,9 +34,12 @@ export let getProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
+    if (ctx.input.branch && ctx.input.buildVersion) {
+      throw createApiServiceError('Provide either branch or buildVersion, not both.');
+    }
     let result: Record<string, unknown>;
 
     if (ctx.input.buildVersion) {

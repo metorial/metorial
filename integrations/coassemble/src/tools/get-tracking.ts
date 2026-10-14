@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListItems } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTracking = SlateTool.create(spec, {
@@ -52,7 +52,7 @@ export let getTracking = SlateTool.create(spec, {
       length: ctx.input.length
     });
 
-    let trackings = Array.isArray(result) ? result : (result?.data ?? [result]);
+    let trackings = getListItems(result);
 
     return {
       output: { trackings },

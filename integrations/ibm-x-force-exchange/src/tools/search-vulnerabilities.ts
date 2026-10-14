@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { XForceClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,7 +57,7 @@ Returns vulnerability details including CVSS scores, affected platforms, remedia
         .string()
         .optional()
         .describe('End date for recent vulnerabilities (YYYY-MM-DD)'),
-      limit: z.number().optional().describe('Maximum number of results to return')
+      limit: z.number().optional().describe('Maximum number of results to return (1-200)')
     })
   )
   .output(
@@ -72,13 +72,18 @@ Returns vulnerability details including CVSS scores, affected platforms, remedia
       password: ctx.auth.password
     });
 
+    let limit = ctx.input.limit ?? 25;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      throw createApiServiceError('limit must be an integer between 1 and 200.');
+    }
+
     if (ctx.input.vulnerabilityId) {
       ctx.progress('Looking up vulnerability...');
       let report = await client.getVulnerabilityByXfid(ctx.input.vulnerabilityId);
       let vulns = Array.isArray(report) ? report : [report];
 
-      let mapped = vulns.map((v: any) => ({
-        xfid: v.xfdbid,
+      let mapped = vulns.slice(0, limit).map((v: any) => ({
+        xfid: v.xfdbid == null ? undefined : Number(v.xfdbid),
         stdCode: v.stdcode,
         title: v.title,
         description: v.description,
@@ -95,19 +100,22 @@ Returns vulnerability details including CVSS scores, affected platforms, remedia
       }));
 
       return {
-        output: { vulnerabilities: mapped, totalCount: mapped.length },
+        output: { vulnerabilities: mapped, totalCount: vulns.length },
         message: `Found vulnerability **${ctx.input.vulnerabilityId}**: ${mapped[0]?.title || 'N/A'}`
       };
     }
 
     if (ctx.input.query) {
       ctx.progress('Searching vulnerabilities...');
-      let report = await client.searchVulnerabilities(ctx.input.query);
+      let report = await client.searchVulnerabilities(ctx.input.query, {
+        startDate: ctx.input.startDate,
+        endDate: ctx.input.endDate
+      });
       let rows = report.rows || report || [];
-      let totalRows = report.totalRows || rows.length;
+      let totalRows = report.total_rows ?? report.totalRows ?? rows.length;
 
-      let mapped = rows.slice(0, ctx.input.limit || 25).map((v: any) => ({
-        xfid: v.xfdbid,
+      let mapped = rows.slice(0, limit).map((v: any) => ({
+        xfid: v.xfdbid == null ? undefined : Number(v.xfdbid),
         stdCode: v.stdcode,
         title: v.title,
         description: v.description,
@@ -129,13 +137,13 @@ Returns vulnerability details including CVSS scores, affected platforms, remedia
     let report = await client.getRecentVulnerabilities(
       ctx.input.startDate,
       ctx.input.endDate,
-      ctx.input.limit || 25
+      limit
     );
     let rows = report.rows || report || [];
-    let totalRows = report.totalRows || rows.length;
+    let totalRows = report.total_rows ?? report.totalRows ?? rows.length;
 
     let mapped = rows.map((v: any) => ({
-      xfid: v.xfdbid,
+      xfid: v.xfdbid == null ? undefined : Number(v.xfdbid),
       stdCode: v.stdcode,
       title: v.title,
       description: v.description,

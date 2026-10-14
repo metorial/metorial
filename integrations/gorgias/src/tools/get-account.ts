@@ -34,7 +34,7 @@ export let getAccount = SlateTool.create(spec, {
         name: account.name || null,
         timezone: account.timezone || null,
         language: account.language || null,
-        plan: account.plan?.name || account.plan || null,
+        plan: typeof account.plan === 'string' ? account.plan : account.plan?.name || null,
         createdDatetime: account.created_datetime || null
       },
       message: `Retrieved account info for **${account.name || account.domain || 'Unknown'}**.`

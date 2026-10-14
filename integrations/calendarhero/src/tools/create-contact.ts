@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,10 +10,14 @@ export let createContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Full name of the contact'),
+      name: z.string().optional().describe('Full name of the contact'),
       title: z.string().optional().describe('Job title of the contact'),
       organization: z.string().optional().describe('Company or organization name'),
-      emails: z.array(z.string()).optional().describe('Email addresses for the contact'),
+      emails: z
+        .array(z.string())
+        .optional()
+        .describe('Email addresses for the contact. CalendarHero requires at least one.'),
+      defaultEmail: z.string().optional().describe('Preferred email address for the contact'),
       phoneNumbers: z.array(z.string()).optional().describe('Phone numbers for the contact')
     })
   )
@@ -26,12 +30,16 @@ export let createContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.emails?.length || ctx.input.emails.some(email => !email.trim())) {
+      throw createApiServiceError('Provide at least one non-empty email address in emails.');
+    }
     let client = new Client(ctx.auth.token);
     let result = await client.createContact({
       name: ctx.input.name,
       title: ctx.input.title,
       organization: ctx.input.organization,
       email: ctx.input.emails,
+      defaultEmail: ctx.input.defaultEmail,
       telephone: ctx.input.phoneNumbers
     });
 
@@ -42,7 +50,7 @@ export let createContact = SlateTool.create(spec, {
         email: Array.isArray(result?.email) ? result.email[0] : result?.email,
         raw: result
       },
-      message: `Contact **${ctx.input.name}** created.`
+      message: `Contact **${ctx.input.name || ctx.input.emails[0]}** created.`
     };
   })
   .build();

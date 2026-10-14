@@ -1,13 +1,34 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage
+} from 'slates';
 
-let api = createAxios({
-  baseURL: 'https://api.chatwork.com/v2'
-});
+export let createChatworkAxios = (baseURL: string) =>
+  createAuthenticatedAxios({
+    baseURL,
+    errorMapping: {
+      extractResponseData: response => ({
+        message: extractApiErrorMessage({ response })
+      })
+    },
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'Chatwork',
+        reason: 'chatwork_api_error'
+      })
+  });
+
+let api = createChatworkAxios('https://api.chatwork.com/v2');
 
 export class ChatworkClient {
   private headers: Record<string, string>;
 
   constructor(token: string, authType: 'oauth' | 'api_token' = 'api_token') {
+    if (!token.trim()) {
+      throw createApiServiceError('A Chatwork token is required. Reconnect your account.');
+    }
     if (authType === 'oauth') {
       this.headers = { Authorization: `Bearer ${token}` };
     } else {
@@ -32,7 +53,7 @@ export class ChatworkClient {
     status?: 'open' | 'done';
   }): Promise<ChatworkTask[]> {
     let query: Record<string, string> = {};
-    if (params?.assignedByAccountId)
+    if (params?.assignedByAccountId !== undefined)
       query.assigned_by_account_id = String(params.assignedByAccountId);
     if (params?.status) query.status = params.status;
 
@@ -88,7 +109,7 @@ export class ChatworkClient {
   }): Promise<{ room_id: number }> {
     let body = new URLSearchParams();
     body.append('name', params.name);
-    if (params.description) body.append('description', params.description);
+    if (params.description !== undefined) body.append('description', params.description);
     if (params.iconPreset) body.append('icon_preset', params.iconPreset);
     body.append('members_admin_ids', params.membersAdminIds.join(','));
     if (params.membersMemberIds?.length)
@@ -174,9 +195,12 @@ export class ChatworkClient {
   }
 
   async getMessage(roomId: number, messageId: string): Promise<ChatworkMessage> {
-    let response = await api.get(`/rooms/${roomId}/messages/${messageId}`, {
-      headers: this.headers
-    });
+    let response = await api.get(
+      `/rooms/${roomId}/messages/${encodeURIComponent(messageId)}`,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -202,7 +226,7 @@ export class ChatworkClient {
     let formBody = new URLSearchParams({ body });
 
     let response = await api.put(
-      `/rooms/${roomId}/messages/${messageId}`,
+      `/rooms/${roomId}/messages/${encodeURIComponent(messageId)}`,
       formBody.toString(),
       {
         headers: { ...this.headers, 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -212,7 +236,9 @@ export class ChatworkClient {
   }
 
   async deleteMessage(roomId: number, messageId: string): Promise<void> {
-    await api.delete(`/rooms/${roomId}/messages/${messageId}`, { headers: this.headers });
+    await api.delete(`/rooms/${roomId}/messages/${encodeURIComponent(messageId)}`, {
+      headers: this.headers
+    });
   }
 
   async markMessagesRead(
@@ -241,8 +267,14 @@ export class ChatworkClient {
 
   // ---- Tasks ----
 
-  async getRoomTasks(roomId: number): Promise<ChatworkRoomTask[]> {
-    let response = await api.get(`/rooms/${roomId}/tasks`, { headers: this.headers });
+  async getRoomTasks(
+    roomId: number,
+    params?: { accountId?: number; status?: 'open' | 'done' }
+  ): Promise<ChatworkRoomTask[]> {
+    let response = await api.get(`/rooms/${roomId}/tasks`, {
+      headers: this.headers,
+      params: { account_id: params?.accountId, status: params?.status }
+    });
     return response.data || [];
   }
 
@@ -265,7 +297,7 @@ export class ChatworkClient {
     let formBody = new URLSearchParams();
     formBody.append('body', params.body);
     formBody.append('to_ids', params.toIds.join(','));
-    if (params.limit) formBody.append('limit', String(params.limit));
+    if (params.limit !== undefined) formBody.append('limit', String(params.limit));
     if (params.limitType) formBody.append('limit_type', params.limitType);
 
     let response = await api.post(`/rooms/${roomId}/tasks`, formBody.toString(), {
@@ -278,8 +310,8 @@ export class ChatworkClient {
     roomId: number,
     taskId: number,
     status: 'open' | 'done'
-  ): Promise<ChatworkRoomTask> {
-    let body = new URLSearchParams({ status });
+  ): Promise<{ task_id: string }> {
+    let body = new URLSearchParams({ body: status });
 
     let response = await api.put(`/rooms/${roomId}/tasks/${taskId}/status`, body.toString(), {
       headers: { ...this.headers, 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -289,8 +321,11 @@ export class ChatworkClient {
 
   // ---- Files ----
 
-  async getRoomFiles(roomId: number): Promise<ChatworkFile[]> {
-    let response = await api.get(`/rooms/${roomId}/files`, { headers: this.headers });
+  async getRoomFiles(roomId: number, accountId?: number): Promise<ChatworkFile[]> {
+    let response = await api.get(`/rooms/${roomId}/files`, {
+      headers: this.headers,
+      params: { account_id: accountId }
+    });
     return response.data || [];
   }
 
@@ -478,8 +513,9 @@ export interface ChatworkFile {
     name: string;
     avatar_image_url: string;
   };
-  file_name: string;
-  file_size: number;
+  filename: string;
+  filesize: number;
+  message_id: string;
   upload_time: number;
 }
 

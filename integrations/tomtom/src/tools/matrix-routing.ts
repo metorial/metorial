@@ -7,7 +7,10 @@ export let matrixRouting = SlateTool.create(spec, {
   name: 'Matrix Routing',
   key: 'matrix_routing',
   description: `Calculate a matrix of route summaries (travel times and distances) for multiple origin-destination pairs. Useful for finding the nearest facility, comparing multiple destinations, or building distance tables.`,
-  constraints: ['Maximum matrix size is 100x100 (10,000 routes) for synchronous requests'],
+  constraints: [
+    'Standard synchronous requests support up to 100 routes; specific fastest/historical options allow 200, or 2,500 with Enterprise access',
+    'Synchronous routing supports fastest and car, truck, or pedestrian travel modes'
+  ],
   tags: {
     readOnly: true
   }
@@ -58,7 +61,18 @@ export let matrixRouting = SlateTool.create(spec, {
             trafficDelayInSeconds: z.number().optional().describe('Traffic delay in seconds')
           })
         )
-        .describe('Matrix route summaries'),
+        .describe('Successfully calculated matrix route summaries'),
+      failedCells: z
+        .array(
+          z.object({
+            originIndex: z.number(),
+            destinationIndex: z.number(),
+            errorCode: z.string().optional()
+          })
+        )
+        .optional()
+        .describe('Failed route pairs and their provider error codes'),
+      failureCount: z.number().optional().describe('Number of failed route calculations'),
       totalCount: z.number().describe('Total number of route calculations'),
       successCount: z.number().describe('Number of successful calculations')
     })
@@ -75,21 +89,33 @@ export let matrixRouting = SlateTool.create(spec, {
       departAt: ctx.input.departAt
     });
 
-    let cells = (data.data || []).map((cell: any) => ({
-      originIndex: cell.originIndex,
-      destinationIndex: cell.destinationIndex,
-      lengthInMeters: cell.routeSummary?.lengthInMeters || 0,
-      travelTimeInSeconds: cell.routeSummary?.travelTimeInSeconds || 0,
-      trafficDelayInSeconds: cell.routeSummary?.trafficDelayInSeconds
-    }));
+    let rawCells = data.data || [];
+    let cells = rawCells
+      .filter((cell: any) => cell.routeSummary && !cell.detailedError)
+      .map((cell: any) => ({
+        originIndex: cell.originIndex,
+        destinationIndex: cell.destinationIndex,
+        lengthInMeters: cell.routeSummary.lengthInMeters,
+        travelTimeInSeconds: cell.routeSummary.travelTimeInSeconds,
+        trafficDelayInSeconds: cell.routeSummary?.trafficDelayInSeconds
+      }));
+    let failedCells = rawCells
+      .filter((cell: any) => cell.detailedError)
+      .map((cell: any) => ({
+        originIndex: cell.originIndex,
+        destinationIndex: cell.destinationIndex,
+        errorCode: cell.detailedError.code
+      }));
 
     return {
       output: {
         cells,
-        totalCount: data.statistics?.totalCount || cells.length,
-        successCount: data.statistics?.successes || cells.length
+        failedCells,
+        failureCount: data.statistics?.failures ?? failedCells.length,
+        totalCount: data.statistics?.totalCount ?? rawCells.length,
+        successCount: data.statistics?.successes ?? cells.length
       },
-      message: `Calculated **${cells.length}** route(s) in a ${ctx.input.origins.length}x${ctx.input.destinations.length} matrix.`
+      message: `Calculated **${cells.length}** route(s) in a ${ctx.input.origins.length}x${ctx.input.destinations.length} matrix; **${failedCells.length}** failed.`
     };
   })
   .build();

@@ -63,11 +63,13 @@ Returns extracted fields as structured JSON for easy integration into workflows.
       extractedData: z
         .string()
         .describe('JSON string containing the extracted structured data'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     let endpointMap: Record<string, string> = {
       invoice: 'AIProcessInvoice',
@@ -100,9 +102,13 @@ Returns extracted fields as structured JSON for easy integration into workflows.
     return {
       output: {
         extractedData: result.result || '',
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Successfully extracted data from **${ctx.input.documentType.replace(/_/g, ' ')}** document using AI.`
+      message: client.message(
+        `Successfully extracted data from **${ctx.input.documentType.replace(/_/g, ' ')}** document using AI.`
+      )
     };
   })
   .build();

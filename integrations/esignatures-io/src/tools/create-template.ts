@@ -89,9 +89,10 @@ let documentElementSchema = z.object({
 export let createTemplate = SlateTool.create(spec, {
   name: 'Create Template',
   key: 'create_template',
-  description: `Creates a new contract template with a defined document structure. Templates use \`documentElements\` to define headers, text, signer fields, images, tables, and more. Created templates can then be used to generate contracts.`,
+  description:
+    'Creates a contract template from Markdown content, including formatted text, placeholders, and signer input fields. Created templates can then be used to generate contracts.',
   instructions: [
-    'Document elements define the template structure: headers, paragraphs, signer input fields, images, tables, and embedded sub-templates.',
+    'Provide markdown using the provider documentation for extended signer-field syntax. Legacy documentElements inputs remain supported; provide only one content format.',
     'Use signer fields (text, dropdown, checkbox, etc.) to collect input from signers during signing.',
     'Placeholder fields in text elements (e.g., {{interest_rate}}) can be filled dynamically when creating a contract.'
   ],
@@ -104,10 +105,15 @@ export let createTemplate = SlateTool.create(spec, {
     z.object({
       title: z.string().describe('Title of the template'),
       labels: z.array(z.string()).optional().describe('Labels for organizing the template'),
+      markdown: z
+        .string()
+        .optional()
+        .describe('Template content in Markdown, including extended signer-field syntax'),
       documentElements: z
         .array(documentElementSchema)
         .min(1)
-        .describe('Document elements defining the template structure')
+        .optional()
+        .describe('Legacy document elements defining the template structure; prefer markdown')
     })
   )
   .output(
@@ -122,7 +128,7 @@ export let createTemplate = SlateTool.create(spec, {
 
     let result = await client.createTemplate(ctx.input);
 
-    let templateData = result?.data?.[0] || result?.data || result;
+    let templateData = result.data[0];
 
     return {
       output: {

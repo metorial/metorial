@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,15 +30,7 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.webscraper.io/api/v1'
-      });
-
-      let response = await axios.get('/account', {
-        params: { api_token: ctx.output.token }
-      });
-
-      let data = response.data.data;
+      let data = await new Client(ctx.output.token).getAccount();
 
       return {
         profile: {

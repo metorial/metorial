@@ -16,12 +16,23 @@ export let createContactTool = SlateTool.create(spec, {
       firstName: z.string().optional().describe('First name of the contact'),
       lastName: z.string().optional().describe('Last name of the contact'),
       companyName: z.string().optional().describe('Company name'),
-      contactType: z.string().optional().describe('Contact type classification'),
+      contactType: z
+        .string()
+        .optional()
+        .describe('Contact type name or ID; names are resolved against the connected company'),
       street: z.string().optional().describe('Street address'),
       city: z.string().optional().describe('City'),
-      state: z.string().optional().describe('State'),
+      state: z
+        .string()
+        .optional()
+        .describe(
+          'State name, abbreviation, or numeric ID. A country is required for names and abbreviations.'
+        ),
       zip: z.string().optional().describe('ZIP/postal code'),
-      country: z.string().optional().describe('Country'),
+      country: z
+        .string()
+        .optional()
+        .describe('Country name, two-letter abbreviation, or numeric ID'),
       emailAddresses: z
         .array(
           z.object({
@@ -34,8 +45,11 @@ export let createContactTool = SlateTool.create(spec, {
       phoneNumbers: z
         .array(
           z.object({
-            phoneNumber: z.string().describe('Phone number'),
-            type: z.string().optional().describe('Phone type (e.g. Mobile, Home, Work)'),
+            phoneNumber: z.string().describe('Phone number containing exactly 10 digits'),
+            type: z
+              .string()
+              .optional()
+              .describe('Phone type: Mobile, Home, or Work. Defaults to Home.'),
             isPrimary: z.boolean().optional().describe('Whether this is the primary phone')
           })
         )
@@ -51,20 +65,21 @@ export let createContactTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let address =
-      ctx.input.street ||
-      ctx.input.city ||
-      ctx.input.state ||
-      ctx.input.zip ||
+    let address = [
+      ctx.input.street,
+      ctx.input.city,
+      ctx.input.state,
+      ctx.input.zip,
       ctx.input.country
-        ? {
-            street: ctx.input.street,
-            city: ctx.input.city,
-            state: ctx.input.state,
-            zip: ctx.input.zip,
-            country: ctx.input.country
-          }
-        : undefined;
+    ].some(value => value !== undefined)
+      ? {
+          street: ctx.input.street,
+          city: ctx.input.city,
+          state: ctx.input.state,
+          zip: ctx.input.zip,
+          country: ctx.input.country
+        }
+      : undefined;
 
     let contact = await client.createContact({
       firstName: ctx.input.firstName,

@@ -1,4 +1,4 @@
-# Slates Specification for SMS Alert
+# SMS Alert API Specification
 
 ## Overview
 
@@ -39,11 +39,11 @@ Generate and validate OTPs via SMS for mobile number verification. The OTP templ
 
 ### Contact Management
 
-Manage contacts organized in groups. Contacts can be created, edited, deleted, imported (via XML), and listed within groups. Supports sending SMS to entire groups at once.
+Manage contacts organized in groups. Contacts can be created, edited, deleted, and listed within groups. Contact IDs from list results identify edits and deletions. Existing group-name and mobile-number inputs discover these IDs across pages. Supports sending SMS to entire groups at once.
 
 ### Group Management
 
-Create, edit, delete, and list contact groups. Groups serve as reusable recipient lists for sending bulk SMS campaigns. Group names must not contain spaces.
+Create, edit, delete, and list contact groups. Groups serve as reusable recipient lists for sending bulk SMS campaigns. Group names must not contain spaces. Group IDs from list results identify group sends, renames, and deletions; existing name inputs remain supported through paginated discovery.
 
 ### Template Management
 
@@ -55,7 +55,7 @@ List available sender IDs assigned to the account. Sender IDs appear as the send
 
 ### Reports and Delivery Status
 
-Retrieve sent SMS campaign logs with filtering options. Delivery reports can be obtained via two mechanisms:
+Retrieve SMS campaign logs through `smscampaignlog.json` with page, limit, query, and scheduled-campaign controls. Date and sender filters apply to the returned page. Recipient filtering is unavailable on campaign logs; use a batch delivery report instead. Delivery reports can be obtained via two mechanisms:
 
 - **Pull**: Query delivery status by batch ID to get per-recipient delivery status (e.g., DELIVRD, AWAITED-DLR).
 - **Push (DLR URL)**: Specify a callback URL (`dlrurl`) when sending an SMS to receive delivery reports pushed to your endpoint.
@@ -66,7 +66,7 @@ Create and delete shortened URLs. Useful for including trackable links in SMS me
 
 ### Account Management
 
-Check credit balance (broken down by route, e.g., transactional, non-DND), update profile details, change password, and view available sender IDs.
+Check credit balance (broken down by route, e.g., transactional, non-DND), read the connected account profile, and view available sender IDs. Profile updates and password changes are not exposed as tools.
 
 ## Events
 
@@ -79,3 +79,7 @@ SMS Alert supports delivery report callbacks (push DLR). When sending an SMS, yo
 - Includes details such as mobile number, message ID, and delivery status.
 
 SMS Alert does not appear to support general-purpose webhook subscriptions or event subscriptions beyond per-message delivery report callbacks.
+
+## API Reference
+
+The request routes and parameters follow the [official Developers API reference](https://kb.smsalert.co.in/developers-api/). OTP options are attributes of the `[otp]` tag passed as `template` to `mverify.json`; validation sends `code`. A successful API status alone does not confirm an OTP match. Scheduling edits and cancellations use the returned `batchid`.

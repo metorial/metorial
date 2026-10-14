@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LeadBoxerClient } from '../lib/client';
+import { leadNumber, leadString } from '../lib/responses';
+import { datasetIdSchema, getLegacyDatasetId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let ipLookup = SlateTool.create(spec, {
@@ -13,7 +15,8 @@ export let ipLookup = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      ipAddress: z.string().describe('The IP address to look up')
+      ipAddress: z.string().describe('The IPv4 or IPv6 address to look up'),
+      datasetId: datasetIdSchema
     })
   )
   .output(
@@ -41,28 +44,27 @@ export let ipLookup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new LeadBoxerClient({
       token: ctx.auth.token,
-      datasetId: ctx.config.datasetId
+      datasetId: ctx.input.datasetId ?? getLegacyDatasetId(ctx.config)
     });
 
     let result = await client.lookupIp(ctx.input.ipAddress);
 
     let output = {
-      companyDomain: result.ipDomain,
-      organizationName: result.ipOrganization,
-      country: result.ipCountryName,
-      countryCode: result.ipCountryCode,
-      region: result.ipRegionName,
-      city: result.ipCity,
-      subContinent: result.ipSubContinent,
-      latitude: result.ipLatitude != null ? String(result.ipLatitude) : undefined,
-      longitude: result.ipLongitude != null ? String(result.ipLongitude) : undefined,
-      timezone: result.ipTimezone,
-      isp: result.ipIsp,
-      ipRange: result.ipRange,
-      usageType: result.ipUsageType,
-      searchedIp: result.searchIp,
-      responseTimeMs:
-        result.searchResponseTimeMs != null ? Number(result.searchResponseTimeMs) : undefined
+      companyDomain: leadString(result.ipDomain),
+      organizationName: leadString(result.ipOrganization),
+      country: leadString(result.ipCountryName),
+      countryCode: leadString(result.ipCountryCode),
+      region: leadString(result.ipRegionName),
+      city: leadString(result.ipCity),
+      subContinent: leadString(result.ipSubContinent),
+      latitude: leadString(result.ipLatitude),
+      longitude: leadString(result.ipLongitude),
+      timezone: leadString(result.ipTimezone),
+      isp: leadString(result.ipIsp),
+      ipRange: leadString(result.ipRange),
+      usageType: leadString(result.ipUsageType),
+      searchedIp: leadString(result.searchIp),
+      responseTimeMs: leadNumber(result.searchResponseTimeMs)
     };
 
     let orgLabel = output.organizationName || output.companyDomain || 'Unknown';

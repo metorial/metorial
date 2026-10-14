@@ -22,7 +22,7 @@ Useful for CRM enrichment, lead scoring, and contact segmentation.`,
       timeout: z
         .number()
         .optional()
-        .describe('Maximum seconds to attempt verification (defaults to 30)')
+        .describe('Legacy timeout in seconds; the current API may ignore this value')
     })
   )
   .output(

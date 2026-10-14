@@ -1,81 +1,46 @@
-Now let me look at the Tave API documentation more closely and the Zapier integration to understand specific features.Now I have a comprehensive picture. Let me compile the specification. Tave has two distinct API mechanisms:
+# Tave API specification
 
-1. **New Lead API** (legacy webservice): Uses a Secret Key + Studio ID, posted to `https://tave.app/webservice/create-lead/{studio_id}`
-2. **Public API V2**: Uses API Keys, base URL `https://tave.io/v2`
+Tave, now VSCO Workspace, provides a studio CRM for contacts, leads, jobs, scheduling, orders, and payments.
 
-The Zapier integration (now under "VSCO Workspace") shows specific triggers and actions available.
+## Official documentation
 
-# Slates Specification for Tave
+- [Public API guide](https://help.workspace.vsco.co/en/articles/13259288-public-api)
+- [API reference](https://workspace.vsco.co/api)
+- [Official OpenAPI document](https://workspace.vsco.co/api/v2/openapi.json)
+- [Legacy contact form guide](https://help.workspace.vsco.co/en/articles/13252315-using-contact-form-7)
+- [Provider-authored legacy submission source](https://plugins.svn.wordpress.org/tave-cf7-integration/trunk/tave_cf7.php)
 
-## Overview
+## Authentication and requests
 
-Tave (now VSCO Workspace) is a CRM and studio management platform designed for photographers and creative professionals. It provides tools for lead tracking, client management, job/order management, invoicing, contracts, scheduling, workflow automation, and financial reporting.
+Public V2 uses an API key from Settings › API Integrations. The current base URL is `https://workspace.vsco.co/api/v2`; the OpenAPI document also lists `https://tave.io/v2` as a legacy server. Keys are accepted in `X-API-KEY` or as a bearer token. Read-only keys can retrieve data; creation needs read-and-write permission.
 
-## Authentication
+Legacy New Lead API uses Secret Key and Studio ID from Settings › API Integrations › Legacy New Lead API. The provider plugin posts form-encoded fields to `https://workspace.vsco.co/webservice/create-lead/{studioId}`. It sends `SecretKey` in the body and `X-Tave-No-Email-Notification: true` to suppress notification. A trimmed response body of `OK` confirms success. Field names are case sensitive; `JobType` must match a configured name. Unknown legacy fields can become custom fields.
 
-Tave supports two authentication mechanisms depending on the API being used:
+## Tool mapping
 
-### Public API (V2)
+| Tool | Official operation and behavior |
+| --- | --- |
+| `create_contact` | `POST /address-book`; `kind`, camelCase person/company/location fields, structured phone fields, and custom-field `{fieldId, value}` arrays |
+| `search_contacts` | `GET /address-book` for lists; `GET /search?scope=contact&q=...` and `GET /address-book/{id}` for hydrated searches; contact-kind and brand filters are applied locally |
+| `create_job` | `POST /job` with resolved `jobTypeId`, `brandId`, `leadSourceId`, `stage`, `eventDate`, `leadNotes`, and custom fields; optional existing contact via `POST /job-contact`; optional scheduled event via `POST /event` |
+| `get_brands` | `GET /brand`, all pages |
+| `get_orders` | `GET /order`; optional brand/job-type filters use related jobs from `GET /job?includeClosed=true` before local pagination |
+| `get_payments` | `GET /payment`; optional brand/job-type filters use related jobs from `GET /job?includeClosed=true` before local pagination |
+| `get_studio` | `GET /studio/me`, authenticated studio identity and settings |
+| `get_job_types` | `GET /job-type`, including documented hidden/external-mapping filters |
+| `get_jobs` | `GET /job`, including documented closed/external-mapping filters |
+| `create_lead` | Legacy form submission with explicit success confirmation |
 
-- **Method:** API Key
-- **Base URL:** `https://tave.io/v2`
-- API keys are created in **Settings › API Integrations › New API Key** within the Tave account.
-- Each key has a configurable permission level: **Read Only** or **Read and Write**.
-- It is recommended to create a separate API key per application.
-- Keys can be revoked at any time from the settings panel.
+Public collections expose `items` and `meta.currentPage`, `meta.totalPages`, and `meta.totalItems`. Public list pagination uses `page` and `pageSize` (10–100 rows); search supports 1–100 rows. Existing `perPage` inputs map to `pageSize`. Searches and locally filtered results accept 1–100 results per returned page.
 
-### New Lead API (Legacy Webservice)
+Paginated responses must include valid count and page metadata. A missing or inconsistent result raises an error instead of returning an incomplete collection as complete. Custom-field discovery is the documented unpaginated exception: it uses `canApplyTo=contact` or `job`, while each returned field's `canApplyTo` value is `Contact` or `Job`.
 
-- **Method:** Secret Key + Studio ID
-- **Endpoint:** `https://tave.app/webservice/create-lead/{studio_id}`
-- The Secret Key is passed in the request body as a `SecretKey` field alongside the lead data.
-- The Studio ID is a unique identifier for the account and is part of the URL path.
-- Both credentials are found under **Settings › New Lead API** in the Tave account.
+Brand, job type, job role, event type, and lead source inputs resolve exact configured names or IDs. Ambiguous names fail with a request to use an ID. `individual` and `business` contact kinds remain accepted aliases for `person` and `company`. Company and location creation require the optional `name` input. A company's first/last name inputs describe its primary contact.
 
-## Features
+Job stages are `lead`, `booked`, `fulfillment`, and `completed`. Event inputs map to `startDate`, `startTime`, `endDate`, `endTime`, `timezoneName`, and `typeId`. A job role requires an existing contact ID. Related creation failures identify the already-created job rather than reporting complete success.
 
-### Lead Management
+All existing tool keys and input/output types remain available. Existing `raw` and legacy `response` fields retain actual provider values. Existing monetary outputs retain the provider's numeric values without rescaling. HTTP/provider and local validation failures use structured service errors.
 
-Create leads directly in Tave from external sources such as website contact forms. Leads can include details like name, email, phone, brand, job type, and job role. This is commonly used to feed inquiries from custom forms into Tave's pipeline.
+## Verification boundary
 
-### Contact Management
-
-Create, search, and retrieve contacts in the Tave address book. Contacts can be filtered by contact kind (e.g., individual, business) and brand. Custom fields can be attached to contacts.
-
-### Job Management
-
-Create and manage jobs (projects/bookings) with associated details including job type, job stage, job role assignments, event types, event dates/times, and timezones. Jobs link contacts to specific work engagements like weddings or photo sessions. Custom job fields are supported.
-
-### Order and Booking Tracking
-
-Track orders as they are booked, including both manually created orders and electronic bookings made through client-facing portals. Orders can be filtered by brand and job type.
-
-### Payment Tracking
-
-Monitor payments as they are created within the system. Payments can be filtered by brand and job type.
-
-### Brand Management
-
-Retrieve and manage brands configured in the account. Brands represent different business identities or product lines under a single Tave account.
-
-### Workflow Automation (Web Requests)
-
-Tave's built-in automation engine can make outbound HTTP requests (web requests) when workflow tasks are triggered. This allows sending data from Tave to external services using token-based templates (e.g., `{{primary_contact.first_name}}`). This is commonly used to push data to third-party webhooks or services.
-
-## Events
-
-Tave does not provide a traditional webhook registration API for arbitrary endpoints. However, it supports event-driven triggers through its Zapier integration (built on the Public API), which uses instant webhook-style triggers for the following events:
-
-### Contact Created
-
-Fires when a new contact is created in Tave. Can be filtered by contact kind and brand.
-
-### Order Booked
-
-Fires when an order is booked, including both manually booked orders in the manager interface and electronic bookings made by clients. Can be filtered by brand and job type.
-
-### Payment Created
-
-Fires when a new payment is recorded in Tave. Can be filtered by brand and job type.
-
-Additionally, Tave's **Web Request Automation** feature allows configuring outbound HTTP POST requests from within Tave's workflow engine to any URL when specific workflow tasks are completed. This functions as an outbound webhook mechanism, passing templated data (contact details, job information, etc.) to external endpoints.
+This specification is grounded in the official public OpenAPI document and provider-authored legacy plugin source. No live account or provider mutation was used for the refresh. Large filtered collections and searches can require many API calls, and multi-request job creation can partially succeed. API acceptance, rate limits, and live legacy submissions require separate account verification.

@@ -20,7 +20,9 @@ import {
   modifyReservation,
   modifyUser,
   recordPayment,
-  reservationAction
+  reservationAction,
+  searchReservations,
+  searchResources
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -44,7 +46,9 @@ export let provider = Slate.create({
     listUsers,
     createVoucher,
     listVouchers,
-    getSiteInfo
+    getSiteInfo,
+    searchReservations,
+    searchResources
   ],
   triggers: []
 });

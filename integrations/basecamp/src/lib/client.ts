@@ -1,20 +1,62 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export interface BasecampAuthorization {
+  identity: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email_address: string;
+  };
+  accounts: {
+    id: number;
+    name: string;
+    product: string;
+    href: string;
+    app_href: string;
+  }[];
+}
+
+export let getAuthorization = async (token: string): Promise<BasecampAuthorization> => {
+  let axios = createAuthenticatedAxios({
+    baseURL: 'https://3.basecampapi.com',
+    authHeader: { value: `Bearer ${token}` },
+    errorAdapter: error =>
+      buildApiServiceError(error, { providerLabel: 'Basecamp', reason: 'basecamp_api_error' })
+  });
+  let response = await axios.get<BasecampAuthorization>('/authorization.json');
+  return response.data;
+};
 
 export class Client {
   private accountId: string;
   private token: string;
   private axios;
 
-  constructor(config: { token: string; accountId: string }) {
-    this.accountId = config.accountId;
+  constructor(config: { token: string; accountId?: string; legacyConfig?: unknown }) {
+    let legacyAccountId =
+      typeof config.legacyConfig === 'object' &&
+      config.legacyConfig !== null &&
+      'accountId' in config.legacyConfig &&
+      typeof config.legacyConfig.accountId === 'string'
+        ? config.legacyConfig.accountId
+        : undefined;
+    let accountId = config.accountId ?? legacyAccountId;
+    if (!accountId || !/^\d+$/.test(accountId)) {
+      throw createApiServiceError(
+        'A Basecamp accountId is required. Call list_accounts and pass an authorized account ID.'
+      );
+    }
+    this.accountId = accountId;
     this.token = config.token;
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://3.basecampapi.com/${this.accountId}`,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json; charset=utf-8',
-        'User-Agent': 'Slates Basecamp Integration (https://slates.dev)'
-      }
+      authHeader: { value: `Bearer ${this.token}` },
+      contentType: 'application/json; charset=utf-8',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Basecamp',
+          reason: 'basecamp_api_error'
+        })
     });
   }
 
@@ -42,7 +84,11 @@ export class Client {
     projectId: string,
     data: { name?: string; description?: string }
   ): Promise<any> {
-    let response = await this.axios.put(`/projects/${projectId}.json`, data);
+    let current = await this.getProject(projectId);
+    let response = await this.axios.put(`/projects/${projectId}.json`, {
+      name: data.name ?? current.name,
+      description: data.description ?? current.description
+    });
     return response.data;
   }
 
@@ -118,10 +164,11 @@ export class Client {
     todoListId: string,
     data: { name: string; description?: string }
   ): Promise<any> {
-    let response = await this.axios.put(
-      `/buckets/${projectId}/todolists/${todoListId}.json`,
-      data
-    );
+    let current = await this.getTodoList(projectId, todoListId);
+    let response = await this.axios.put(`/buckets/${projectId}/todolists/${todoListId}.json`, {
+      name: data.name,
+      description: data.description ?? current.description
+    });
     return response.data;
   }
 
@@ -189,15 +236,20 @@ export class Client {
       startsOn?: string | null;
     }
   ): Promise<any> {
-    let body: Record<string, any> = {};
-    if (data.content !== undefined) body.content = data.content;
-    if (data.description !== undefined) body.description = data.description;
-    if (data.assigneeIds !== undefined) body.assignee_ids = data.assigneeIds;
-    if (data.completionSubscriberIds !== undefined)
-      body.completion_subscriber_ids = data.completionSubscriberIds;
+    let current = await this.getTodo(projectId, todoId);
+    let body: Record<string, any> = {
+      content: data.content ?? current.content,
+      description: data.description ?? current.description,
+      assignee_ids:
+        data.assigneeIds ??
+        (current.assignees ?? []).map((person: { id: number }) => person.id),
+      completion_subscriber_ids:
+        data.completionSubscriberIds ??
+        (current.completion_subscribers ?? []).map((person: { id: number }) => person.id),
+      due_on: data.dueOn === undefined ? current.due_on : data.dueOn,
+      starts_on: data.startsOn === undefined ? current.starts_on : data.startsOn
+    };
     if (data.notify !== undefined) body.notify = data.notify;
-    if (data.dueOn !== undefined) body.due_on = data.dueOn;
-    if (data.startsOn !== undefined) body.starts_on = data.startsOn;
     let response = await this.axios.put(`/buckets/${projectId}/todos/${todoId}.json`, body);
     return response.data;
   }
@@ -434,13 +486,22 @@ export class Client {
       notify?: boolean;
     }
   ): Promise<any> {
-    let body: Record<string, any> = {};
-    if (data.summary !== undefined) body.summary = data.summary;
-    if (data.startsAt !== undefined) body.starts_at = data.startsAt;
-    if (data.endsAt !== undefined) body.ends_at = data.endsAt;
-    if (data.description !== undefined) body.description = data.description;
+    let current = await this.getScheduleEntry(projectId, entryId);
+    if (current.recurrence_schedule) {
+      throw createApiServiceError(
+        'Recurring schedule entries cannot be updated through this endpoint. Edit the recurring event in Basecamp.'
+      );
+    }
+    let body: Record<string, any> = {
+      summary: data.summary ?? current.summary,
+      starts_at: data.startsAt ?? current.starts_at,
+      ends_at: data.endsAt ?? current.ends_at,
+      description: data.description ?? current.description,
+      all_day: data.allDay ?? current.all_day,
+      visible_to_clients: current.visible_to_clients,
+      status: current.status
+    };
     if (data.participantIds !== undefined) body.participant_ids = data.participantIds;
-    if (data.allDay !== undefined) body.all_day = data.allDay;
     if (data.notify !== undefined) body.notify = data.notify;
     let response = await this.axios.put(
       `/buckets/${projectId}/schedule_entries/${entryId}.json`,

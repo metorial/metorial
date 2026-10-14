@@ -1,16 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BotstarClient } from '../lib/client';
+import { botIdSchema, botScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createUserAttribute = SlateTool.create(spec, {
   name: 'Create User Attribute',
   key: 'create_user_attribute',
-  description: `Create a new custom attribute field for users of a specific bot. Once created, this attribute can be set on individual users. Supported types are string, number, date, and boolean.`
+  description: `Create a new custom attribute field for users of a specific bot. Once created, this attribute can be set on individual users. Supported types are string, number, date, and boolean. ${botScopeGuidance}`
 })
   .input(
     z.object({
-      botId: z.string().describe('ID of the bot to add the user attribute to'),
+      botId: botIdSchema,
       fieldName: z.string().describe('Name of the new custom attribute field'),
       fieldType: z
         .enum(['string', 'number', 'date', 'boolean'])

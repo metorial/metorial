@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -16,9 +17,9 @@ let externalReferenceSchema = z
 export let manageTimeEntry = SlateTool.create(spec, {
   name: 'Manage Time Entry',
   key: 'manage_time_entry',
-  description: `Create, update, or delete a time entry in Harvest. Time entries can be created via duration (hours) or via start/end time. Supports associating entries with projects, tasks, and users. Can also link to external references like Trello cards or Basecamp to-dos.`,
+  description: `Create, update, or delete a time entry in Harvest. Time entries can be created via duration (hours) or via start/end time. Supports associating entries with projects, tasks, and users. Can also link to external references like Trello cards or Basecamp to-dos. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   instructions: [
-    'Either provide **hours** for duration-based entries, or **startedTime**/**endedTime** for timer-based entries.',
+    'Use hours for accounts that track durations, or startedTime/endedTime for accounts that track timestamps. Omitting duration or end time starts a running timer. Check the account settings or get_company (administrators only) for the tracking mode.',
     'To delete a time entry, set action to "delete" and provide the timeEntryId.'
   ],
   tags: {
@@ -28,6 +29,7 @@ export let manageTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       timeEntryId: z
         .number()
@@ -74,12 +76,22 @@ export let manageTimeEntry = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
+
+    if (
+      ctx.input.action !== 'delete' &&
+      ctx.input.hours !== undefined &&
+      (ctx.input.startedTime !== undefined || ctx.input.endedTime !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide hours for a duration entry or startedTime/endedTime for a timestamp entry, not both.'
+      );
+    }
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.timeEntryId) {
-        throw new Error('timeEntryId is required for delete');
+        throw createApiServiceError('timeEntryId is required for delete');
       }
       await client.deleteTimeEntry(ctx.input.timeEntryId);
       return {
@@ -90,7 +102,9 @@ export let manageTimeEntry = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.projectId || !ctx.input.taskId || !ctx.input.spentDate) {
-        throw new Error('projectId, taskId, and spentDate are required for create');
+        throw createApiServiceError(
+          'projectId, taskId, and spentDate are required for create'
+        );
       }
       let entry = await client.createTimeEntry({
         projectId: ctx.input.projectId,
@@ -119,7 +133,7 @@ export let manageTimeEntry = SlateTool.create(spec, {
 
     // update
     if (!ctx.input.timeEntryId) {
-      throw new Error('timeEntryId is required for update');
+      throw createApiServiceError('timeEntryId is required for update');
     }
     let entry = await client.updateTimeEntry(ctx.input.timeEntryId, {
       projectId: ctx.input.projectId,

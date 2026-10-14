@@ -1,144 +1,39 @@
-Now let me look at the full API reference to understand all API categories:I now have a comprehensive picture of Insighto.ai's API. Let me compile the specification.
+# Insighto.ai API specification
 
-# Slates Specification for Insighto.ai
-
-## Overview
-
-Insighto.ai is a no-code conversational AI platform that enables businesses to build, customize, and deploy AI-powered chat and voice agents across multiple channels. It enables businesses to create and deploy conversational AI chatbots and voice agents for enhanced customer engagement across multiple channels. The platform allows administrators to automate workflows, such as appointment bookings, recommendations, lead generation, and reservations.
+Insighto.ai builds and operates conversational AI assistants, voice widgets, SMS and WhatsApp messaging, knowledge sources, contacts, forms, and outbound campaigns.
 
 ## Authentication
 
-Insighto.ai uses **API key** authentication. You must create an account on Insighto.ai to obtain an API key, which is required to connect with the Insighto.ai services.
+Generate an API key in Settings → API Keys. Keys begin with `in-`. Requests use `https://api.insighto.ai` and the `api_key` query parameter. The [API key guide](https://docs.insighto.ai/settings/api-tokens) explicitly requires query authentication. The generated [reference introduction](https://docs.insighto.ai/api/ragify) also lists Bearer authentication; this integration uses the query scheme documented by both sources.
 
-- **Generating an API key**: Navigate to the API section in your dashboard and generate a new API key.
-- **Format**: The API key starts with the prefix `in-`.
-- **Usage**: The API key can be passed either as a query parameter (`api_key`) or via an HTTP Bearer token in the `Authorization` header.
-- **Base URL**: `https://api.insighto.ai`
+## Available operations
 
-Example using query parameter:
+- `who_am_i`: read the connected account profile.
+- `list_assistants`, `manage_assistant`: discover, read, create, update, and delete assistants; inspect linked widgets and knowledge sources.
+- `list_widgets`: discover configured deployment endpoints.
+- `list_contacts`, `manage_contact`: read contacts, upsert by email or phone, update contact/channel/custom-field data, and delete contacts.
+- `list_conversations`, `delete_conversation`: discover conversations by required date range or contact, inspect transcripts, and delete conversations.
+- `make_call`, `disconnect_call`, `send_message`: initiate or disconnect a call, or send SMS/WhatsApp messages through configured widgets.
+- `list_data_sources`, `manage_data_source`: discover, create, and delete knowledge sources; add text content or link a source to an assistant. File lists describe provider source records.
+- `list_forms`, `manage_form`: discover and manage forms and inspect captured responses.
+- `list_webhooks`, `manage_webhook`: manage outbound notification endpoints and inspect delivery logs. The provider currently documents one delivery attempt and no HMAC signature.
+- `list_campaigns`, `manage_campaign`: discover campaigns, inspect status and schedules, create/update/delete scheduled outbound-call campaigns, attach contacts, and run campaigns through widgets.
 
-```
-GET https://api.insighto.ai/api/v1/user?api_key=in-your_api_key_here
-```
+## Request and response behavior
 
-Example using Bearer token:
+Paginated APIs return records in `data.items` and pagination totals in `data.total`. Page numbers begin at 1; ordinary page sizes range from 1 to 100. Existing numeric inputs remain numeric; invalid fractional page values receive an operation error.
 
-```
-Authorization: Bearer in-your_api_key_here
-```
+Scheduled campaign creation requires a name, start timestamp, and integer scheduling interval. Campaign runs require recipient contact IDs, supplied directly or discovered from a saved campaign. A create/update followed by contact linking can leave the campaign saved if linking fails; inspect the campaign before retrying.
 
-## Features
+Form creation supplies all required body keys, including nullable trigger instructions and a collection style. Contact upserts send identity fields as query parameters; custom fields are saved through the contact update endpoint. Updating a contact's channel configuration uses `channels`.
 
-### Outbound Calling
+The generated reference leaves some response bodies unspecified (including transcripts and messaging), and some legacy fields are absent from its current request schemas. Existing inputs remain available; omitted documentation alone is not treated as endpoint or field removal. Provider acceptance of those legacy fields requires live verification.
 
-Initiate AI-powered outbound phone calls to specified phone numbers via configured voice widgets. Calls are placed through telephony providers (Twilio, Plivo, or Telnyx) connected to a widget. Supports dynamic prompt variables to personalize conversations (e.g., customer name, appointment details). Phone numbers must be in E.164 format. Also supports bulk calling to a list of contacts for campaign-style outreach.
+## Official reference
 
-### Call Management
-
-Disconnect active calls programmatically. Useful for managing ongoing AI voice conversations or implementing custom call flow logic.
-
-### Messaging
-
-Send messages through chat-based AI assistants across configured channels (SMS, WhatsApp, web chat, etc.).
-
-### Conversation Management
-
-Access and manage conversations between AI agents and end users. Conversations are created when interactions occur across any channel (voice or chat).
-
-### Contact Management
-
-Create and manage contacts in the system. Contacts represent end users who interact with AI agents and can be organized for campaigns or bulk operations. Creates a Contact in the system.
-
-### Assistant Management
-
-Create, configure, and manage AI assistants. Assistants define the behavior, personality, and capabilities of the AI agents that handle conversations. Configuration includes prompts, connected tools, advanced settings like webhooks, and channel assignments.
-
-### Widget Management
-
-Manage widgets that serve as deployment endpoints for AI agents. Widgets can be embedded on websites, connected to telephony providers for voice, or linked to messaging channels.
-
-### Data Source Management
-
-Create and manage knowledge bases that AI agents use to answer queries. Adds a text blob into an existing Data Source. Data sources can be populated with text content, documents, and other structured information that agents reference during conversations.
-
-### Campaign Management
-
-Run outbound campaigns to reach multiple contacts via voice calls or chat messages. Campaigns queue up interactions and process them sequentially.
-
-### Form Management
-
-Create and manage forms that AI agents can use to collect structured data from users during conversations. Forms can be connected to webhooks to push captured data to external systems.
-
-### Intent Management
-
-Define and manage intents that help AI agents categorize and route user queries appropriately.
-
-### Prompt Management
-
-Create and manage prompt templates that control AI agent behavior and response patterns.
-
-### Voice Configuration
-
-Configure voice settings for AI voice agents, including voice selection and related parameters.
-
-### Tool Management
-
-Manage built-in and custom tools that AI agents can invoke during conversations (e.g., Google Calendar, HubSpot, Freshdesk, PayPal, Zoho Calendar, GoHighLevel, PostgreSQL database, etc.). Custom tools allow connecting to any external API.
-
-### Custom Fields
-
-Define custom fields to extend the data model for contacts and other entities.
-
-### Channel Management
-
-Configure and manage communication channels through which AI agents interact with users (web chat, WhatsApp, Messenger, Instagram, Telegram, SMS, etc.).
-
-### Outbound Webhook Management
-
-Create, update, and manage outbound webhook configurations via the API. Webhooks allow pushing real-time data from Insighto to external platforms.
-
-### Conversation Flow
-
-Manage conversation flow configurations that define how AI agents navigate through multi-step interactions.
-
-### Analytics
-
-Access analytics and performance data about AI agent interactions, conversations, and usage metrics.
-
-### Tags
-
-Create and manage tags for organizing and categorizing contacts, conversations, or other entities.
-
-### Agency & White-Label (Agency plans)
-
-Manage sub-accounts, branding, custom domains, and rebilling for agency/reseller use cases. Includes Bring Your Own Key (BYOK) support for custom AI model integration.
-
-### Logs
-
-Access logs of API activity, webhook deliveries, and agent interactions for debugging and auditing.
-
-## Events
-
-Insighto.ai supports outbound webhooks that push data to external platforms in real-time.
-
-### Form Submissions
-
-Any form submissions will trigger the webhook automatically. When an AI agent captures form data from a user, the completed form data is sent to the configured webhook endpoint.
-
-### Assistant Conversation Events
-
-Within the assistant's settings, go to the Advanced tab, scroll down to find the Webhook field, then select the webhook you want to connect from the dropdown menu. Webhooks can be connected to assistants to receive data about conversations handled by that assistant.
-
-### New Conversation Created
-
-Triggers when a new conversation is created. Fires when a new conversation is initiated with an AI agent.
-
-### New Contact Created
-
-Triggers when a new contact is created. Fires when a new contact record is created in the system.
-
-### New Captured Form
-
-Triggers when a new form is captured. Fires when a form is completed and captured during an AI agent interaction.
-
-**Configuration**: Webhooks are created in the Settings section of the Insighto dashboard. Each webhook requires a Name and an Endpoint URL from the platform you're creating a workflow with (e.g., Zapier, Make, or any other system). Each webhook must be uniquely assigned to a single form or assistant to avoid conflicts.
+- [API reference](https://docs.insighto.ai/api/ragify)
+- [Current account](https://docs.insighto.ai/api/get-my-data-api-v-1-user-get)
+- [Contact upsert](https://docs.insighto.ai/api/upsert-contact-by-email-or-phone-number-api-v-1-contact-upsert-post)
+- [Campaign creation](https://docs.insighto.ai/api/create-campaign-api-v-1-campaign-create-post)
+- [Campaign run](https://docs.insighto.ai/api/run-campaign-api-v-1-campaign-run-widget-id-post)
+- [Outbound webhook behavior](https://docs.insighto.ai/settings/webhooks)

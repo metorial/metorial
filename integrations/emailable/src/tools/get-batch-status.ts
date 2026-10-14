@@ -1,38 +1,49 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { getBatchDownload } from '../lib/batch-download';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let verificationResultSchema = z.object({
-  email: z.string().describe('The email address that was verified'),
-  state: z
-    .string()
-    .describe('Deliverability state: deliverable, undeliverable, risky, or unknown'),
-  reason: z.string().describe('The reason for the associated state'),
-  score: z.number().describe('Deliverability score from 0 to 100'),
-  domain: z.string().describe('The domain part of the email'),
-  user: z.string().describe('The user part of the email'),
-  acceptAll: z.boolean().describe('Whether the mail server accepts all addresses'),
-  disposable: z.boolean().describe('Whether the email is disposable'),
-  free: z.boolean().describe('Whether the email is from a free provider'),
-  role: z.boolean().describe('Whether the email is role-based'),
-  mailboxFull: z.boolean().describe('Whether the mailbox is full'),
-  noReply: z.boolean().describe('Whether this is a no-reply address'),
-  didYouMean: z.string().nullable().describe('Suggested correction'),
-  firstName: z.string().nullable().describe('Inferred first name'),
-  lastName: z.string().nullable().describe('Inferred last name'),
-  fullName: z.string().nullable().describe('Inferred full name'),
-  gender: z.string().nullable().describe('Inferred gender'),
-  mxRecord: z.string().nullable().describe('MX record of the domain'),
-  smtpProvider: z.string().nullable().describe('SMTP provider'),
-  tag: z.string().nullable().describe('Tag part of the email'),
-  duration: z.number().describe('Verification duration in seconds')
-});
+let verificationResultSchema = z
+  .object({
+    email: z.string().describe('The email address that was verified'),
+    state: z
+      .string()
+      .describe('Deliverability state: deliverable, undeliverable, risky, or unknown'),
+    reason: z.string().describe('The reason for the associated state'),
+    score: z.number().describe('Deliverability score from 0 to 100'),
+    domain: z.string().describe('The domain part of the email'),
+    user: z.string().describe('The user part of the email'),
+    birthYear: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Possible birth year inferred from the email address'),
+    acceptAll: z
+      .boolean()
+      .nullable()
+      .describe('Whether the mail server accepts all addresses'),
+    disposable: z.boolean().describe('Whether the email is disposable'),
+    free: z.boolean().describe('Whether the email is from a free provider'),
+    role: z.boolean().describe('Whether the email is role-based'),
+    mailboxFull: z.boolean().describe('Whether the mailbox is full'),
+    noReply: z.boolean().describe('Whether this is a no-reply address'),
+    didYouMean: z.string().nullable().describe('Suggested correction'),
+    firstName: z.string().nullable().describe('Inferred first name'),
+    lastName: z.string().nullable().describe('Inferred last name'),
+    fullName: z.string().nullable().describe('Inferred full name'),
+    gender: z.string().nullable().describe('Inferred gender'),
+    mxRecord: z.string().nullable().describe('MX record of the domain'),
+    smtpProvider: z.string().nullable().describe('SMTP provider'),
+    tag: z.string().nullable().describe('Tag part of the email'),
+    duration: z.number().describe('Verification duration in seconds')
+  })
+  .partial();
 
 export let getBatchStatus = SlateTool.create(spec, {
   name: 'Get Batch Status',
   key: 'get_batch_status',
-  description: `Retrieve the status and results of a previously submitted batch email verification. Returns processing progress, aggregate counts by state and reason, and individual verification results (for batches up to 1,000 emails) or a CSV download link (for larger batches).`,
+  description: `Retrieve the status and results of a previously submitted batch email verification. Returns processing progress, aggregate counts by state and reason, and individual verification results (for batches up to 1,000 emails) or downloadable ZIP-compressed CSV results (for larger batches).`,
   instructions: [
     'Set partial to true to retrieve available results while the batch is still processing (only for batches up to 1,000 emails).'
   ],
@@ -68,7 +79,9 @@ export let getBatchStatus = SlateTool.create(spec, {
       downloadFile: z
         .string()
         .optional()
-        .describe('URL to download CSV results (for batches over 1,000 emails)'),
+        .describe(
+          'Provider URL for ZIP-compressed CSV results (for batches over 1,000 emails)'
+        ),
       totalCounts: z
         .object({
           deliverable: z.number().describe('Count of deliverable emails'),
@@ -83,7 +96,14 @@ export let getBatchStatus = SlateTool.create(spec, {
         .describe('Aggregate counts by deliverability state'),
       reasonCounts: z
         .object({
-          acceptableEmail: z.number().optional(),
+          acceptableEmail: z
+            .number()
+            .optional()
+            .describe('Count of accepted emails; retained compatibility alias'),
+          acceptedEmail: z
+            .number()
+            .optional()
+            .describe('Count of emails accepted by the mail server'),
           invalidDomain: z.number().optional(),
           invalidEmail: z.number().optional(),
           invalidSmtp: z.number().optional(),
@@ -112,8 +132,12 @@ export let getBatchStatus = SlateTool.create(spec, {
         ? ` (${result.processed}/${result.total} processed)`
         : '';
 
+    if (result.downloadFile) {
+      await ctx.addAttachment({ type: 'url', ...getBatchDownload(result) });
+    }
+
     let downloadStr = result.downloadFile
-      ? `\n\n[Download CSV results](${result.downloadFile})`
+      ? '\n\nThe results are available as a downloadable file.'
       : '';
 
     return {

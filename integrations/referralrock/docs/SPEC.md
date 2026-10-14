@@ -1,4 +1,4 @@
-# Slates Specification for ReferralRock
+# Referral Rock API Capabilities
 
 ## Overview
 
@@ -73,3 +73,14 @@ Notifications when a reward is added (`RewardAdd`), updated (`RewardUpdate`), de
 ### Email Events
 
 Notification when an email address is unsubscribed (`EmailUnsubscribed`).
+
+
+## API Reference
+
+The current [official API reference](https://api.referralrock.com/help) documents member statistics, reward updates, and customer feed processing in addition to the operations above.
+
+- [Member statistics](https://api.referralrock.com/Help/Api/GET-api-memberstats-getsingle_query_timePeriod) supports member lookup by ID, email, external ID, or referral code and five reporting periods.
+- [Reward updates](https://api.referralrock.com/Help/Api/POST-api-rewards-update) require both the reward ID and payout ID.
+- [Customer feeds](https://api.referralrock.com/Help/Api/POST-api-customerfeeds) accept up to ten customers per request. Matching referrals can be approved and configured rewards triggered; unmatched customers can become preloaded members depending on account settings. Each record has its own outcome.
+
+The legacy invite feed remains available for existing workflows. It is distinct from customer feed processing, which can approve referrals and trigger rewards. Member portal and sharing URLs are browser links, rather than downloadable files.

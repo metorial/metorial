@@ -42,7 +42,7 @@ export let updateTask = SlateTool.create(spec, {
     if (ctx.input.isCompleted !== undefined) data.is_completed = ctx.input.isCompleted;
     if (ctx.input.dateStart !== undefined) data.date_start = ctx.input.dateStart;
     if (ctx.input.dateEnd !== undefined) data.date_end = ctx.input.dateEnd;
-    if (ctx.input.owners !== undefined) data.owners = ctx.input.owners;
+    if (ctx.input.owners !== undefined) data.owners = ctx.input.owners.map(id => ({ id }));
     if (ctx.input.tags !== undefined) data.tags = ctx.input.tags;
 
     let result = await client.updateTask(ctx.input.taskId, data);

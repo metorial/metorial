@@ -59,7 +59,7 @@ export let listPeople = SlateTool.create(spec, {
           : undefined,
       companyName: p['company-name'] || p.companyName || undefined,
       avatarUrl: p['avatar-url'] || p.avatarUrl || undefined,
-      isAdmin: p.administrator ?? p.administrator ?? undefined
+      isAdmin: p.administrator ?? undefined
     }));
 
     return {

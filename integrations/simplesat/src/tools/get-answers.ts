@@ -7,15 +7,23 @@ export let getAnswers = SlateTool.create(spec, {
   name: 'Get Answers',
   key: 'get_answers',
   description: `Retrieve individual feedback answers from survey questions. Answers are individual ratings or comments. Supports filtering by date range to narrow results. Each answer includes the choice, sentiment, follow-up text, and associated question/survey info.`,
-  instructions: ['Use YYYY-MM-DD format for date filters.'],
+  instructions: [
+    'Use YYYY-MM-DD dates or ISO 8601 timestamps for date filters. Date-only ranges include the full end date.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      startDate: z.string().optional().describe('Start date filter in YYYY-MM-DD format'),
-      endDate: z.string().optional().describe('End date filter in YYYY-MM-DD format'),
+      startDate: z
+        .string()
+        .optional()
+        .describe('Start date filter as a YYYY-MM-DD date or ISO 8601 timestamp'),
+      endDate: z
+        .string()
+        .optional()
+        .describe('End date filter as a YYYY-MM-DD date or ISO 8601 timestamp'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
       pageSize: z.number().optional().describe('Number of results per page (max 100)')
     })
@@ -59,10 +67,10 @@ export let getAnswers = SlateTool.create(spec, {
 
     let answers = result.results.map(a => ({
       answerId: a.id,
-      choice: a.choice,
-      choiceLabel: a.choice_label,
-      sentiment: a.sentiment,
-      followUpAnswer: a.follow_up_answer,
+      choice: a.choice ?? null,
+      choiceLabel: a.choice_label ?? null,
+      sentiment: a.sentiment ?? null,
+      followUpAnswer: a.follow_up_answer ?? null,
       publishedAsTestimonial: a.published_as_testimonial,
       created: a.created,
       modified: a.modified,

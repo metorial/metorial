@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AscoraAccountingClient } from '../lib/client';
 import { spec } from '../spec';
@@ -70,7 +70,7 @@ Returns full invoice details including header information, customer data, and li
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.username || !ctx.auth.password) {
-      throw new Error(
+      throw createApiServiceError(
         'Basic Authentication credentials (username and password) are required for the Accounting API. Please use the Basic Authentication method.'
       );
     }

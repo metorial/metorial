@@ -45,7 +45,7 @@ export let listTransactionTypes = SlateTool.create(spec, {
       return {
         output: {
           transactionTypes: undefined,
-          eventTypes: eventTypes as Record<string, unknown>[]
+          eventTypes
         },
         message: `Found **${eventTypes.length}** event type(s) for transaction type **${ctx.input.transactionType}**.`
       };
@@ -54,7 +54,7 @@ export let listTransactionTypes = SlateTool.create(spec, {
     let transactionTypes = await client.listTransactionTypes();
     return {
       output: {
-        transactionTypes: transactionTypes as Record<string, unknown>[],
+        transactionTypes,
         eventTypes: undefined
       },
       message: `Found **${transactionTypes.length}** transaction type(s).`

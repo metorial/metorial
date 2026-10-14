@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,6 +30,16 @@ export let checkAvailability = SlateTool.create(spec, {
           'Specific date to check for available time slots (e.g. "2024-03-15"). Returns available times.'
         ),
       calendarId: z.number().optional().describe('Filter by specific calendar ID'),
+      addonIds: z
+        .array(z.number())
+        .optional()
+        .describe('Add-on IDs to include when calculating availability'),
+      ignoreAppointmentIds: z
+        .array(z.number())
+        .optional()
+        .describe(
+          'Appointment IDs to ignore when checking times, allowing overlapping rescheduling; used with date'
+        ),
       timezone: z
         .string()
         .optional()
@@ -54,12 +64,25 @@ export let checkAvailability = SlateTool.create(spec, {
       authMethod: ctx.auth.authMethod
     });
 
+    if (Boolean(ctx.input.date) === Boolean(ctx.input.month)) {
+      throw createApiServiceError(
+        'Provide exactly one of month or date to check availability.'
+      );
+    }
+    if (ctx.input.ignoreAppointmentIds?.length && !ctx.input.date) {
+      throw createApiServiceError(
+        'ignoreAppointmentIds is supported only when checking times with date.'
+      );
+    }
+
     if (ctx.input.date) {
       let times = await client.getAvailableTimes({
         appointmentTypeID: ctx.input.appointmentTypeId,
         date: ctx.input.date,
         calendarID: ctx.input.calendarId,
-        timezone: ctx.input.timezone
+        timezone: ctx.input.timezone,
+        addonIDs: ctx.input.addonIds,
+        ignoreAppointmentIDs: ctx.input.ignoreAppointmentIds
       });
 
       let availableTimes = (times as any[]).map((t: any) => t.time);
@@ -75,7 +98,8 @@ export let checkAvailability = SlateTool.create(spec, {
         appointmentTypeID: ctx.input.appointmentTypeId,
         month: ctx.input.month,
         calendarID: ctx.input.calendarId,
-        timezone: ctx.input.timezone
+        timezone: ctx.input.timezone,
+        addonIDs: ctx.input.addonIds
       });
 
       let availableDates = (dates as any[]).map((d: any) => d.date);
@@ -86,10 +110,6 @@ export let checkAvailability = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: {},
-      message:
-        'Please provide either a **month** (for available dates) or a **date** (for available time slots).'
-    };
+    throw createApiServiceError('Provide month or date to check availability.');
   })
   .build();

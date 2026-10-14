@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteEvents = SlateTool.create(spec, {
@@ -48,10 +48,7 @@ export let deleteEvents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      projectId: ctx.config.projectId,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let params: Record<string, any> = {};
     if (ctx.input.timeframe) params.timeframe = ctx.input.timeframe;

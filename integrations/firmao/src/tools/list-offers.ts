@@ -72,17 +72,20 @@ export let listOffers = SlateTool.create(spec, {
 
     let offers = result.data.map((o: any) => ({
       offerId: o.id,
-      number: o.number,
-      type: o.type,
-      mode: o.mode,
-      offerDate: o.offerDate,
-      offerStatus: o.offerStatus,
-      currency: o.currency,
-      netTotal: o.nettoPrice,
-      grossTotal: o.bruttoPrice,
-      customerId: typeof o.customer === 'object' ? o.customer?.id : o.customer,
-      customerName: typeof o.customer === 'object' ? o.customer?.name : undefined,
-      creationDate: o.creationDate
+      number: o.number ?? undefined,
+      type: o.type ?? undefined,
+      mode: o.mode ?? undefined,
+      offerDate: o.offerDate ?? undefined,
+      offerStatus: o.offerStatus ?? undefined,
+      currency: o.currency ?? undefined,
+      netTotal: o.nettoPrice ?? undefined,
+      grossTotal: o.bruttoPrice ?? o.grossPrice ?? undefined,
+      customerId: (typeof o.customer === 'object' ? o.customer?.id : o.customer) ?? undefined,
+      customerName:
+        (typeof o.customer === 'object'
+          ? (o.customer?.name ?? o.customer?.label)
+          : undefined) ?? undefined,
+      creationDate: o.creationDate ?? undefined
     }));
 
     return {

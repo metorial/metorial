@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listCustomProperties = SlateTool.create(spec, {
   name: 'List Custom Properties',
   key: 'list_custom_properties',
-  description: `List all custom properties configured for a site. Custom properties allow capturing additional metadata with events (e.g., author, category, logged-in status). Requires a Sites API key (Enterprise plan).`,
+  description: `List all custom properties configured for a site. Custom properties allow capturing additional metadata with events (e.g., author, category, logged-in status). Works with a Stats API key or Sites API key.`,
   tags: {
     readOnly: true
   }
@@ -30,7 +30,10 @@ export let listCustomProperties = SlateTool.create(spec, {
     });
 
     let result = await client.listCustomProperties(ctx.input.siteId);
-    let properties = result.custom_properties ?? result ?? [];
+    let properties = (result.custom_properties ?? result ?? []).map(
+      (property: string | { property: string }) =>
+        typeof property === 'string' ? property : property.property
+    );
 
     return {
       output: {

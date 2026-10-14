@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type ContactInput } from '../lib/client';
 import { spec } from '../spec';
 
 let contactInputSchema = z.object({
@@ -30,13 +30,14 @@ export let enrichContacts = SlateTool.create(spec, {
   name: 'Enrich Contacts',
   key: 'enrich_contacts',
   description: `Submit B2B contacts for enrichment to find verified professional email addresses and enrich contact and company data.
-Provide at least one of: (firstName + lastName + company), (fullName + company), a LinkedIn URL, or an email address per contact.
+Provide an email address, or contact identifiers with company context such as company, website, companyLinkedinUrl, siren, or siret.
 Supports up to 250 contacts per request. Returns a request ID for retrieving results — enrichment is asynchronous and typically takes up to 60 seconds.
 Use **Get Enrichment Results** to retrieve the enriched data once processing completes.`,
   instructions: [
-    'Each contact must include at minimum: (firstName + lastName + company), (fullName + company), a linkedinUrl, or an email.',
+    'For contact enrichment, provide an email or a name or LinkedIn URL with company context. Organization-only inputs may enrich a French legal representative.',
     'Enable sirenEnrichment to get French company registration data (SIREN, SIRET, NAF, VAT).',
-    'Results are processed asynchronously. Use the returned requestId with the Get Enrichment Results tool.'
+    'Results are processed asynchronously. Use the returned requestId with the Get Enrichment Results tool.',
+    'customCallbackUrl overrides the default webhook URL for this request.'
   ],
   constraints: [
     'Maximum 250 contacts per request.',
@@ -60,6 +61,16 @@ Use **Get Enrichment Results** to retrieve the enriched data once processing com
         .optional()
         .describe(
           'Set to true to receive French company registration data (SIREN, SIRET, NAF, VAT)'
+        ),
+      language: z
+        .enum(['en', 'fr'])
+        .optional()
+        .describe('Override the connection language for this request'),
+      customCallbackUrl: z
+        .string()
+        .optional()
+        .describe(
+          'HTTP or HTTPS URL for receiving results for this request; overrides the default callback URL'
         )
     })
   )
@@ -67,42 +78,69 @@ Use **Get Enrichment Results** to retrieve the enriched data once processing com
     z.object({
       requestId: z.string().describe('Request ID for retrieving enrichment results'),
       creditsLeft: z.number().describe('Remaining credits after this request'),
-      success: z.boolean().describe('Whether the enrichment request was accepted')
+      success: z.boolean().describe('Whether the enrichment request was accepted'),
+      diagnostics: z
+        .array(
+          z.object({
+            index: z
+              .number()
+              .optional()
+              .describe('Zero-based contact index in the submitted batch'),
+            errors: z.record(z.string(), z.unknown()).optional(),
+            warnings: z.record(z.string(), z.unknown()).optional()
+          })
+        )
+        .optional()
+        .describe('Provider validation errors and warnings for individual contacts')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data = ctx.input.contacts.map(contact => {
-      let mapped: Record<string, any> = {};
-      if (contact.email) mapped.email = contact.email;
-      if (contact.firstName) mapped.first_name = contact.firstName;
-      if (contact.lastName) mapped.last_name = contact.lastName;
-      if (contact.fullName) mapped.full_name = contact.fullName;
-      if (contact.phone) mapped.phone = contact.phone;
-      if (contact.company) mapped.company = contact.company;
-      if (contact.website) mapped.website = contact.website;
-      if (contact.linkedinUrl) mapped.linkedin = contact.linkedinUrl;
-      if (contact.companyLinkedinUrl) mapped.company_linkedin = contact.companyLinkedinUrl;
-      if (contact.jobTitle) mapped.job = contact.jobTitle;
-      if (contact.siren) mapped.num_siren = contact.siren;
-      if (contact.siret) mapped.siret = contact.siret;
-      if (contact.country) mapped.country = contact.country;
-      if (contact.customFields) mapped.custom_fields = contact.customFields;
-      return mapped;
-    });
+    if (
+      ctx.input.customCallbackUrl !== undefined &&
+      (!URL.canParse(ctx.input.customCallbackUrl) ||
+        !['http:', 'https:'].includes(new URL(ctx.input.customCallbackUrl).protocol))
+    ) {
+      throw createApiServiceError('customCallbackUrl must be an HTTP or HTTPS URL.');
+    }
+
+    let data: ContactInput[] = ctx.input.contacts.map(contact =>
+      pickDefined({
+        email: contact.email,
+        first_name: contact.firstName,
+        last_name: contact.lastName,
+        full_name: contact.fullName,
+        phone: contact.phone,
+        company: contact.company,
+        website: contact.website,
+        linkedin: contact.linkedinUrl,
+        company_linkedin: contact.companyLinkedinUrl,
+        job: contact.jobTitle,
+        num_siren: contact.siren,
+        siret: contact.siret,
+        country: contact.country,
+        custom_fields: contact.customFields
+      })
+    );
 
     let response = await client.enrichContacts({
       data,
       siren: ctx.input.sirenEnrichment,
-      language: ctx.config.language
+      language: ctx.input.language ?? ctx.config.language,
+      custom_callback_url: ctx.input.customCallbackUrl
     });
 
     return {
       output: {
         requestId: response.request_id,
         creditsLeft: response.credits_left,
-        success: response.success
+        success: response.success,
+        diagnostics: response.data?.map(contact => ({
+          index: contact.index,
+          errors: contact.errors,
+          warnings: contact.warnings
+        }))
       },
       message: `Enrichment request submitted for **${ctx.input.contacts.length}** contact(s). Request ID: \`${response.request_id}\`. Credits remaining: **${response.credits_left}**.`
     };

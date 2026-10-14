@@ -14,7 +14,7 @@ export let listRatePlans = SlateTool.create(spec, {
       propertyId: z
         .string()
         .optional()
-        .describe('Property ID (uses default from config if not set)'),
+        .describe('Property ID from list_properties; uses the configured default if omitted.'),
       unitGroupId: z.string().optional().describe('Filter by room type ID'),
       channelCode: z.string().optional().describe('Filter by distribution channel'),
       pageNumber: z.number().optional().describe('Page number'),
@@ -31,6 +31,7 @@ export let listRatePlans = SlateTool.create(spec, {
               name: z.string().optional().describe('Rate plan name'),
               description: z.string().optional(),
               channelCode: z.string().optional(),
+              channelCodes: z.array(z.string()).optional(),
               property: z
                 .object({
                   propertyId: z.string().optional(),
@@ -67,29 +68,32 @@ export let listRatePlans = SlateTool.create(spec, {
     });
 
     let ratePlans = (result.ratePlans || []).map((rp: any) => ({
-      ratePlanId: rp.id,
-      name: rp.name,
-      description: rp.description,
-      channelCode: rp.channelCode,
-      property: rp.property
-        ? { propertyId: rp.property.id, name: rp.property.name }
-        : undefined,
-      unitGroup: rp.unitGroup
-        ? { unitGroupId: rp.unitGroup.id, name: rp.unitGroup.name }
-        : undefined,
-      isSubjectToCityTax: rp.isSubjectToCityTax,
-      pricingUnit: rp.pricingUnit,
-      minGuaranteeType: rp.minGuaranteeType,
-      created: rp.created,
-      modified: rp.modified
+      ratePlanId: rp.id ?? undefined,
+      name: rp.name ?? undefined,
+      description: rp.description ?? undefined,
+      channelCode: rp.channelCode ?? ctx.input.channelCode ?? rp.channelCodes?.[0],
+      channelCodes: rp.channelCodes ?? undefined,
+      property:
+        (rp.property ?? undefined)
+          ? { propertyId: rp.property.id ?? undefined, name: rp.property.name ?? undefined }
+          : undefined,
+      unitGroup:
+        (rp.unitGroup ?? undefined)
+          ? { unitGroupId: rp.unitGroup.id ?? undefined, name: rp.unitGroup.name ?? undefined }
+          : undefined,
+      isSubjectToCityTax: rp.isSubjectToCityTax ?? undefined,
+      pricingUnit: rp.pricingUnit ?? undefined,
+      minGuaranteeType: rp.minGuaranteeType ?? undefined,
+      created: rp.created ?? undefined,
+      modified: rp.modified ?? undefined
     }));
 
     return {
       output: {
         ratePlans,
-        count: result.count || ratePlans.length
+        count: result.count ?? ratePlans.length
       },
-      message: `Found **${result.count || ratePlans.length}** rate plans.`
+      message: `Found **${result.count ?? ratePlans.length}** rate plans.`
     };
   })
   .build();

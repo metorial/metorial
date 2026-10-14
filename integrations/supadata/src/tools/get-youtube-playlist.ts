@@ -38,7 +38,15 @@ export let getYouTubePlaylist = SlateTool.create(spec, {
       videoIds: z
         .array(z.string())
         .optional()
-        .describe('List of video IDs in the playlist (when includeVideos is true)')
+        .describe('List of regular video IDs in the playlist (when includeVideos is true)'),
+      shortIds: z
+        .array(z.string())
+        .optional()
+        .describe('Shorts IDs when includeVideos is true'),
+      liveIds: z
+        .array(z.string())
+        .optional()
+        .describe('Live video IDs when includeVideos is true')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,11 +55,15 @@ export let getYouTubePlaylist = SlateTool.create(spec, {
     let playlist = await client.getYouTubePlaylist({ url: ctx.input.url });
 
     let videoIds: string[] | undefined;
+    let shortIds: string[] | undefined;
+    let liveIds: string[] | undefined;
     if (ctx.input.includeVideos) {
       let videosResult = await client.getYouTubePlaylistVideos({
         url: ctx.input.url,
         limit: ctx.input.videoLimit
       });
+      shortIds = videosResult.shortIds;
+      liveIds = videosResult.liveIds;
       videoIds = videosResult.videoIds ?? videosResult.videos ?? videosResult;
       if (!Array.isArray(videoIds)) {
         videoIds = [];
@@ -67,7 +79,9 @@ export let getYouTubePlaylist = SlateTool.create(spec, {
         channelName: playlist.channelName ?? playlist.channel?.name,
         channelId: playlist.channelId ?? playlist.channel?.id,
         thumbnail: playlist.thumbnail,
-        videoIds
+        videoIds,
+        shortIds,
+        liveIds
       },
       message: `Playlist **${playlist.title ?? playlist.name ?? 'unknown'}** — ${playlist.videoCount ?? 0} videos${videoIds ? `, ${videoIds.length} video IDs retrieved` : ''}.`
     };

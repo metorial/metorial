@@ -33,7 +33,11 @@ export let updateForm = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
     let form = await client.updateForm(ctx.input.formId, {
@@ -47,7 +51,7 @@ export let updateForm = SlateTool.create(spec, {
       output: {
         formId: form.id || form.form_id || ctx.input.formId,
         formName: form.name || form.form_name,
-        enabled: form.enabled
+        enabled: form.active ?? form.enabled
       },
       message: `Updated form **${form.name || form.form_name || ctx.input.formId}**.`
     };

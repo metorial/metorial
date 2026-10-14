@@ -57,13 +57,18 @@ export let listCalls = SlateTool.create(spec, {
 
     let calls = callsArray.map((call: any) => ({
       callId: String(call.id),
-      startedAt: call.started_at,
-      direction: call.direction,
-      status: call.status,
-      leadStatus: call.lead_status,
-      duration: call.seconds ?? call.duration,
-      recordingUrl: call.recording_url,
-      lead: call.lead
+      startedAt: call.started_at ?? undefined,
+      direction: call.direction ?? undefined,
+      status: call.status ?? undefined,
+      leadStatus: call.lead_status ?? undefined,
+      duration:
+        typeof call.seconds === 'number'
+          ? call.seconds
+          : typeof call.duration === 'number'
+            ? call.duration
+            : undefined,
+      recordingUrl: call.recording_url ?? undefined,
+      lead: Array.isArray(call.lead) ? undefined : (call.lead ?? undefined)
     }));
 
     return {

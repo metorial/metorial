@@ -49,9 +49,16 @@ export let listSchemas = SlateTool.create(spec, {
       fields: (s.fields ?? []).map(f => ({
         key: f.key,
         label: f.label,
-        type: f.type,
+        type:
+          typeof f.type === 'string'
+            ? f.type
+            : f.type === undefined
+              ? undefined
+              : JSON.stringify(f.type),
         description: f.description,
-        required: f.required
+        required:
+          f.required ??
+          f.validators?.some(v => v && typeof v === 'object' && v.validate === 'required')
       })),
       createdDate: s.created_date,
       updatedDate: s.updated_date

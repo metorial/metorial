@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
+import { normalizeLibraryEntry } from '../lib/files';
 import { spec } from '../spec';
 
 let fileSchema = z
@@ -63,7 +64,9 @@ export let listFiles = SlateTool.create(spec, {
       files = await client.listLibrary(ctx.input.parentHandle);
     }
 
-    let items = Array.isArray(files) ? files : [];
+    if (!Array.isArray(files))
+      throw createApiServiceError('Gigasheet returned an invalid library listing.');
+    let items = files.map(normalizeLibraryEntry);
 
     return {
       output: {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HabiticaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let manageGroup = SlateTool.create(spec, {
   name: 'Manage Group',
   key: 'manage_group',
   description: `Retrieve, create, or update a Habitica group (party or guild). Use "party" as the groupId to access your current party.
-Can also list guilds the user belongs to.`,
+Guild operations are available only where Habitica still permits them.`,
   instructions: [
     'Use groupId "party" to access your current party.',
     'To list groups, use action "list" with type "party", "guilds", "privateGuilds", "publicGuilds", or comma-separated.'
@@ -62,7 +62,9 @@ Can also list guilds the user belongs to.`,
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     let mapGroup = (g: Record<string, any>) => ({
@@ -72,8 +74,8 @@ Can also list guilds the user belongs to.`,
       type: g.type,
       privacy: g.privacy,
       memberCount: g.memberCount,
-      leader: typeof g.leader === 'object' ? g.leader?._id : g.leader,
-      questKey: g.quest?.key,
+      leader: typeof g.leader === 'object' ? g.leader?._id : g.leader || undefined,
+      questKey: g.quest?.key || undefined,
       questActive: g.quest?.active
     });
 
@@ -86,7 +88,8 @@ Can also list guilds the user belongs to.`,
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.groupId) throw new Error('groupId is required for get action');
+      if (!ctx.input.groupId)
+        throw createApiServiceError('groupId is required for get action');
       let group = await client.getGroup(ctx.input.groupId);
       return {
         output: { groups: [mapGroup(group)] },
@@ -95,11 +98,13 @@ Can also list guilds the user belongs to.`,
     }
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.name || !ctx.input.groupType)
+        throw createApiServiceError('name and groupType are required to create a group.');
       let groupData: Record<string, any> = {};
       if (ctx.input.name) groupData.name = ctx.input.name;
-      if (ctx.input.description) groupData.description = ctx.input.description;
+      if (ctx.input.description !== undefined) groupData.description = ctx.input.description;
       if (ctx.input.groupType) groupData.type = ctx.input.groupType;
-      if (ctx.input.privacy) groupData.privacy = ctx.input.privacy;
+      groupData.privacy = ctx.input.privacy ?? 'private';
 
       let group = await client.createGroup(groupData);
       return {
@@ -109,10 +114,11 @@ Can also list guilds the user belongs to.`,
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.groupId) throw new Error('groupId is required for update action');
+      if (!ctx.input.groupId)
+        throw createApiServiceError('groupId is required for update action');
       let groupData: Record<string, any> = {};
       if (ctx.input.name) groupData.name = ctx.input.name;
-      if (ctx.input.description) groupData.description = ctx.input.description;
+      if (ctx.input.description !== undefined) groupData.description = ctx.input.description;
 
       let group = await client.updateGroup(ctx.input.groupId, groupData);
       return {
@@ -121,6 +127,6 @@ Can also list guilds the user belongs to.`,
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

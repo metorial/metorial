@@ -19,6 +19,10 @@ let enrichedContactSchema = z.object({
   contactPhoneNumber: z.string().nullable().describe('Enriched mobile phone number'),
   contactGender: z.string().nullable().describe('Detected gender of the contact'),
   contactJobTitle: z.string().nullable().describe('Job title of the contact'),
+  contactId: z.number().nullable().describe('Stable BetterContact contact identifier'),
+  contactLinkedinUrl: z.string().nullable().describe('LinkedIn profile URL of the contact'),
+  companyName: z.string().nullable().describe('Current company name'),
+  companyDomain: z.string().nullable().describe('Current company domain'),
   customFields: z
     .record(z.string(), z.string())
     .nullable()
@@ -44,7 +48,9 @@ Poll this endpoint until the status is **"terminated"** to get complete results.
 
   instructions: [
     'Use the requestId returned by the Enrich Contacts tool.',
-    'The status field will be "terminated" when enrichment is complete.',
+    'The status field will be "terminated" and completed will be true when enrichment is complete.',
+    'While completed is false, empty contacts and zero summary counts are placeholders, not final results. Wait a few seconds before polling again.',
+    'An on_hold request resumes after you top up account credits; do not resubmit it.',
     'You are not charged credits for invalid or not-found data.'
   ],
 
@@ -62,6 +68,9 @@ Poll this endpoint until the status is **"terminated"** to get complete results.
     z.object({
       requestId: z.string().describe('The enrichment request ID'),
       status: z.string().describe('Processing status (e.g. "terminated" when complete)'),
+      completed: z
+        .boolean()
+        .describe('True only when the request has terminated and results are final'),
       creditsConsumed: z.number().describe('Number of credits consumed by this request'),
       creditsLeft: z.number().describe('Remaining credit balance after this request'),
       summary: summarySchema.describe('Aggregate statistics of enrichment results'),
@@ -73,7 +82,16 @@ Poll this endpoint until the status is **"terminated"** to get complete results.
 
     let result = await client.getEnrichmentResults(ctx.input.requestId);
 
-    let statusText = result.status === 'terminated' ? 'complete' : result.status;
+    if (!result.completed) {
+      return {
+        output: result,
+        message:
+          result.status === 'on_hold'
+            ? 'Enrichment is on hold. Top up account credits to resume this request.'
+            : `Enrichment **${result.status}**. Results are not ready; wait a few seconds before retrieving this request again.`
+      };
+    }
+    let statusText = 'complete';
 
     return {
       output: result,

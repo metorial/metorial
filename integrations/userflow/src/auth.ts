@@ -4,11 +4,7 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z
-        .string()
-        .describe(
-          'Userflow API key (environment API key for Users API, or personal API key for Accounts API)'
-        )
+      token: z.string().describe('Userflow environment API key')
     })
   )
   .addTokenAuth({
@@ -19,7 +15,7 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Userflow API key. For user/group/event/content/webhook operations, use an environment API key from Settings > API. For account management, use a personal API key from My Account > Personal API Keys.'
+          'Userflow environment API key from Settings > API for users, groups, events, content, attribute definitions, and webhook operations.'
         )
     }),
     getOutput: async ctx => {

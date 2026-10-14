@@ -10,13 +10,13 @@ export let scrapeWebpage = SlateTool.create(spec, {
 Use this to retrieve the full HTML of any webpage, optionally with custom browser settings, proxy configuration, or JavaScript execution.`,
   instructions: [
     'The `jsSnippet` parameter should be provided as a **plain JavaScript string** — it will be automatically Base64-encoded before sending to the API.',
-    'Use `blockResources` to reduce page load time and credit cost by preventing unnecessary resources from loading.',
+    'Use `blockResources` to reduce page load time by preventing unnecessary resources from loading. Browser-only options require browser=true.',
     'Set `browser` to `false` to skip headless browser rendering and reduce credit cost (1 credit instead of 10).'
   ],
   constraints: [
     'Timeout must be between 5 and 60 seconds.',
     'Requests with browser rendering enabled cost 10 API credits; without browser costs 1 credit.',
-    'Residential proxy requests cost 25 API credits.'
+    'Residential proxies cost 125 API credits with browser rendering or 25 without.'
   ],
   tags: {
     destructive: false,

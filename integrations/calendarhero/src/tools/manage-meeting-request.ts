@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageMeetingRequest = SlateTool.create(spec, {
   key: 'manage_meeting_request',
   description: `List, delete, or send reminders for meeting requests. Use this to check the status of active/upcoming/closed requests, cancel a request, or nudge contacts who haven't responded.`,
   instructions: [
-    'To list requests, provide no requestId. Optionally filter by state.',
+    'To list requests, set action to list. Optionally filter by state or meeting type.',
     'To delete or remind, provide the requestId and set the corresponding action.'
   ]
 })
@@ -23,6 +23,12 @@ export let manageMeetingRequest = SlateTool.create(spec, {
         .enum(['active', 'upcoming', 'closed'])
         .optional()
         .describe('Filter by request state (only for list action)'),
+      type: z
+        .string()
+        .optional()
+        .describe(
+          'Filter by meeting type (only for list action). Call list_meeting_types to discover types.'
+        ),
       skip: z
         .number()
         .optional()
@@ -58,6 +64,7 @@ export let manageMeetingRequest = SlateTool.create(spec, {
     if (ctx.input.action === 'list') {
       let data = await client.listMeetingRequests({
         state: ctx.input.state,
+        type: ctx.input.type,
         skip: ctx.input.skip,
         take: ctx.input.take
       });
@@ -79,7 +86,9 @@ export let manageMeetingRequest = SlateTool.create(spec, {
     }
 
     if (!ctx.input.requestId) {
-      throw new Error('requestId is required for delete and remind actions');
+      throw createApiServiceError(
+        'requestId is required for delete and remind actions. List requests to find an ID.'
+      );
     }
 
     if (ctx.input.action === 'delete') {
@@ -98,6 +107,6 @@ export let manageMeetingRequest = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

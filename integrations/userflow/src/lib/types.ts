@@ -6,7 +6,7 @@ export interface UserflowListResponse<T> {
   next_page_url: string | null;
 }
 
-export interface UserflowUser {
+export interface UserflowUser extends Record<string, unknown> {
   id: string;
   object: 'user';
   attributes: Record<string, unknown>;
@@ -15,15 +15,16 @@ export interface UserflowUser {
   memberships?: UserflowMembership[] | null;
 }
 
-export interface UserflowGroup {
+export interface UserflowGroup extends Record<string, unknown> {
   id: string;
   object: 'group';
   attributes: Record<string, unknown>;
   created_at: string;
   memberships?: UserflowMembership[] | null;
+  users?: UserflowUser[] | null;
 }
 
-export interface UserflowMembership {
+export interface UserflowMembership extends Record<string, unknown> {
   id: string;
   object: 'group_membership';
   attributes: Record<string, unknown>;
@@ -61,10 +62,10 @@ export interface UserflowContent {
   object: 'content';
   created_at: string;
   draft_version_id: string | null;
-  draft_version?: unknown | null;
+  draft_version?: UserflowContentVersion | null;
   name: string;
   published_version_id: string | null;
-  published_version?: unknown | null;
+  published_version?: UserflowContentVersion | null;
   type: 'flow' | 'checklist' | 'launcher';
 }
 
@@ -77,7 +78,7 @@ export interface UserflowContentVersion {
   [key: string]: unknown;
 }
 
-export interface UserflowContentSession {
+export interface UserflowContentSession extends Record<string, unknown> {
   id: string;
   object: 'content_session';
   answers?: unknown[] | null;
@@ -145,4 +146,15 @@ export interface UserflowInvite {
 
 export interface UserflowDeleteResponse {
   deleted: boolean;
+}
+
+export interface UserflowAttributeDefinition {
+  id: string;
+  object: 'attribute_definition';
+  created_at: string;
+  data_type: string;
+  description: string | null;
+  display_name: string;
+  name: string;
+  scope: 'event' | 'group' | 'group_membership' | 'user';
 }

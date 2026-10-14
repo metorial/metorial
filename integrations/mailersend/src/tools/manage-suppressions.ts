@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,19 @@ Suppression lists automatically prevent sending to problematic addresses.`,
       entries: z
         .array(z.record(z.string(), z.unknown()))
         .describe('List of suppression entries.'),
-      total: z.number().describe('Total number of entries.')
+      total: z
+        .number()
+        .describe(
+          'Provider total when available; otherwise the number of entries on this page.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider pagination metadata.'),
+      links: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider links to adjacent result pages.')
     })
   )
   .handleInvocation(async ctx => {
@@ -55,7 +67,9 @@ Suppression lists automatically prevent sending to problematic addresses.`,
     return {
       output: {
         entries: result.data || [],
-        total
+        total,
+        pagination: result.meta,
+        links: result.links
       },
       message: `Found **${total}** entries in the **${ctx.input.suppressionType}** suppression list.`
     };
@@ -90,6 +104,12 @@ For blocklist, you can add both specific recipients and wildcard patterns.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.recipients?.length && !ctx.input.patterns?.length) {
+      throw createApiServiceError('Provide recipients or patterns to suppress.');
+    }
+    if (ctx.input.suppressionType !== 'blocklist' && ctx.input.patterns?.length) {
+      throw createApiServiceError('patterns are supported only for the blocklist.');
+    }
     let client = new Client({ token: ctx.auth.token });
     let result = await client.addToSuppressionList(ctx.input.suppressionType, {
       domainId: ctx.input.domainId,
@@ -133,6 +153,18 @@ export let removeFromSuppressions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.removeAll) {
+      if (!ctx.input.domainId) {
+        throw createApiServiceError('Provide domainId when removeAll is true.');
+      }
+      if (ctx.input.entryIds?.length) {
+        throw createApiServiceError('Provide entryIds or removeAll, not both.');
+      }
+    } else if (!ctx.input.entryIds?.length) {
+      throw createApiServiceError(
+        'Provide entryIds or set removeAll to true with a domainId.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
     await client.deleteFromSuppressionList(ctx.input.suppressionType, {
       ids: ctx.input.entryIds,

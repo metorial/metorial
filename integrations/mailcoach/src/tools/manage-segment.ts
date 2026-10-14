@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -80,7 +80,8 @@ export let manageSegment = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.segmentUuid) throw new Error('segmentUuid is required for delete');
+      if (!ctx.input.segmentUuid)
+        throw createApiServiceError('segmentUuid is required for delete');
       await client.deleteSegment(ctx.input.emailListUuid, ctx.input.segmentUuid);
       return {
         output: { segment: null, segments: null, totalCount: null },
@@ -89,7 +90,7 @@ export let manageSegment = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create');
       let result = await client.createSegment(ctx.input.emailListUuid, {
         name: ctx.input.name,
         all_positive_tags_required: ctx.input.allPositiveTagsRequired,
@@ -104,8 +105,9 @@ export let manageSegment = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.segmentUuid) throw new Error('segmentUuid is required for update');
-    if (!ctx.input.name) throw new Error('name is required for update');
+    if (!ctx.input.segmentUuid)
+      throw createApiServiceError('segmentUuid is required for update');
+    if (!ctx.input.name) throw createApiServiceError('name is required for update');
 
     let result = await client.updateSegment(ctx.input.emailListUuid, ctx.input.segmentUuid, {
       name: ctx.input.name,

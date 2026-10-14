@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -19,13 +19,17 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Your Forminit API key (starts with fi_) or legacy Getform form-specific API token. Generate from Account -> API Tokens in the Forminit dashboard, or find under Form Settings in the Getform dashboard.'
+          'Your Forminit API key or legacy Getform form-specific API token. Generate from Account -> API Tokens in the Forminit dashboard, or find under Form Settings in the Getform dashboard.'
         )
     }),
     getOutput: async ctx => {
+      let token = ctx.input.token.trim();
+      if (!token) {
+        throw createApiServiceError('Enter a Forminit API key or legacy Getform API token.');
+      }
       return {
         output: {
-          token: ctx.input.token
+          token
         }
       };
     }

@@ -1,6 +1,8 @@
 # <img src="logo.jpeg" height="20"> Moco
 
-Manage projects, time tracking, invoicing, and CRM for agencies and service businesses. Create and update projects with budgets, tasks, and staff assignments. Log time entries (activities) against project tasks for billable and non-billable hours. Manage companies, contacts, deals, and sales pipelines. Create and send invoices, track payments, and handle invoice reminders. Generate offers/proposals with digital client approval workflows. Manage purchases, expenses, and receipts. Schedule resources and plan team capacity across projects. Administer users, employment details, absences, leave requests, and clock-in/clock-out presences. Retrieve project reports with budget progress, hours logged, and cost breakdowns. Configure custom properties, hourly rates, tags, and account settings.
+Manage MOCO projects, project tasks, time entries, companies, contacts, deals, invoices, offers, purchases, project expenses, resource planning, comments, and presences. Retrieve project reports and staff information, identify the authenticated user, and list or record invoice payments.
+
+Connect with your API key and account subdomain. Collection tools accept optional `page` and `perPage` inputs for paging through results. Use `get_profile` to identify the authenticated user, and `list_invoice_payments` or `create_invoice_payment` to manage payment records. Invoice and offer creation accepts an explicit `vatCodeId` or a matching tax percentage; line items default to the `item` type. `delete_invoice` accepts the deletion reason required for non-draft invoices.
 
 ## License
 

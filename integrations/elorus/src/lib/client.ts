@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginatedResponse<T> {
   count: number;
@@ -29,14 +29,25 @@ export class Client {
   private token: string;
   private organizationId: string;
 
-  constructor(config: { token: string; organizationId: string }) {
+  constructor(config: { token: string; organizationId?: string }) {
+    if (!config.organizationId?.trim()) {
+      throw createApiServiceError(
+        'Provide organizationId. Find it in Elorus under Settings > Organization > Organization ID.',
+        { reason: 'missing_organization_id' }
+      );
+    }
     this.token = config.token;
     this.organizationId = config.organizationId;
   }
 
   private getAxios() {
-    return createAxios({
+    return createAuthenticatedAxios({
       baseURL: 'https://api.elorus.com/v1.2/',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Elorus',
+          reason: 'elorus_api_error'
+        }),
       headers: {
         Authorization: `Token ${this.token}`,
         'X-Elorus-Organization': this.organizationId,
@@ -82,7 +93,12 @@ export class Client {
           'modifiedAfter',
           'modifiedBefore',
           'currencyCode',
-          'customId'
+          'customId',
+          'isClient',
+          'isSupplier',
+          'isVoid',
+          'selfBilled',
+          'transactionType'
         ].includes(key)
       ) {
         queryParams[key] = String(value);
@@ -90,6 +106,13 @@ export class Client {
     }
 
     return queryParams;
+  }
+
+  async listUsers(params: ListParams = {}): Promise<PaginatedResponse<any>> {
+    let response = await this.getAxios().get('/users/', {
+      params: this.buildListParams(params)
+    });
+    return response.data;
   }
 
   // --- Contacts ---
@@ -121,11 +144,9 @@ export class Client {
     return response.data;
   }
 
-  async updateContact(contactId: string, data: any, partial: boolean = true): Promise<any> {
+  async updateContact(contactId: string, data: any): Promise<any> {
     let axios = this.getAxios();
-    let response = partial
-      ? await axios.patch(`/contacts/${contactId}/`, data)
-      : await axios.put(`/contacts/${contactId}/`, data);
+    let response = await axios.put(`/contacts/${contactId}/`, data);
     return response.data;
   }
 
@@ -187,7 +208,22 @@ export class Client {
 
   async sendInvoiceEmail(invoiceId: string, emailData?: any): Promise<any> {
     let axios = this.getAxios();
-    let response = await axios.post(`/invoices/${invoiceId}/email/`, emailData || {});
+    let defaults = await axios.get(`/invoices/${invoiceId}/email/`);
+    let response = await axios.post(`/invoices/${invoiceId}/email/`, {
+      ...defaults.data,
+      cc: defaults.data.cc
+        ? String(defaults.data.cc)
+            .split(',')
+            .map((email: string) => email.trim())
+        : [],
+      bcc: defaults.data.bcc
+        ? String(defaults.data.bcc)
+            .split(',')
+            .map((email: string) => email.trim())
+        : [],
+      attach_pdf: true,
+      ...emailData
+    });
     return response.data;
   }
 
@@ -197,9 +233,10 @@ export class Client {
     return response.data;
   }
 
-  async voidInvoice(invoiceId: string): Promise<any> {
+  async voidInvoice(invoiceId: string, voidStatus: boolean = true): Promise<any> {
     let axios = this.getAxios();
-    let response = await axios.put(`/invoices/${invoiceId}/void/`);
+    await axios.put(`/invoices/${invoiceId}/void/`, { void: voidStatus });
+    let response = await axios.get(`/invoices/${invoiceId}/`);
     return response.data;
   }
 
@@ -530,16 +567,13 @@ export class Client {
     params: ListParams & {
       project?: string;
       task?: string;
-      billable?: string;
-      billed?: string;
+      billing_status?: string;
     } = {}
   ): Promise<PaginatedResponse<any>> {
     let axios = this.getAxios();
     let queryParams = this.buildListParams(params);
     if (params.project) queryParams.project = params.project;
     if (params.task) queryParams.task = params.task;
-    if (params.billable) queryParams.billable = params.billable;
-    if (params.billed) queryParams.billed = params.billed;
     let response = await axios.get('/timeentries/', { params: queryParams });
     return response.data;
   }

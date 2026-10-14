@@ -1,99 +1,37 @@
-Now let me get more details on the REST API and GraphQL capabilities.Now I have enough information to write the specification.
+# LiveSession integration
 
-# Slates Specification for Livesession
-
-## Overview
-
-LiveSession is a product analytics platform focused on session replay, allowing teams to record and replay user sessions on web applications. It provides features including heatmaps, conversion funnels, custom metrics and dashboards, developer tools (console logs, network requests, JS errors), and user segmentation. LiveSession is the first product analytics software with a session replay first approach.
+LiveSession provides session replay and product analytics. This integration exposes 17 tools for sessions, websites, alerts, webhook destinations, funnels, and event metrics.
 
 ## Authentication
 
-The LiveSession API uses Personal Access Tokens (PAT) for authentication. You can create PAT inside LiveSession settings by following these steps:
+Use a Personal Access Token created in Settings > API Tokens. Requests use `Authorization: Bearer <token>`. Select the website and scopes needed for the workflow when creating the token. There is no required connection configuration or OAuth refresh flow for this authentication method.
 
-1. Click API Tokens from left menu.
-2. In the upper-right corner of API Tokens page, click the creation button.
-3. Give your token a descriptive name.
-4. Select the website you want to access through the REST API.
-5. Select the scopes you'd like to grant this token.
+The [authentication guide](https://livesession.dev/docs/api/authentication) documents token setup and the default per-token rate limit of two requests per second. Available [scopes](https://livesession.dev/docs/api/access-scopes) include `users.sessions:read`, `websites:read/write`, `alerts:read/write`, `webhooks:read/write`, `funnels:read/write`, and `metrics:read/write`.
 
-All API requests must include the token in an `Authorization` HTTP header:
+## Tools
 
-```
-Authorization: Bearer <YOUR_PERSONAL_ACCESS_TOKEN>
-```
+| Tool keys | Behavior |
+| --- | --- |
+| `list_sessions` | Filter sessions by email, visitor, and date range; paginate from page 0 with up to 100 results per page. Returns replay URLs and session/visitor metadata. Existing timestamp outputs remain strings containing the provider timestamp, and visitor parameters remain a name/value record. |
+| `list_websites`, `create_website` | Discover stable website IDs and hostnames, or create a website. |
+| `list_alerts`, `create_alert`, `update_alert`, `delete_alert` | Manage session-event alerts and Slack or webhook notification destinations. Creation requires the destination matching the selected provider. |
+| `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook` | Manage webhook destinations. Updates send the website ID, URL, and API version. Omitted website/URL values are resolved from the current webhook and require `webhooks:read`. |
+| `create_funnel`, `update_funnel`, `delete_funnel`, `set_funnel_favourite`, `compute_funnel` | Manage conversion funnels and compute session, visitor, and event counts. Existing nested filter lists and custom-property aliases are translated to documented GraphQL inputs. Funnel creation/update compute arrays accept one configuration. |
+| `compute_metric` | Compute sessions containing an exact custom-event name over a date range, using histogram aggregation. The documented defaults are `sum` and `week`. Returns the full provider response. |
 
-The API is HTTP-based and is hosted at `https://api.livesession.io/v1`.
+Call `list_websites` before tools that need a website ID. REST relative dates include `TODAY`, `YESTERDAY`, `TODAY-7DAYS`, and `TODAY-30DAYS`; the GraphQL reference uses `TODAY_MINUS_7_DAYS` and `TODAY_MINUS_30_DAYS`.
 
-**Available scopes:**
+## Provider documentation limitations
 
-| Scope                               | Description                   |
-| ----------------------------------- | ----------------------------- |
-| `users.sessions:read`               | Read user sessions list       |
-| `websites:write`, `websites:read`   | Read and write websites data  |
-| `alerts:write`, `alerts:read`       | Read and write alerts data    |
-| `webhooks:write`, `webhooks:read`   | Read and write webhooks data  |
-| `funnels:write`, `funnels:read`     | Read and write funnels data   |
-| `metrics:write`, `metrics:read`     | Read and write metrics data   |
-| `dashboard:write`, `dashboard:read` | Read and write dashboard data |
+The current official GraphQL schema describes `updateFunnel(funnel_id: ID!): Boolean!`, while the existing tool sends its configuration as `input: FunnelInput!` and expects a funnel object. The configuration fields and operation are retained for compatibility, and provider errors are reported explicitly; the documented signature cannot perform the advertised configuration update. Provider confirmation is required to establish the legacy operation's availability.
 
-When creating a token, you must select the specific website and scopes the token should have access to. Each token is scoped to a single website.
+The webhook update reference requires `url`, `website_id`, and `version` in the request body, with version also in the query. It does not document the existing `enabled` input. That input is retained and forwarded, but changing enabled state is not confirmed by the public contract.
 
-For webhooks, verification is done via an HMAC-SHA256 signature. Every webhook request incorporates a base64-encoded HMAC-SHA256 signature included in the `LiveSession-Signature` header.
+The published GraphQL reference contains no identity endpoint or funnel list/get query, so no such operation is invented. Metric documentation demonstrates a request but does not define a response schema or enumerate all histogram options. The metric tool returns the provider response without assuming undocumented response fields.
 
-## Features
+## Sources
 
-### Session Data Access
-
-Access and manage session data, events, and user journeys programmatically. The REST API allows listing and retrieving user session data collected by LiveSession, including visitor information, geolocation, custom parameters, and session metadata. This is useful for building custom dashboards or exporting data to third-party systems.
-
-### Funnel Management (GraphQL)
-
-Create, update, delete, and compute conversion funnels via the GraphQL API. Funnels can be defined with multiple steps and filters, computed over flexible date ranges, and marked as favorites. Each funnel step supports a rich filtering system with string, integer, float, boolean, parameter, and custom event property filters.
-
-- Supports relative date ranges (e.g., today, last 7 days, beginning of month) and absolute date ranges.
-
-### Metrics and Dashboards
-
-Read and write custom metrics and dashboard configurations through the API. This allows programmatic management of the analytics dashboards and KPI tracking that LiveSession provides.
-
-### Alerts Management
-
-Create and manage alerts programmatically. Alerts can be configured to trigger on specific session events and can be connected to webhook endpoints for real-time notifications.
-
-### Websites Management
-
-Read and manage website configurations within your LiveSession account. Each website has its own tracking ID and can be configured independently.
-
-### Webhook Management
-
-Programmatically create and manage webhook endpoint configurations. Note that you must have an Admin or Owner role to manage webhook settings.
-
-### Data Export
-
-Export users or events data to CSV or JSON.
-
-## Events
-
-LiveSession supports webhooks that deliver real-time notifications when specific session events occur. Once you've configured your endpoints, you can begin assigning them to specific events using Alerts.
-
-All webhook events are delivered under the `session.event` type with the following sub-categories:
-
-### JavaScript Errors (`JSError`)
-
-Triggers when a JavaScript error occurs during a user session. The payload includes the error message, occurrence count, timestamp, and visitor details (ID, name, email, custom parameters, geolocation).
-
-### Network Errors (`NetError`)
-
-Triggers when a network request error is detected during a session. The payload includes the HTTP method, URL, status code, timestamp, and visitor details.
-
-### Error Clicks (`ErrorClick`)
-
-Triggers when a user clicks on an element that results in an error. The payload includes the error message, timestamp, and visitor details.
-
-### Rage Clicks (`RageClick`)
-
-Triggers when a user performs rapid repeated clicks (indicating frustration). The payload includes the click count, timestamp, and visitor details.
-
-### Custom Events (`Custom`)
-
-Triggers when a custom event is handled. These events are made during recording through the `ls.track('EVENT')` Browser API function. The payload includes the event name, custom properties (with typed values based on key suffixes like `_str`, `_int`, `_bool`), timestamp, and visitor details.
+- [REST API reference](https://livesession.dev/docs/api/rest/get-sessions)
+- [Official REST OpenAPI](https://github.com/livesession/livesession-docs/blob/master/api/rest/openapi.yaml)
+- [Official GraphQL schema](https://github.com/livesession/livesession-docs/blob/master/api/graphql/schema.graphql)
+- [Metrics computation](https://livesession.dev/docs/capabilities/metrics)

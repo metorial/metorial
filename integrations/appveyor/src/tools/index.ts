@@ -2,6 +2,7 @@ export * from './encrypt-value';
 export * from './get-build-history';
 export * from './get-build-log-and-artifacts';
 export * from './get-project';
+export * from './get-project-deployments';
 export * from './get-project-settings';
 export * from './list-projects';
 export * from './manage-build';

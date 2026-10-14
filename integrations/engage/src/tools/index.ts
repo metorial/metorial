@@ -1,5 +1,7 @@
 export * from './create-or-update-user';
+export * from './delete-device-token';
 export * from './delete-user';
+export * from './delete-user-attribute';
 export * from './get-user';
 export * from './list-lists';
 export * from './list-users';

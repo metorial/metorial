@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/split.png" height="20"> Split
 
-Manage feature flags, segments, and experimentation for software releases. Create, update, kill, restore, and delete feature flags with targeting rules, percentage-based rollouts, and multiple treatments. Organize flags into flag sets and manage user segments for targeting. Run A/B experiments and measure feature impact on metrics via events. Manage environments, projects, traffic types, and change request approval workflows. Administer users, groups, and permissions.
+Manage feature flags, targeting rules, environments, segments, flag sets, users, and groups with the Split Admin API. Discover workspaces, traffic types, environment definitions, and rollout status IDs before applying changes. Connect with a Split Admin API key; legacy user and group administration endpoints may be unavailable for migrated Harness accounts.
 
 ## Tools
 
@@ -10,7 +10,7 @@ Create a new feature flag in a Split workspace and optionally set up its initial
 
 ### Delete Feature Flag
 
-Permanently delete a feature flag from all environments. This removes the flag definition everywhere and cannot be undone. Use the update tool with \
+Permanently delete a feature flag from all environments. This cannot be undone. Set `killed: true` with Update Feature Flag to temporarily disable the flag instead.
 
 ### Get Feature Flag
 
@@ -24,9 +24,17 @@ List all environments in a Split workspace. Returns environment names, IDs, prod
 
 List feature flags in a Split workspace. Supports filtering by name or tag and pagination. Returns flag metadata including name, description, traffic type, tags, and rollout status.
 
+### List Flag Definitions
+
+List a page of full feature flag definitions in an environment, including targeting rules, treatments, traffic allocation, and kill status.
+
+### List Rollout Statuses
+
+Discover rollout status IDs, names, and descriptions for use with Update Feature Flag.
+
 ### List Segments
 
-List all segments in a Split workspace. Returns segment names, descriptions, and associated traffic types.
+List a page of segments in a Split workspace with names, descriptions, traffic types, and pagination metadata.
 
 ### List Traffic Types
 

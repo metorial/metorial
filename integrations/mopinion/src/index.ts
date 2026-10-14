@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getAccount,
+  getDataset,
   getFeedback,
   getFields,
   listDeployments,
@@ -14,6 +15,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     getAccount,
+    getDataset,
     getFeedback,
     getFields,
     listReports,

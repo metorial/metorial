@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,9 +15,13 @@ export let auth = SlateAuth.create()
       apiKey: z.string().describe('SSLMate API key, found on your SSLMate account page')
     }),
     getOutput: async ctx => {
+      let token = ctx.input.apiKey.trim();
+      if (!token) {
+        throw createApiServiceError('Provide an SSLMate API key from your account page.');
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token
         }
       };
     }

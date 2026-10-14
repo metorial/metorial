@@ -49,8 +49,24 @@ export let getFormResults = SlateTool.create(spec, {
         .describe('Filter by synchronization status'),
       visitorId: z.string().optional().describe('Filter results by visitor ID'),
       filterName: z.string().optional().describe('Name of a pre-defined filter to apply'),
-      limit: z.number().optional().describe('Maximum number of results to return'),
-      offset: z.number().optional().describe('Number of results to skip for pagination')
+      limit: z
+        .number()
+        .refine(
+          value => Number.isInteger(value) && value >= 0,
+          'Limit must be a non-negative whole number'
+        )
+        .optional()
+        .describe(
+          'Maximum number of results to return after fetching the matching result list'
+        ),
+      offset: z
+        .number()
+        .refine(
+          value => Number.isInteger(value) && value >= 0,
+          'Offset must be a non-negative whole number'
+        )
+        .optional()
+        .describe('Number of results to skip locally after fetching the matching result list')
     })
   )
   .output(
@@ -98,7 +114,7 @@ export let getFormResults = SlateTool.create(spec, {
     return {
       output: {
         resultIds,
-        totalCount: data?.total || undefined
+        totalCount: data?.total ?? undefined
       },
       message: `Found **${resultIds.length}** result(s) for form "${ctx.input.formName}".`
     };

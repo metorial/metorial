@@ -1,8 +1,16 @@
 export { cancelPrintJob } from './cancel-print-job';
 export { createPrintJob } from './create-print-job';
+export { downloadLetterPreview } from './download-letter-preview';
+export { getFileUrl } from './get-file-url';
 export { getPrintJob } from './get-print-job';
 export { listPrintJobs } from './list-print-jobs';
-export { deleteBackground, getBackground, listBackgrounds } from './manage-backgrounds';
+export {
+  createBackground,
+  deleteBackground,
+  getBackground,
+  listBackgrounds,
+  updateBackground
+} from './manage-backgrounds';
 export {
   createMailingList,
   deleteMailingList,

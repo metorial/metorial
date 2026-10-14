@@ -17,3 +17,6 @@ export * from './search-profiles';
 export * from './update-experience';
 export * from './update-microsurvey';
 export * from './update-tour';
+export * from './upsert-company';
+export * from './upsert-profile';
+export * from './who-am-i';

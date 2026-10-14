@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,6 +19,10 @@ Supports full profile information including name, phone, email, date of birth, g
         .enum(['create', 'update', 'delete'])
         .describe('Action to perform on the client'),
       clientId: z.string().optional().describe('Client ID (required for update and delete)'),
+      fullName: z
+        .string()
+        .optional()
+        .describe('Full name; alternatively provide firstName and lastName'),
       firstName: z.string().optional().describe('First name'),
       lastName: z.string().optional().describe('Last name'),
       phone: z.string().optional().describe('Phone number'),
@@ -46,6 +50,7 @@ Supports full profile information including name, phone, email, date of birth, g
       clientId: z.string().optional().describe('ID of the client'),
       firstName: z.string().optional().describe('First name'),
       lastName: z.string().optional().describe('Last name'),
+      fullName: z.string().optional().describe('Full name returned by Whautomate'),
       phone: z.string().optional().describe('Phone number'),
       email: z.string().optional().describe('Email address'),
       success: z.boolean().describe('Whether the operation succeeded')
@@ -64,26 +69,28 @@ Supports full profile information including name, phone, email, date of birth, g
       return {
         output: {
           clientId: result.id || result._id,
-          firstName: result.firstName,
-          lastName: result.lastName,
-          phone: result.phone,
-          email: result.email,
+          firstName: result.firstName ?? ctx.input.firstName,
+          lastName: result.lastName ?? ctx.input.lastName,
+          fullName: result.fullName ?? undefined,
+          phone: result.phone ?? undefined,
+          email: result.email ?? undefined,
           success: true
         },
-        message: `Created client **${result.firstName || ''} ${result.lastName || ''}**.`
+        message: `Created client **${result.fullName || [result.firstName, result.lastName].filter(Boolean).join(' ')}**.`
       };
     }
 
     if (action === 'update') {
-      if (!clientId) throw new Error('clientId is required for update');
+      if (!clientId) throw createApiServiceError('clientId is required for update');
       let result = await client.updateClient(clientId, fields);
       return {
         output: {
           clientId: result.id || result._id || clientId,
-          firstName: result.firstName,
-          lastName: result.lastName,
-          phone: result.phone,
-          email: result.email,
+          firstName: result.firstName ?? ctx.input.firstName,
+          lastName: result.lastName ?? ctx.input.lastName,
+          fullName: result.fullName ?? undefined,
+          phone: result.phone ?? undefined,
+          email: result.email ?? undefined,
           success: true
         },
         message: `Updated client **${clientId}**.`
@@ -91,7 +98,7 @@ Supports full profile information including name, phone, email, date of birth, g
     }
 
     if (action === 'delete') {
-      if (!clientId) throw new Error('clientId is required for delete');
+      if (!clientId) throw createApiServiceError('clientId is required for delete');
       await client.deleteClient(clientId);
       return {
         output: {
@@ -102,6 +109,6 @@ Supports full profile information including name, phone, email, date of birth, g
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -32,6 +32,9 @@ export let revokeCredential = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.credentialIds.length === 0) {
+      throw createApiServiceError('Provide at least one credential ID to revoke or unrevoke.');
+    }
     let client = createClient(ctx);
 
     let result =
@@ -48,7 +51,7 @@ export let revokeCredential = SlateTool.create(spec, {
         action: ctx.input.action,
         credentialIds: ctx.input.credentialIds
       },
-      message: `${ctx.input.action === 'revoke' ? 'Revoked' : 'Unrevoked'} **${ctx.input.credentialIds.length}** credential(s) in registry **${ctx.input.registryId}**.`
+      message: `Submitted ${ctx.input.action} for **${ctx.input.credentialIds.length}** credential(s) in registry **${ctx.input.registryId}**.${jobId ? ` Check get_job with job ID **${jobId}** for completion.` : ''}`
     };
   })
   .build();

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listUnitGroups = SlateTool.create(spec, {
   name: 'List Room Types',
   key: 'list_unit_groups',
-  description: `List room types (unit groups) for a property. Returns room type names, descriptions, max occupancy, and associated rate plans. Useful for understanding the room inventory structure.`,
+  description: `List room types (unit groups) for a property. Returns room type names, descriptions, max occupancy, and property details. Useful for understanding the room inventory structure.`,
   tags: { readOnly: true, destructive: false }
 })
   .input(
@@ -14,7 +14,7 @@ export let listUnitGroups = SlateTool.create(spec, {
       propertyId: z
         .string()
         .optional()
-        .describe('Property ID (uses default from config if not set)'),
+        .describe('Property ID from list_properties; uses the configured default if omitted.'),
       pageNumber: z.number().optional(),
       pageSize: z.number().optional()
     })
@@ -55,24 +55,25 @@ export let listUnitGroups = SlateTool.create(spec, {
     });
 
     let unitGroups = (result.unitGroups || []).map((ug: any) => ({
-      unitGroupId: ug.id,
-      name: ug.name,
-      description: ug.description,
-      memberCount: ug.memberCount,
-      maxPersons: ug.maxPersons,
-      rank: ug.rank,
-      type: ug.type,
-      property: ug.property
-        ? { propertyId: ug.property.id, name: ug.property.name }
-        : undefined
+      unitGroupId: ug.id ?? undefined,
+      name: ug.name ?? undefined,
+      description: ug.description ?? undefined,
+      memberCount: ug.memberCount ?? undefined,
+      maxPersons: ug.maxPersons ?? undefined,
+      rank: ug.rank ?? undefined,
+      type: ug.type ?? undefined,
+      property:
+        (ug.property ?? undefined)
+          ? { propertyId: ug.property.id ?? undefined, name: ug.property.name ?? undefined }
+          : undefined
     }));
 
     return {
       output: {
         unitGroups,
-        count: result.count || unitGroups.length
+        count: result.count ?? unitGroups.length
       },
-      message: `Found **${result.count || unitGroups.length}** room types.`
+      message: `Found **${result.count ?? unitGroups.length}** room types.`
     };
   })
   .build();

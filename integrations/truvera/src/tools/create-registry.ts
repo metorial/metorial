@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -37,6 +37,9 @@ export let createRegistry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.policyDids.length === 0) {
+      throw createApiServiceError('Provide at least one controlling DID in policyDids.');
+    }
     let client = createClient(ctx);
 
     let result = await client.createRegistry({
@@ -45,15 +48,15 @@ export let createRegistry = SlateTool.create(spec, {
       addOnly: ctx.input.addOnly
     });
 
-    let registryId = result?.data?.id || result?.id;
-    let jobId = result?.id;
+    let registryId = result?.data?.id || result?.registryId;
+    let jobId = result?.id || result?.jobId;
 
     return {
       output: {
         registryId: registryId ? String(registryId) : undefined,
         jobId: jobId ? String(jobId) : undefined
       },
-      message: `Created revocation registry${registryId ? ` **${registryId}**` : ''} of type **${ctx.input.registryType}**.`
+      message: `Submitted creation of revocation registry${registryId ? ` **${registryId}**` : ''} of type **${ctx.input.registryType}**.${jobId ? ` Check get_job with job ID **${jobId}** for completion.` : ''}`
     };
   })
   .build();

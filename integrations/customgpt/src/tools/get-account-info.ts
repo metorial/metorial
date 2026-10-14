@@ -21,14 +21,8 @@ export let getAccountInfo = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new CustomGPTClient({ token: ctx.auth.token });
 
-    let user: Record<string, unknown> | null = null;
+    let user = await client.getUser();
     let limits: Record<string, unknown> | null = null;
-
-    try {
-      user = await client.getUser();
-    } catch (_e) {
-      ctx.warn('Could not retrieve user profile');
-    }
 
     try {
       limits = await client.getAccountLimits();

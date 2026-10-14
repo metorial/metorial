@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let projectOutputSchema = z.object({
@@ -17,11 +18,12 @@ let projectOutputSchema = z.object({
 export let createProject = SlateTool.create(spec, {
   name: 'Create Project',
   key: 'create_project',
-  description: `Create a new project in the Clockify workspace. Set name, client, visibility, billing, color, and notes.`,
+  description: `Create a new project in the Clockify workspace. Set name, client, visibility, billing, color, and notes. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Name of the project'),
       clientId: z.string().optional().describe('Client ID to associate with the project'),
       isPublic: z
@@ -35,16 +37,12 @@ export let createProject = SlateTool.create(spec, {
   )
   .output(projectOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let project = await client.createProject({
       name: ctx.input.name,
       clientId: ctx.input.clientId,
-      isPublic: ctx.input.isPublic,
+      isPublic: ctx.input.isPublic ?? true,
       color: ctx.input.color,
       billable: ctx.input.billable,
       note: ctx.input.note
@@ -69,11 +67,12 @@ export let createProject = SlateTool.create(spec, {
 export let updateProject = SlateTool.create(spec, {
   name: 'Update Project',
   key: 'update_project',
-  description: `Update an existing project in Clockify. Modify its name, client, visibility, billing, color, notes, or archive status. Active projects must be archived before deletion.`,
+  description: `Update an existing project in Clockify. Modify its name, client, visibility, billing, color, notes, or archive status. Active projects must be archived before deletion. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       projectId: z.string().describe('ID of the project to update'),
       name: z.string().optional().describe('Updated project name'),
       clientId: z.string().optional().describe('Updated client ID'),
@@ -86,11 +85,7 @@ export let updateProject = SlateTool.create(spec, {
   )
   .output(projectOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let project = await client.updateProject(ctx.input.projectId, {
       name: ctx.input.name,
@@ -121,12 +116,13 @@ export let updateProject = SlateTool.create(spec, {
 export let deleteProject = SlateTool.create(spec, {
   name: 'Delete Project',
   key: 'delete_project',
-  description: `Delete a project from Clockify. The project must be archived before it can be deleted.`,
+  description: `Delete a project from Clockify. The project must be archived before it can be deleted. Call get_workspaces to discover the workspace ID.`,
   constraints: ['Project must be archived before deletion'],
   tags: { destructive: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       projectId: z.string().describe('ID of the project to delete')
     })
   )
@@ -136,11 +132,7 @@ export let deleteProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     await client.deleteProject(ctx.input.projectId);
 
@@ -154,17 +146,28 @@ export let deleteProject = SlateTool.create(spec, {
 export let getProjects = SlateTool.create(spec, {
   name: 'Get Projects',
   key: 'get_projects',
-  description: `List projects in the Clockify workspace. Filter by name, archived status, client, or billable status. Supports pagination.`,
+  description: `List projects in the Clockify workspace. Filter by name, archived status, client, or billable status. Supports pagination. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().optional().describe('Filter by project name (partial match)'),
       archived: z.boolean().optional().describe('Filter by archived status'),
       clientId: z.string().optional().describe('Filter by client ID'),
       billable: z.boolean().optional().describe('Filter by billable status'),
-      page: z.number().optional().describe('Page number (1-based)'),
-      pageSize: z.number().optional().describe('Entries per page')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Page number (1-based)'),
+      pageSize: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Entries per page')
     })
   )
   .output(
@@ -174,16 +177,12 @@ export let getProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let projects = await client.getProjects({
       name: ctx.input.name,
       archived: ctx.input.archived,
-      clients: ctx.input.clientId,
+      clients: ctx.input.clientId ? [ctx.input.clientId] : undefined,
       billable: ctx.input.billable,
       page: ctx.input.page,
       'page-size': ctx.input.pageSize
@@ -203,6 +202,41 @@ export let getProjects = SlateTool.create(spec, {
     return {
       output: { projects: mapped, count: mapped.length },
       message: `Retrieved **${mapped.length}** projects.`
+    };
+  })
+  .build();
+
+export let getProject = SlateTool.create(spec, {
+  name: 'Get Project',
+  key: 'get_project',
+  description:
+    'Get a Clockify project by ID, including visibility, archive state, and client assignment. Call get_workspaces to discover the workspace ID.',
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      workspaceId: workspaceIdSchema,
+      projectId: z
+        .string()
+        .min(1)
+        .describe('Project ID. Call get_projects to discover projects.')
+    })
+  )
+  .output(projectOutputSchema)
+  .handleInvocation(async ctx => {
+    let project = await createApiClient(ctx).getProject(ctx.input.projectId);
+    return {
+      output: {
+        projectId: project.id,
+        name: project.name,
+        clientId: project.clientId || undefined,
+        billable: project.billable ?? false,
+        isPublic: project.public ?? true,
+        archived: project.archived ?? false,
+        color: project.color || undefined,
+        note: project.note || undefined
+      },
+      message: `Project: **${project.name}**.`
     };
   })
   .build();

@@ -36,15 +36,14 @@ export let listSandboxProjects = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let result = await client.listProjects();
     let projects = (Array.isArray(result) ? result : []).map((p: any) => ({
       projectId: p.id,
       name: p.name || '',
-      inboxes: (p.inboxes || []).map((i: any) => ({
+      inboxes: (p.sandboxes ?? p.inboxes ?? []).map((i: any) => ({
         inboxId: i.id,
         name: i.name,
         emailUsername: i.email_username

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppcuesClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let publishExperience = SlateTool.create(spec, {
   name: 'Publish Experience',
   key: 'publish_experience',
-  description: `Publish or unpublish an Appcues experience. Supports all experience types: flows, pins, banners, launchpads, checklists, mobile experiences, NPS surveys, and embeds. Publishing makes the experience visible to users; unpublishing hides it.`,
+  description: `Publish or unpublish an Appcues experience. Supports all experience types: flows (including Flow 2.0), pins, banners, launchpads, checklists, mobile experiences, NPS surveys, and embeds. Publishing makes the experience visible to users; unpublishing hides it.`,
   tags: {
     destructive: false
   }
@@ -14,7 +14,17 @@ export let publishExperience = SlateTool.create(spec, {
   .input(
     z.object({
       experienceType: z
-        .enum(['flow', 'pin', 'banner', 'launchpad', 'checklist', 'mobile', 'nps', 'embed'])
+        .enum([
+          'flow',
+          'flow_v2',
+          'pin',
+          'banner',
+          'launchpad',
+          'checklist',
+          'mobile',
+          'nps',
+          'embed'
+        ])
         .describe('The type of experience'),
       experienceId: z.string().describe('The ID of the experience'),
       action: z
@@ -38,6 +48,7 @@ export let publishExperience = SlateTool.create(spec, {
 
     let publishMap: Record<string, (id: string) => Promise<any>> = {
       flow: id => client.publishFlow(id),
+      flow_v2: id => client.publishFlowV2(id),
       pin: id => client.publishPin(id),
       banner: id => client.publishBanner(id),
       launchpad: id => client.publishLaunchpad(id),
@@ -49,6 +60,7 @@ export let publishExperience = SlateTool.create(spec, {
 
     let unpublishMap: Record<string, (id: string) => Promise<any>> = {
       flow: id => client.unpublishFlow(id),
+      flow_v2: id => client.unpublishFlowV2(id),
       pin: id => client.unpublishPin(id),
       banner: id => client.unpublishBanner(id),
       launchpad: id => client.unpublishLaunchpad(id),
@@ -63,7 +75,7 @@ export let publishExperience = SlateTool.create(spec, {
         ? publishMap[ctx.input.experienceType]
         : unpublishMap[ctx.input.experienceType];
     if (!actionFn) {
-      throw new Error(`Unsupported experience type: ${ctx.input.experienceType}`);
+      throw createApiServiceError(`Unsupported experience type: ${ctx.input.experienceType}`);
     }
     await actionFn(ctx.input.experienceId);
 

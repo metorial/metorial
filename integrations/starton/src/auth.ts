@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { StartonClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,23 +18,18 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('A Starton API key is required.');
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey.trim()
         }
       };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.starton.com/v3',
-        headers: {
-          'x-api-key': ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/project');
-      let project = response.data;
+      let project = await new StartonClient({ token: ctx.output.token }).getProject();
 
       return {
         profile: {

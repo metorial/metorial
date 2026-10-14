@@ -7,7 +7,7 @@ export let checkCredits = SlateTool.create(spec, {
   name: 'Check Credits',
   key: 'check_credits',
   description: `Check the remaining enrichment credits on your Dropcontact account.
-Each credit corresponds to one email found or verified. Credits are only consumed on success — if no email is found, no credit is used.`,
+Email finding consumes a credit when an email is found; unsuccessful searches are refunded. Submitting an existing email for verification consumes one credit.`,
   tags: {
     destructive: false,
     readOnly: true

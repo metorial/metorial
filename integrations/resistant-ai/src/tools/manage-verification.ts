@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageVerification = SlateTool.create(spec, {
   name: 'Manage Verification',
   key: 'manage_verification',
-  description: `Perform management actions on an existing identity verification request. Supports cancelling a pending verification or resending the verification email to the individual. Use "cancel" to stop a verification that is no longer needed, or "resend" to remind the individual to complete their check.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Perform management actions on an existing identity verification request. Supports cancelling a pending verification or resending the verification email to the individual. Use "cancel" to stop a verification that is no longer needed, or "resend" to remind the individual to complete their check.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -30,7 +30,7 @@ export let manageVerification = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
     let result: Record<string, any>;
 
     if (ctx.input.action === 'cancel') {

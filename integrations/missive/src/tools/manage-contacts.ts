@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -16,11 +16,17 @@ let contactInfoSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('twitter'),
-    username: z.string().describe('Twitter/X username')
+    username: z.string().describe('Twitter/X username'),
+    label: z.string().optional().describe('Account label')
   }),
   z.object({
     type: z.literal('facebook'),
-    url: z.string().describe('Facebook profile URL')
+    url: z.string().describe('Facebook profile URL'),
+    name: z
+      .string()
+      .optional()
+      .describe('Facebook user name, required by Missive when creating or updating this info'),
+    label: z.string().optional().describe('Account label')
   }),
   z.object({
     type: z.literal('physical_address'),
@@ -29,7 +35,8 @@ let contactInfoSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('url'),
-    url: z.string().describe('Website URL')
+    url: z.string().describe('Website URL'),
+    label: z.string().optional().describe('URL label')
   }),
   z.object({
     type: z.literal('custom'),
@@ -107,16 +114,63 @@ When updating, provide the contactId. When creating, provide the contactBookId.`
     if (f.gender !== undefined) apiFields.gender = f.gender;
     if (f.infos) {
       apiFields.infos = f.infos.map(info => {
-        if (info.type === 'phone_number') {
-          return { type: 'phone_number', phone_number: info.phoneNumber, label: info.label };
+        let labels: Record<string, string[]> = {
+          email: ['home', 'work', 'personal', 'other'],
+          phone_number: [
+            'main',
+            'mobile',
+            'home',
+            'work',
+            'home_fax',
+            'work_fax',
+            'other_fax',
+            'pager',
+            'other'
+          ],
+          twitter: ['work', 'personal', 'other'],
+          facebook: ['work', 'personal', 'other'],
+          physical_address: ['work', 'home', 'other'],
+          url: ['homepage', 'profile', 'blog', 'work', 'personal', 'other'],
+          custom: ['other']
+        };
+        let requestedLabel = info.label?.toLowerCase() ?? 'other';
+        let label = labels[info.type]?.includes(requestedLabel) ? requestedLabel : 'other';
+        let fields: Record<string, unknown> = { kind: info.type, label };
+        if (label === 'other' && info.label) fields.custom_label = info.label;
+        switch (info.type) {
+          case 'email':
+            fields.value = info.address;
+            break;
+          case 'phone_number':
+            fields.value = info.phoneNumber;
+            break;
+          case 'twitter':
+            fields.value = info.username;
+            break;
+          case 'url':
+            fields.value = info.url;
+            break;
+          case 'physical_address':
+            fields.street = info.address;
+            break;
+          case 'custom':
+            fields.value = info.value;
+            break;
+          case 'facebook':
+            if (!info.name)
+              throw createApiServiceError(
+                'Provide the Facebook user name in the name field; Missive does not accept a profile URL for Facebook contact info.'
+              );
+            fields.name = info.name;
+            break;
         }
-        return info;
+        return fields;
       });
     }
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.contactBookId)
-        throw new Error('contactBookId is required for creating contacts');
+        throw createApiServiceError('contactBookId is required for creating contacts');
       apiFields.contact_book = ctx.input.contactBookId;
       let data = await client.createContacts(apiFields);
       let contacts = Array.isArray(data.contacts) ? data.contacts : [data.contacts];
@@ -124,24 +178,25 @@ When updating, provide the contactId. When creating, provide the contactBookId.`
         output: {
           contacts: contacts.map((c: any) => ({
             contactId: c.id,
-            firstName: c.first_name,
-            lastName: c.last_name,
-            email: c.infos?.find((i: any) => i.type === 'email')?.address
+            firstName: c.first_name ?? undefined,
+            lastName: c.last_name ?? undefined,
+            email: c.infos?.find((i: any) => i.kind === 'email')?.value
           }))
         },
         message: `Created **${contacts.length}** contact(s).`
       };
     } else {
-      if (!ctx.input.contactId) throw new Error('contactId is required for updating contacts');
+      if (!ctx.input.contactId)
+        throw createApiServiceError('contactId is required for updating contacts');
       let data = await client.updateContacts([ctx.input.contactId], apiFields);
       let contacts = Array.isArray(data.contacts) ? data.contacts : [data.contacts];
       return {
         output: {
           contacts: contacts.map((c: any) => ({
             contactId: c.id,
-            firstName: c.first_name,
-            lastName: c.last_name,
-            email: c.infos?.find((i: any) => i.type === 'email')?.address
+            firstName: c.first_name ?? undefined,
+            lastName: c.last_name ?? undefined,
+            email: c.infos?.find((i: any) => i.kind === 'email')?.value
           }))
         },
         message: `Updated contact **${ctx.input.contactId}**.`

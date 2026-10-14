@@ -1,44 +1,43 @@
-Let me get the specific Fomo auth token details from their SDK.Now I have enough information to write the specification. Let me compile what I've found:
+# Fomo Integration Specification
 
-# Slates Specification for Fomo
-
-## Overview
-
-Fomo is a social proof automation platform that displays real-time customer activity notifications (such as purchases, signups, and reviews) on websites to build trust and increase conversions. It uses current customer behaviors to encourage future customers. The API allows programmatic management of notification events, templates, and application settings.
+Fomo displays website notifications for customer activity such as purchases, signups, and reviews.
 
 ## Authentication
 
-Fomo uses **token-based authentication** via an API token.
+Connect using the API token for a selected website from **Settings > Site**. Requests use `Authorization: Token <token>`. API access normally requires a paid Fomo plan; Fomo can grant test access on request. There is no OAuth flow or additional setup configuration.
 
-- **Obtaining the token**: Navigate to Settings, click Site, select your website, scroll to the bottom of the page, and copy the API token displayed there. Alternatively, the auth token can be found in the Fomo application admin dashboard under App → API Access.
-- **Using the token**: Include the token in the `Authorization` HTTP header using the `Token` scheme. The header format is `Authorization: Token <your_auth_token>`.
-- **API base URL**: `https://api.fomo.com`
-- There are no OAuth flows, scopes, or additional credentials required. Each Fomo application (site) has its own API token.
+## Tools
 
-## Features
+| Tool | Operation |
+| --- | --- |
+| `create_event` | Create an event with a template ID or tag and optional customer, location, URL, image, timestamp, and custom fields. |
+| `get_event` | Retrieve an event by ID. |
+| `list_events` | Retrieve events with page, page size, and available pagination metadata. |
+| `search_event` | Retrieve the latest event matching an email address or external ID. |
+| `update_event` | Update selected fields on an existing event. |
+| `delete_event` | Delete an event from the notification feed. |
+| `create_template` | Create a notification template. Fomo recommends the Templates screen for template management. |
+| `get_statistics` | Retrieve application performance for a date range. |
+| `update_application` | Update display timing, position, theme, UTM tracking, age limits, timestamp thresholds, mobile visibility, and looping. |
+| `get_open_metrics` | Retrieve public Fomo marketing metrics, independent of the connected website's data. |
 
-### Event (Notification) Management
+The authenticated event base URL is `https://api.fomo.com/api/v1/applications/me`. Application updates use `PATCH /:ID`; performance statistics use `GET /dashboard` with `date_range[from]` and `date_range[to]`. Public marketing metrics use `https://fomo.com/api/v1/open`.
 
-The primary API interaction is with the Events endpoint. All events are created via POST requests from your app's front-end/backend, a 3rd party integration, or Zapier, and event parameters are added to a live data feed. You can create, retrieve, search, update, and delete events.
+Template IDs and tags are available in the Fomo Templates screen. API input ID fields retain their existing numeric or string types; invalid numeric resource IDs and pagination values produce a clear error. Event creation requires a template ID or a nonempty template tag.
 
-- Events can reference a template via `event_type_id` (numeric ID) or `event_type_tag` (string tag). Users who maintain separate Fomo app instances for dev, staging, and production can use `event_type_tag` to reduce dynamic environment variables.
-- Event parameters include: `title`, `first_name`, `email_address` (used to fetch Gravatar), `ip_address` (used for geolocation), `city`, `province`, `country`, `url`, and custom attribute key-value pairs.
-- Events can be searched by a specific field and value.
+For `update_application`, `displayPeriod` and `timeAgoPeriod` use 1 for seconds, 2 for minutes, 3 for hours, and 4 for days. `displayThreshold` defines the notification age limit in `displayPeriod` units. `timeAgoThreshold` defines the timestamp threshold in `timeAgoPeriod` units. All six added controls are optional.
 
-### Template Management
+## Documentation and limitations
 
-Fomo delineates event parameters (e.g., first_name, city, product_name) from a notification's message structure using templates. Templates define the display format for notifications using variable placeholders. You can create templates via the API, though Fomo recommends using the application UI for managing templates.
+- [Token authentication](https://docs.usefomo.com/reference/fomo-api-auth-token)
+- [Event creation](https://docs.usefomo.com/reference/create)
+- [Event retrieval](https://docs.usefomo.com/reference/get)
+- [Event search](https://docs.fomo.com/reference/search-for-an-event)
+- [Event updates](https://docs.fomo.com/reference/update-event)
+- [Application settings](https://docs.usefomo.com/reference/update-application)
+- [Application statistics](https://docs.fomo.com/reference/application-get-statistics)
+- [Public marketing metrics](https://docs.usefomo.com/reference/fomo-open)
+- [Event/template model](https://docs.fomo.com/reference/how-it-works)
+- [Official Node SDK](https://github.com/usefomo/fomo-nodejs-sdk)
 
-### Application Settings
-
-You can retrieve application statistics and update application-level settings via the API. This controls how notifications are displayed to end-users on your website, including display behavior and branding.
-
-### Fomo Open (Public Metrics)
-
-Fomo provides public endpoints to consume Fomo's own marketing metrics. Fomo's KPIs are available to anyone via the Open API. Available metrics include signups count, customers count, and integrations. This is a public, unauthenticated API and is unrelated to your own application's data.
-
-## Events
-
-Fomo supports **inbound webhooks** — it can receive webhook data from external platforms to automatically create notifications. Webhooks are data "pings" that are sent from a 3rd party platform after some trigger event occurs. Fomo provides a long webhook URL that you copy and paste into the webhook input form of the external platform of your choosing.
-
-However, Fomo does **not** provide outbound webhooks or event subscriptions that allow external systems to listen for changes within Fomo. The webhook functionality is designed for Fomo to consume data from other platforms, not to emit events to subscribers.
+The public reference does not expose readable response examples for every operation, and detailed template endpoint documentation was unavailable during the refresh. Existing template and response mappings remain compatible; no speculative template-list or identity endpoint is added. Current documentation describes `display_for` and `display_interval` in a way that conflicts with the integration's existing help text, so their established public meaning is preserved pending provider clarification. No file download/export operation or outbound event subscription is implemented.

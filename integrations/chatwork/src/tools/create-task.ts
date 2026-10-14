@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -44,8 +44,11 @@ export let createTask = SlateTool.create(spec, {
     let client = createClient(ctx.auth);
 
     let limit: number | undefined;
-    if (ctx.input.dueDate) {
+    if (ctx.input.dueDate !== undefined && ctx.input.dueDate !== '') {
       limit = Math.floor(new Date(ctx.input.dueDate).getTime() / 1000);
+      if (!Number.isFinite(limit)) {
+        throw createApiServiceError('dueDate must be a valid ISO 8601 date and time.');
+      }
     }
 
     let result = await client.createTask(ctx.input.roomId, {

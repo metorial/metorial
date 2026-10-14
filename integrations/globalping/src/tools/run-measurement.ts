@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type MeasurementRequest } from '../lib/client';
 import { spec } from '../spec';
 
 let locationSchema = z
@@ -19,7 +19,14 @@ let locationSchema = z
       .string()
       .optional()
       .describe('ISO 3166-1 alpha-2 country code (e.g. "US", "DE")'),
-    state: z.string().optional().describe('US state code with US- prefix (e.g. "US-CA")'),
+    state: z
+      .string()
+      .optional()
+      .describe('Two-letter US state code (e.g. "CA"); legacy US- prefixes are accepted.'),
+    region: z
+      .string()
+      .optional()
+      .describe('UN geographic region name (e.g. "Western Europe")'),
     city: z.string().optional().describe('City name in English'),
     asn: z.number().optional().describe('Autonomous System Number'),
     network: z.string().optional().describe('Network/ISP name (e.g. "Google LLC")'),
@@ -32,9 +39,11 @@ let locationSchema = z
     limit: z
       .number()
       .min(1)
-      .max(200)
+      .max(500)
       .optional()
-      .describe('Max number of probes from this location (1-200, default: 1)')
+      .describe(
+        'Max number of probes from this location (1-500, default: 1); cannot combine with the global limit'
+      )
   })
   .describe('Location filter for probe selection');
 
@@ -149,25 +158,16 @@ let httpOptionsSchema = z
       .enum(['HTTP', 'HTTPS', 'HTTP2'])
       .optional()
       .describe('HTTP protocol (default: HTTPS)'),
-    port: z.number().min(0).max(65535).optional().describe('Port number (default: 80)'),
+    port: z
+      .number()
+      .min(0)
+      .max(65535)
+      .optional()
+      .describe('Port number (default: 443 for HTTPS/HTTP2, 80 for HTTP)'),
     ipVersion: z.number().optional().describe('IP version: 4 or 6 (default: 4)')
   })
   .optional()
   .describe('HTTP-specific measurement options');
-
-let _probeLocationSchema = z
-  .object({
-    continent: z.string().describe('Continent code'),
-    region: z.string().describe('Geographic region'),
-    country: z.string().describe('ISO 3166-1 alpha-2 country code'),
-    state: z.string().nullable().optional().describe('US state code'),
-    city: z.string().describe('City name'),
-    asn: z.number().describe('Autonomous System Number'),
-    network: z.string().describe('Network/ISP name'),
-    latitude: z.number().describe('Latitude'),
-    longitude: z.number().describe('Longitude')
-  })
-  .describe('Probe location details');
 
 let probeResultSchema = z
   .object({
@@ -180,6 +180,8 @@ let probeResultSchema = z
         city: z.string(),
         asn: z.number(),
         network: z.string(),
+        latitude: z.number().optional(),
+        longitude: z.number().optional(),
         tags: z.array(z.string()).optional(),
         resolvers: z.array(z.string()).optional()
       })
@@ -195,14 +197,15 @@ let probeResultSchema = z
 export let runMeasurement = SlateTool.create(spec, {
   name: 'Run Measurement',
   key: 'run_measurement',
-  description: `Create and run a network diagnostic test from globally distributed probes, then poll for and return the completed results. Supports **ping**, **traceroute**, **dns**, **mtr**, and **http** measurement types.
+  description: `Create and run a network diagnostic test from globally distributed probes, then poll for and return its results. Supports **ping**, **traceroute**, **dns**, **mtr**, and **http** measurement types.
 
-Use location filters to target specific geographic regions, networks, or cloud providers. The tool automatically waits for the measurement to complete before returning results.`,
+Use location filters to target specific geographic regions, networks, or cloud providers. By default, the tool waits up to about 40 seconds for completion and returns the current status. If it remains in progress, retrieve it later with Get Measurement.`,
   instructions: [
     'Use the "magic" location field for simple, flexible probe targeting (e.g. "Germany", "AWS", "us-east-2").',
     'Use structured location fields (country, city, asn, etc.) when you need precise control.',
-    'For HTTP measurements, the target should be a domain name or IP address. Use measurementOptions to configure path, method, and headers.',
-    'Set waitForResults to false if you only want to create the measurement without waiting for completion.'
+    'For HTTP measurements, the target should be a domain name or IP address. Use httpOptions to configure path, method, and headers.',
+    'Set waitForResults to false if you only want to create the measurement without waiting for completion.',
+    'Set previousMeasurementId to reuse the probes from an earlier measurement; omit locations in that case.'
   ],
   constraints: [
     'Only public endpoints can be targeted; no local/private network tests.',
@@ -211,7 +214,7 @@ Use location filters to target specific geographic regions, networks, or cloud p
     'HTTP response body is limited to the first 10 KB.'
   ],
   tags: {
-    readOnly: true,
+    readOnly: false,
     destructive: false
   }
 })
@@ -227,12 +230,30 @@ Use location filters to target specific geographic regions, networks, or cloud p
         .describe(
           'Probe location filters. If omitted, a single probe is selected automatically.'
         ),
+      previousMeasurementId: z
+        .string()
+        .optional()
+        .describe(
+          'Measurement ID whose probes should be reused. Cannot combine with locations.'
+        ),
+      timeout: z
+        .number()
+        .min(5)
+        .max(30)
+        .optional()
+        .describe('Probe test timeout in whole seconds (5-30).'),
+      inProgressUpdates: z
+        .boolean()
+        .optional()
+        .describe('Return partial test updates while the measurement is running.'),
       limit: z
         .number()
         .min(1)
         .max(500)
         .optional()
-        .describe('Global max number of probes (1-500, default: 1)'),
+        .describe(
+          'Global max number of probes (1-500, default: 1); cannot combine with per-location limits'
+        ),
       pingOptions: pingOptionsSchema,
       tracerouteOptions: tracerouteOptionsSchema,
       dnsOptions: dnsOptionsSchema,
@@ -255,6 +276,7 @@ Use location filters to target specific geographic regions, networks, or cloud p
       status: z.string().describe('Measurement status: "in-progress" or "finished"'),
       probesCount: z.number().describe('Number of probes that executed the test'),
       createdAt: z.string().optional().describe('ISO 8601 creation timestamp'),
+      updatedAt: z.string().optional().describe('ISO 8601 last update timestamp'),
       results: z
         .array(probeResultSchema)
         .optional()
@@ -263,6 +285,56 @@ Use location filters to target specific geographic regions, networks, or cloud p
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+
+    if (ctx.input.previousMeasurementId && ctx.input.locations?.length) {
+      throw createApiServiceError('Use either previousMeasurementId or locations, not both.');
+    }
+    if (
+      ctx.input.limit !== undefined &&
+      ctx.input.locations?.some(location => location.limit !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Use either the global limit or per-location limits, not both.'
+      );
+    }
+    let optionGroups = {
+      ping: ctx.input.pingOptions,
+      traceroute: ctx.input.tracerouteOptions,
+      dns: ctx.input.dnsOptions,
+      mtr: ctx.input.mtrOptions,
+      http: ctx.input.httpOptions
+    };
+    for (let [type, options] of Object.entries(optionGroups)) {
+      if (options && type !== ctx.input.type) {
+        throw createApiServiceError(
+          `${type}Options can only be used for ${type} measurements.`
+        );
+      }
+      if (
+        options?.ipVersion !== undefined &&
+        options.ipVersion !== 4 &&
+        options.ipVersion !== 6
+      ) {
+        throw createApiServiceError('ipVersion must be 4 or 6.');
+      }
+      for (let value of [
+        options && 'packets' in options ? options.packets : undefined,
+        options?.port
+      ]) {
+        if (value !== undefined && !Number.isInteger(value)) {
+          throw createApiServiceError('Packet counts and ports must be whole numbers.');
+        }
+      }
+    }
+    for (let value of [
+      ctx.input.limit,
+      ctx.input.timeout,
+      ...(ctx.input.locations ?? []).flatMap(location => [location.limit, location.asn])
+    ]) {
+      if (value !== undefined && !Number.isInteger(value)) {
+        throw createApiServiceError('Probe limits, ASNs, and timeouts must be whole numbers.');
+      }
+    }
 
     let measurementOptions: Record<string, unknown> = {};
 
@@ -278,14 +350,23 @@ Use location filters to target specific geographic regions, networks, or cloud p
       Object.assign(measurementOptions, ctx.input.httpOptions);
     }
 
-    let body: Record<string, unknown> = {
+    let body: MeasurementRequest = {
       type: ctx.input.type,
       target: ctx.input.target
     };
 
     if (ctx.input.locations && ctx.input.locations.length > 0) {
-      body.locations = ctx.input.locations;
+      body.locations = ctx.input.locations.map(location => ({
+        ...location,
+        ...(location.state ? { state: location.state.toUpperCase().replace(/^US-/, '') } : {}),
+        ...(location.country ? { country: location.country.toUpperCase() } : {})
+      }));
     }
+
+    if (ctx.input.previousMeasurementId) body.locations = ctx.input.previousMeasurementId;
+    if (ctx.input.timeout !== undefined) body.timeout = ctx.input.timeout;
+    if (ctx.input.inProgressUpdates !== undefined)
+      body.inProgressUpdates = ctx.input.inProgressUpdates;
 
     if (ctx.input.limit !== undefined) {
       body.limit = ctx.input.limit;
@@ -301,20 +382,14 @@ Use location filters to target specific geographic regions, networks, or cloud p
       target: ctx.input.target
     });
 
-    let { measurementId, probesCount } = await client.createMeasurement(
-      body as {
-        type: string;
-        target: string;
-        locations?: Record<string, unknown>[];
-        limit?: number;
-        measurementOptions?: Record<string, unknown>;
-      }
-    );
+    let { measurementId, probesCount } = await client.createMeasurement(body);
 
     if (!ctx.input.waitForResults) {
       return {
         output: {
           measurementId,
+          type: ctx.input.type,
+          target: ctx.input.target,
           status: 'in-progress',
           probesCount
         },
@@ -326,32 +401,20 @@ Use location filters to target specific geographic regions, networks, or cloud p
 
     let result = await client.pollMeasurement(measurementId);
 
-    let results = (result.results as Record<string, unknown>[] | undefined) ?? [];
+    let results = result.results;
 
     return {
       output: {
         measurementId,
-        type: result.type as string,
-        target: result.target as string,
-        status: result.status as string,
-        probesCount: results.length,
-        createdAt: result.createdAt as string | undefined,
-        results: results as Array<{
-          probe: {
-            continent: string;
-            region: string;
-            country: string;
-            state?: string | null;
-            city: string;
-            asn: number;
-            network: string;
-            tags?: string[];
-            resolvers?: string[];
-          };
-          result: Record<string, unknown>;
-        }>
+        type: result.type,
+        target: result.target,
+        status: result.status,
+        probesCount: result.probesCount,
+        createdAt: result.createdAt,
+        updatedAt: result.updatedAt,
+        results
       },
-      message: `**${ctx.input.type}** measurement to **${ctx.input.target}** completed with status **${result.status}**. ${results.length} probe(s) returned results.`
+      message: `**${ctx.input.type}** measurement to **${ctx.input.target}** returned with status **${result.status}**. ${results.length} probe(s) returned results.`
     };
   })
   .build();

@@ -4,15 +4,9 @@ import { MapulusClient } from '../lib/client';
 import { spec } from '../spec';
 
 let travelBoundarySchema = z.object({
-  mode: z
-    .string()
-    .optional()
-    .describe('Travel mode, e.g. "driving", "walking", "cycling", "transit"'),
-  value: z.number().optional().describe('Travel time or distance value'),
-  unit: z
-    .string()
-    .optional()
-    .describe('Unit for the value, e.g. "minutes", "kilometers", "miles"')
+  mode: z.string().optional().describe('Travel mode, e.g. "driving", "walking", "cycling"'),
+  value: z.number().optional().describe('Positive travel time in minutes'),
+  unit: z.string().optional().describe('Unit for the value, e.g. "minutes"')
 });
 
 export let createLocation = SlateTool.create(spec, {

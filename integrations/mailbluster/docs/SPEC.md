@@ -1,6 +1,6 @@
-Let me fetch the actual API documentation page to get more details.Now I have enough information to write the specification. Let me compile everything.
+# MailBluster Integration Specification
 
-# Slates Specification for MailBluster
+Official API documentation: [getting started](https://app.mailbluster.com/api-doc/getting-started), [leads](https://app.mailbluster.com/api-doc/leads), [fields](https://app.mailbluster.com/api-doc/fields), [products](https://app.mailbluster.com/api-doc/products), and [orders](https://app.mailbluster.com/api-doc/orders).
 
 ## Overview
 
@@ -34,12 +34,16 @@ The Developer API is intended for collecting leads from the client's website and
 
 - Only single lead additions, updates, and deletions are supported via the API; bulk lead operations should use the MailBluster main app.
 - MailBluster does not allow duplicate leads (emails) within a brand.
+- Lead read, update, and delete requests identify leads with an MD5 hash of their email address. The tools accept the email address and calculate this hash.
+- Lead creation requires a subscription status. `create_lead` defaults omitted `subscribed` to false.
+- `update_lead` supports `newEmail`, `addTags`, and `removeTags`. The existing `tags` input replaces the tag list using the documented add/remove operations and a read of current tags; it cannot be combined with `addTags` or `removeTags`.
 
 ### Field Management
 
 You can personalize email campaigns with Fields and Custom Fields. The API allows managing custom fields that can be associated with leads. Custom fields use merge tags as keys and store string values.
 
 - Custom fields in MailBluster are designed for string data types and are not designed for date and time.
+- `list_fields` and `create_field` expose numeric field IDs for `update_field` and `delete_field`. Updating a field requires both its display label and merge tag.
 
 ### Product Management
 
@@ -50,6 +54,8 @@ You can create, read, update, list, and delete products. Products support full C
 You can create, read, update, list, and delete orders. Orders support creating, listing, getting by order ID, and updating by order ID. Orders link to products and campaigns, enabling e-commerce revenue tracking and attribution to specific email campaigns.
 
 - You need to pass a campaign ID at the time of creating an order to attribute the order to a specific campaign.
+- Order tools retain string campaign ID inputs and send numeric IDs to the API. Decimal-string prices returned by the API are exposed as numbers; customer and item data are mapped from the API's lead and order item records.
+- `list_products` and `list_orders` return one page, with pagination metadata including the next page number. The provider defaults to page 1 and 10 results per page.
 
 ## Events
 

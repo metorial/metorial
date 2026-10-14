@@ -61,7 +61,7 @@ export let modifyReservation = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result?.status ? String(result.status) : undefined,
+        status: result?.status != null ? String(result.status) : undefined,
         warningText: result?.warning_text
       },
       message: `Reservation **#${ctx.input.reservationId}** modified successfully.`

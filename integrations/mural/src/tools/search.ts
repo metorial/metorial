@@ -7,7 +7,6 @@ export let searchTool = SlateTool.create(spec, {
   name: 'Search',
   key: 'search',
   description: `Search across murals, rooms, or templates within a workspace by name. Specify the **resourceType** to determine what to search for.`,
-  instructions: ['Template search requires a query of at least 3 characters.'],
   tags: {
     readOnly: true
   }
@@ -15,7 +14,17 @@ export let searchTool = SlateTool.create(spec, {
   .input(
     z.object({
       workspaceId: z.string().describe('ID of the workspace to search in'),
-      query: z.string().describe('Search query string'),
+      query: z.string().min(1).describe('Search query string'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Maximum results per page; keep the same limit for subsequent pages'),
+      nextToken: z
+        .string()
+        .optional()
+        .describe('Pagination token from the previous search call'),
       resourceType: z
         .enum(['murals', 'rooms', 'templates'])
         .describe('Type of resource to search for')
@@ -23,6 +32,7 @@ export let searchTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextToken: z.string().optional(),
       results: z.array(
         z.object({
           resourceId: z.string(),
@@ -34,8 +44,10 @@ export let searchTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { workspaceId, query, resourceType } = ctx.input;
+    let options = { limit: ctx.input.limit, next: ctx.input.nextToken };
+    let nextToken: string | undefined;
 
     let results: Array<{
       resourceId: string;
@@ -46,7 +58,8 @@ export let searchTool = SlateTool.create(spec, {
 
     switch (resourceType) {
       case 'murals': {
-        let data = await client.searchMurals(workspaceId, query);
+        let data = await client.searchMurals(workspaceId, query, options);
+        nextToken = data.next;
         results = data.value.map(m => ({
           resourceId: m.id,
           name: m.title,
@@ -56,7 +69,8 @@ export let searchTool = SlateTool.create(spec, {
         break;
       }
       case 'rooms': {
-        let data = await client.searchRooms(workspaceId, query);
+        let data = await client.searchRooms(workspaceId, query, options);
+        nextToken = data.next;
         results = data.value.map(r => ({
           resourceId: r.id,
           name: r.name,
@@ -66,7 +80,8 @@ export let searchTool = SlateTool.create(spec, {
         break;
       }
       case 'templates': {
-        let data = await client.searchTemplates(workspaceId, query);
+        let data = await client.searchTemplates(workspaceId, query, options);
+        nextToken = data.next;
         results = data.value.map(t => ({
           resourceId: t.id,
           name: t.name,
@@ -78,7 +93,7 @@ export let searchTool = SlateTool.create(spec, {
     }
 
     return {
-      output: { results },
+      output: { results, nextToken },
       message: `Found **${results.length}** ${resourceType} matching "${query}".`
     };
   })

@@ -1,15 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createBot = SlateTool.create(spec, {
   name: 'Create Bot',
   key: 'create_bot',
-  description: `Create a new AI chatbot for the configured team. Requires a name, description, privacy level, and language. Optionally specify the AI model or duplicate an existing bot.`
+  description: `Create a new AI chatbot for a team selected with list_teams. Requires a name, description, privacy level, and language. Optionally specify the AI model or duplicate an existing bot.`
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       name: z.string().describe('Bot name'),
       description: z.string().describe('Bot description'),
       privacy: z.enum(['public', 'private']).describe('Privacy level for the bot'),
@@ -43,7 +45,7 @@ export let createBot = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DocsBotAdminClient(ctx.auth.token);
 
-    let bot = await client.createBot(ctx.config.teamId, {
+    let bot = await client.createBot(resolveTeamId(ctx.input.teamId, ctx.config.teamId), {
       name: ctx.input.name,
       description: ctx.input.description,
       privacy: ctx.input.privacy,

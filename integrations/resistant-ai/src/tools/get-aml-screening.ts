@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAmlScreening = SlateTool.create(spec, {
   name: 'Get AML Screening',
   key: 'get_aml_screening',
-  description: `Retrieves the details and results of a previously submitted AML (Anti-Money Laundering) screening. Returns match information for PEP, sanctions, and adverse media checks along with a link to the detailed report.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Retrieves the details and results of a previously submitted AML (Anti-Money Laundering) screening. Returns match information for PEP, sanctions, and adverse media checks along with a link to the detailed report.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -57,7 +57,7 @@ export let getAmlScreening = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.getAmlScreening(ctx.input.screeningId);
 
@@ -65,7 +65,7 @@ export let getAmlScreening = SlateTool.create(spec, {
     let matches = rawMatches.map((m: any) => ({
       matchType: m.match_type || m.type,
       matchName: m.match_name || m.name,
-      matchScore: m.match_score || m.score,
+      matchScore: m.match_score ?? m.score,
       source: m.source
     }));
 
@@ -81,7 +81,7 @@ export let getAmlScreening = SlateTool.create(spec, {
         pepMatch: result.pep_match,
         sanctionsMatch: result.sanctions_match,
         adverseMediaMatch: result.adverse_media_match,
-        matchCount: result.match_count || rawMatches.length,
+        matchCount: result.match_count ?? rawMatches.length,
         matches,
         reportUrl: result.report_url,
         referenceId: result.reference_id,

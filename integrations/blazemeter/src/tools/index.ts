@@ -1,3 +1,4 @@
+export { getCurrentUser } from './get-current-user';
 export * from './get-test';
 export * from './get-test-results';
 export * from './list-tests';

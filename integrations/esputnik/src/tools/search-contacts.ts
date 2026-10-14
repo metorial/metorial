@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getGroupNames } from '../lib/client';
+import { validatePagination } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let searchContacts = SlateTool.create(spec, {
@@ -20,6 +21,10 @@ export let searchContacts = SlateTool.create(spec, {
       firstName: z.string().optional().describe('Filter by first name'),
       lastName: z.string().optional().describe('Filter by last name'),
       startIndex: z.number().optional().describe('Starting index for pagination (default: 1)'),
+      sortBy: z
+        .enum(['contactId'])
+        .optional()
+        .describe('Sort by contact ID for an unfiltered search'),
       maxRows: z
         .number()
         .optional()
@@ -65,6 +70,7 @@ export let searchContacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination(ctx.input.startIndex, ctx.input.maxRows);
     let client = new Client({ token: ctx.auth.token });
 
     let params: Record<string, any> = {};
@@ -75,6 +81,7 @@ export let searchContacts = SlateTool.create(spec, {
     if (ctx.input.lastName) params.lastname = ctx.input.lastName;
     if (ctx.input.startIndex) params.startindex = ctx.input.startIndex;
     if (ctx.input.maxRows) params.maxrows = ctx.input.maxRows;
+    if (ctx.input.sortBy) params.sortBy = ctx.input.sortBy;
 
     let results = await client.searchContacts(params);
     let contacts = Array.isArray(results) ? results : [];
@@ -85,7 +92,7 @@ export let searchContacts = SlateTool.create(spec, {
       lastName: c.lastName,
       channels: c.channels,
       fields: c.fields,
-      groups: c.groups,
+      groups: getGroupNames(c.groups),
       externalCustomerId: c.externalCustomerId,
       languageCode: c.languageCode,
       timeZone: c.timeZone

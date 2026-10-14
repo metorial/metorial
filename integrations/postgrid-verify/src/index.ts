@@ -7,6 +7,9 @@ import {
   batchVerifyInternationalAddresses,
   completeAddressSuggestion,
   completeInternationalAddressSuggestion,
+  getLookupInfo,
+  lookupCityState,
+  parseAddress,
   verifyAddress,
   verifyInternationalAddress
 } from './tools';
@@ -21,7 +24,10 @@ export let provider = Slate.create({
     verifyInternationalAddress,
     batchVerifyInternationalAddresses,
     autocompleteInternationalAddress,
-    completeInternationalAddressSuggestion
+    completeInternationalAddressSuggestion,
+    getLookupInfo,
+    parseAddress,
+    lookupCityState
   ],
   triggers: []
 });

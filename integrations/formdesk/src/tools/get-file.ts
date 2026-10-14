@@ -1,4 +1,4 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FormdeskClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,14 +6,18 @@ import { spec } from '../spec';
 export let getFile = SlateTool.create(spec, {
   name: 'Get File',
   key: 'get_file',
-  description: `Retrieves an uploaded file associated with a form submission by its file name or ID. Returns the file as an attachment along with its MIME type.`,
+  description: `Retrieves an uploaded file associated with a form submission by its file name or ID. Provides a downloadable file with its MIME type. Call list_files to discover file IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      fileNameOrId: z.string().describe('The file name or file ID to retrieve')
+      fileNameOrId: z
+        .string()
+        .describe(
+          'The file ID to retrieve. Call list_files to discover file IDs; filename lookup depends on provider support.'
+        )
     })
   )
   .output(
@@ -32,12 +36,18 @@ export let getFile = SlateTool.create(spec, {
     ctx.progress('Downloading file...');
     let result = await client.getFile(ctx.input.fileNameOrId);
 
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.url,
+      mimeType: result.contentType,
+      headers: { Authorization: `Bearer ${ctx.auth.token}` }
+    });
+
     return {
       output: {
         contentType: result.contentType,
         fileName: result.fileName
       },
-      attachments: [createBase64Attachment(result.content, result.contentType)],
       message: `Successfully downloaded file "${ctx.input.fileNameOrId}".`
     };
   })

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrerenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,20 +57,25 @@ export let manageDomains = SlateTool.create(spec, {
         break;
       }
       case 'get_config': {
-        if (!ctx.input.domain) {
-          throw new Error('domain is required for the get_config action.');
+        if (!ctx.input.domain?.trim()) {
+          throw createApiServiceError('domain is required for the get_config action.');
         }
         result = await client.getDomainConfig(ctx.input.domain);
         actionDescription = `Retrieved config for domain **${ctx.input.domain}**`;
         break;
       }
       case 'update_config': {
-        if (!ctx.input.domain) {
-          throw new Error('domain is required for the update_config action.');
+        if (!ctx.input.domain?.trim()) {
+          throw createApiServiceError('domain is required for the update_config action.');
         }
         let updates: Record<string, unknown> = { ...ctx.input.configUpdates };
         if (ctx.input.cacheLifetime !== undefined) {
           updates.cacheLifetime = ctx.input.cacheLifetime;
+        }
+        if (Object.keys(updates).length === 0) {
+          throw createApiServiceError(
+            'Provide cacheLifetime or configUpdates for update_config.'
+          );
         }
         result = await client.updateDomainConfig(ctx.input.domain, updates);
         actionDescription = `Updated config for domain **${ctx.input.domain}**`;

@@ -4,8 +4,9 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'callerapi',
-  name: 'Callerapi',
-  description: undefined,
+  name: 'CallerAPI',
+  description:
+    'Phone intelligence, caller identification, spam reputation, porting history, online presence, and carrier identity matching.',
   metadata: {},
   config,
   auth

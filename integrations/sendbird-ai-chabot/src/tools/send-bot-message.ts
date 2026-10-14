@@ -14,10 +14,19 @@ export let sendBotMessage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botUserId: z.string().describe('User ID of the bot sending the message'),
-      channelUrl: z.string().describe('URL of the target channel'),
-      message: z.string().describe('Text content of the message to send'),
-      customType: z.string().optional().describe('Custom message type for categorization')
+      botUserId: z.string().min(1).max(80).describe('User ID of the bot sending the message'),
+      channelUrl: z
+        .string()
+        .min(1)
+        .describe(
+          'URL of the target group channel. Call list_bot_channels to discover joined channel URLs.'
+        ),
+      message: z.string().min(1).describe('Text content of the message to send'),
+      customType: z
+        .string()
+        .max(128)
+        .optional()
+        .describe('Custom message type for categorization')
     })
   )
   .output(
@@ -32,7 +41,7 @@ export let sendBotMessage = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     let result = await client.sendBotMessage(
@@ -42,13 +51,13 @@ export let sendBotMessage = SlateTool.create(spec, {
       ctx.input.customType
     );
 
-    let msg = result.message_info || result;
+    let msg = result;
     return {
       output: {
-        messageId: msg.message_id ?? result.message_id,
+        messageId: msg.message_id,
         message: msg.message ?? ctx.input.message,
         channelUrl: msg.channel_url ?? ctx.input.channelUrl,
-        createdAt: msg.created_at ?? 0,
+        createdAt: msg.created_at,
         customType: msg.custom_type
       },
       message: `Bot **${ctx.input.botUserId}** sent a message to channel.`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -23,6 +23,12 @@ export let updateLead = SlateTool.create(spec, {
       action: z
         .enum(['update', 'change_status', 'mark_sold'])
         .describe('Operation to perform: "update" fields, "change_status", or "mark_sold"'),
+      type: z
+        .enum(['personal', 'business'])
+        .optional()
+        .describe(
+          'Lead type for the update action. Supply business for a commercial lead when its returned type is ambiguous.'
+        ),
       firstName: z.string().optional().describe('Updated first name (for "update" action)'),
       lastName: z.string().optional().describe('Updated last name (for "update" action)'),
       email: z.string().optional().describe('Updated email address (for "update" action)'),
@@ -74,17 +80,14 @@ export let updateLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let result: any;
 
     switch (ctx.input.action) {
       case 'update': {
         let data: Record<string, unknown> = {};
+        if (ctx.input.type !== undefined) data.type = ctx.input.type;
         if (ctx.input.firstName !== undefined) data.firstName = ctx.input.firstName;
         if (ctx.input.lastName !== undefined) data.lastName = ctx.input.lastName;
         if (ctx.input.email !== undefined) data.email = ctx.input.email;
@@ -106,7 +109,7 @@ export let updateLead = SlateTool.create(spec, {
       }
       case 'change_status': {
         if (!ctx.input.status) {
-          throw new Error('status is required for "change_status" action');
+          throw createApiServiceError('status is required for "change_status" action');
         }
 
         result = await client.changeLeadStatus(ctx.input.leadId, { status: ctx.input.status });

@@ -1,3 +1,4 @@
+export * from './analyze-image-forensics';
 export * from './compare-texts';
 export * from './detect-ai-image';
 export * from './detect-ai-text';

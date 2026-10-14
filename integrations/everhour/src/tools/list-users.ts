@@ -44,8 +44,8 @@ export let listUsers = SlateTool.create(spec, {
             {
               userId: user.id,
               name: user.name,
-              headline: user.headline,
-              avatarUrl: user.avatarUrl,
+              headline: user.headline ?? undefined,
+              avatarUrl: user.avatarUrl ?? undefined,
               role: user.role,
               status: user.status
             }
@@ -59,8 +59,8 @@ export let listUsers = SlateTool.create(spec, {
     let mapped = users.map((u: any) => ({
       userId: u.id,
       name: u.name,
-      headline: u.headline,
-      avatarUrl: u.avatarUrl,
+      headline: u.headline ?? undefined,
+      avatarUrl: u.avatarUrl ?? undefined,
       role: u.role,
       status: u.status
     }));

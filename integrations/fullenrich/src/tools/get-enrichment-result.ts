@@ -6,7 +6,7 @@ import { spec } from '../spec';
 let emailSchema = z.object({
   email: z.string().describe('Email address'),
   status: z
-    .enum(['DELIVERABLE', 'HIGH_PROBABILITY', 'CATCH_ALL', 'INVALID'])
+    .enum(['DELIVERABLE', 'HIGH_PROBABILITY', 'CATCH_ALL', 'INVALID', 'INVALID_DOMAIN'])
     .optional()
     .describe('Verification status')
 });

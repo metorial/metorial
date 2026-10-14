@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KadoaClient } from '../lib/client';
+import { validateKadoaInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getDataChanges = SlateTool.create(spec, {
@@ -55,6 +56,8 @@ Each change includes the affected data, type of change (added, removed, changed)
   )
   .handleInvocation(async ctx => {
     let client = new KadoaClient({ token: ctx.auth.token });
+    validateKadoaInteger(ctx.input.skip, 'skip', 0);
+    validateKadoaInteger(ctx.input.limit, 'limit', 1);
 
     // If a specific change is requested
     if (ctx.input.changeId) {

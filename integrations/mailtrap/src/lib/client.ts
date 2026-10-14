@@ -1,8 +1,25 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
-let generalApi = createAxios({ baseURL: 'https://mailtrap.io' });
-let sendApi = createAxios({ baseURL: 'https://send.api.mailtrap.io' });
-let bulkApi = createAxios({ baseURL: 'https://bulk.api.mailtrap.io' });
+let generalApi = createAuthenticatedAxios({
+  baseURL: 'https://mailtrap.io',
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'Mailtrap', reason: 'mailtrap_api_error' })
+});
+let sendApi = createAuthenticatedAxios({
+  baseURL: 'https://send.api.mailtrap.io',
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'Mailtrap', reason: 'mailtrap_api_error' })
+});
+let bulkApi = createAuthenticatedAxios({
+  baseURL: 'https://bulk.api.mailtrap.io',
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'Mailtrap', reason: 'mailtrap_api_error' })
+});
 
 export interface EmailAddress {
   email: string;
@@ -23,7 +40,7 @@ export interface SendEmailParams {
   cc?: EmailAddress[];
   bcc?: EmailAddress[];
   replyTo?: EmailAddress;
-  subject: string;
+  subject?: string;
   text?: string;
   html?: string;
   templateUuid?: string;
@@ -34,13 +51,30 @@ export interface SendEmailParams {
   headers?: Record<string, string>;
 }
 
+export interface MailtrapContact {
+  id: string;
+  email: string;
+  fields: Record<string, unknown>;
+  list_ids: number[];
+  status: 'subscribed' | 'unsubscribed';
+  created_at: number;
+  updated_at: number;
+}
+
+export interface MailtrapSandbox {
+  id: number;
+  name: string;
+  project_id: number;
+  status: string;
+  emails_count: number;
+  emails_unread_count: number;
+}
+
 export class MailtrapClient {
   private token: string;
-  private accountId: string;
 
-  constructor(config: { token: string; accountId: string }) {
+  constructor(config: { token: string }) {
     this.token = config.token;
-    this.accountId = config.accountId;
   }
 
   private headers() {
@@ -55,11 +89,20 @@ export class MailtrapClient {
   }
 
   private buildEmailBody(params: SendEmailParams) {
-    let body: Record<string, any> = {
+    if (params.templateUuid) {
+      if (params.text !== undefined || params.html !== undefined) {
+        throw createApiServiceError('Provide templateUuid or text/html content, not both.');
+      }
+    } else if (!params.subject || (!params.text && !params.html)) {
+      throw createApiServiceError(
+        'Provide a subject and text or html content, or use templateUuid.'
+      );
+    }
+    let body: Record<string, unknown> = pickDefined({
       from: params.from,
       to: params.to,
-      subject: params.subject
-    };
+      subject: params.templateUuid ? undefined : params.subject
+    });
 
     if (params.cc) body.cc = params.cc;
     if (params.bcc) body.bcc = params.bcc;
@@ -102,6 +145,36 @@ export class MailtrapClient {
     return response.data;
   }
 
+  async listContacts(params: {
+    listId?: number;
+    status?: string;
+    email?: string;
+    perPage?: number;
+    cursor?: string;
+  }) {
+    let response = await generalApi.get<{
+      data: MailtrapContact[];
+      pagination: { next_token: string | null };
+    }>('/api/contacts', {
+      headers: this.headers(),
+      params: pickDefined({
+        list_id: params.listId,
+        status: params.status,
+        email: params.email,
+        per_page: params.perPage,
+        token: params.cursor
+      })
+    });
+    return response.data;
+  }
+
+  async listSandboxInboxes() {
+    let response = await generalApi.get<MailtrapSandbox[]>('/api/sandboxes', {
+      headers: this.headers()
+    });
+    return response.data;
+  }
+
   // ─── Contacts ────────────────────────────────────────────────────
 
   async createContact(contact: {
@@ -110,11 +183,13 @@ export class MailtrapClient {
     listIds?: number[];
   }) {
     let response = await generalApi.post(
-      `/api/accounts/${this.accountId}/contacts`,
+      `/api/contacts`,
       {
-        email: contact.email,
-        fields: contact.fields,
-        list_ids: contact.listIds
+        contact: pickDefined({
+          email: contact.email,
+          fields: contact.fields,
+          list_ids: contact.listIds
+        })
       },
       { headers: this.authHeaders() }
     );
@@ -123,7 +198,7 @@ export class MailtrapClient {
 
   async getContact(contactIdentifier: string) {
     let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/contacts/${contactIdentifier}`,
+      `/api/contacts/${encodeURIComponent(contactIdentifier)}`,
       { headers: this.headers() }
     );
     return response.data;
@@ -139,23 +214,28 @@ export class MailtrapClient {
       unsubscribed?: boolean;
     }
   ) {
-    let body: Record<string, any> = {};
-    if (data.email) body.email = data.email;
+    let current = data.email ? undefined : await this.getContact(contactIdentifier);
+    let body: Record<string, unknown> = {
+      email: data.email ?? current?.data?.email ?? current?.email
+    };
+    if (!body.email) {
+      throw createApiServiceError('Provide the contact email when updating this contact.');
+    }
     if (data.fields) body.fields = data.fields;
     if (data.listIdsIncluded) body.list_ids_included = data.listIdsIncluded;
     if (data.listIdsExcluded) body.list_ids_excluded = data.listIdsExcluded;
     if (data.unsubscribed !== undefined) body.unsubscribed = data.unsubscribed;
 
     let response = await generalApi.patch(
-      `/api/accounts/${this.accountId}/contacts/${contactIdentifier}`,
-      body,
+      `/api/contacts/${encodeURIComponent(contactIdentifier)}`,
+      { contact: body },
       { headers: this.authHeaders() }
     );
     return response.data;
   }
 
   async deleteContact(contactIdentifier: string) {
-    await generalApi.delete(`/api/accounts/${this.accountId}/contacts/${contactIdentifier}`, {
+    await generalApi.delete(`/api/contacts/${encodeURIComponent(contactIdentifier)}`, {
       headers: this.headers()
     });
   }
@@ -163,7 +243,7 @@ export class MailtrapClient {
   // ─── Contact Lists ───────────────────────────────────────────────
 
   async listContactLists() {
-    let response = await generalApi.get(`/api/accounts/${this.accountId}/contacts/lists`, {
+    let response = await generalApi.get(`/api/contacts/lists`, {
       headers: this.headers()
     });
     return response.data;
@@ -171,7 +251,7 @@ export class MailtrapClient {
 
   async createContactList(name: string) {
     let response = await generalApi.post(
-      `/api/accounts/${this.accountId}/contacts/lists`,
+      `/api/contacts/lists`,
       { name },
       { headers: this.authHeaders() }
     );
@@ -179,16 +259,15 @@ export class MailtrapClient {
   }
 
   async getContactList(listId: number) {
-    let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/contacts/lists/${listId}`,
-      { headers: this.headers() }
-    );
+    let response = await generalApi.get(`/api/contacts/lists/${listId}`, {
+      headers: this.headers()
+    });
     return response.data;
   }
 
   async updateContactList(listId: number, name: string) {
     let response = await generalApi.patch(
-      `/api/accounts/${this.accountId}/contacts/lists/${listId}`,
+      `/api/contacts/lists/${listId}`,
       { name },
       { headers: this.authHeaders() }
     );
@@ -196,7 +275,7 @@ export class MailtrapClient {
   }
 
   async deleteContactList(listId: number) {
-    await generalApi.delete(`/api/accounts/${this.accountId}/contacts/lists/${listId}`, {
+    await generalApi.delete(`/api/contacts/lists/${listId}`, {
       headers: this.headers()
     });
   }
@@ -204,7 +283,7 @@ export class MailtrapClient {
   // ─── Sandbox: Projects ──────────────────────────────────────────
 
   async listProjects() {
-    let response = await generalApi.get(`/api/accounts/${this.accountId}/projects`, {
+    let response = await generalApi.get(`/api/projects`, {
       headers: this.headers()
     });
     return response.data;
@@ -222,7 +301,7 @@ export class MailtrapClient {
     if (params?.page) query.page = params.page;
 
     let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages`,
       { headers: this.headers(), params: query }
     );
     return response.data;
@@ -230,7 +309,7 @@ export class MailtrapClient {
 
   async getSandboxMessage(inboxId: string, messageId: string) {
     let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,
       { headers: this.headers() }
     );
     return response.data;
@@ -238,7 +317,7 @@ export class MailtrapClient {
 
   async getSandboxMessageHtml(inboxId: string, messageId: string) {
     let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}/body.html`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/body.html`,
       { headers: this.headers() }
     );
     return response.data;
@@ -246,7 +325,7 @@ export class MailtrapClient {
 
   async getSandboxMessageText(inboxId: string, messageId: string) {
     let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}/body.txt`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/body.txt`,
       { headers: this.headers() }
     );
     return response.data;
@@ -254,7 +333,7 @@ export class MailtrapClient {
 
   async getSandboxMessageSpamReport(inboxId: string, messageId: string) {
     let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}/spam_report`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/spam_report`,
       { headers: this.headers() }
     );
     return response.data;
@@ -262,7 +341,7 @@ export class MailtrapClient {
 
   async getSandboxMessageHtmlAnalysis(inboxId: string, messageId: string) {
     let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}/analyze`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/analyze`,
       { headers: this.headers() }
     );
     return response.data;
@@ -270,7 +349,7 @@ export class MailtrapClient {
 
   async updateSandboxMessage(inboxId: string, messageId: string, isRead: boolean) {
     let response = await generalApi.patch(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,
       { message: { is_read: isRead } },
       { headers: this.authHeaders() }
     );
@@ -279,7 +358,7 @@ export class MailtrapClient {
 
   async deleteSandboxMessage(inboxId: string, messageId: string) {
     let response = await generalApi.delete(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}`,
       { headers: this.headers() }
     );
     return response.data;
@@ -287,7 +366,7 @@ export class MailtrapClient {
 
   async forwardSandboxMessage(inboxId: string, messageId: string, email: string) {
     let response = await generalApi.post(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}/forward`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/forward`,
       { email },
       { headers: this.authHeaders() }
     );
@@ -296,7 +375,7 @@ export class MailtrapClient {
 
   async getSandboxMessageAttachments(inboxId: string, messageId: string) {
     let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/inboxes/${inboxId}/messages/${messageId}/attachments`,
+      `/api/sandboxes/${encodeURIComponent(inboxId)}/messages/${encodeURIComponent(messageId)}/attachments`,
       { headers: this.headers() }
     );
     return response.data;
@@ -305,7 +384,7 @@ export class MailtrapClient {
   // ─── Sending Domains ─────────────────────────────────────────────
 
   async listSendingDomains() {
-    let response = await generalApi.get(`/api/accounts/${this.accountId}/sending_domains`, {
+    let response = await generalApi.get(`/api/domains`, {
       headers: this.headers()
     });
     return response.data;
@@ -313,45 +392,50 @@ export class MailtrapClient {
 
   async createSendingDomain(domainName: string) {
     let response = await generalApi.post(
-      `/api/accounts/${this.accountId}/sending_domains`,
-      { sending_domain: { domain_name: domainName } },
+      `/api/domains`,
+      { domain: { domain_name: domainName } },
       { headers: this.authHeaders() }
     );
     return response.data;
   }
 
   async getSendingDomain(domainId: number) {
-    let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/sending_domains/${domainId}`,
-      { headers: this.headers() }
-    );
+    let response = await generalApi.get(`/api/domains/${domainId}`, {
+      headers: this.headers()
+    });
     return response.data;
   }
 
   async deleteSendingDomain(domainId: number) {
-    await generalApi.delete(`/api/accounts/${this.accountId}/sending_domains/${domainId}`, {
+    await generalApi.delete(`/api/domains/${domainId}`, {
       headers: this.headers()
     });
   }
 
   // ─── Suppressions ────────────────────────────────────────────────
 
-  async listSuppressions(params?: { email?: string; startTime?: string; endTime?: string }) {
+  async listSuppressions(params?: {
+    email?: string;
+    startTime?: string;
+    endTime?: string;
+    lastId?: string;
+  }) {
     let query: Record<string, any> = {};
     if (params?.email) query.email = params.email;
+    if (params?.lastId) query.last_id = params.lastId;
     if (params?.startTime) query.start_time = params.startTime;
     if (params?.endTime) query.end_time = params.endTime;
 
-    let response = await generalApi.get(`/api/accounts/${this.accountId}/suppressions`, {
+    let response = await generalApi.get(`/api/suppressions`, {
       headers: this.headers(),
       params: query
     });
     return response.data;
   }
 
-  async deleteSuppression(suppressionId: number) {
+  async deleteSuppression(suppressionId: number | string) {
     let response = await generalApi.delete(
-      `/api/accounts/${this.accountId}/suppressions/${suppressionId}`,
+      `/api/suppressions/${encodeURIComponent(String(suppressionId))}`,
       { headers: this.headers() }
     );
     return response.data;
@@ -371,11 +455,11 @@ export class MailtrapClient {
       start_date: params.startDate,
       end_date: params.endDate
     };
-    if (params.sendingDomainIds) query['sending_domain_ids[]'] = params.sendingDomainIds;
+    if (params.sendingDomainIds) query['domain_ids[]'] = params.sendingDomainIds;
     if (params.sendingStreams) query['sending_streams[]'] = params.sendingStreams;
     if (params.categories) query['categories[]'] = params.categories;
 
-    let path = `/api/accounts/${this.accountId}/stats`;
+    let path = `/api/stats`;
     if (params.groupBy) {
       path += `/${params.groupBy}`;
     }
@@ -405,15 +489,22 @@ export class MailtrapClient {
     if (params?.searchAfter) query.search_after = params.searchAfter;
     if (params?.sentAfter) query['filters[sent_after]'] = params.sentAfter;
     if (params?.sentBefore) query['filters[sent_before]'] = params.sentBefore;
-    if (params?.to) query['filters[to]'] = params.to;
-    if (params?.from) query['filters[from]'] = params.from;
-    if (params?.subject) query['filters[subject]'] = params.subject;
-    if (params?.status) query['filters[status]'] = params.status;
-    if (params?.sendingStream) query['filters[sending_stream]'] = params.sendingStream;
-    if (params?.category) query['filters[category]'] = params.category;
-    if (params?.sendingDomainId) query['filters[sending_domain_id]'] = params.sendingDomainId;
+    for (let [field, value, operator] of [
+      ['to', params?.to, 'ci_equal'],
+      ['from', params?.from, 'ci_equal'],
+      ['subject', params?.subject, 'ci_contain'],
+      ['status', params?.status, 'equal'],
+      ['sending_stream', params?.sendingStream, 'equal'],
+      ['category', params?.category, 'equal'],
+      ['domain_id', params?.sendingDomainId, 'equal']
+    ] as const) {
+      if (value !== undefined) {
+        query[`filters[${field}][operator]`] = operator;
+        query[`filters[${field}][value]`] = value;
+      }
+    }
 
-    let response = await generalApi.get(`/api/accounts/${this.accountId}/email_logs`, {
+    let response = await generalApi.get(`/api/email_logs`, {
       headers: this.headers(),
       params: query
     });
@@ -421,10 +512,9 @@ export class MailtrapClient {
   }
 
   async getEmailLog(messageId: string) {
-    let response = await generalApi.get(
-      `/api/accounts/${this.accountId}/email_logs/${messageId}`,
-      { headers: this.headers() }
-    );
+    let response = await generalApi.get(`/api/email_logs/${encodeURIComponent(messageId)}`, {
+      headers: this.headers()
+    });
     return response.data;
   }
 

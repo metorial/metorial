@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { TombaClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -32,18 +33,10 @@ export let auth = SlateAuth.create()
       output: { apiKey: string; apiSecret: string };
       input: { apiKey: string; apiSecret: string };
     }) => {
-      let http = createAxios({
-        baseURL: 'https://api.tomba.io/v1'
-      });
+      let client = new TombaClient(ctx.output);
+      let response = await client.getAccount();
 
-      let response = await http.get('/me', {
-        headers: {
-          'X-Tomba-Key': ctx.output.apiKey,
-          'X-Tomba-Secret': ctx.output.apiSecret
-        }
-      });
-
-      let data = response.data?.data;
+      let data = response.data;
 
       return {
         profile: {

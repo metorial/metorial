@@ -1,29 +1,29 @@
 export interface WachetAlert {
-  type: string;
-  value?: string;
+  type: string | number;
+  value?: string | null;
   parameters?: {
-    compare?: string;
-    value?: string;
+    compare?: string | number | null;
+    value?: string | null;
   };
 }
 
 export interface NotificationEndpoint {
-  type: string;
-  value?: string;
+  type: string | number;
+  value?: string | null;
 }
 
 export interface WebProxy {
-  location: string;
+  location: string | null;
 }
 
 export interface UrlFilterValue {
   filter: string;
-  type: string;
+  type: string | number;
 }
 
 export interface UrlFilter {
-  include?: UrlFilterValue[];
-  exclude?: UrlFilterValue[];
+  include?: UrlFilterValue[] | null;
+  exclude?: UrlFilterValue[] | null;
 }
 
 export interface StringKeyValuePair {
@@ -32,95 +32,104 @@ export interface StringKeyValuePair {
 }
 
 export interface WachetData {
-  lastCheckTimestamp?: string;
-  valueChangedTimestamp?: string;
-  raw?: string;
-  error?: string;
+  lastCheckTimestamp?: string | null;
+  valueChangedTimestamp?: string | null;
+  raw?: string | null;
+  error?: string | null;
 }
 
 export interface Wachet {
-  id?: string;
-  name?: string;
-  method?: string;
-  url?: string;
-  headers?: StringKeyValuePair[];
-  body?: string;
-  xPath?: string;
-  excludeXPath?: string;
-  regex?: string;
-  alerts?: WachetAlert[];
-  recurrenceInSeconds?: number;
-  folderId?: string;
-  data?: WachetData;
-  notificationEndpoints?: NotificationEndpoint[];
-  proxies?: WebProxy[];
+  id?: string | null;
+  name?: string | null;
+  method?: string | null;
+  url?: string | null;
+  headers?: StringKeyValuePair[] | null;
+  body?: string | null;
+  xPath?: string | null;
+  excludeXPath?: string | null;
+  regex?: string | null;
+  alerts?: WachetAlert[] | null;
+  recurrenceInSeconds?: number | null;
+  folderId?: string | null;
+  data?: WachetData | null;
+  notificationEndpoints?: NotificationEndpoint[] | null;
+  proxies?: WebProxy[] | null;
   dynamicContent?: boolean;
   ignoreInvalidPages?: boolean;
   collectRawHtml?: boolean;
-  jobType?: string;
-  crawlingDepth?: number;
+  jobType?: string | number | null;
+  crawlingDepth?: number | null;
   crawlBinaryContent?: boolean;
-  urlFilter?: UrlFilter;
+  urlFilter?: UrlFilter | null;
   crawlPagesFromAllDomains?: boolean;
-  note?: string;
+  note?: string | null;
 }
 
 export interface Notification {
-  id: string;
-  type: string;
-  current?: string;
-  comparand?: string;
-  html?: string;
-  error?: string;
+  id: string | null;
+  type: string | number;
+  current?: string | null;
+  comparand?: string | null;
+  html?: string | null;
+  error?: string | null;
   timestamp: string;
   serverTime: string;
-  taskId: string;
-  taskName?: string;
-  url?: string;
+  taskId: string | null;
+  taskName?: string | null;
+  url?: string | null;
 }
 
 export interface NotificationListResponse {
-  data: Notification[];
-  continuationToken?: string;
+  data: Notification[] | null;
+  continuationToken?: string | null;
 }
 
 export interface DiffElement {
-  operation?: number;
-  text?: string;
+  operation?: number | null;
+  text?: string | null;
 }
 
 export interface DataHistoryItem {
   lastCheckTimestamp: string;
-  valueChangedTimestamp?: string;
-  raw?: string;
-  error?: string;
-  diff?: DiffElement[];
+  valueChangedTimestamp?: string | null;
+  raw?: string | null;
+  error?: string | null;
+  diff?: DiffElement[] | null;
 }
 
 export interface DataHistoryResponse {
-  data: DataHistoryItem[];
-  continuationToken?: string;
+  data: DataHistoryItem[] | null;
+  continuationToken?: string | null;
 }
 
 export interface Folder {
-  id?: string;
-  name?: string;
-  parentId?: string;
-  count?: number;
-  failedCount?: number;
-  pausedCount?: number;
+  id?: string | null;
+  name?: string | null;
+  parentId?: string | null;
+  count?: number | null;
+  failedCount?: number | null;
+  pausedCount?: number | null;
 }
 
 export interface FolderContentResponse {
-  subfolders?: Folder[];
-  tasks?: Wachet[];
-  path?: Folder[];
-  continuationToken?: string;
+  subfolders?: Folder[] | null;
+  tasks?: Wachet[] | null;
+  path?: Folder[] | null;
+  continuationToken?: string | null;
 }
 
 export interface CrawlerPage {
-  id?: string;
-  name?: string;
-  url?: string;
-  data?: WachetData;
+  id?: string | null;
+  name?: string | null;
+  url?: string | null;
+  data?: WachetData | null;
+}
+
+export interface NotificationContent {
+  jobType?: string | number | null;
+  syntheticExpression?: string | null;
+  url?: string | null;
+  name?: string | null;
+  html?: string | null;
+  timestampUtc?: string;
 }

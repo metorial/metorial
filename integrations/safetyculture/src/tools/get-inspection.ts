@@ -49,18 +49,24 @@ export let getInspection = SlateTool.create(spec, {
 
     return {
       output: {
-        inspectionId: inspection.id || inspection.audit_id,
-        title: inspection.title || inspection.audit_title,
-        templateId: inspection.template_id,
-        status: inspection.status,
-        ownerId: inspection.owner_id,
-        siteId: inspection.site_id,
-        organisationId: inspection.organisation_id,
-        archived: inspection.archived,
-        createdAt: inspection.created_at,
-        modifiedAt: inspection.modified_at,
-        startedAt: inspection.started_at,
-        completedAt: inspection.completed_at,
+        inspectionId: inspection.id || inspection.audit_id || ctx.input.inspectionId,
+        title: inspection.title || inspection.audit_title || undefined,
+        templateId: inspection.template_id ?? undefined,
+        status:
+          inspection.status ??
+          (inspection.is_marked_as_complete === true
+            ? 'complete'
+            : inspection.is_marked_as_complete === false
+              ? 'in_progress'
+              : undefined),
+        ownerId: inspection.owner_id ?? undefined,
+        siteId: inspection.site_id ?? inspection.site?.id ?? undefined,
+        organisationId: inspection.organisation_id ?? undefined,
+        archived: inspection.archived ?? undefined,
+        createdAt: inspection.created_at ?? undefined,
+        modifiedAt: inspection.modified_at ?? undefined,
+        startedAt: inspection.started_at ?? undefined,
+        completedAt: inspection.completed_at ?? undefined,
         answers: answers
       },
       message: `Retrieved inspection **${inspection.title || inspection.audit_title || ctx.input.inspectionId}** (status: ${inspection.status || 'unknown'}).`

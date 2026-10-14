@@ -23,7 +23,10 @@ export let updateLeadTool = SlateTool.create(spec, {
       statusId: z.number().optional().describe('New pipeline stage/status ID'),
       pipelineId: z.number().optional().describe('New pipeline ID'),
       responsibleUserId: z.number().optional().describe('New responsible user ID'),
-      lossReasonId: z.number().optional().describe('Loss reason ID (for closed-lost leads)'),
+      lossReasonId: z
+        .number()
+        .optional()
+        .describe('Loss reason ID for closed-lost leads. Call list_loss_reasons to find IDs.'),
       tagsToAdd: z.array(tagSchema).optional().describe('Tags to add'),
       tagsToDelete: z.array(tagSchema).optional().describe('Tags to remove'),
       customFieldsValues: z

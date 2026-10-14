@@ -28,15 +28,21 @@ export let createScrapingJob = SlateTool.create(spec, {
       pageLoadDelay: z
         .number()
         .optional()
-        .describe('Delay in milliseconds after page load before extraction'),
+        .describe('Non-negative whole milliseconds after page load; required to create a job'),
       requestInterval: z
         .number()
         .optional()
-        .describe('Delay in milliseconds between requests'),
+        .describe(
+          'Non-negative whole milliseconds between requests; required to create a job'
+        ),
       proxy: z
         .string()
         .optional()
-        .describe('Proxy to use, e.g. "datacenter-us" or "residential-gb"'),
+        .describe('Required proxy, e.g. "datacenter-us" or "residential-gb"'),
+      priority: z
+        .number()
+        .optional()
+        .describe('Job priority from 1 to 5; the provider default is 3'),
       startUrls: z
         .array(z.string())
         .optional()
@@ -63,13 +69,14 @@ export let createScrapingJob = SlateTool.create(spec, {
       requestInterval: ctx.input.requestInterval,
       proxy: ctx.input.proxy,
       startUrls: ctx.input.startUrls,
-      customId: ctx.input.customId
+      customId: ctx.input.customId,
+      priority: ctx.input.priority
     });
 
     return {
       output: {
         scrapingJobId: result.id,
-        customId: result.custom_id
+        customId: result.custom_id ?? undefined
       },
       message: `Created scraping job \`${result.id}\` for sitemap \`${ctx.input.sitemapId}\`.`
     };

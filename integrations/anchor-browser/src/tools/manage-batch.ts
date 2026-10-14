@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -91,7 +91,7 @@ export let manageBatch = SlateTool.create(spec, {
     let input = ctx.input;
 
     if (input.action === 'create') {
-      if (!input.count) throw new Error('count is required for create.');
+      if (!input.count) throw createApiServiceError('count is required for create.');
       let result = await client.createBatch({
         count: input.count,
         configuration: input.sessionConfig as any,
@@ -126,7 +126,7 @@ export let manageBatch = SlateTool.create(spec, {
     }
 
     if (input.action === 'get') {
-      if (!input.batchId) throw new Error('batchId is required for get.');
+      if (!input.batchId) throw createApiServiceError('batchId is required for get.');
       let result = await client.getBatch(input.batchId);
       return {
         output: {
@@ -155,7 +155,7 @@ export let manageBatch = SlateTool.create(spec, {
     }
 
     if (input.action === 'cancel') {
-      if (!input.batchId) throw new Error('batchId is required for cancel.');
+      if (!input.batchId) throw createApiServiceError('batchId is required for cancel.');
       let _result = await client.cancelBatch(input.batchId);
       return {
         output: {
@@ -167,7 +167,7 @@ export let manageBatch = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.batchId) throw new Error('batchId is required for delete.');
+      if (!input.batchId) throw createApiServiceError('batchId is required for delete.');
       await client.deleteBatch(input.batchId);
       return {
         output: { deleted: true },
@@ -176,7 +176,7 @@ export let manageBatch = SlateTool.create(spec, {
     }
 
     if (input.action === 'retry') {
-      if (!input.batchId) throw new Error('batchId is required for retry.');
+      if (!input.batchId) throw createApiServiceError('batchId is required for retry.');
       let result = await client.retryBatch(input.batchId, {
         retryFailedOnly: input.retryFailedOnly,
         maxRetries: input.maxRetries
@@ -191,6 +191,6 @@ export let manageBatch = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

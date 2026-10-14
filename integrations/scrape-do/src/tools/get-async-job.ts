@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, getResponseHeaderValue, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ScrapeDoClient } from '../lib/client';
+import { ScrapeDoClient, validateWholeNumber } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAsyncJob = SlateTool.create(spec, {
@@ -36,7 +36,23 @@ export let getAsyncJob = SlateTool.create(spec, {
       pageSize: z
         .number()
         .optional()
-        .describe('Number of jobs per page (default: 10, max: 100)')
+        .describe('Number of jobs per page (default: 10, max: 100)'),
+      status: z
+        .enum(['queuing', 'queued', 'pending', 'rotating', 'success', 'error', 'canceled'])
+        .optional()
+        .describe('Job status filter for the list action'),
+      startFrom: z
+        .string()
+        .optional()
+        .describe('Inclusive start-time lower bound in RFC3339 format, for the list action'),
+      startTo: z
+        .string()
+        .optional()
+        .describe('Inclusive start-time upper bound in RFC3339 format, for the list action'),
+      sort: z
+        .enum(['start_time_asc', 'start_time_desc'])
+        .optional()
+        .describe('Start-time ordering for the list action')
     })
   )
   .output(
@@ -55,7 +71,7 @@ export let getAsyncJob = SlateTool.create(spec, {
     let input = ctx.input;
 
     if (input.action === 'status') {
-      if (!input.jobId) throw new Error('jobId is required for status action');
+      if (!input.jobId) throw createApiServiceError('jobId is required for status action');
       let status = await client.getAsyncJobStatus(input.jobId);
       return {
         output: {
@@ -69,9 +85,31 @@ export let getAsyncJob = SlateTool.create(spec, {
     }
 
     if (input.action === 'result') {
-      if (!input.jobId) throw new Error('jobId is required for result action');
-      if (!input.taskId) throw new Error('taskId is required for result action');
+      if (!input.jobId) throw createApiServiceError('jobId is required for result action');
+      if (!input.taskId) throw createApiServiceError('taskId is required for result action');
       let result = await client.getAsyncTaskResult(input.jobId, input.taskId);
+      if (
+        result.Base64EncodedContent &&
+        typeof result.Content === 'string' &&
+        result.Content
+      ) {
+        let bytes = Buffer.from(result.Content, 'base64');
+        if (
+          bytes.length === 0 ||
+          bytes.toString('base64') !== result.Content.replace(/\s/g, '')
+        ) {
+          throw createApiServiceError('Scrape.do returned invalid base64 task content.');
+        }
+        let mimeType =
+          getResponseHeaderValue(result.ResponseHeaders, 'content-type') ??
+          'application/octet-stream';
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(bytes, { headers: { 'content-type': mimeType } }),
+          filename: 'task-result',
+          mimeType
+        });
+      }
       return {
         output: {
           jobStatus: null,
@@ -84,7 +122,29 @@ export let getAsyncJob = SlateTool.create(spec, {
     }
 
     if (input.action === 'list') {
-      let jobs = await client.listAsyncJobs(input.page || 1, input.pageSize || 10);
+      validateWholeNumber('page', input.page, 1);
+      validateWholeNumber('pageSize', input.pageSize, 1, 100);
+      let timestamp = z.iso.datetime({ offset: true });
+      for (let name of ['startFrom', 'startTo'] as const) {
+        if (input[name] !== undefined && !timestamp.safeParse(input[name]).success) {
+          throw createApiServiceError(
+            `${name} must be an RFC3339 timestamp with uppercase T and Z or an offset.`
+          );
+        }
+      }
+      if (
+        input.startFrom &&
+        input.startTo &&
+        Date.parse(input.startFrom) > Date.parse(input.startTo)
+      ) {
+        throw createApiServiceError('startFrom must not be later than startTo.');
+      }
+      let jobs = await client.listAsyncJobs(input.page ?? 1, input.pageSize ?? 10, {
+        status: input.status,
+        startFrom: input.startFrom,
+        startTo: input.startTo,
+        sort: input.sort
+      });
       return {
         output: {
           jobStatus: null,
@@ -97,8 +157,12 @@ export let getAsyncJob = SlateTool.create(spec, {
     }
 
     if (input.action === 'cancel') {
-      if (!input.jobId) throw new Error('jobId is required for cancel action');
+      if (!input.jobId) throw createApiServiceError('jobId is required for cancel action');
       let result = await client.cancelAsyncJob(input.jobId);
+      if (result.Canceled !== true)
+        throw createApiServiceError(
+          'Scrape.do did not confirm cancellation. Check the job status.'
+        );
       return {
         output: {
           jobStatus: null,
@@ -110,6 +174,6 @@ export let getAsyncJob = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

@@ -1,4 +1,4 @@
-# Slates Specification for Callingly
+# Callingly Specification
 
 ## Overview
 
@@ -37,7 +37,7 @@ Send SMS messages to leads from a specified phone number. Messages support perso
 
 ### Team Management
 
-Create, update, and list teams. Teams have configurable settings including:
+Create, update, and list teams. Use `get_team` to inspect the detailed settings for a team found with `list_teams`. Teams have configurable settings including:
 
 - **Call mode** (e.g., simultaneous ringing of agents).
 - **Whisper text** — customizable message agents hear before connecting, with variable placeholders for lead info.
@@ -56,6 +56,8 @@ Create, update, and delete agents. Manage agent properties including phone numbe
 
 Retrieve and update per-agent weekly availability schedules. Each day can be toggled available/unavailable and supports multiple time windows (e.g., morning and afternoon shifts).
 
+Provide weekday names and times in `HH:MM`, `HH:MM:SS`, or `allday` form. Schedules are sent as the API's array of days with numeric weekday indexes. Retry schedules retain their comma-separated input format and are sent as arrays of minute intervals.
+
 ### Team Agent Assignment
 
 List agents assigned to a team (with priority and cap settings), assign or remove agents from teams, and update individual agent settings within a team (priority level and lead cap).
@@ -63,6 +65,8 @@ List agents assigned to a team (with priority and cap settings), assign or remov
 ### Client Management (Agency)
 
 For agency partners: list, create, delete, and activate/deactivate client accounts. Each client has their own account with separate billing for users and phone numbers.
+
+Use the read-only `list_clients` tool to discover account IDs for agency configuration and client management. API key validation uses the team list endpoint; the public API does not document a current-user or current-account identity endpoint.
 
 ## Events
 

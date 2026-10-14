@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -78,7 +78,8 @@ export let manageSuppression = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       let identifier = ctx.input.suppressionUuid || ctx.input.email;
-      if (!identifier) throw new Error('email or suppressionUuid is required for get');
+      if (!identifier)
+        throw createApiServiceError('email or suppressionUuid is required for get');
       let result = await client.getSuppression(identifier);
       return {
         output: { suppression: mapSuppression(result), suppressions: null, totalCount: null },
@@ -88,7 +89,8 @@ export let manageSuppression = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       let identifier = ctx.input.suppressionUuid || ctx.input.email;
-      if (!identifier) throw new Error('email or suppressionUuid is required for delete');
+      if (!identifier)
+        throw createApiServiceError('email or suppressionUuid is required for delete');
       await client.deleteSuppression(identifier);
       return {
         output: { suppression: null, suppressions: null, totalCount: null },
@@ -97,7 +99,7 @@ export let manageSuppression = SlateTool.create(spec, {
     }
 
     // create
-    if (!ctx.input.email) throw new Error('email is required for create');
+    if (!ctx.input.email) throw createApiServiceError('email is required for create');
     let result = await client.createSuppression({
       email: ctx.input.email,
       reason: ctx.input.reason

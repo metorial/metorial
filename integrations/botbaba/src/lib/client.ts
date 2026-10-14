@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export interface Bot {
   botId: string;
@@ -17,41 +22,51 @@ export interface SendWhatsAppTemplateParams {
 export type WhatsAppProvider = '360dialog' | 'gupshup';
 
 export class BotbabaClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Botbaba auth token is required. Reconnect with your profile auth token.'
+      );
+    }
+
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://app.botbaba.io/api',
+      authHeader: { value: config.token },
+      timeout: 30_000,
       headers: {
-        Authorization: config.token,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
+        Accept: 'application/json'
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Botbaba', reason: 'botbaba_api_error' })
     });
   }
 
   async getBots(): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get('/GetBots');
-    let data = response.data;
-    if (Array.isArray(data)) {
-      return data;
+    let data: unknown = response.data;
+    let bots = Array.isArray(data)
+      ? data
+      : isApiErrorRecord(data) && Array.isArray(data.bots)
+        ? data.bots
+        : isApiErrorRecord(data) && Array.isArray(data.data)
+          ? data.data
+          : isApiErrorRecord(data)
+            ? [data]
+            : undefined;
+
+    if (!bots?.every(isApiErrorRecord)) {
+      throw createApiServiceError('Botbaba returned an unexpected bot listing response.');
     }
-    if (data && typeof data === 'object' && Array.isArray(data.bots)) {
-      return data.bots;
-    }
-    if (data && typeof data === 'object' && Array.isArray(data.data)) {
-      return data.data;
-    }
-    return Array.isArray(data) ? data : [data];
+
+    return bots;
   }
 
   async sendWhatsAppTemplate(
     provider: WhatsAppProvider,
     params: SendWhatsAppTemplateParams
   ): Promise<Record<string, unknown>> {
-    let endpoint =
-      provider === '360dialog' ? '/SendWhatsAppWAMessages' : '/SendWhatsAppTemplateMessages';
-
     let body: Record<string, unknown> = {
       mobile: params.mobileNumber
     };
@@ -70,7 +85,23 @@ export class BotbabaClient {
       }
     }
 
-    let response = await this.axios.post(endpoint, body);
-    return response.data ?? { success: true };
+    let response = await this.sendWhatsAppTemplateRequest(provider, body);
+    return isApiErrorRecord(response) ? response : response == null ? {} : { value: response };
+  }
+
+  async sendWhatsAppTemplateRequest(
+    provider: WhatsAppProvider,
+    requestBody: Record<string, unknown>
+  ): Promise<unknown> {
+    if (Object.keys(requestBody).length === 0) {
+      throw createApiServiceError(
+        'Copy the JSON request body from Actions → WhatsApp Users → Broadcast Template Message.'
+      );
+    }
+
+    let endpoint =
+      provider === '360dialog' ? '/SendWhatsAppWAMessages' : '/SendWhatsAppTemplateMessages';
+    let response = await this.axios.post(endpoint, requestBody);
+    return response.data ?? null;
   }
 }

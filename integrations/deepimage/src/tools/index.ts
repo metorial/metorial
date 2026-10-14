@@ -1,4 +1,5 @@
 export * from './delete-job-result';
+export * from './edit-image';
 export * from './enhance-image';
 export * from './face-swap';
 export * from './generate-image';

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -23,7 +23,9 @@ export let logCall = SlateTool.create(spec, {
       outcome: z
         .string()
         .optional()
-        .describe('Call outcome (e.g., "connected", "no answer", "left voicemail")'),
+        .describe(
+          'Call outcome: Interested, Not Interested, Left Message, No Answer, Busy, or Bad Number'
+        ),
       userId: z.number().optional().describe('User ID who made/received the call'),
       callDate: z.string().optional().describe('Date of the call (ISO 8601)'),
       phone: z.string().optional().describe('Phone number called')
@@ -42,15 +44,19 @@ export let logCall = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     let data: Record<string, any> = {
-      personId: ctx.input.personId
+      personId: ctx.input.personId,
+      isIncoming: ctx.input.incoming ?? false
     };
-    if (ctx.input.incoming !== undefined) data.incoming = ctx.input.incoming;
     if (ctx.input.duration !== undefined) data.duration = ctx.input.duration;
     if (ctx.input.note !== undefined) data.note = ctx.input.note;
     if (ctx.input.outcome !== undefined) data.outcome = ctx.input.outcome;
     if (ctx.input.userId !== undefined) data.userId = ctx.input.userId;
     if (ctx.input.callDate !== undefined) data.callDate = ctx.input.callDate;
     if (ctx.input.phone !== undefined) data.phone = ctx.input.phone;
+
+    if (!ctx.input.phone) {
+      throw createApiServiceError('Provide phone to log the call.');
+    }
 
     let call = await client.createCall(data);
 
@@ -59,7 +65,7 @@ export let logCall = SlateTool.create(spec, {
         callId: call.id,
         personId: call.personId,
         duration: call.duration,
-        incoming: call.incoming,
+        incoming: call.isIncoming,
         created: call.created
       },
       message: `Logged ${ctx.input.incoming ? 'incoming' : 'outgoing'} call for contact **${ctx.input.personId}**${ctx.input.duration ? ` (${ctx.input.duration}s)` : ''}.`

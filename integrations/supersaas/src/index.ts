@@ -5,6 +5,7 @@ import {
   createAppointmentTool,
   createUserTool,
   deleteAppointmentTool,
+  deletePromotionTool,
   deleteUserTool,
   duplicatePromotionTool,
   getAppointmentTool,
@@ -18,6 +19,7 @@ import {
   listPromotionsTool,
   listResourcesTool,
   listSchedulesTool,
+  listSlotsTool,
   listUsersTool,
   updateAppointmentTool,
   updateUserTool
@@ -26,6 +28,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     listSchedulesTool,
+    listSlotsTool,
     listResourcesTool,
     listUsersTool,
     getUserTool,
@@ -44,6 +47,7 @@ export let provider = Slate.create({
     listPromotionsTool,
     getPromotionTool,
     duplicatePromotionTool,
+    deletePromotionTool,
     getRecentChangesTool
   ],
   triggers: []

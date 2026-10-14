@@ -9,7 +9,8 @@ export let getRecording = SlateTool.create(spec, {
   description: `Retrieves the recording URL for a session. The returned URL provides access to an interactive recording where users can replay events, download resources, and switch between different participants' perspectives. The recording URL is valid for up to 3 hours.`,
   constraints: [
     'Recording must have been enabled when the space was launched.',
-    'The returned recording URL expires after approximately 3 hours.'
+    'The returned recording URL expires after approximately 3 hours.',
+    'If ready is false, the recording is still preparing and may not play correctly yet.'
   ],
   tags: {
     destructive: false,
@@ -25,22 +26,25 @@ export let getRecording = SlateTool.create(spec, {
     z.object({
       recordingUrl: z
         .string()
-        .describe('Direct URL to the interactive session recording. Valid for up to 3 hours.')
+        .describe('Direct URL to the interactive session recording. Valid for up to 3 hours.'),
+      ready: z.boolean().describe('Whether the recording is ready to play.')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      organisationId: ctx.config.organisationId
+      token: ctx.auth.token
     });
 
     let result = await client.getPlaybackUrl(ctx.input.sessionUuid);
 
     return {
       output: {
-        recordingUrl: result.recordingUrl
+        recordingUrl: result.recordingUrl,
+        ready: result.ready
       },
-      message: `Recording URL retrieved: ${result.recordingUrl}`
+      message: result.ready
+        ? `Recording is ready: ${result.recordingUrl}`
+        : `Recording is still preparing. Playback URL: ${result.recordingUrl}`
     };
   })
   .build();

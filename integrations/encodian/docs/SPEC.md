@@ -1,4 +1,4 @@
-# Slates Specification for Encodian
+# Encodian Integration Specification
 
 ## Overview
 
@@ -81,6 +81,22 @@ The General connector provides actions covering email processing.
 ### Subscription Management
 
 Returns the current subscription status, plan, and credit usage for monitoring API consumption.
+
+### Queued Operations and Downloads
+
+Processing tools return `operationStatus` and, for queued requests, the provider's
+`statusUrl`. Call `get_operation_status` with that URL until the operation is
+complete. The lookup also accepts an operation ID, connector, and result type
+when the original URL is unavailable. Completed files are available to download.
+Existing base64 output fields remain available for compatible workflows.
+
+## API Sources
+
+- [Direct API integration](https://support.encodian.com/hc/en-gb/articles/13253632800284-Direct-API-Integration)
+- [Conversion API](https://api.apps-encodian.com/swagger/Conversion/swagger.json)
+- [PDF API](https://api.apps-encodian.com/swagger/PDF/swagger.json)
+- [General API](https://api.apps-encodian.com/swagger/General/swagger.json)
+- [Queued requests](https://support.encodian.com/hc/en-gb/articles/13253819695516-Queuing-requests)
 
 ## Events
 

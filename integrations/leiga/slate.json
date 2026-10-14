@@ -1,18 +1,17 @@
 {
   "name": "@metorial/leiga",
-  "description": "Manage issues, sprints, epics, and releases in an AI-powered project management platform for development teams. Create, update, query, and delete work items with fields like priority, status, assignee, and custom fields. Manage subtasks, link related issues, and track story points. Create and manage sprints with goals and date ranges. Organize work into epics and versions/releases. Add comments and reactions to issues. Upload and manage file attachments. Configure project workflows, tags, and webhooks. Manage project members and roles.",
+  "description": "Manage Leiga issues, subtasks, issue relations, sprints, epics, organization releases, comments, and tags. Discover accessible projects, issue types and schemas, and organization and project members.",
   "categories": ["task-and-project-management"],
   "skills": [
     "create and manage issues",
+    "discover issue fields and options",
     "manage sprints",
     "manage epics and releases",
-    "track subtasks",
+    "list and manage subtasks",
     "link related issues",
     "add issue comments",
-    "upload file attachments",
-    "manage project members",
-    "configure webhooks",
-    "manage tags and workflows"
+    "discover members",
+    "manage tags"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/leiga.svg"
 }

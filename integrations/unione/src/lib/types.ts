@@ -27,6 +27,7 @@ export interface UniOneEmailOptions {
 
 export interface UniOneEmailMessage {
   recipients: UniOneRecipient[];
+  idempotence_key?: string;
   template_id?: string;
   skip_unsubscribe?: 0 | 1;
   global_language?: string;
@@ -103,18 +104,29 @@ export interface UniOneSuppressionEntry {
 }
 
 export interface UniOneDomainDnsRecord {
-  type: string;
-  host: string;
-  value: string;
+  type?: string;
+  host?: string;
+  value?: string;
+  key?: string;
   status?: string;
 }
 
 export interface UniOneDomainInfo {
   domain: string;
-  verification_record: UniOneDomainDnsRecord;
-  dkim: UniOneDomainDnsRecord;
+  verification_record?: UniOneDomainDnsRecord;
+  dkim?: UniOneDomainDnsRecord;
   spf?: UniOneDomainDnsRecord;
   status?: string;
+}
+
+export interface UniOneDomainResponse extends Omit<UniOneDomainInfo, 'dkim'> {
+  'verification-record'?: string | UniOneDomainDnsRecord;
+  dkim?: string | UniOneDomainDnsRecord;
+}
+
+export interface UniOneConfirmedEmail {
+  email: string;
+  status: string;
 }
 
 export interface UniOneWebhookConfig {
@@ -152,15 +164,20 @@ export interface UniOneEventDumpRequest {
 }
 
 export interface UniOneEventDump {
-  dump_id: number;
+  dump_id: number | string;
   dump_status: string;
   url?: string;
   files?: string[];
   created?: string;
 }
 
+export interface UniOneEventDumpResponse extends Omit<UniOneEventDump, 'files'> {
+  files?: (string | { url: string; size: number })[];
+}
+
 export interface UniOneTag {
   tag: string;
+  tag_id?: number;
   status?: string;
 }
 
@@ -185,6 +202,12 @@ export interface UniOneSystemInfo {
   emails_sent?: number;
   project_id?: string;
   project_name?: string;
+  accounting?: {
+    period_start?: string;
+    period_end?: string;
+    emails_included?: number;
+    emails_sent?: number;
+  };
 }
 
 export interface UniOneValidationResult {

@@ -1,18 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getIssuanceSession = SlateTool.create(spec, {
   name: 'Get Issuance Session',
   key: 'get_issuance_session',
   description: `Retrieve details of a credential issuance session. Use this to check the current status of an OpenID4VC or DIDComm issuance offer, including whether the credential has been accepted by the holder.`,
+  instructions: ['Call list_projects to choose the projectId for this operation.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       protocol: z.enum(['openid4vc', 'didcomm']).describe('Protocol used for the issuance'),
       issuanceId: z.string().describe('ID of the issuance session to retrieve')
     })
@@ -31,7 +34,7 @@ export let getIssuanceSession = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
     let result: any;

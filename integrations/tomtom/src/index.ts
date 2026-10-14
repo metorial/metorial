@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  autocomplete,
   calculateRoute,
   createGeofence,
   createGeofenceAlert,
@@ -16,6 +17,7 @@ import {
   listGeofenceAlerts,
   listGeofenceProjects,
   listGeofences,
+  listPoiCategories,
   listTrackedObjects,
   manageContactGroup,
   matrixRouting,
@@ -31,6 +33,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    autocomplete,
+    listPoiCategories,
     searchGeocode,
     reverseGeocode,
     calculateRoute,

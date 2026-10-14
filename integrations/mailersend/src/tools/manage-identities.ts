@@ -36,7 +36,19 @@ export let listIdentities = SlateTool.create(spec, {
           })
         )
         .describe('List of sender identities.'),
-      total: z.number().describe('Total number of identities.')
+      total: z
+        .number()
+        .describe(
+          'Provider total when available; otherwise the number of entries on this page.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider pagination metadata.'),
+      links: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider links to adjacent result pages.')
     })
   )
   .handleInvocation(async ctx => {
@@ -59,7 +71,7 @@ export let listIdentities = SlateTool.create(spec, {
       ((result.meta as Record<string, unknown>)?.total as number) ?? identities.length;
 
     return {
-      output: { identities, total },
+      output: { identities, total, pagination: result.meta, links: result.links },
       message: `Found **${total}** sender identities.`
     };
   })
@@ -76,8 +88,8 @@ export let createIdentity = SlateTool.create(spec, {
   .input(
     z.object({
       domainId: z.string().describe('ID of the domain to create the identity for.'),
-      email: z.string().describe('Sender email address (must be unique, max 191 characters).'),
-      name: z.string().describe('Sender display name (max 191 characters).'),
+      email: z.string().describe('Sender email address (must be unique, max 320 characters).'),
+      name: z.string().optional().describe('Sender display name (max 191 characters).'),
       replyToEmail: z.string().optional().describe('Reply-to email address.'),
       replyToName: z.string().optional().describe('Reply-to display name.'),
       addNote: z.boolean().optional().describe('Whether to include a personal note.'),

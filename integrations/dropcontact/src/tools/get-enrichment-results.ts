@@ -16,6 +16,12 @@ let enrichedContactSchema = z.object({
   lastName: z.string().optional().describe('Last name'),
   fullName: z.string().optional().describe('Full name'),
   emails: z.array(emailResultSchema).optional().describe('Qualified email addresses'),
+  inputEmail: z
+    .string()
+    .optional()
+    .describe(
+      'Original email when the provider returns unchanged input instead of qualified emails'
+    ),
   phone: z.string().optional().describe('Phone number'),
   mobilePhone: z.string().optional().describe('Mobile phone number'),
   company: z.string().optional().describe('Company name'),
@@ -29,6 +35,22 @@ let enrichedContactSchema = z.object({
   siretCity: z.string().optional().describe('SIRET city'),
   vat: z.string().optional().describe('VAT number'),
   nbEmployees: z.string().optional().describe('Number of employees'),
+  employeeCount: z
+    .string()
+    .optional()
+    .describe('Employee count when available for the account plan'),
+  industry: z
+    .string()
+    .optional()
+    .describe('Company industry when available for the account plan'),
+  errors: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Provider validation errors for this contact'),
+  warnings: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Provider validation warnings for this contact'),
   naf5Code: z.string().optional().describe('NAF code'),
   naf5Description: z.string().optional().describe('NAF code description'),
   country: z.string().optional().describe('Country'),
@@ -52,7 +74,7 @@ Use **forceResults** to retrieve partial results before all contacts are fully p
   instructions: [
     'Use the requestId returned by the Enrich Contacts tool.',
     'If results are not ready, wait ~30 seconds and try again.',
-    'Enable forceResults to get partial results for contacts already processed.'
+    'Enable forceResults to get partial results. Unprocessed contacts may contain unchanged input. Forced retrieval can affect credit refunds.'
   ],
   tags: {
     destructive: false,
@@ -70,7 +92,19 @@ Use **forceResults** to retrieve partial results before all contacts are fully p
   )
   .output(
     z.object({
-      ready: z.boolean().describe('Whether the enrichment results are fully processed'),
+      ready: z
+        .boolean()
+        .describe(
+          'Whether a successful result was retrieved without forcing potentially partial results'
+        ),
+      mayBePartial: z
+        .boolean()
+        .optional()
+        .describe('Whether forceResults was used, so some contacts may still be unprocessed'),
+      creditsLeft: z
+        .number()
+        .optional()
+        .describe('Remaining enrichment credits when returned by the provider'),
       reason: z.string().optional().describe('Reason if results are not ready yet'),
       contacts: z
         .array(enrichedContactSchema)
@@ -86,13 +120,15 @@ Use **forceResults** to retrieve partial results before all contacts are fully p
       ctx.input.forceResults
     );
 
-    if (!response.success && response.reason) {
+    if (!response.success && !response.data?.length) {
       return {
         output: {
           ready: false,
-          reason: response.reason
+          reason: response.reason,
+          mayBePartial: Boolean(ctx.input.forceResults),
+          creditsLeft: response.credits_left
         },
-        message: `Results not ready yet: ${response.reason}`
+        message: `Results not ready yet: ${response.reason ?? 'Try again in 30 seconds.'}`
       };
     }
 
@@ -101,20 +137,25 @@ Use **forceResults** to retrieve partial results before all contacts are fully p
       firstName: c.first_name,
       lastName: c.last_name,
       fullName: c.full_name,
-      emails: c.email,
+      emails: Array.isArray(c.email) ? c.email : undefined,
+      inputEmail: typeof c.email === 'string' ? c.email : undefined,
       phone: c.phone,
       mobilePhone: c.mobile_phone,
       company: c.company,
       website: c.website,
       linkedinUrl: c.linkedin,
       companyLinkedinUrl: c.company_linkedin,
-      siren: c.siren,
+      siren: c.siren ?? c.num_siren,
       siret: c.siret,
       siretAddress: c.siret_address,
       siretZip: c.siret_zip,
       siretCity: c.siret_city,
       vat: c.vat,
       nbEmployees: c.nb_employees,
+      employeeCount: c.employee_count,
+      industry: c.industry,
+      errors: c.errors,
+      warnings: c.warnings,
       naf5Code: c.naf5_code,
       naf5Description: c.naf5_des,
       country: c.country,
@@ -130,10 +171,13 @@ Use **forceResults** to retrieve partial results before all contacts are fully p
 
     return {
       output: {
-        ready: true,
+        ready: response.success && !ctx.input.forceResults,
+        reason: response.reason,
+        mayBePartial: Boolean(ctx.input.forceResults),
+        creditsLeft: response.credits_left,
         contacts
       },
-      message: `Enrichment complete for **${contacts.length}** contact(s). Found **${emailCount}** email address(es).`
+      message: `${ctx.input.forceResults ? 'Retrieved potentially partial results' : 'Enrichment complete'} for **${contacts.length}** contact(s). Found **${emailCount}** email address(es).`
     };
   })
   .build();

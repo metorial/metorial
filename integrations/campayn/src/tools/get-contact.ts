@@ -35,7 +35,9 @@ export let getContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      contactId: z.string().describe('ID of the contact to retrieve')
+      contactId: z
+        .string()
+        .describe('Contact ID. Call list_contacts to find contacts on a list.')
     })
   )
   .output(

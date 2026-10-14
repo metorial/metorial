@@ -36,7 +36,12 @@ export let manageOntology = SlateTool.create(spec, {
       graphIds: z
         .array(z.string())
         .optional()
-        .describe('Specific graph IDs to apply ontology to')
+        .describe('Specific graph IDs to apply ontology to'),
+      userId: z.string().optional().describe('User-specific ontology to retrieve with list'),
+      graphId: z
+        .string()
+        .optional()
+        .describe('Standalone graph ontology to retrieve with list')
     })
   )
   .output(
@@ -50,7 +55,10 @@ export let manageOntology = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
 
     if (ctx.input.action === 'list') {
-      let result = await client.getEntityTypes();
+      let result = await client.getEntityTypes({
+        userId: ctx.input.userId,
+        graphId: ctx.input.graphId
+      });
       return {
         output: {
           entityTypes: result.entity_types || [],

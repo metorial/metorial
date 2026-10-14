@@ -46,11 +46,11 @@ export let listStaff = SlateTool.create(spec, {
             {
               staffId: s.id,
               name: s.name,
-              email: s.email,
-              phone: s.phone,
-              mobile: s.mobile,
+              email: s.email ?? undefined,
+              phone: s.phone ?? undefined,
+              mobile: s.mobile ?? undefined,
               title: s.title,
-              extension: s.ext
+              extension: s.ext ?? undefined
             }
           ]
         },
@@ -62,11 +62,11 @@ export let listStaff = SlateTool.create(spec, {
     let staff = (result.staff || []).map((s: any) => ({
       staffId: s.id,
       name: s.name,
-      email: s.email,
-      phone: s.phone,
-      mobile: s.mobile,
+      email: s.email ?? undefined,
+      phone: s.phone ?? undefined,
+      mobile: s.mobile ?? undefined,
       title: s.title,
-      extension: s.ext
+      extension: s.ext ?? undefined
     }));
 
     return {

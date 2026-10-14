@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -26,7 +26,11 @@ export let manageContact = SlateTool.create(spec, {
       email: z.string().optional().describe('Email address'),
       phone: z.string().optional().describe('Phone number'),
       mobile: z.string().optional().describe('Mobile number'),
-      jobTitle: z.string().optional().describe('Job title'),
+      jobTitle: z
+        .string()
+        .optional()
+        .describe('Unsupported by this endpoint; omit this field'),
+      type: z.string().optional().describe('Contact role, such as JOB or BILLING'),
       isPrimary: z.string().optional().describe('Set to "1" to make this the primary contact')
     })
   )
@@ -36,7 +40,17 @@ export let manageContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    if (!ctx.input.contactUuid && !ctx.input.companyUuid) {
+      throw createApiServiceError(
+        'Provide companyUuid when creating a contact. Call list_clients to discover clients.'
+      );
+    }
+    if (ctx.input.jobTitle !== undefined) {
+      throw createApiServiceError(
+        'ServiceM8 company contacts do not support jobTitle. Omit this field.'
+      );
+    }
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = {};
     if (ctx.input.companyUuid) data.company_uuid = ctx.input.companyUuid;
@@ -45,8 +59,8 @@ export let manageContact = SlateTool.create(spec, {
     if (ctx.input.email !== undefined) data.email = ctx.input.email;
     if (ctx.input.phone !== undefined) data.phone = ctx.input.phone;
     if (ctx.input.mobile !== undefined) data.mobile = ctx.input.mobile;
-    if (ctx.input.jobTitle !== undefined) data.job_title = ctx.input.jobTitle;
-    if (ctx.input.isPrimary !== undefined) data.is_primary = ctx.input.isPrimary;
+    if (ctx.input.type !== undefined) data.type = ctx.input.type;
+    if (ctx.input.isPrimary !== undefined) data.is_primary_contact = ctx.input.isPrimary;
 
     let contactUuid: string;
     let action: string;

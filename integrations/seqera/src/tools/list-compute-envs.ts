@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listComputeEnvs = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listComputeEnvs = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       status: z
         .string()
         .optional()
@@ -50,8 +52,8 @@ export let listComputeEnvs = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let envs = await client.listComputeEnvs({
@@ -59,16 +61,16 @@ export let listComputeEnvs = SlateTool.create(spec, {
     });
 
     let computeEnvs = envs.map(e => ({
-      computeEnvId: e.id,
-      name: e.name,
-      description: e.description,
-      platform: e.platform,
-      status: e.status,
-      primary: e.primary,
-      workDir: e.workDir,
-      credentialsId: e.credentialsId,
-      dateCreated: e.dateCreated,
-      lastUsed: e.lastUsed
+      computeEnvId: e.id ?? undefined,
+      name: e.name ?? undefined,
+      description: e.description ?? undefined,
+      platform: e.platform ?? undefined,
+      status: e.status ?? undefined,
+      primary: e.primary ?? undefined,
+      workDir: e.workDir ?? undefined,
+      credentialsId: e.credentialsId ?? undefined,
+      dateCreated: e.dateCreated ?? undefined,
+      lastUsed: e.lastUsed ?? undefined
     }));
 
     return {

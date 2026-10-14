@@ -2,6 +2,8 @@ export * from './create-bot';
 export * from './delete-bot';
 export * from './generate-ai-reply';
 export * from './get-bot';
+export * from './get-message';
+export * from './list-bot-channels';
 export * from './list-bots';
 export * from './manage-bot-channels';
 export * from './manage-typing-indicator';

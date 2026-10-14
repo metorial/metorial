@@ -1,6 +1,8 @@
 # Rentman
 
-Manage rental projects, equipment inventory, crew scheduling, and financial documents for AV and event production. Create and update projects, subprojects, and project requests. Track equipment availability, serial numbers, stock movements, and repairs. Assign crew to projects, manage crew availability and rates, and track time registrations. Manage contacts and contact persons for CRM integration. Create and manage quotes, contracts, and invoices with line items. Handle subrentals from external suppliers. Plan vehicle assignments and appointments. Organize files and folders attached to projects or equipment.
+Manage rental projects, equipment inventory, crew availability, contacts, appointments, and financial records for AV and event production. Create projects, subprojects, and project requests; manage contacts and contact persons; browse appointments and equipment serial numbers; record stock movements; and retrieve invoices, quotes, contracts, subrentals, and project costs. Collection tools support cursor pagination alongside their existing offset inputs. To continue with a cursor from `nextPageUrl`, repeat the original filters, resource IDs, sort, and fields. For appointments, this includes any `startAfter` and `startBefore` values. The cursor carries the original page limit.
+
+The API uses a user-specific Bearer token from Rentman's Configuration > Account > Integrations. Calls inherit the token owner's permissions. See the [official API documentation](https://api.rentman.net/) for supported fields and access requirements.
 
 ## License
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlaygroundClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ export let manageConsent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
 
     if (ctx.input.action === 'get_passcode') {
       let result = await client.getConsentPasscode(ctx.input.avatarId);
@@ -51,7 +51,9 @@ export let manageConsent = SlateTool.create(spec, {
     }
 
     if (!ctx.input.consentVideoUrl) {
-      throw new Error('consentVideoUrl is required for submit_consent action');
+      throw createApiServiceError(
+        'consentVideoUrl is required for the submit_consent action. Provide a public URL of the consent video.'
+      );
     }
 
     let submitted = await client.submitConsent({

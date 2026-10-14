@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
   description: `Sends a transactional email via Sender. Supports two modes: send directly with custom content (subject, HTML/text body), or send using a pre-built campaign template by providing a campaignId. Supports personalization variables (Liquid syntax), attachments via public URLs, and custom headers.`,
   instructions: [
     'When using a campaign template, provide the campaignId and the content from the template will be used. You can still override text/html content.',
-    'Attachments must be publicly accessible HTTPS URLs. Max 10MB per attachment.',
+    'Attachments must be publicly accessible HTTPS URLs. Max 25MB per attachment.',
     'Variables use Liquid template syntax for personalization.'
   ],
   tags: {
@@ -47,6 +47,10 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
         .record(z.string(), z.string())
         .optional()
         .describe('Personalization variables for Liquid template tags'),
+      headers: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Custom email headers, such as X- headers or charset'),
       attachments: z
         .record(z.string(), z.string())
         .optional()
@@ -68,7 +72,8 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
         variables: ctx.input.variables,
         attachments: ctx.input.attachments,
         text: ctx.input.text,
-        html: ctx.input.html
+        html: ctx.input.html,
+        headers: ctx.input.headers
       });
 
       return {
@@ -81,8 +86,14 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
     }
 
     if (!ctx.input.fromEmail || !ctx.input.fromName || !ctx.input.subject) {
-      throw new Error(
+      throw createApiServiceError(
         'fromEmail, fromName, and subject are required when not using a campaign template'
+      );
+    }
+
+    if (!ctx.input.html && !ctx.input.text) {
+      throw createApiServiceError(
+        'Provide html or text content when sending without a campaign template.'
       );
     }
 
@@ -93,7 +104,8 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
       html: ctx.input.html,
       text: ctx.input.text,
       variables: ctx.input.variables,
-      attachments: ctx.input.attachments
+      attachments: ctx.input.attachments,
+      headers: ctx.input.headers
     });
 
     return {

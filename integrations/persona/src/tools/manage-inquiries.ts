@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PersonaClient } from '../lib/client';
-import { normalizeResource } from '../lib/helpers';
+import { normalizeListResponse, normalizeResource } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let createInquiry = SlateTool.create(spec, {
@@ -10,7 +10,7 @@ export let createInquiry = SlateTool.create(spec, {
   description: `Create a new identity verification inquiry from a template. The inquiry can be pre-populated with user data and later completed by the end-user via hosted flow, embedded flow, or mobile SDK.
 Returns the inquiry ID and a session token for embedding the flow.`,
   instructions: [
-    'You must provide either an inquiryTemplateId or a templateId (legacy).',
+    'Provide exactly one of inquiryTemplateId, inquiryTemplateVersionId, or templateId (legacy). Call list_inquiry_templates with a production API key to discover template IDs.',
     'Use referenceId to link the inquiry to your internal user ID for deduplication.'
   ],
   tags: { destructive: false, readOnly: false }
@@ -20,7 +20,13 @@ Returns the inquiry ID and a session token for embedding the flow.`,
       inquiryTemplateId: z
         .string()
         .optional()
-        .describe('Inquiry template ID (starts with itmpl_)'),
+        .describe(
+          'Inquiry template ID (starts with itmpl_). Discover IDs with list_inquiry_templates using a production API key.'
+        ),
+      inquiryTemplateVersionId: z
+        .string()
+        .optional()
+        .describe('Published inquiry template version ID (starts with itmplv_)'),
       templateId: z.string().optional().describe('Legacy template ID (starts with tmpl_)'),
       referenceId: z
         .string()
@@ -50,10 +56,21 @@ Returns the inquiry ID and a session token for embedding the flow.`,
     })
   )
   .handleInvocation(async ctx => {
+    let templates = [
+      ctx.input.inquiryTemplateId,
+      ctx.input.inquiryTemplateVersionId,
+      ctx.input.templateId
+    ].filter(value => value !== undefined);
+    if (templates.length !== 1 || !templates[0]?.trim()) {
+      throw createApiServiceError(
+        'Provide exactly one non-empty inquiryTemplateId, inquiryTemplateVersionId, or templateId.'
+      );
+    }
     let client = new PersonaClient({ token: ctx.auth.token });
 
     let result = await client.createInquiry({
       inquiryTemplateId: ctx.input.inquiryTemplateId,
+      inquiryTemplateVersionId: ctx.input.inquiryTemplateVersionId,
       templateId: ctx.input.templateId,
       referenceId: ctx.input.referenceId,
       accountId: ctx.input.accountId,
@@ -68,7 +85,7 @@ Returns the inquiry ID and a session token for embedding the flow.`,
       output: {
         inquiryId: result.data?.id || normalized.resourceId,
         status: normalized.status,
-        referenceId: normalized['reference-id'] || normalized.reference_id,
+        referenceId: normalized['reference-id'] ?? normalized.reference_id ?? undefined,
         sessionToken,
         attributes: normalized
       },
@@ -118,11 +135,13 @@ export let getInquiry = SlateTool.create(spec, {
       output: {
         inquiryId: result.data?.id,
         status: normalized.status,
-        referenceId: normalized['reference-id'] || normalized.reference_id,
-        accountId: normalized.relationships?.account?.data?.id,
-        templateId: normalized.relationships?.['inquiry-template']?.data?.id,
-        createdAt: normalized['created-at'] || normalized.created_at,
-        completedAt: normalized['completed-at'] || normalized.completed_at,
+        referenceId: normalized['reference-id'] ?? normalized.reference_id ?? undefined,
+        accountId: normalized.relationships?.account?.id,
+        templateId:
+          normalized.relationships?.['inquiry-template']?.id ??
+          normalized.relationships?.template?.id,
+        createdAt: normalized['created-at'] ?? normalized.created_at ?? undefined,
+        completedAt: normalized['completed-at'] ?? normalized.completed_at ?? undefined,
         attributes: normalized,
         included: result.included
       },
@@ -185,23 +204,15 @@ export let listInquiries = SlateTool.create(spec, {
       return {
         inquiryId: item.id,
         status: n.status,
-        referenceId: n['reference-id'] || n.reference_id,
-        createdAt: n['created-at'] || n.created_at
+        referenceId: n['reference-id'] ?? n.reference_id ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined
       };
     });
 
-    let nextCursor: string | undefined;
-    if (result.links?.next) {
-      try {
-        let parsed = new URL(result.links.next, 'https://withpersona.com');
-        nextCursor = parsed.searchParams.get('page[after]') || undefined;
-      } catch {
-        /* ignore */
-      }
-    }
+    let { nextCursor, previousCursor } = normalizeListResponse(result);
 
     return {
-      output: { inquiries, nextCursor, previousCursor: undefined },
+      output: { inquiries, nextCursor, previousCursor },
       message: `Found **${inquiries.length}** inquiries.`
     };
   })
@@ -334,6 +345,12 @@ export let generateInquiryLink = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.expiresIn !== undefined &&
+      (!Number.isInteger(ctx.input.expiresIn) || ctx.input.expiresIn <= 0)
+    ) {
+      throw createApiServiceError('expiresIn must be a positive integer number of seconds.');
+    }
     let client = new PersonaClient({ token: ctx.auth.token });
     let result = await client.generateInquiryLink(ctx.input.inquiryId, ctx.input.expiresIn);
 
@@ -391,7 +408,7 @@ export let tagInquiry = SlateTool.create(spec, {
     } else if (ctx.input.action === 'set' && ctx.input.allTags) {
       result = await client.setInquiryTags(ctx.input.inquiryId, ctx.input.allTags);
     } else {
-      throw new Error('Invalid tag action or missing required parameters');
+      throw createApiServiceError('Provide tag for add/remove, or allTags for set.');
     }
 
     let normalized = normalizeResource(result.data);

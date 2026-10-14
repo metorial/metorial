@@ -41,6 +41,10 @@ Available actions: **Confirm**, **Cancel** (admin cancel), **User_cancel** (cust
         ])
         .describe('Action to perform on the reservation'),
       comment: z.string().optional().describe('Comment about the action'),
+      verificationCode: z
+        .string()
+        .optional()
+        .describe('Email verification code, required for the Verify action'),
       suppressNotifications: z
         .boolean()
         .optional()
@@ -58,12 +62,13 @@ Available actions: **Confirm**, **Cancel** (admin cancel), **User_cancel** (cust
 
     let result = await client.doReservationAction(ctx.input.reservationId, ctx.input.action, {
       comment: ctx.input.comment,
-      isQuiet: ctx.input.suppressNotifications
+      isQuiet: ctx.input.suppressNotifications,
+      verificationCode: ctx.input.verificationCode
     });
 
     return {
       output: {
-        status: result?.status ? String(result.status) : undefined,
+        status: result?.status != null ? String(result.status) : undefined,
         userText: result?.user_text
       },
       message: `Action **${ctx.input.action}** performed on reservation **#${ctx.input.reservationId}**.`

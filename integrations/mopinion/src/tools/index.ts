@@ -1,4 +1,5 @@
 export * from './get-account';
+export * from './get-dataset';
 export * from './get-feedback';
 export * from './get-fields';
 export * from './list-deployments';

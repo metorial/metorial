@@ -1,4 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 let BASE_URLS: Record<string, string> = {
   us: 'https://us1.dws4.docmosis.com/api',
@@ -20,73 +27,68 @@ export interface DocmosisResponse {
 export interface EnvironmentSummaryResponse extends DocmosisResponse {
   accountEnvironmentSummary?: {
     accountEnvDetails?: {
-      auditInfo?: {
-        lastUpdatedByUser?: string;
-        lastUpdatedTime?: number;
-      };
-      isActivated?: boolean;
-      isDeleted?: boolean;
-      isDisabled?: boolean;
+      isActivated?: boolean | string;
+      isDeleted?: boolean | string;
+      isDisabled?: boolean | string;
       name?: string;
     };
     pageQuota?: {
-      isHardLimited?: boolean;
-      pctUsed?: number;
+      isHardLimited?: boolean | string;
+      pctUsed?: number | string;
       pctUsedStr?: string;
-      quota?: number;
-      used?: number;
+      quota?: number | string;
+      used?: number | string;
     };
-    plan?: {
-      name?: string;
-    };
-    ready?: boolean;
+    plan?: { name?: string };
+    ready?: boolean | string;
   };
 }
 
 export interface TemplateDetails {
   name: string;
-  sizeBytes?: number;
+  sizeBytes?: number | string;
+  lastModifiedMillisSinceEpoch?: number | string;
+  lastModifiedISO8601?: string;
   uploadedTime?: number;
   createdTime?: number;
+  templateHasErrors?: boolean | string;
 }
 
 export interface ListTemplatesResponse extends DocmosisResponse {
   templateList?: TemplateDetails[];
+  nextPageToken?: string | null;
+  templateListStale?: boolean | string;
 }
 
 export interface TemplateDetailsResponse extends DocmosisResponse {
   templateDetails?: TemplateDetails;
 }
 
-export interface UploadTemplateResponse extends DocmosisResponse {
-  templateDetails?: TemplateDetails;
-}
-
 export interface TemplateStructureResponse extends DocmosisResponse {
-  structure?: Record<string, any>;
+  templateStructure?: Record<string, unknown>[] | Record<string, unknown>;
 }
 
 export interface SampleDataResponse extends DocmosisResponse {
-  sampleData?: Record<string, any>;
+  templateSampleData?: Record<string, unknown>;
 }
 
 export interface RenderQueueResponse extends DocmosisResponse {
-  queueInfo?: {
-    availablePct?: number;
-    delaySeconds?: number;
-    rejected?: boolean;
+  queue?: {
+    availablePct?: number | string;
+    delaySeconds?: number | string;
+    rejected?: boolean | string;
   };
 }
 
 export interface RenderTagEntry {
   name: string;
-  countPages?: string;
-  countDocuments?: string;
+  countPages?: string | number;
+  countDocuments?: string | number;
 }
 
 export interface RenderTagMonth {
-  year: string;
-  month: string;
+  year: string | number;
+  month: string | number;
   tags: RenderTagEntry[];
 }
 
@@ -97,7 +99,7 @@ export interface RenderTagsResponse extends DocmosisResponse {
 export interface RenderOptions {
   templateName: string;
   outputName: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   outputFormat?: string;
   storeTo?: string;
   devMode?: boolean;
@@ -107,23 +109,110 @@ export interface RenderOptions {
   renderTag?: string;
 }
 
-export interface RenderResult {
+export interface RenderResult extends DocmosisResponse {
   pagesRendered?: string;
   requestId?: string;
   documentErrorsDetected?: string;
-  succeeded?: boolean;
-  shortMsg?: string;
-  longMsg?: string;
+  file?: Response;
+  filename?: string;
 }
+
+// DWS4 examples use both JSON scalars and their string representations.
+export let asBoolean = (value: unknown): boolean | undefined =>
+  value === true || value === 'true'
+    ? true
+    : value === false || value === 'false'
+      ? false
+      : undefined;
+
+export let asNumber = (value: unknown): number | undefined => {
+  if ((typeof value !== 'number' && typeof value !== 'string') || value === '')
+    return undefined;
+  let number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+};
+
+let apiError = (error: unknown) =>
+  buildApiServiceError(error, {
+    providerLabel: 'Docmosis',
+    reason: 'docmosis_api_error',
+    detailKeys: ['shortMsg', 'longMsg', 'message', 'error']
+  });
 
 export class Client {
   private axios;
-  private accessKey: string;
 
   constructor(config: ClientConfig) {
-    let baseURL = BASE_URLS[config.region] || BASE_URLS.us;
-    this.accessKey = config.token;
-    this.axios = createAxios({ baseURL });
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Docmosis API access key is required.');
+    }
+    let baseURL = BASE_URLS[config.region];
+    if (!baseURL)
+      throw createApiServiceError('Choose a supported Docmosis region: us, eu, or au.');
+    this.axios = createAuthenticatedAxios({
+      baseURL,
+      authHeader: { name: 'accessKey', value: config.token },
+      contentType: false,
+      validateStatus: () => true,
+      errorAdapter: apiError
+    });
+  }
+
+  private checkResponse<T extends DocmosisResponse>(data: unknown, status: number): T {
+    if (!isApiErrorRecord(data)) {
+      throw createApiServiceError('Docmosis returned an invalid response.', {
+        reason: 'docmosis_invalid_response',
+        upstreamStatus: status
+      });
+    }
+    let succeeded = data.succeeded === true || data.succeeded === 'true';
+    if (status !== 200 || !succeeded) {
+      throw apiError({ response: { status, data } });
+    }
+    return { ...data, succeeded } as T;
+  }
+
+  private async post<T extends DocmosisResponse>(
+    path: string,
+    data: unknown = {}
+  ): Promise<T> {
+    let response = await this.axios.post(path, data);
+    return this.checkResponse<T>(response.data, response.status);
+  }
+
+  private async fileRequest(path: string, data: unknown) {
+    let response = await this.axios.post<ArrayBuffer>(path, data, {
+      responseType: 'arraybuffer'
+    });
+    let bytes = new Uint8Array(response.data);
+    let mimeType = getResponseHeaderValue(response.headers, 'content-type');
+    if (response.status !== 200 || mimeType?.includes('application/json')) {
+      let body: unknown;
+      try {
+        body = JSON.parse(new TextDecoder().decode(bytes));
+      } catch {
+        throw createApiServiceError(
+          `Docmosis returned an invalid file response (HTTP ${response.status}).`,
+          {
+            reason: 'docmosis_invalid_response',
+            upstreamStatus: response.status
+          }
+        );
+      }
+      this.checkResponse(body, response.status);
+      throw createApiServiceError(
+        'Docmosis returned a status response instead of a downloadable file.'
+      );
+    }
+    if (bytes.byteLength === 0) {
+      throw createApiServiceError('Docmosis returned an empty file.');
+    }
+    return {
+      file: new Response(bytes, {
+        headers: { 'content-type': mimeType || 'application/octet-stream' }
+      }),
+      headers: response.headers
+    };
   }
 
   async ping(): Promise<boolean> {
@@ -131,136 +220,134 @@ export class Client {
     return response.status === 200;
   }
 
-  async environmentReady(): Promise<DocmosisResponse> {
-    let response = await this.axios.post('/environment/ready', {
-      accessKey: this.accessKey
-    });
-    return response.data;
-  }
-
   async environmentSummary(): Promise<EnvironmentSummaryResponse> {
-    let response = await this.axios.post('/environment/summary', {
-      accessKey: this.accessKey
-    });
-    return response.data;
+    return this.post('/environment/summary');
   }
 
   async listTemplates(
     folder?: string,
     includeSubFolders?: boolean
   ): Promise<ListTemplatesResponse> {
-    let body: Record<string, any> = { accessKey: this.accessKey };
-    if (folder) body.folder = folder;
-    if (includeSubFolders !== undefined) body.includeSubFolders = includeSubFolders;
-    let response = await this.axios.post('/listTemplates', body);
-    return response.data;
+    let response = await this.post<ListTemplatesResponse>(
+      '/listTemplates',
+      pickDefined({ folder, includeSubFolders })
+    );
+    // The API returns names relative to a requested folder; expose reusable paths.
+    if (folder) {
+      let prefix = folder.replace(/\/+$/, '');
+      response.templateList = response.templateList?.map(template => ({
+        ...template,
+        name: `${prefix}/${template.name.replace(/^\/+/, '')}`
+      }));
+    }
+    return response;
   }
 
   async getTemplateDetails(templateName: string): Promise<TemplateDetailsResponse> {
-    let response = await this.axios.post('/getTemplateDetails', {
-      accessKey: this.accessKey,
-      templateName
-    });
-    return response.data;
+    return this.post('/getTemplateDetails', { templateName });
   }
 
   async getTemplateStructure(templateName: string): Promise<TemplateStructureResponse> {
-    let response = await this.axios.post('/getTemplateStructure', {
-      accessKey: this.accessKey,
-      templateName
-    });
-    return response.data;
+    return this.post('/getTemplateStructure', { templateName, stringify: false });
   }
 
-  async getSampleData(
-    templateName: string,
-    sampleDataFormat?: string
-  ): Promise<SampleDataResponse> {
-    let body: Record<string, any> = { accessKey: this.accessKey, templateName };
-    if (sampleDataFormat) body.sampleDataFormat = sampleDataFormat;
-    let response = await this.axios.post('/getSampleData', body);
-    return response.data;
+  async getSampleData(templateName: string): Promise<SampleDataResponse> {
+    return this.post('/getSampleData', { templateName, format: 'json', stringify: false });
   }
 
   async deleteTemplate(templateName: string | string[]): Promise<DocmosisResponse> {
-    let response = await this.axios.post('/deleteTemplate', {
-      accessKey: this.accessKey,
-      templateName
-    });
-    return response.data;
+    let names = Array.isArray(templateName) ? templateName : [templateName];
+    if (!names.length || names.some(name => !name.trim())) {
+      throw createApiServiceError('Provide at least one non-empty template path.');
+    }
+    let form = new URLSearchParams();
+    for (let name of names) form.append('templateName', name);
+    return this.post('/deleteTemplate', form);
+  }
+
+  async uploadTemplate(options: {
+    filename: string;
+    content: Uint8Array;
+    templateName?: string;
+    templateDescription?: string;
+    devMode?: boolean;
+    keepPrevOnFail?: boolean;
+  }): Promise<TemplateDetailsResponse> {
+    let form = new FormData();
+    form.append('templateFile', new Blob([new Uint8Array(options.content)]), options.filename);
+    for (let [key, value] of Object.entries(
+      pickDefined({
+        templateName: options.templateName,
+        templateDescription: options.templateDescription,
+        devMode: options.devMode,
+        keepPrevOnFail: options.keepPrevOnFail
+      })
+    )) {
+      form.append(key, String(value));
+    }
+    return this.post('/uploadTemplate', form);
+  }
+
+  async downloadTemplate(templateName: string) {
+    return this.fileRequest('/getTemplate', { templateName });
   }
 
   async render(options: RenderOptions): Promise<RenderResult> {
-    let body: Record<string, any> = {
-      accessKey: this.accessKey,
+    let body = pickDefined({
       templateName: options.templateName,
       outputName: options.outputName,
-      data: options.data
-    };
-
-    if (options.outputFormat) body.outputFormat = options.outputFormat;
-    if (options.storeTo) body.storeTo = options.storeTo;
-    if (options.devMode !== undefined) body.devMode = options.devMode;
-    if (options.strictParams !== undefined) body.strictParams = options.strictParams;
-    if (options.mailSubject) body.mailSubject = options.mailSubject;
-    if (options.mailBodyText) body.mailBodyText = options.mailBodyText;
-    if (options.renderTag) body.renderTag = options.renderTag;
-
-    // If storeTo is not "stream" (the default), the response is JSON
-    // If storeTo includes "stream", the response is a binary file
-    let isStreamResponse = !options.storeTo || options.storeTo.includes('stream');
-
-    let response = await this.axios.post('/render', body, {
-      responseType: isStreamResponse ? 'arraybuffer' : 'json'
+      data: options.data,
+      outputFormat: options.outputFormat,
+      storeTo: options.storeTo,
+      devMode: options.devMode,
+      strictParams: options.strictParams,
+      mailSubject: options.mailSubject,
+      mailBodyText: options.mailBodyText,
+      tags: options.renderTag
     });
-
-    let result: RenderResult = {
-      pagesRendered: response.headers['x-docmosis-pagesrendered'],
-      requestId: response.headers['x-docmosis-requestid'],
-      documentErrorsDetected: response.headers['x-docmosis-document-errors-detected']
-    };
-
-    if (!isStreamResponse && response.data) {
-      let data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-      result.succeeded = data.succeeded;
-      result.shortMsg = data.shortMsg;
-      result.longMsg = data.longMsg;
-    } else {
-      result.succeeded = response.status === 200;
+    let isStreamResponse =
+      !options.storeTo?.trim() ||
+      options.storeTo.split(';').some(target => /^stream(?::|$)/.test(target.trim()));
+    if (!isStreamResponse) {
+      let response = await this.axios.post('/render', body);
+      let result = this.checkResponse<RenderResult>(response.data, response.status);
+      return {
+        ...result,
+        pagesRendered: getResponseHeaderValue(response.headers, 'x-docmosis-pagesrendered'),
+        requestId:
+          getResponseHeaderValue(response.headers, 'x-docmosis-requestid') ?? result.requestId,
+        documentErrorsDetected: getResponseHeaderValue(
+          response.headers,
+          'x-docmosis-document-errors-detected'
+        )
+      };
     }
-
-    return result;
+    let response = await this.fileRequest('/render', body);
+    let zipped = getResponseHeaderValue(response.headers, 'x-docmosis-zip-created') === 'true';
+    return {
+      succeeded: true,
+      pagesRendered: getResponseHeaderValue(response.headers, 'x-docmosis-pagesrendered'),
+      requestId: getResponseHeaderValue(response.headers, 'x-docmosis-requestid'),
+      documentErrorsDetected: getResponseHeaderValue(
+        response.headers,
+        'x-docmosis-document-errors-detected'
+      ),
+      file: response.file,
+      filename:
+        zipped && !options.outputName.endsWith('.zip')
+          ? `${options.outputName}.zip`
+          : options.outputName
+    };
   }
 
   async getRenderQueue(): Promise<RenderQueueResponse> {
-    let response = await this.axios.post('/getRenderQueue', {
-      accessKey: this.accessKey
-    });
-    return response.data;
+    return this.post('/getRenderQueue');
   }
 
   async getRenderTags(tags?: string): Promise<RenderTagsResponse> {
-    let body: Record<string, any> = { accessKey: this.accessKey };
-    if (tags) body.tags = tags;
-    let response = await this.axios.post('/getRenderTags', body);
-    return response.data;
-  }
-
-  async listImages(folderName?: string): Promise<{
-    succeeded: boolean;
-    images?: Array<{ name: string; sizeBytes?: number; uploadedTime?: number }>;
-  }> {
-    let body: Record<string, any> = { accessKey: this.accessKey };
-    if (folderName) body.folderName = folderName;
-    let response = await this.axios.post('/listImages', body);
-    return response.data;
-  }
-
-  async deleteImage(imageName: string | string[]): Promise<DocmosisResponse> {
-    let response = await this.axios.post('/deleteImage', {
-      accessKey: this.accessKey,
-      imageName
-    });
-    return response.data;
+    if (!tags?.trim()) {
+      throw createApiServiceError('Provide one or more semicolon-separated render tags.');
+    }
+    return this.post('/getRenderTags', { tags });
   }
 }

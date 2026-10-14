@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -17,19 +17,27 @@ export let managePullRequestTool = SlateTool.create(spec, {
       collectionId: z
         .string()
         .optional()
-        .describe('Collection ID (required for create and list)'),
+        .describe('Collection UID for list; fork UID for create when sourceUid is omitted'),
       pullRequestId: z
         .string()
         .optional()
         .describe('Pull request ID (required for get and update)'),
       title: z.string().optional().describe('PR title (required for create)'),
       description: z.string().optional().describe('PR description'),
-      sourceUid: z.string().optional().describe('Forked collection UID (required for create)'),
+      sourceUid: z
+        .string()
+        .optional()
+        .describe('Forked collection UID for create; defaults to collectionId'),
       destinationUid: z
         .string()
         .optional()
         .describe('Parent collection UID (required for create)'),
-      reviewers: z.array(z.string()).optional().describe('User IDs of reviewers')
+      reviewers: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'User IDs of reviewers; update replaces the current reviewer list when provided'
+        )
     })
   )
   .output(
@@ -43,16 +51,17 @@ export let managePullRequestTool = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.collectionId) throw new Error('collectionId is required for create.');
-      if (!ctx.input.title || !ctx.input.sourceUid || !ctx.input.destinationUid) {
-        throw new Error('title, sourceUid, and destinationUid are required for create.');
+      let sourceUid = ctx.input.sourceUid ?? ctx.input.collectionId;
+      if (!ctx.input.title || !sourceUid || !ctx.input.destinationUid) {
+        throw createApiServiceError(
+          'title, a sourceUid or collectionId, and destinationUid are required for create.'
+        );
       }
-      let result = await client.createPullRequest(ctx.input.collectionId, {
+      let result = await client.createPullRequest(sourceUid, {
         title: ctx.input.title,
         description: ctx.input.description,
-        source: ctx.input.sourceUid,
-        destination: ctx.input.destinationUid,
-        reviewers: ctx.input.reviewers
+        destinationId: ctx.input.destinationUid,
+        reviewers: ctx.input.reviewers ?? []
       });
       return {
         output: { pullRequest: result },
@@ -61,7 +70,8 @@ export let managePullRequestTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.pullRequestId) throw new Error('pullRequestId is required for get.');
+      if (!ctx.input.pullRequestId)
+        throw createApiServiceError('pullRequestId is required for get.');
       let result = await client.getPullRequest(ctx.input.pullRequestId);
       return {
         output: { pullRequest: result },
@@ -70,10 +80,16 @@ export let managePullRequestTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.pullRequestId) throw new Error('pullRequestId is required for update.');
+      if (!ctx.input.pullRequestId)
+        throw createApiServiceError('pullRequestId is required for update.');
+      let current = await client.getPullRequest(ctx.input.pullRequestId);
       let result = await client.updatePullRequest(ctx.input.pullRequestId, {
-        title: ctx.input.title,
-        description: ctx.input.description
+        title: ctx.input.title ?? current.title,
+        description: ctx.input.description ?? current.description,
+        reviewers:
+          ctx.input.reviewers ??
+          current.reviewers?.map((reviewer: { id: string }) => reviewer.id) ??
+          []
       });
       return {
         output: { pullRequest: result },
@@ -81,7 +97,8 @@ export let managePullRequestTool = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.collectionId) throw new Error('collectionId is required for list.');
+    if (!ctx.input.collectionId)
+      throw createApiServiceError('collectionId is required for list.');
     let result = await client.listPullRequests(ctx.input.collectionId);
     return {
       output: { pullRequests: result },

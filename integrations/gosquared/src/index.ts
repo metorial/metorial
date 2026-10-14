@@ -8,10 +8,13 @@ import {
   getChatMessages,
   getHistoricalAnalytics,
   getPerson,
+  getPersonActivity,
   getRealtimeAnalytics,
   getSmartGroupMembers,
+  getTokenInfo,
   identifyUser,
   listChats,
+  listSites,
   listSmartGroups,
   searchPeople,
   sendChatMessage,
@@ -38,7 +41,10 @@ export let provider = Slate.create({
     archiveChatConversation,
     listSmartGroups,
     getSmartGroupMembers,
-    createSmartGroup
+    createSmartGroup,
+    listSites,
+    getTokenInfo,
+    getPersonActivity
   ],
   triggers: []
 });

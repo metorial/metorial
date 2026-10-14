@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SevdeskClient } from '../lib/client';
+import { SevdeskClient, sevdeskDateToTimestamp } from '../lib/client';
 import { spec } from '../spec';
 
 let invoicePositionSchema = z
@@ -57,13 +57,27 @@ export let createInvoice = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Tax rule ID (for sevDesk 2.0). Use Receipt Guidance to find valid IDs.'),
+      taxType: z
+        .enum(['default', 'eu', 'noteu', 'custom', 'ss'])
+        .optional()
+        .describe('Tax type for bookkeeping version 1.0; use taxRuleId for version 2.0.'),
+      taxSetId: z.string().optional().describe('Tax set ID. Required when taxType is custom.'),
+      taxText: z.string().optional().describe('Tax explanation displayed on the invoice.'),
+      contactPersonId: z
+        .string()
+        .optional()
+        .describe('sevDesk user ID of the contact person responsible for the invoice.'),
+      addressCountryId: z.string().optional().describe('Country ID for the invoice address.'),
       currency: z.string().optional().describe('Currency code (default: EUR)'),
       positions: z.array(invoicePositionSchema).describe('Line items for the invoice'),
       sendType: z
         .enum(['VPR', 'VPDF', 'VM', 'VP'])
         .optional()
         .describe('Send type: VPR=print, VPDF=PDF, VM=mail, VP=post'),
-      status: z.number().optional().describe('Initial status: 100=Draft, 200=Open')
+      status: z
+        .number()
+        .optional()
+        .describe('Initial status must be 100 (Draft). Use send_invoice to open the invoice.')
     })
   )
   .output(
@@ -76,16 +90,27 @@ export let createInvoice = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.taxType === 'custom' && !ctx.input.taxSetId?.trim()) {
+      throw createApiServiceError('taxSetId is required when taxType is custom.');
+    }
+    if (ctx.input.status !== undefined && ctx.input.status !== 100) {
+      throw createApiServiceError(
+        'New invoices must have status 100 (Draft). Use send_invoice to open an invoice.'
+      );
+    }
     let client = new SevdeskClient({ token: ctx.auth.token });
 
     let invoiceData: Record<string, any> = {
       objectName: 'Invoice',
       contact: { id: ctx.input.contactId, objectName: 'Contact' },
-      invoiceDate: ctx.input.invoiceDate,
+      invoiceDate: String(sevdeskDateToTimestamp(ctx.input.invoiceDate, 'invoiceDate')),
       status: ctx.input.status ?? 100,
       invoiceType: 'RE',
       currency: ctx.input.currency ?? 'EUR',
-      mapAll: true
+      mapAll: true,
+      showNet: true,
+      discount: ctx.input.discount ?? 0,
+      taxRate: 0
     };
 
     if (ctx.input.dueDate) invoiceData.dueDate = ctx.input.dueDate;
@@ -96,13 +121,30 @@ export let createInvoice = SlateTool.create(spec, {
     if (ctx.input.discount !== undefined) invoiceData.discount = ctx.input.discount;
     if (ctx.input.discountTime !== undefined)
       invoiceData.discountTime = ctx.input.discountTime;
-    if (ctx.input.deliveryDate) invoiceData.deliveryDate = ctx.input.deliveryDate;
+    if (ctx.input.deliveryDate)
+      invoiceData.deliveryDate = String(
+        sevdeskDateToTimestamp(ctx.input.deliveryDate, 'deliveryDate')
+      );
     if (ctx.input.deliveryDateUntil)
-      invoiceData.deliveryDateUntil = ctx.input.deliveryDateUntil;
+      invoiceData.deliveryDateUntil = sevdeskDateToTimestamp(
+        ctx.input.deliveryDateUntil,
+        'deliveryDateUntil'
+      );
     if (ctx.input.timeToPay !== undefined) invoiceData.timeToPay = ctx.input.timeToPay;
     if (ctx.input.taxRuleId) {
       invoiceData.taxRule = { id: ctx.input.taxRuleId, objectName: 'TaxRule' };
     }
+    if (ctx.input.taxType) invoiceData.taxType = ctx.input.taxType;
+    if (ctx.input.taxSetId?.trim())
+      invoiceData.taxSet = { id: ctx.input.taxSetId.trim(), objectName: 'TaxSet' };
+    if (ctx.input.taxText !== undefined) invoiceData.taxText = ctx.input.taxText;
+    if (ctx.input.contactPersonId)
+      invoiceData.contactPerson = { id: ctx.input.contactPersonId, objectName: 'SevUser' };
+    if (ctx.input.addressCountryId)
+      invoiceData.addressCountry = {
+        id: ctx.input.addressCountryId,
+        objectName: 'StaticCountry'
+      };
     if (ctx.input.sendType) invoiceData.sendType = ctx.input.sendType;
 
     let positions = ctx.input.positions.map((pos, idx) => {
@@ -124,17 +166,24 @@ export let createInvoice = SlateTool.create(spec, {
 
     let result = await client.createInvoice({
       invoice: invoiceData,
-      invoicePosSave: positions
+      invoicePosSave: positions,
+      invoicePosDelete: null,
+      discountSave: [],
+      discountDelete: null,
+      takeDefaultAddress: true
     });
 
     let invoice = result?.invoice ?? result;
+    if (invoice?.id == null) {
+      throw createApiServiceError('sevDesk did not return the created invoice ID.');
+    }
 
     return {
       output: {
         invoiceId: String(invoice.id),
         invoiceNumber: invoice.invoiceNumber ?? undefined,
-        totalNet: invoice.sumNet ?? undefined,
-        totalGross: invoice.sumGross ?? undefined,
+        totalNet: invoice.sumNet != null ? String(invoice.sumNet) : undefined,
+        totalGross: invoice.sumGross != null ? String(invoice.sumGross) : undefined,
         status: invoice.status ? String(invoice.status) : undefined
       },
       message: `Created invoice **${invoice.invoiceNumber ?? invoice.id}** for contact ${ctx.input.contactId}.`

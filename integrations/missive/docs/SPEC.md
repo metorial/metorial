@@ -1,4 +1,4 @@
-Let me get more details on the webhook types and the full list of API features.# Slates Specification for Missive
+# Missive API Specification
 
 ## Overview
 

@@ -1,9 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
-let axiosInstance = createAxios({
-  baseURL: 'https://api.docupilot.app'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -27,7 +25,12 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let encoded = btoa(`${ctx.input.apiKey}:${ctx.input.apiSecret}`);
+      if (!ctx.input.apiKey.trim() || !ctx.input.apiSecret || !ctx.input.workspaceId.trim()) {
+        throw createApiServiceError('Enter your Docupilot API key, secret, and workspace ID.');
+      }
+      let encoded = Buffer.from(`${ctx.input.apiKey}:${ctx.input.apiSecret}`, 'utf8').toString(
+        'base64'
+      );
       return {
         output: {
           token: encoded,
@@ -40,17 +43,16 @@ export let auth = SlateAuth.create()
       output: { token: string; workspaceId: string };
       input: { apiKey: string; apiSecret: string; workspaceId: string };
     }) => {
-      let response = await axiosInstance.get('/dashboard/accounts/v2/users/me/', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'X-Workspace': ctx.output.workspaceId
-        }
-      });
-
-      let user = response.data;
+      let user = await new Client(ctx.output).getCurrentUser();
+      let id = user.id == null ? user.email : String(user.id);
+      if (!id) {
+        throw createApiServiceError(
+          'Docupilot did not return a user identity. Verify your API credentials.'
+        );
+      }
       return {
         profile: {
-          id: String(user.id ?? ''),
+          id,
           email: user.email ?? '',
           name: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || ''
         }

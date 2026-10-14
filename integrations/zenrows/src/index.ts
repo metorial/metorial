@@ -1,7 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  extractUrl,
   getUsage,
+  listExtractDomains,
   scrapeAmazon,
   scrapeIdealista,
   scrapeUrl,
@@ -19,7 +21,9 @@ export let provider = Slate.create({
     scrapeZillow,
     scrapeIdealista,
     searchGoogle,
-    getUsage
+    getUsage,
+    extractUrl,
+    listExtractDomains
   ],
   triggers: []
 });

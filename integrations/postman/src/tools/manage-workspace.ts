@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -35,7 +35,7 @@ export let manageWorkspaceTool = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!name || !type)
-        throw new Error('Name and type are required when creating a workspace.');
+        throw createApiServiceError('Name and type are required when creating a workspace.');
       let result = await client.createWorkspace({ name, type, description });
       return {
         output: { workspaceId: result.id, name: result.name },
@@ -44,7 +44,7 @@ export let manageWorkspaceTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!workspaceId) throw new Error('workspaceId is required for update.');
+      if (!workspaceId) throw createApiServiceError('workspaceId is required for update.');
       let result = await client.updateWorkspace(workspaceId, { name, type, description });
       return {
         output: { workspaceId: result.id, name: result.name },
@@ -52,7 +52,7 @@ export let manageWorkspaceTool = SlateTool.create(spec, {
       };
     }
 
-    if (!workspaceId) throw new Error('workspaceId is required for delete.');
+    if (!workspaceId) throw createApiServiceError('workspaceId is required for delete.');
     let result = await client.deleteWorkspace(workspaceId);
     return {
       output: { workspaceId: result.id, name: undefined },

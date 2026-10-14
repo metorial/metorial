@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,7 @@ export let manageBotChannels = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botUserId: z.string().describe('User ID of the bot'),
+      botUserId: z.string().min(1).max(80).describe('User ID of the bot'),
       action: z.enum(['join', 'leave']).describe('Whether to join or leave channels'),
       channelUrls: z
         .array(z.string())
@@ -43,14 +43,14 @@ export let manageBotChannels = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     let { botUserId, action, channelUrls, channelUrl, leaveAll } = ctx.input;
 
     if (action === 'join') {
       if (!channelUrls || channelUrls.length === 0) {
-        throw new Error('channelUrls is required when action is "join"');
+        throw createApiServiceError('channelUrls is required when action is "join"');
       }
       await client.joinChannels(botUserId, channelUrls);
       return {
@@ -70,7 +70,7 @@ export let manageBotChannels = SlateTool.create(spec, {
         message: `Bot **${botUserId}** left the specified channel.`
       };
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Provide either channelUrl or set leaveAll to true when action is "leave"'
       );
     }

@@ -24,7 +24,8 @@ export let getTicket = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let ticket = await client.getTicket(ctx.input.ticketId);

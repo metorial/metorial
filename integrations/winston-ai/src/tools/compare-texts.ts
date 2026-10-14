@@ -92,7 +92,7 @@ Useful for checking if two texts share common content, detecting paraphrasing, o
       matchSegments: (t.items ?? []).map(item => ({
         type: item.type,
         wordCount: item.word_count,
-        startIndex: item.start_index,
+        startIndex: item.index_start ?? item.start_index,
         length: item.length
       }))
     });

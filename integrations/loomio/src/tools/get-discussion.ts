@@ -55,22 +55,21 @@ export let getDiscussion = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.getDiscussion(ctx.input.discussionId);
-    let discussion = result.discussions?.[0] || result;
+    let discussion = await client.getDiscussion(ctx.input.discussionId);
 
     return {
       output: {
         discussionId: discussion.id,
         discussionKey: discussion.key,
         title: discussion.title,
-        description: discussion.description,
-        descriptionFormat: discussion.description_format,
-        groupId: discussion.group_id,
-        authorId: discussion.author_id,
-        createdAt: discussion.created_at,
-        lastActivityAt: discussion.last_activity_at,
-        itemsCount: discussion.items_count,
-        closedAt: discussion.closed_at
+        description: discussion.description ?? undefined,
+        descriptionFormat: discussion.description_format ?? undefined,
+        groupId: discussion.group_id ?? undefined,
+        authorId: discussion.author_id ?? undefined,
+        createdAt: discussion.created_at ?? undefined,
+        lastActivityAt: discussion.last_activity_at ?? undefined,
+        itemsCount: discussion.items_count ?? undefined,
+        closedAt: discussion.closed_at ?? undefined
       },
       message: `Retrieved discussion **"${discussion.title}"** (ID: ${discussion.id}).`
     };

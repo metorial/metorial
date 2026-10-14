@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FluxguardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -12,7 +12,7 @@ let categorySchema = z.object({
 export let listCategories = SlateTool.create(spec, {
   name: 'List Categories',
   key: 'list_categories',
-  description: `List all site categories in your Fluxguard account. Categories are used to organize monitored sites into logical groups.`,
+  description: `List all site and page categories in your Fluxguard account, including their identifiers, names, and available category type.`,
   tags: {
     readOnly: true
   }
@@ -28,16 +28,26 @@ export let listCategories = SlateTool.create(spec, {
 
     let result = await client.listCategories();
 
+    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+      throw createApiServiceError('Fluxguard returned an invalid category list.');
+    }
+
     let categories: Array<{ categoryId: string; name: string; type?: string }> = [];
-    if (result && typeof result === 'object') {
-      for (let [id, value] of Object.entries(result)) {
-        let cat = value as any;
-        categories.push({
-          categoryId: id,
-          name: cat.name ?? cat.categoryName ?? id,
-          type: cat.type ?? undefined
-        });
+    for (let [id, value] of Object.entries(result)) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw createApiServiceError('Fluxguard returned invalid category data.');
       }
+      let cat = value as Record<string, unknown>;
+      categories.push({
+        categoryId: id,
+        name:
+          typeof cat.name === 'string'
+            ? cat.name
+            : typeof cat.categoryName === 'string'
+              ? cat.categoryName
+              : id,
+        type: typeof cat.type === 'string' ? cat.type : undefined
+      });
     }
 
     return {
@@ -71,10 +81,16 @@ export let createCategory = SlateTool.create(spec, {
     let client = new FluxguardClient(ctx.auth.token);
 
     let result = await client.createCategory(ctx.input.name);
+    let categoryId = typeof result === 'string' ? result : (result?.categoryId ?? result?.id);
+    if (typeof categoryId !== 'string' || !categoryId.trim()) {
+      throw createApiServiceError(
+        'Fluxguard did not return an identifier for the created category. Call list_categories before retrying.'
+      );
+    }
 
     return {
       output: {
-        categoryId: result.categoryId ?? result.id ?? '',
+        categoryId,
         name: ctx.input.name
       },
       message: `Created category **${ctx.input.name}**.`

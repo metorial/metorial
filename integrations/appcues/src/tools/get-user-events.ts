@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppcuesClient } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,10 @@ export let getUserEvents = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Maximum number of events to return (default: 100)'),
-      timeZone: z.string().optional().describe('Time zone for timestamps (default: UTC)')
+      timeZone: z
+        .string()
+        .optional()
+        .describe('UTC offset for timestamps, such as -04:00 or -240 (default: UTC)')
     })
   )
   .output(
@@ -41,6 +44,13 @@ export let getUserEvents = SlateTool.create(spec, {
       accountId: ctx.config.accountId,
       region: ctx.config.region
     });
+
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1)
+    ) {
+      throw createApiServiceError('Event limit must be a positive integer.');
+    }
 
     let events = await client.getUserEvents(
       ctx.input.userId,

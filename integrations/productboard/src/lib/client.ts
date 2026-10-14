@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -15,17 +15,124 @@ export interface PaginationParams {
 }
 
 export class Client {
-  private api: ReturnType<typeof createAxios>;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
+  private currentApi: ReturnType<typeof createAuthenticatedAxios>;
+  private oauthApi: ReturnType<typeof createAuthenticatedAxios>;
+  private token: string;
 
   constructor(config: { token: string }) {
-    this.api = createAxios({
+    this.token = config.token;
+    this.api = createAuthenticatedAxios({
       baseURL: 'https://api.productboard.com',
       headers: {
         Authorization: `Bearer ${config.token}`,
         'X-Version': '1',
         'Content-Type': 'application/json'
-      }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Productboard',
+          reason: 'productboard_api_error'
+        })
     });
+    this.currentApi = createAuthenticatedAxios({
+      baseURL: 'https://api.productboard.com/v2',
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Productboard',
+          reason: 'productboard_api_error'
+        })
+    });
+    this.oauthApi = createAuthenticatedAxios({
+      baseURL: 'https://app.productboard.com',
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Productboard',
+          reason: 'productboard_oauth_error'
+        })
+    });
+  }
+
+  async listEntityConfigurations(params: { types?: string[]; pageCursor?: string }) {
+    let query = new URLSearchParams();
+    for (let type of params.types ?? []) query.append('type[]', type);
+    if (params.pageCursor) query.set('pageCursor', params.pageCursor);
+    return this.listCurrentEntities('/entities/configurations', query);
+  }
+
+  async listEntities(params: {
+    types?: string[];
+    pageCursor?: string;
+    name?: string;
+    archived?: boolean;
+    parentId?: string;
+    fields?: string[];
+  }) {
+    let query = new URLSearchParams();
+    for (let type of params.types ?? []) query.append('type[]', type);
+    for (let field of params.fields ?? []) query.append('fields[]', field);
+    if (params.pageCursor) query.set('pageCursor', params.pageCursor);
+    if (params.name !== undefined) query.set('name', params.name);
+    if (params.archived !== undefined) query.set('archived', String(params.archived));
+    if (params.parentId !== undefined) query.set('parent[id]', params.parentId);
+    return this.listCurrentEntities('/entities', query);
+  }
+
+  private async listCurrentEntities(path: string, params: URLSearchParams) {
+    let response = await this.currentApi.get<{
+      data: Record<string, unknown>[];
+      links?: { next?: string | null };
+    }>(path, { params });
+    if (!Array.isArray(response.data?.data)) {
+      throw createApiServiceError('Productboard returned an invalid entity list response.', {
+        reason: 'invalid_productboard_response'
+      });
+    }
+    let pageCursor: string | undefined;
+    if (response.data.links?.next) {
+      try {
+        pageCursor =
+          new URL(response.data.links.next, 'https://api.productboard.com').searchParams.get(
+            'pageCursor'
+          ) ?? undefined;
+      } catch {
+        throw createApiServiceError('Productboard returned an invalid pagination link.', {
+          reason: 'invalid_productboard_response'
+        });
+      }
+    }
+    return { data: response.data.data, pageCursor };
+  }
+
+  async getCurrentUser() {
+    let response = await this.oauthApi.get<{
+      application: { uid: string };
+      resource_owner: { name?: string; email?: string };
+      space: { name: string; domain: string };
+      scopes: string[];
+      expires_in: number;
+    }>('/oauth2/token/info', { params: { access_token: this.token } });
+    if (
+      typeof response.data?.application?.uid !== 'string' ||
+      !response.data.resource_owner ||
+      typeof response.data.space?.name !== 'string' ||
+      typeof response.data.space?.domain !== 'string' ||
+      !Array.isArray(response.data.scopes) ||
+      typeof response.data.expires_in !== 'number'
+    ) {
+      throw createApiServiceError('Productboard returned an invalid OAuth profile response.', {
+        reason: 'invalid_productboard_response'
+      });
+    }
+    return {
+      applicationId: response.data.application.uid,
+      user: response.data.resource_owner,
+      workspace: response.data.space,
+      scopes: response.data.scopes,
+      expiresIn: response.data.expires_in
+    };
   }
 
   // ---- Features ----

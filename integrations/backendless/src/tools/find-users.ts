@@ -23,9 +23,14 @@ export let findUsers = SlateTool.create(spec, {
       sortBy: z
         .array(z.string())
         .optional()
-        .describe('Properties to sort by. Prefix with "-" for descending.'),
+        .describe(
+          'Properties to sort by, e.g. ["created DESC"]. A leading "-" also selects descending order.'
+        ),
       props: z.array(z.string()).optional().describe('Specific user properties to return'),
-      pageSize: z.number().optional().describe('Number of users per page'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Number of users per page (1-100, default: 10)'),
       offset: z.number().optional().describe('Starting index for pagination'),
       loadRelations: z
         .array(z.string())

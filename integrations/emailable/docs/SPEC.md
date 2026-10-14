@@ -1,4 +1,4 @@
-# Slates Specification for Emailable
+# Emailable Integration Specification
 
 ## Overview
 
@@ -25,8 +25,8 @@ API keys are created and managed in the Emailable Dashboard.
 
 Emailable supports OAuth 2.0 for authenticating users of OAuth Apps you've created. This allows making API requests on behalf of authenticated users.
 
-- **Authorization endpoint**: `GET https://api.emailable.com/oauth/authorize`
-- **Token endpoint**: `POST https://api.emailable.com/oauth/token`
+- **Authorization endpoint**: `GET https://app.emailable.com/oauth/authorize`
+- **Token endpoint**: `POST https://app.emailable.com/oauth/token`
 - **Revoke endpoint**: `POST https://app.emailable.com/oauth/revoke`
 
 The flow requires a `client_id`, `client_secret`, and `redirect_uri` configured in your OAuth App. Access tokens expire (default 86400 seconds) and can be refreshed using the provided refresh token. Scopes are not currently implemented; all tokens receive `all` scope.
@@ -57,11 +57,15 @@ Verify an individual email address in real time. Returns the deliverability stat
 Verify a list of emails in bulk by submitting a batch. Up to 50,000 emails can be submitted per batch.
 
 - Results can be retrieved by polling the batch status endpoint or by providing a callback URL that receives results via HTTP POST upon completion.
-- For batches up to 1,000 emails, individual results are returned inline. For larger batches, a downloadable CSV file is provided.
+- For batches up to 1,000 emails, individual results are returned inline. For larger batches, a downloadable ZIP-compressed CSV file is provided.
 - Partial results can be requested while a batch is still processing (for batches up to 1,000 emails).
 - The `response_fields` parameter allows limiting which fields are returned.
 - Results include aggregate counts by state and reason.
 - Individual results for small batches are retained for 30 days; download links for large batches are available for 5 days.
+
+### Download Batch Results
+
+Use `get_batch_results` to download completed batch results. Small batches are exported as JSON with camelCase field names. Large batches use the provider download URL, with renewal while the file remains available. The selected response fields are preserved.
 
 ### Account Information
 

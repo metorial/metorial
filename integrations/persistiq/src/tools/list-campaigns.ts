@@ -31,7 +31,16 @@ let campaignSchema = z.object({
     .optional()
     .nullable()
     .describe('Number of prospects who opted out'),
-  totalContacted: z.number().optional().nullable().describe('Total number contacted')
+  totalContacted: z
+    .number()
+    .optional()
+    .nullable()
+    .describe('Total number contacted, if supplied by the provider'),
+  totalProspects: z
+    .number()
+    .optional()
+    .nullable()
+    .describe('Total number of prospects in the campaign')
 });
 
 export let listCampaigns = SlateTool.create(spec, {
@@ -44,20 +53,36 @@ export let listCampaigns = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (starts at 0)')
+      page: z
+        .number()
+        .min(0)
+        .refine(Number.isSafeInteger, 'Page must be a safe whole number')
+        .optional()
+        .describe('Page number for pagination'),
+      name: z.string().optional().describe('Filter by campaign name'),
+      ownerId: z.string().optional().describe('Filter by owner user ID from list_users'),
+      leadId: z
+        .string()
+        .optional()
+        .describe('Filter campaigns containing a lead ID from list_leads')
     })
   )
   .output(
     z.object({
       campaigns: z.array(campaignSchema).describe('List of campaigns'),
-      hasMore: z.boolean().describe('Whether there are more pages of results')
+      hasMore: z.boolean().describe('Whether there are more pages of results'),
+      nextPage: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Provider continuation value for the next page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.listCampaigns({ page: ctx.input.page });
+    let result = await client.listCampaigns(ctx.input);
 
-    let campaigns = (result.campaigns || []).map((c: any) => ({
+    let campaigns = (result.campaigns || []).map(c => ({
       campaignId: c.id,
       name: c.name,
       creatorId: c.creator?.id,
@@ -69,13 +94,14 @@ export let listCampaigns = SlateTool.create(spec, {
       prospectsOpened: c.stats?.prospects_opened,
       prospectsBounced: c.stats?.prospects_bounced,
       prospectsOptedOut: c.stats?.prospects_optedout,
-      totalContacted: c.stats?.total_contacted
+      totalContacted: c.stats?.total_contacted,
+      totalProspects: c.stats?.total_prospects
     }));
 
-    let hasMore = !!result.next_page;
+    let hasMore = result.has_more ?? !!result.next_page;
 
     return {
-      output: { campaigns, hasMore },
+      output: { campaigns, hasMore, nextPage: result.next_page },
       message: `Retrieved **${campaigns.length}** campaigns${hasMore ? ' (more pages available)' : ''}.`
     };
   })

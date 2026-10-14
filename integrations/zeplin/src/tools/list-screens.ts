@@ -50,7 +50,8 @@ export let listScreens = SlateTool.create(spec, {
       screenId: s.id,
       name: s.name,
       description: s.description,
-      thumbnail: s.thumbnail,
+      thumbnail:
+        s.image?.thumbnails?.medium ?? s.image?.thumbnails?.small ?? s.image?.original_url,
       created: s.created,
       updated: s.updated,
       tags: s.tags

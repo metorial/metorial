@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -12,7 +12,8 @@ let apiEntrySchema = z.object({
     .array(
       z.object({
         type: z.string().optional(),
-        url: z.string().optional()
+        url: z.string().optional(),
+        value: z.string().optional()
       })
     )
     .optional()
@@ -56,6 +57,18 @@ export let searchApisAndDomains = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.page !== undefined &&
+      (!Number.isInteger(ctx.input.page) || ctx.input.page < 0)
+    ) {
+      throw createApiServiceError('page must be a non-negative integer.');
+    }
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1 || ctx.input.limit > 100)
+    ) {
+      throw createApiServiceError('limit must be an integer between 1 and 100.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       baseUrl: ctx.config.baseUrl
@@ -73,13 +86,20 @@ export let searchApisAndDomains = SlateTool.create(spec, {
       order: ctx.input.order
     });
 
-    let apis = result?.apis ?? [];
-    let totalCount = result?.totalCount ?? apis.length;
+    let apis = apiEntrySchema.array().safeParse(result?.apis);
+    if (!apis.success) {
+      throw createApiServiceError('SwaggerHub returned an invalid search result.');
+    }
+    let entries = apis.data.map(api => ({
+      ...api,
+      owner: api.owner ?? api.properties?.find(property => property.type === 'X-Owner')?.value
+    }));
+    let totalCount = result?.totalCount ?? entries.length;
 
     return {
       output: {
         totalCount,
-        apis
+        apis: entries
       },
       message: `Found **${totalCount}** result(s) matching the search criteria.`
     };

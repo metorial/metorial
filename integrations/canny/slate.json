@@ -1,6 +1,6 @@
 {
   "name": "@metorial/canny",
-  "description": "Collect, organize, and prioritize user feedback and feature requests. Create, update, and manage feedback posts on boards with voting, comments, and status tracking. Manage users, companies, categories, tags, and changelog entries. Track ideas, insights, and opportunities linked to sales tools. Use AI-powered Autopilot to extract feature requests from text content. Monitor post, comment, and vote events via webhooks.",
+  "description": "Collect, organize, and prioritize user feedback and feature requests. Create, update, and manage feedback posts on boards with voting, comments, and status tracking. Manage users, companies, categories, tags, and changelog entries. List sales opportunities linked to feedback posts. Use AI-powered Autopilot to extract feature requests from text content.",
   "categories": [
     "apis-and-http-requests",
     "crm-and-sales-tools",

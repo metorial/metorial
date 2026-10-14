@@ -1,6 +1,6 @@
 # Motion
 
-Create, update, delete, and list tasks with AI-powered auto-scheduling, priorities, deadlines, and assignees. Manage projects within workspaces, create recurring tasks with configurable frequency, and add comments to tasks for collaboration. Define and manage custom fields (text, number, date, select, checkbox, etc.) on tasks and projects. Retrieve user schedules that control when tasks can be auto-scheduled. List workspaces, workspace statuses, and users.
+Create, update, delete, and list tasks with AI-powered auto-scheduling, priorities, deadlines, and assignees. Manage projects within workspaces, create recurring tasks with configurable frequency, and add comments to tasks for collaboration. Define and manage custom fields (text, number, date, select, checkbox, etc.) on tasks and projects. Retrieve user schedules that control when tasks can be auto-scheduled. List workspaces, workspace statuses, and users, and retrieve the current API-key owner directly. Use documented recurrence strings to create repeating tasks.
 
 ## License
 

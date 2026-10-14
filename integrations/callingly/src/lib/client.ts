@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private axios;
@@ -9,8 +9,16 @@ export class Client {
       accountId?: string;
     }
   ) {
-    this.axios = createAxios({
-      baseURL: 'https://api.callingly.com/v1'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.callingly.com/v1',
+      authHeader: { value: `Bearer ${options.token}` },
+      headers: { Accept: 'application/json' },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Callingly',
+          reason: 'callingly_api_error'
+        })
     });
   }
 
@@ -23,10 +31,10 @@ export class Client {
   }
 
   private addAccountId(params: Record<string, any> = {}): Record<string, any> {
-    if (this.options.accountId) {
-      params.account_id = this.options.accountId;
-    }
-    return params;
+    return {
+      ...params,
+      ...(this.options.accountId ? { account_id: this.options.accountId } : {})
+    };
   }
 
   // ── Leads ──────────────────────────────────────────────
@@ -45,7 +53,7 @@ export class Client {
   }
 
   async getLead(leadId: string) {
-    let response = await this.axios.get(`/leads/${leadId}`, {
+    let response = await this.axios.get(`/leads/${encodeURIComponent(leadId)}`, {
       headers: this.headers,
       params: this.addAccountId()
     });
@@ -53,14 +61,18 @@ export class Client {
   }
 
   async updateLead(leadId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/leads/${leadId}`, this.addAccountId(data), {
-      headers: this.headers
-    });
+    let response = await this.axios.put(
+      `/leads/${encodeURIComponent(leadId)}`,
+      this.addAccountId(data),
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   async deleteLead(leadId: string) {
-    let response = await this.axios.delete(`/leads/${leadId}`, {
+    let response = await this.axios.delete(`/leads/${encodeURIComponent(leadId)}`, {
       headers: this.headers,
       params: this.addAccountId()
     });
@@ -80,8 +92,8 @@ export class Client {
     if (params?.start) queryParams.start = params.start;
     if (params?.end) queryParams.end = params.end;
     if (params?.teamId) queryParams.team_id = params.teamId;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.page) queryParams.page = params.page;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.page !== undefined) queryParams.page = params.page;
 
     let response = await this.axios.get('/calls', {
       headers: this.headers,
@@ -91,7 +103,7 @@ export class Client {
   }
 
   async getCall(callId: string) {
-    let response = await this.axios.get(`/calls/${callId}`, {
+    let response = await this.axios.get(`/calls/${encodeURIComponent(callId)}`, {
       headers: this.headers,
       params: this.addAccountId()
     });
@@ -114,14 +126,14 @@ export class Client {
       team_id: data.teamId,
       phone_number: data.phoneNumber
     });
-    if (data.firstName) body.first_name = data.firstName;
-    if (data.lastName) body.last_name = data.lastName;
-    if (data.email) body.email = data.email;
-    if (data.company) body.company = data.company;
-    if (data.category) body.category = data.category;
-    if (data.source) body.source = data.source;
-    if (data.crmId) body.crm_id = data.crmId;
-    if (data.scheduledAt) body.scheduled_at = data.scheduledAt;
+    if (data.firstName !== undefined) body.first_name = data.firstName;
+    if (data.lastName !== undefined) body.last_name = data.lastName;
+    if (data.email !== undefined) body.email = data.email;
+    if (data.company !== undefined) body.company = data.company;
+    if (data.category !== undefined) body.category = data.category;
+    if (data.source !== undefined) body.source = data.source;
+    if (data.crmId !== undefined) body.crm_id = data.crmId;
+    if (data.scheduledAt !== undefined) body.scheduled_at = data.scheduledAt;
 
     let response = await this.axios.post('/calls', body, {
       headers: this.headers
@@ -141,6 +153,12 @@ export class Client {
     let response = await this.axios.post('/sms', body, {
       headers: this.headers
     });
+    if (response.data?.is_error === 1 || response.data?.is_error === true) {
+      throw createApiServiceError(
+        `Callingly could not send the SMS: ${response.data.error_code || response.data.error_message || 'message rejected'}.`,
+        { reason: 'callingly_sms_error' }
+      );
+    }
     return response.data;
   }
 
@@ -155,7 +173,7 @@ export class Client {
   }
 
   async getTeam(teamId: string) {
-    let response = await this.axios.get(`/teams/${teamId}`, {
+    let response = await this.axios.get(`/teams/${encodeURIComponent(teamId)}`, {
       headers: this.headers,
       params: this.addAccountId()
     });
@@ -171,16 +189,20 @@ export class Client {
   }
 
   async updateTeam(teamId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/teams/${teamId}`, this.addAccountId(data), {
-      headers: this.headers
-    });
+    let response = await this.axios.put(
+      `/teams/${encodeURIComponent(teamId)}`,
+      this.addAccountId(data),
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   // ── Team Agents ────────────────────────────────────────
 
   async listTeamAgents(teamId: string) {
-    let response = await this.axios.get(`/teams/${teamId}/agents`, {
+    let response = await this.axios.get(`/teams/${encodeURIComponent(teamId)}/agents`, {
       headers: this.headers,
       params: this.addAccountId()
     });
@@ -189,17 +211,20 @@ export class Client {
 
   async assignAgentsToTeam(teamId: string, agentIds: string[]) {
     let body = this.addAccountId({ agents: agentIds });
-    let response = await this.axios.put(`/teams/${teamId}/agents`, body, {
+    let response = await this.axios.put(`/teams/${encodeURIComponent(teamId)}/agents`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async removeAgentFromTeam(teamId: string, agentId: string) {
-    let response = await this.axios.delete(`/teams/${teamId}/agents/${agentId}`, {
-      headers: this.headers,
-      params: this.addAccountId()
-    });
+    let response = await this.axios.delete(
+      `/teams/${encodeURIComponent(teamId)}/agents/${encodeURIComponent(agentId)}`,
+      {
+        headers: this.headers,
+        params: this.addAccountId()
+      }
+    );
     return response.data;
   }
 
@@ -212,9 +237,13 @@ export class Client {
     if (data.priority !== undefined) body.priority = data.priority;
     if (data.cap !== undefined) body.cap = data.cap;
 
-    let response = await this.axios.put(`/teams/${teamId}/agents/${agentId}`, body, {
-      headers: this.headers
-    });
+    let response = await this.axios.put(
+      `/teams/${encodeURIComponent(teamId)}/agents/${encodeURIComponent(agentId)}`,
+      body,
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -240,8 +269,8 @@ export class Client {
       lname: data.lastName,
       phone_number: data.phoneNumber
     });
-    if (data.ext) body.ext = data.ext;
-    if (data.timezone) body.timezone = data.timezone;
+    if (data.ext !== undefined) body.ext = data.ext;
+    if (data.timezone !== undefined) body.timezone = data.timezone;
 
     let response = await this.axios.post('/agents', body, {
       headers: this.headers
@@ -250,14 +279,18 @@ export class Client {
   }
 
   async updateAgent(agentId: string, data: Record<string, any>) {
-    let response = await this.axios.put(`/agents/${agentId}`, this.addAccountId(data), {
-      headers: this.headers
-    });
+    let response = await this.axios.put(
+      `/agents/${encodeURIComponent(agentId)}`,
+      this.addAccountId(data),
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
   async deleteAgent(agentId: string) {
-    let response = await this.axios.delete(`/agents/${agentId}`, {
+    let response = await this.axios.delete(`/agents/${encodeURIComponent(agentId)}`, {
       headers: this.headers,
       params: this.addAccountId()
     });
@@ -265,7 +298,7 @@ export class Client {
   }
 
   async getAgentSchedule(agentId: string) {
-    let response = await this.axios.get(`/agents/${agentId}/schedule`, {
+    let response = await this.axios.get(`/agents/${encodeURIComponent(agentId)}/schedule`, {
       headers: this.headers,
       params: this.addAccountId()
     });
@@ -273,10 +306,14 @@ export class Client {
   }
 
   async updateAgentSchedule(agentId: string, schedule: any[]) {
-    let body = this.addAccountId({ schedule });
-    let response = await this.axios.put(`/agents/${agentId}/schedule`, body, {
-      headers: this.headers
-    });
+    let response = await this.axios.put(
+      `/agents/${encodeURIComponent(agentId)}/schedule`,
+      schedule,
+      {
+        headers: this.headers,
+        params: this.addAccountId()
+      }
+    );
     return response.data;
   }
 
@@ -315,7 +352,7 @@ export class Client {
   }
 
   async deleteClient(clientId: string) {
-    let response = await this.axios.delete(`/clients/${clientId}`, {
+    let response = await this.axios.delete(`/clients/${encodeURIComponent(clientId)}`, {
       headers: this.headers
     });
     return response.data;
@@ -323,7 +360,7 @@ export class Client {
 
   async setClientActive(clientId: string, isActive: boolean) {
     let response = await this.axios.post(
-      `/clients/${clientId}/active`,
+      `/clients/${encodeURIComponent(clientId)}/active`,
       {
         is_active: isActive ? 1 : 0
       },

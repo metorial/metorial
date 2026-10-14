@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listProjects = SlateTool.create(spec, {
@@ -13,12 +14,14 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageToken: pageTokenSchema,
       offset: z.number().optional().describe('Pagination offset (number of records to skip)'),
       limit: z.number().optional().describe('Maximum number of projects to return')
     })
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       projects: z
         .array(
           z.object({
@@ -38,6 +41,7 @@ export let listProjects = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listProjects({
+      pageToken: ctx.input.pageToken,
       offset: ctx.input.offset,
       limit: ctx.input.limit
     });
@@ -45,7 +49,7 @@ export let listProjects = SlateTool.create(spec, {
     let projects = Array.isArray(result) ? result : (result.projects ?? result.data ?? []);
 
     return {
-      output: { projects },
+      output: { projects, pagination: result.pagination },
       message: `Found **${projects.length}** project(s).`
     };
   })

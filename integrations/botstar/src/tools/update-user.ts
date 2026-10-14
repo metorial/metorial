@@ -1,19 +1,20 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BotstarClient } from '../lib/client';
+import { botIdSchema, botScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateUser = SlateTool.create(spec, {
   name: 'Update User',
   key: 'update_user',
-  description: `Update a chatbot user's profile information and custom attributes. You can update standard fields like name, email, gender, birthday, or set custom attribute values.`,
+  description: `Update a chatbot user's profile information and custom attributes. You can update standard fields like name, email, gender, birthday, or set custom attribute values. ${botScopeGuidance}`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      botId: z.string().describe('ID of the bot the user belongs to'),
+      botId: botIdSchema,
       userId: z.string().describe('ID of the user to update'),
       firstName: z.string().optional().describe('Updated first name'),
       lastName: z.string().optional().describe('Updated last name'),
@@ -41,9 +42,11 @@ export let updateUser = SlateTool.create(spec, {
     if (ctx.input.gender !== undefined) updates.gender = ctx.input.gender;
     if (ctx.input.birthday !== undefined) updates.birthday = ctx.input.birthday;
     if (ctx.input.customAttributes) {
-      Object.assign(updates, ctx.input.customAttributes);
+      updates = { ...ctx.input.customAttributes, ...updates };
     }
 
+    if (Object.keys(updates).length === 0)
+      throw createApiServiceError('Provide profile fields or customAttributes to update.');
     await client.updateUser(ctx.input.botId, ctx.input.userId, updates);
 
     return {

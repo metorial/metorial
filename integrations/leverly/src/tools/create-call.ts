@@ -114,7 +114,7 @@ export let createCall = SlateTool.create(spec, {
         phone: ctx.input.phone,
         response: responseStr
       },
-      message: `Lead **${leadName}** (${ctx.input.phone}) submitted to Leverly. An automated call sequence will be initiated to connect your sales team with this lead.`
+      message: `Lead **${leadName}** (${ctx.input.phone}) submitted to Leverly for an automated call sequence.`
     };
   })
   .build();

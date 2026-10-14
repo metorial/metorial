@@ -1,4 +1,5 @@
 export * from './get-account';
+export * from './get-analytics';
 export * from './get-chatbot-settings';
 export * from './get-conversations';
 export * from './get-leads';

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -96,12 +96,12 @@ export let exploreGraph = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
 
     if (ctx.input.action === 'list_nodes') {
-      if (!ctx.input.userId) throw new Error('userId is required for list_nodes');
+      if (!ctx.input.userId) throw createApiServiceError('userId is required for list_nodes');
       let result = await client.getUserNodes(ctx.input.userId, {
         limit: ctx.input.limit,
         uuidCursor: ctx.input.uuidCursor
       });
-      let nodes = (Array.isArray(result) ? result : result.nodes || []).map((n: any) => ({
+      let nodes = (Array.isArray(result) ? result : result.nodes || []).map(n => ({
         uuid: n.uuid,
         name: n.name,
         summary: n.summary,
@@ -116,10 +116,11 @@ export let exploreGraph = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'node_edges') {
-      if (!ctx.input.nodeUuid) throw new Error('nodeUuid is required for node_edges');
+      if (!ctx.input.nodeUuid)
+        throw createApiServiceError('nodeUuid is required for node_edges');
       let result = await client.getNodeEdges(ctx.input.nodeUuid);
       let edgeList = Array.isArray(result) ? result : result.edges || [];
-      let edges = edgeList.map((e: any) => ({
+      let edges = edgeList.map(e => ({
         uuid: e.uuid,
         fact: e.fact,
         name: e.name,
@@ -137,10 +138,11 @@ export let exploreGraph = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'node_episodes') {
-      if (!ctx.input.nodeUuid) throw new Error('nodeUuid is required for node_episodes');
+      if (!ctx.input.nodeUuid)
+        throw createApiServiceError('nodeUuid is required for node_episodes');
       let result = await client.getNodeEpisodes(ctx.input.nodeUuid);
       let episodeList = Array.isArray(result) ? result : result.episodes || [];
-      let episodes = episodeList.map((ep: any) => ({
+      let episodes = episodeList.map(ep => ({
         uuid: ep.uuid,
         content: ep.content
       }));
@@ -151,7 +153,8 @@ export let exploreGraph = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_edge') {
-      if (!ctx.input.edgeUuid) throw new Error('edgeUuid is required for get_edge');
+      if (!ctx.input.edgeUuid)
+        throw createApiServiceError('edgeUuid is required for get_edge');
       let edge = await client.getEdge(ctx.input.edgeUuid);
       return {
         output: {
@@ -174,7 +177,7 @@ export let exploreGraph = SlateTool.create(spec, {
     }
 
     // user_node
-    if (!ctx.input.userId) throw new Error('userId is required for user_node');
+    if (!ctx.input.userId) throw createApiServiceError('userId is required for user_node');
     let userNode = await client.getUserNode(ctx.input.userId);
     return {
       output: {

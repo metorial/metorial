@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SevdeskClient } from '../lib/client';
+import { SevdeskClient, sevdeskDateToTimestamp } from '../lib/client';
 import { spec } from '../spec';
 
 export let createOrder = SlateTool.create(spec, {
@@ -22,7 +22,18 @@ export let createOrder = SlateTool.create(spec, {
       orderNumber: z.string().optional().describe('Custom order number'),
       deliveryDate: z.string().optional().describe('Delivery date in YYYY-MM-DD format'),
       currency: z.string().optional().describe('Currency code (default: EUR)'),
-      taxRuleId: z.string().optional().describe('Tax rule ID'),
+      taxRuleId: z.string().optional().describe('Tax rule ID for bookkeeping version 2.0.'),
+      taxType: z
+        .enum(['default', 'eu', 'noteu', 'custom', 'ss'])
+        .optional()
+        .describe('Tax type for bookkeeping version 1.0; use taxRuleId for version 2.0.'),
+      taxSetId: z.string().optional().describe('Tax set ID. Required when taxType is custom.'),
+      taxText: z.string().optional().describe('Tax explanation displayed on the order.'),
+      contactPersonId: z
+        .string()
+        .optional()
+        .describe('sevDesk user ID of the contact person responsible for the order.'),
+      addressCountryId: z.string().optional().describe('Country ID for the order address.'),
       status: z
         .number()
         .optional()
@@ -40,16 +51,21 @@ export let createOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.taxType === 'custom' && !ctx.input.taxSetId?.trim()) {
+      throw createApiServiceError('taxSetId is required when taxType is custom.');
+    }
     let client = new SevdeskClient({ token: ctx.auth.token });
 
     let orderData: Record<string, any> = {
       objectName: 'Order',
       contact: { id: ctx.input.contactId, objectName: 'Contact' },
-      orderDate: ctx.input.orderDate,
+      orderDate: String(sevdeskDateToTimestamp(ctx.input.orderDate, 'orderDate')),
       status: ctx.input.status ?? 100,
       currency: ctx.input.currency ?? 'EUR',
       mapAll: true,
-      orderType: 'AN'
+      orderType: 'AN',
+      version: ctx.input.version ?? 0,
+      taxRate: 0
     };
 
     if (ctx.input.header) orderData.header = ctx.input.header;
@@ -60,9 +76,23 @@ export let createOrder = SlateTool.create(spec, {
     if (ctx.input.taxRuleId) {
       orderData.taxRule = { id: ctx.input.taxRuleId, objectName: 'TaxRule' };
     }
+    if (ctx.input.taxType) orderData.taxType = ctx.input.taxType;
+    if (ctx.input.taxSetId?.trim())
+      orderData.taxSet = { id: ctx.input.taxSetId.trim(), objectName: 'TaxSet' };
+    if (ctx.input.taxText !== undefined) orderData.taxText = ctx.input.taxText;
+    if (ctx.input.contactPersonId)
+      orderData.contactPerson = { id: ctx.input.contactPersonId, objectName: 'SevUser' };
+    if (ctx.input.addressCountryId)
+      orderData.addressCountry = {
+        id: ctx.input.addressCountryId,
+        objectName: 'StaticCountry'
+      };
     if (ctx.input.version !== undefined) orderData.version = ctx.input.version;
 
     let order = await client.createOrder(orderData);
+    if (order?.id == null) {
+      throw createApiServiceError('sevDesk did not return the created order ID.');
+    }
 
     return {
       output: {

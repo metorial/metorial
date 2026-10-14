@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateBot = SlateTool.create(spec, {
   name: 'Update Bot',
   key: 'update_bot',
-  description: `Update an existing bot's settings including name, description, AI model, custom prompt instructions, privacy, widget appearance (color, icon, alignment), allowed domains, branding, support link, and UI labels. Only provided fields are updated.`,
+  description: `Update an existing bot's settings including name, description, AI model, custom prompt instructions, privacy, widget appearance (color, icon, alignment), allowed domains, branding, support link, and UI labels. Only provided fields are updated. Call list_teams to discover accessible team IDs.`,
   instructions: ['Widget settings are cached for up to 5 minutes on CDN after updating.']
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID to update'),
       name: z.string().optional().describe('New bot name'),
       description: z.string().optional().describe('New bot description'),
@@ -70,9 +72,13 @@ export let updateBot = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new DocsBotAdminClient(ctx.auth.token);
-    let { botId, ...updateParams } = ctx.input;
+    let { botId, teamId, ...updateParams } = ctx.input;
 
-    let bot = await client.updateBot(ctx.config.teamId, botId, updateParams);
+    let bot = await client.updateBot(
+      resolveTeamId(teamId, ctx.config.teamId),
+      botId,
+      updateParams
+    );
 
     return {
       output: {
@@ -83,7 +89,7 @@ export let updateBot = SlateTool.create(spec, {
         model: bot.model,
         privacy: bot.privacy,
         language: bot.language,
-        customPrompt: bot.customPrompt
+        customPrompt: bot.customPrompt ?? undefined
       },
       message: `Updated bot **${bot.name}** (ID: \`${bot.id}\`)`
     };

@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let http = createAxios({
-  baseURL: 'https://api.imagior.com'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -31,16 +28,12 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await http.get('/user/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let account = await new Client({ token: ctx.output.token }).getAccount();
 
       return {
         profile: {
-          name: response.data.name,
-          email: response.data.email
+          name: account.name,
+          email: account.email
         }
       };
     }

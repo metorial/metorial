@@ -20,13 +20,23 @@ export let sendSms = SlateTool.create(spec, {
     z.object({
       to: z
         .array(z.string())
+        .min(1)
+        .max(100)
         .describe('Array of destination phone numbers (E.164 format recommended)'),
-      from: z.string().describe('Sender identifier or phone number'),
+      from: z
+        .string()
+        .optional()
+        .describe('Sender phone number in E.164 format; omit to use the default sender'),
       body: z.string().describe('SMS message content')
     })
   )
   .output(
     z.object({
+      totalSent: z.number().optional().describe('Number of messages accepted by the provider'),
+      statuses: z
+        .record(z.string(), z.number())
+        .optional()
+        .describe('Message counts by status'),
       smsResults: z
         .array(
           z.object({
@@ -47,15 +57,15 @@ export let sendSms = SlateTool.create(spec, {
     let result = await client.sendSms(ctx.input);
     let data = result.data || result;
 
-    let smsResults = (data.sms || []).map((s: any) => ({
-      to: s.to ?? '',
+    let smsResults = (data.messages || data.sms || []).map((s: any) => ({
+      to: s.destination ?? s.to ?? '',
       status: s.status ?? '',
       messageId: s.message_id ?? ''
     }));
 
     return {
-      output: { smsResults },
-      message: `SMS sent to **${ctx.input.to.length}** recipient(s).`
+      output: { smsResults, totalSent: data.total_sent, statuses: data.statuses },
+      message: `SMS submission processed: **${data.total_sent ?? smsResults.length}** message(s) accepted.`
     };
   })
   .build();

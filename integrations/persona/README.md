@@ -1,6 +1,8 @@
 # Persona
 
-Verify identities and manage compliance workflows for individuals and businesses. Create and manage inquiries for end-to-end identity verification flows using government IDs, selfies, and documents. Run database verifications, generate risk reports (watchlist, adverse media, PEP, address, email, phone), and screen against sanctions lists. Manage accounts representing verified individuals, consolidate or redact personal data for GDPR/CCPA compliance. Create and manage cases for manual review workflows. Maintain screening lists (blocklists/allowlists) with custom list items. Trigger automated workflows based on verification results. Analyze relationships between accounts via graph connections. Monitor events via webhooks for inquiries, verifications, reports, transactions, and cases.
+Verify identities and manage compliance workflows for individuals and businesses. Create, retrieve, approve, decline, resume, tag, and redact inquiries. Generate one-time verification links and discover inquiry templates with a production API key. Manage accounts, retrieve verification results, create risk reports and transactions, manage manual review cases, maintain screening list items, and inspect events.
+
+Your API key selects the production or sandbox environment. Inquiry template discovery requires a production API key. Case creation and assignment select Persona users by email address; transaction creation requires a transaction type ID beginning with `txntp_`.
 
 ## License
 

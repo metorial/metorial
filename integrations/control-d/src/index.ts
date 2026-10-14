@@ -4,6 +4,7 @@ import {
   getAccountInfo,
   getAnalyticsConfig,
   listDevices,
+  listProfileRestrictions,
   listProfiles,
   listProxies,
   manageCustomRules,
@@ -14,6 +15,7 @@ import {
   manageOrganization,
   manageProfile,
   manageProfileOptions,
+  manageProfileRestrictions,
   manageRuleFolders,
   manageServices
 } from './tools';
@@ -22,12 +24,14 @@ export let provider = Slate.create({
   spec,
   tools: [
     listProfiles,
+    listProfileRestrictions,
     manageProfile,
     manageFilters,
     manageServices,
     manageCustomRules,
     manageRuleFolders,
     manageProfileOptions,
+    manageProfileRestrictions,
     manageDefaultRule,
     listDevices,
     manageDevice,

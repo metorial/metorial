@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailtrapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -58,8 +58,7 @@ export let manageContact = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let {
@@ -74,8 +73,9 @@ export let manageContact = SlateTool.create(spec, {
     } = ctx.input;
 
     if (action === 'create') {
-      if (!email) throw new Error('Email is required for creating a contact');
-      let result = await client.createContact({ email, fields, listIds });
+      if (!email) throw createApiServiceError('Email is required for creating a contact');
+      let response = await client.createContact({ email, fields, listIds });
+      let result = response.data ?? response;
       return {
         output: {
           contactId: result.id?.toString(),
@@ -89,8 +89,9 @@ export let manageContact = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!contactIdentifier)
-        throw new Error('contactIdentifier is required for getting a contact');
-      let result = await client.getContact(contactIdentifier);
+        throw createApiServiceError('contactIdentifier is required for getting a contact');
+      let response = await client.getContact(contactIdentifier);
+      let result = response.data ?? response;
       return {
         output: {
           contactId: result.id?.toString(),
@@ -104,7 +105,7 @@ export let manageContact = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!contactIdentifier)
-        throw new Error('contactIdentifier is required for updating a contact');
+        throw createApiServiceError('contactIdentifier is required for updating a contact');
       let result = await client.updateContact(contactIdentifier, {
         email,
         fields,
@@ -112,7 +113,7 @@ export let manageContact = SlateTool.create(spec, {
         listIdsExcluded,
         unsubscribed
       });
-      let contact = result.contact || result;
+      let contact = result.data ?? result.contact ?? result;
       return {
         output: {
           contactId: contact.id?.toString(),
@@ -126,7 +127,7 @@ export let manageContact = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!contactIdentifier)
-        throw new Error('contactIdentifier is required for deleting a contact');
+        throw createApiServiceError('contactIdentifier is required for deleting a contact');
       await client.deleteContact(contactIdentifier);
       return {
         output: {
@@ -137,6 +138,6 @@ export let manageContact = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

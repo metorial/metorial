@@ -1,6 +1,10 @@
-Now let me check what webhook targets are available:Now let me check for additional webhook targets beyond what's listed in the API docs, since the blog post mentioned InvoiceReminder and Purchase webhooks:I now have enough information to write the specification. Let me compile it.
+# MOCO Integration Specification
 
-# Slates Specification for Moco
+Current API reference: [MOCO OpenAPI documentation](https://docs.mocoapp.com/api/docs/v1) and [OpenAPI specification](https://docs.mocoapp.com/api/docs/v1.yaml).
+
+The sections below describe the provider capability map. The integration exposes selected tools for projects, tasks, activities, companies, contacts, deals, invoices, offers, purchases, planning, comments, presences, and project expenses. It also exposes `get_profile`, `list_invoice_payments`, and `create_invoice_payment`. Collection tools accept optional `page` and `perPage` inputs; callers retrieve subsequent pages explicitly. The account subdomain belongs to API-key authentication and is persisted there, so it is not requested again as separate configuration.
+
+Invoice and offer line items send the documented `type` field, defaulting to `item`. Creation accepts a sales VAT code ID through `vatCodeId` or a matching tax percentage. Deleting a non-draft invoice requires the optional `reason` input. Contact email, phone, and mobile fields map to the provider's `work_email`, `work_phone`, and `mobile_phone` fields.
 
 ## Overview
 

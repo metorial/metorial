@@ -9,6 +9,7 @@ import {
   deleteCustomField,
   deleteRecurringTask,
   deleteTask,
+  getCurrentUser,
   getProject,
   getTask,
   listComments,
@@ -46,7 +47,8 @@ export let provider = Slate.create({
     listWorkspaces,
     listStatuses,
     listSchedules,
-    listUsers
+    listUsers,
+    getCurrentUser
   ],
   triggers: []
 });

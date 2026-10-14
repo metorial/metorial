@@ -1,8 +1,38 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 let api = createAxios({
   baseURL: 'https://rest.clicksend.com/v3'
 });
+
+api.interceptors.response.use(
+  response => {
+    let result = response.data;
+    if (
+      result &&
+      typeof result === 'object' &&
+      ((typeof result.response_code === 'string' && result.response_code !== 'SUCCESS') ||
+        Number(result.http_code) >= 400)
+    ) {
+      throw createApiServiceError(
+        `ClickSend API request failed: ${result.response_msg || result.response_code}`,
+        {
+          reason: 'clicksend_api_error',
+          upstreamStatus: result.http_code ?? response.status,
+          upstreamCode: result.response_code
+        }
+      );
+    }
+    return response;
+  },
+  error =>
+    Promise.reject(
+      buildApiServiceError(error, {
+        providerLabel: 'ClickSend',
+        reason: 'clicksend_api_error',
+        detailKeys: ['response_msg', 'response_code', 'message', 'error']
+      })
+    )
+);
 
 export class ClickSendClient {
   private authHeader: string;
@@ -61,6 +91,8 @@ export class ClickSendClient {
     limit?: number;
     dateFrom?: number;
     dateTo?: number;
+    query?: string;
+    orderBy?: string;
   }) {
     let response = await api.get('/sms/history', {
       headers: this.headers,
@@ -68,9 +100,24 @@ export class ClickSendClient {
         page: params?.page,
         limit: params?.limit,
         date_from: params?.dateFrom,
-        date_to: params?.dateTo
+        date_to: params?.dateTo,
+        q: params?.query,
+        order_by: params?.orderBy
       }
     });
+    return response.data;
+  }
+
+  async getSmsReceipts(params: { messageId?: string; page?: number; limit?: number }) {
+    let response = await api.get(
+      params.messageId
+        ? `/sms/receipts/${encodeURIComponent(params.messageId)}`
+        : '/sms/receipts',
+      {
+        headers: this.headers,
+        params: params.messageId ? undefined : { page: params.page, limit: params.limit }
+      }
+    );
     return response.data;
   }
 
@@ -97,6 +144,12 @@ export class ClickSendClient {
       country?: string;
     }[]
   ) {
+    if (messages.some(message => message.mediaFileUrl !== messages[0]?.mediaFileUrl)) {
+      throw createApiServiceError(
+        'All MMS messages in a request must use the same mediaFileUrl. Send separate requests for different media files.',
+        { reason: 'invalid_mms_media' }
+      );
+    }
     let response = await api.post(
       '/mms/send',
       {
@@ -199,8 +252,11 @@ export class ClickSendClient {
     return response.data;
   }
 
-  async getAllowedEmailAddresses() {
-    let response = await api.get('/email/addresses', { headers: this.headers });
+  async getAllowedEmailAddresses(params?: { page?: number; limit?: number }) {
+    let response = await api.get('/email/addresses', {
+      headers: this.headers,
+      params: { page: params?.page, limit: params?.limit }
+    });
     return response.data;
   }
 

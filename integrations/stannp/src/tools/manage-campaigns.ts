@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let campaignOutputSchema = z.object({
@@ -12,21 +12,21 @@ let campaignOutputSchema = z.object({
   created: z.string().optional().describe('Creation timestamp'),
   updated: z.string().optional().describe('Last update timestamp'),
   sendDate: z.string().optional().describe('Scheduled send date'),
-  dispatched: z.string().optional().describe('Dispatch timestamp'),
+  dispatched: z.string().optional().describe('Number of dispatched mailpieces'),
   cost: z.string().optional().describe('Total campaign cost')
 });
 
 let mapCampaign = (c: any) => ({
   campaignId: String(c.id),
-  name: c.name,
+  name: c.name ?? undefined,
   templateId: c.template_id != null ? String(c.template_id) : undefined,
-  status: c.status,
-  type: c.type,
-  created: c.created,
-  updated: c.updated,
-  sendDate: c.send_date,
-  dispatched: c.dispatched,
-  cost: c.cost
+  status: c.status ?? undefined,
+  type: c.type ?? undefined,
+  created: c.created ?? undefined,
+  updated: c.updated ?? undefined,
+  sendDate: c.send_date ?? undefined,
+  dispatched: c.dispatched ?? undefined,
+  cost: c.cost != null ? String(c.cost) : undefined
 });
 
 // ---- List Campaigns ----
@@ -47,7 +47,7 @@ export let listCampaigns = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.listCampaigns();
     let campaigns = Array.isArray(result) ? result.map(mapCampaign) : [];
@@ -77,7 +77,7 @@ export let getCampaign = SlateTool.create(spec, {
   )
   .output(campaignOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getCampaign(ctx.input.campaignId);
 
@@ -105,7 +105,11 @@ export let createCampaign = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Campaign name'),
-      type: z.enum(['postcard', 'letter', 'greetingcard']).describe('Type of mail to send'),
+      type: z
+        .enum(['postcard', 'letter', 'greetingcard', 'a6-postcard', 'a5-postcard'])
+        .describe(
+          'Campaign type. Prefer a6-postcard, a5-postcard, or letter; postcard is a compatibility alias.'
+        ),
       groupId: z.number().describe('Recipient group ID to target'),
       templateId: z.number().optional().describe('Template ID for the campaign design'),
       file: z.string().optional().describe('File URL or base64 content for the campaign'),
@@ -117,7 +121,7 @@ export let createCampaign = SlateTool.create(spec, {
   )
   .output(campaignOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.createCampaign(ctx.input);
 
@@ -150,13 +154,15 @@ export let approveCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
-    await client.approveCampaign(ctx.input.campaignId);
+    let success = (await client.approveCampaign(ctx.input.campaignId)) === true;
 
     return {
-      output: { success: true },
-      message: `Campaign **${ctx.input.campaignId}** approved and locked.`
+      output: { success },
+      message: success
+        ? `Campaign **${ctx.input.campaignId}** approved and locked.`
+        : `Campaign **${ctx.input.campaignId}** was not approved.`
     };
   })
   .build();
@@ -189,16 +195,19 @@ export let bookCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
-    await client.bookCampaign(ctx.input.campaignId, ctx.input.sendDate, {
-      nextAvailableDate: ctx.input.nextAvailableDate,
-      useBalance: ctx.input.useBalance
-    });
+    let success =
+      (await client.bookCampaign(ctx.input.campaignId, ctx.input.sendDate, {
+        nextAvailableDate: ctx.input.nextAvailableDate,
+        useBalance: ctx.input.useBalance
+      })) === true;
 
     return {
-      output: { success: true },
-      message: `Campaign **${ctx.input.campaignId}** booked for dispatch on **${ctx.input.sendDate}**.`
+      output: { success },
+      message: success
+        ? `Campaign **${ctx.input.campaignId}** booked for dispatch on **${ctx.input.sendDate}**.`
+        : `Campaign **${ctx.input.campaignId}** was not booked.`
     };
   })
   .build();
@@ -225,7 +234,7 @@ export let getCampaignCost = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getCampaignCost(ctx.input.campaignId);
 
@@ -258,7 +267,7 @@ export let deleteCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.deleteCampaign(ctx.input.campaignId);
 

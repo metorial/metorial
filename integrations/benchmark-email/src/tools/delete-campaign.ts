@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteCampaign = SlateTool.create(spec, {
   name: 'Delete Campaign',
   key: 'delete_campaign',
-  description: `Permanently delete an email campaign. This action cannot be undone.`,
+  description: `Delete an email campaign by moving it to Trash.`,
   tags: {
     destructive: true
   }
@@ -24,7 +24,7 @@ export let deleteCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.deleteCampaign(ctx.input.campaignId);
-    let success = result?.Status === 1;
+    let success = String(result?.Status) === '1';
 
     return {
       output: { success },

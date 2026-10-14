@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let managePartitions = SlateTool.create(spec, {
   description: `List, create, inspect, or delete partitions. Partitions logically separate documents for multi-tenant applications or distinct knowledge bases.
 Retrievals can be scoped to a specific partition. Deleting a partition **irreversibly** removes all associated documents, connections, and instructions.`,
   instructions: [
-    'Use action "list" to see all partitions.',
+    'Use list_partitions to browse the current partition API. The legacy "list" action requires timestamp fields that current Ragie responses may omit.',
     'Use action "create" to create a new partition. Names must be lowercase alphanumeric with underscores and hyphens.',
     'Use action "get" to inspect a partition and see usage metrics.',
     'Use action "delete" to permanently delete a partition and ALL its data.'
@@ -67,7 +67,7 @@ Retrievals can be scoped to a specific partition. Deleting a partition **irrever
 
     switch (ctx.input.action) {
       case 'list': {
-        let partitions = await client.listPartitions();
+        let partitions = await client.listLegacyPartitions();
         return {
           output: {
             partitions: partitions.map(p => ({
@@ -83,24 +83,19 @@ Retrievals can be scoped to a specific partition. Deleting a partition **irrever
       }
 
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required for creating a partition.');
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for creating a partition.');
         let partition = await client.createPartition({ name: ctx.input.name });
         return {
           output: {
-            partition: {
-              partitionId: partition.id,
-              name: partition.name,
-              documentCount: partition.documentCount,
-              createdAt: partition.createdAt,
-              updatedAt: partition.updatedAt
-            }
+            partition
           },
-          message: `Partition **${partition.name}** created. ID: \`${partition.id}\``
+          message: `Partition **${partition.name}** created. Identifier: \`${partition.partitionId}\``
         };
       }
 
       case 'get': {
-        if (!ctx.input.partitionId) throw new Error('partitionId is required.');
+        if (!ctx.input.partitionId) throw createApiServiceError('partitionId is required.');
         let partition = await client.getPartition(ctx.input.partitionId);
         return {
           output: {
@@ -111,7 +106,7 @@ Retrievals can be scoped to a specific partition. Deleting a partition **irrever
       }
 
       case 'delete': {
-        if (!ctx.input.partitionId) throw new Error('partitionId is required.');
+        if (!ctx.input.partitionId) throw createApiServiceError('partitionId is required.');
         await client.deletePartition(ctx.input.partitionId);
         return {
           output: {

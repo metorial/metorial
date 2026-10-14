@@ -12,9 +12,11 @@ import {
   manageEmailProviders,
   manageLinkedInCampaign,
   manageLinkedInScraper,
+  manageLists,
   manageWebhooks,
   sendReply,
   sendTestEmail,
+  updateAdvancedCampaign,
   updateEmailCampaign,
   verifyEmail
 } from './tools';
@@ -28,6 +30,8 @@ export let provider = Slate.create({
     manageCampaignContacts,
     manageLinkedInCampaign,
     manageAdvancedCampaign,
+    updateAdvancedCampaign,
+    manageLists,
     findEmail,
     findPhone,
     verifyEmail,

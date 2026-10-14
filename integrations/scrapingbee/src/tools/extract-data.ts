@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,9 +10,9 @@ export let extractData = SlateTool.create(spec, {
   instructions: [
     'Each extraction rule maps a key name to a CSS selector or extraction config object.',
     'Simple form: `{ "title": "h1" }` extracts text content of the h1 element.',
-    'Object form: `{ "title": { "selector": "h1", "type": "text" } }` with optional type (text, html, attribute).',
+    'Object form: `{ "title": { "selector": "h1", "type": "item", "output": "text" } }`. Use output "html" or "@href" for HTML or an attribute.',
     'List extraction: `{ "links": { "selector": "a.item", "type": "list", "output": { "text": "span", "href": { "selector": "a", "output": "@href" } } } }`.',
-    'Table extraction: `{ "table": { "selector": "table", "type": "table" } }` returns rows as arrays or objects.'
+    'Table extraction: `{ "table": { "selector": "table", "output": "table_json" } }` returns row objects; use "table_array" for arrays.'
   ],
   tags: {
     readOnly: true
@@ -69,7 +69,16 @@ export let extractData = SlateTool.create(spec, {
       waitFor: ctx.input.waitFor
     });
 
-    let extractedData = typeof result === 'string' ? JSON.parse(result) : result;
+    let extractedData: Record<string, unknown>;
+    try {
+      extractedData = z
+        .record(z.string(), z.unknown())
+        .parse(typeof result === 'string' ? JSON.parse(result) : result);
+    } catch (error) {
+      throw createApiServiceError('ScrapingBee returned an invalid extraction result.', {
+        parent: error
+      });
+    }
 
     return {
       output: {

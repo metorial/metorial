@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,9 +17,13 @@ export let auth = SlateAuth.create()
         .describe('Your Rosette Text Analytics API key from the Developer Portal')
     }),
     getOutput: async ctx => {
+      let token = ctx.input.apiKey.trim();
+      if (!token) {
+        throw createApiServiceError('Enter your Analytics API key from the Developer Portal.');
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token
         }
       };
     }

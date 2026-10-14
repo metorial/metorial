@@ -18,7 +18,9 @@ export let getTimeEntries = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project'),
+      projectId: z
+        .string()
+        .describe('The ID of the project. Call list_projects to discover available projects.'),
       userIds: z
         .string()
         .describe('Semicolon-separated user IDs to filter by (e.g., "123;456")'),

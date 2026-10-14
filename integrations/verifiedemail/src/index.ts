@@ -5,10 +5,13 @@ import {
   createEmailList,
   deleteEmailList,
   deleteWebhook,
+  getEmailList,
   getListResults,
+  getResultsDownload,
   listEmailLists,
   listWebhooks,
   manageWebhook,
+  requestResultsDownload,
   verifyEmail,
   verifyEmailList
 } from './tools';
@@ -20,9 +23,12 @@ export let provider = Slate.create({
     listEmailLists,
     createEmailList,
     verifyEmailList,
+    getEmailList,
     getListResults,
+    getResultsDownload,
     deleteEmailList,
     manageWebhook,
+    requestResultsDownload,
     listWebhooks,
     deleteWebhook
   ],

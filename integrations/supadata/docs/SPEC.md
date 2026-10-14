@@ -1,6 +1,4 @@
-Now let me check the YouTube and Web features:Let me check the web scrape and YouTube-specific features:Now I have enough information to write the specification.
-
-# Slates Specification for Supadata
+# Supadata API Specification
 
 ## Overview
 
@@ -36,7 +34,7 @@ Extract text transcripts from videos hosted on YouTube, TikTok, Instagram, X (Tw
 - **Transcription mode**: `native` (only existing captions), `generate` (AI-generated transcript), or `auto` (try native first, fall back to AI).
 - Large files or long videos may return a job ID for asynchronous processing, which can be polled for results.
 - Only publicly accessible videos can be transcribed. Private, login-required, age-restricted, or paywalled content is not supported.
-- Maximum file size for direct file URLs is 1 GB.
+- Maximum file size for direct file URLs is 750 MB and maximum duration is 12 hours.
 
 ### Media Metadata
 
@@ -76,19 +74,43 @@ Crawl a whole website and get content of all pages on it.
 
 - Crawling is asynchronous — you create a crawl job and poll for results.
 - Configurable page limit.
+- Results expose a next-page URL; its `skip` parameter retrieves subsequent pages.
 - The crawler follows only child links. For example, crawling `https://example.com/blog` will follow links like `https://example.com/blog/article-1` but not `https://example.com/about`.
+
+### Account Information
+
+Retrieve the API key's organization ID, subscription plan, maximum credits, and used credits through `GET /me`. The account tool also computes credits remaining in the billing period.
 
 ### YouTube-Specific Features
 
 Beyond the universal transcript and metadata endpoints, Supadata offers YouTube-specific capabilities:
 
-- **YouTube Search**: Search YouTube for videos, channels, and playlists with advanced filters.
+- **YouTube Search**: Search YouTube for videos, channels, playlists, and movies with upload-date, duration, and feature filters. Use a result limit for automatic pagination or continuation tokens for individual pages.
 - **Channel Metadata**: Fetch metadata from a YouTube channel including name, description, subscriber count, and more.
-- **Channel Videos**: Fetch a list of video IDs from a YouTube channel. Filterable by type (video, short, live, or all) with configurable limit.
+- **Channel Videos**: Fetch a list of video IDs from a YouTube channel. Filterable by type (video, short, live, or all) with configurable limit. Regular video, Shorts, and live IDs are returned separately.
 - **Playlist Metadata**: Fetch metadata from a YouTube playlist including title, description, video count, and more.
-- **Playlist Videos**: Fetch a list of video IDs from a YouTube playlist.
+- **Playlist Videos**: Fetch regular video, Shorts, and live IDs from a YouTube playlist.
 - **Transcript Translation**: Fetch text transcript from a YouTube video in various formats and languages, translating the transcript into a target language.
 
 ## Events
 
 The provider does not support events. Supadata is a request-response API for data extraction and does not offer webhooks, event subscriptions, or purpose-built polling mechanisms for change detection.
+
+## API References
+
+- [API authentication and base URL](https://docs.supadata.ai/)
+- [Account information](https://docs.supadata.ai/api-reference/endpoint/account/me)
+- [Transcript](https://docs.supadata.ai/get-transcript)
+- [Media metadata](https://docs.supadata.ai/get-metadata)
+- [Structured extraction](https://docs.supadata.ai/get-extract)
+- [YouTube search](https://docs.supadata.ai/youtube/search)
+- [YouTube video metadata](https://docs.supadata.ai/api-reference/endpoint/youtube/video-get)
+- [YouTube channel](https://docs.supadata.ai/youtube/channel)
+- [YouTube playlist](https://docs.supadata.ai/youtube/playlist)
+- [Channel videos](https://docs.supadata.ai/youtube/channel-videos)
+- [Playlist videos](https://docs.supadata.ai/youtube/playlist-videos)
+- [Transcript translation](https://docs.supadata.ai/api-reference/endpoint/youtube/translation)
+- [Web scraping](https://docs.supadata.ai/web/scrape)
+- [Website mapping](https://docs.supadata.ai/web/map)
+- [Website crawling](https://docs.supadata.ai/web/crawl)
+- [Error responses](https://docs.supadata.ai/errors/list)

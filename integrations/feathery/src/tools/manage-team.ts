@@ -35,16 +35,22 @@ export let inviteTeamMember = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
     let permissions: Record<string, boolean> = {};
     if (ctx.input.editFormResults !== undefined)
-      permissions.edit_form_results = ctx.input.editFormResults;
+      permissions.permission_edit_form_results = ctx.input.editFormResults;
     if (ctx.input.inviteCollaborators !== undefined)
-      permissions.invite_collaborators = ctx.input.inviteCollaborators;
-    if (ctx.input.editLogic !== undefined) permissions.edit_logic = ctx.input.editLogic;
-    if (ctx.input.editThemes !== undefined) permissions.edit_themes = ctx.input.editThemes;
+      permissions.permission_invite_collaborators = ctx.input.inviteCollaborators;
+    if (ctx.input.editLogic !== undefined)
+      permissions.permission_edit_logic = ctx.input.editLogic;
+    if (ctx.input.editThemes !== undefined)
+      permissions.permission_edit_theme = ctx.input.editThemes;
 
     await client.inviteTeamMember({
       email: ctx.input.email,
@@ -85,7 +91,11 @@ export let removeTeamMember = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
     await client.removeTeamMember(ctx.input.email);

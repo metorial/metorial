@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SignPathClient } from '../lib/client';
+import { createSignPathClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getProject = SlateTool.create(spec, {
@@ -43,11 +43,7 @@ export let getProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SignPathClient({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createSignPathClient(ctx);
 
     let project = await client.getProject(ctx.input.projectSlug);
 
@@ -55,16 +51,16 @@ export let getProject = SlateTool.create(spec, {
       slug: project.slug || '',
       name: project.name || '',
       description: project.description || '',
-      isActive: project.isActive ?? true,
+      isActive: project.isActive ?? project.status !== 'Inactive',
       signingPolicies: (project.signingPolicies || []).map(sp => ({
         slug: sp.slug || '',
         name: sp.name || '',
-        isActive: sp.isActive ?? true
+        isActive: sp.isActive ?? sp.status !== 'Inactive'
       })),
       artifactConfigurations: (project.artifactConfigurations || []).map(ac => ({
         slug: ac.slug || '',
         name: ac.name || '',
-        isActive: ac.isActive ?? true
+        isActive: ac.isActive ?? ac.status !== 'Inactive'
       }))
     };
 

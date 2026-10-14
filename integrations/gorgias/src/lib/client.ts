@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface GorgiasClientConfig {
   token: string;
@@ -15,14 +15,17 @@ export interface PaginatedResponse<T> {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: GorgiasClientConfig) {
     let authHeader =
       config.authType === 'basic' ? `Basic ${config.token}` : `Bearer ${config.token}`;
 
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: `https://${config.subdomain}.gorgias.com/api`,
+      authHeader: { value: authHeader },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Gorgias', reason: 'gorgias_api_error' }),
       headers: {
         Authorization: authHeader,
         'Content-Type': 'application/json',
@@ -40,6 +43,10 @@ export class Client {
     assignee_user_id?: number;
     assignee_team_id?: number;
     status?: string;
+    view_id?: number;
+    external_id?: string;
+    trashed?: boolean;
+    order_by?: string;
   }): Promise<PaginatedResponse<any>> {
     let response = await this.http.get('/tickets', { params });
     return response.data as PaginatedResponse<any>;
@@ -234,11 +241,31 @@ export class Client {
   }
 
   async mergeCustomers(mainCustomerId: number, secondaryCustomerIds: number[]): Promise<any> {
-    let response = await this.http.put('/customers/merge', {
-      main_customer_id: mainCustomerId,
-      secondary_customer_ids: secondaryCustomerIds
-    });
-    return response.data;
+    if (
+      !Number.isInteger(mainCustomerId) ||
+      mainCustomerId < 1 ||
+      secondaryCustomerIds.length === 0 ||
+      secondaryCustomerIds.some(
+        id => !Number.isInteger(id) || id < 1 || id === mainCustomerId
+      ) ||
+      new Set(secondaryCustomerIds).size !== secondaryCustomerIds.length
+    ) {
+      throw createApiServiceError(
+        'Provide positive whole-number customer IDs, with distinct secondary IDs different from the main customer.'
+      );
+    }
+    let result: unknown;
+    for (let sourceId of secondaryCustomerIds) {
+      let response = await this.http.put(
+        '/customers/merge',
+        {},
+        {
+          params: { source_id: sourceId, target_id: mainCustomerId }
+        }
+      );
+      result = response.data;
+    }
+    return result;
   }
 
   async deleteCustomer(customerId: number): Promise<void> {
@@ -303,6 +330,9 @@ export class Client {
     name: string;
     actions?: Array<{
       type: string;
+      name?: string;
+      title?: string;
+      arguments?: any;
       args?: any;
     }>;
   }): Promise<any> {
@@ -347,12 +377,28 @@ export class Client {
     name: string;
     description?: string;
     events?: Array<{ type: string }>;
+    code?: string;
     conditions?: any;
     actions?: Array<{ type: string; args?: any }>;
     enabled?: boolean;
     priority?: number;
   }): Promise<any> {
-    let response = await this.http.post('/rules', data);
+    if (!data.code?.trim()) {
+      throw createApiServiceError(
+        'Provide the rule logic in code. Gorgias requires JavaScript rule code.'
+      );
+    }
+    if (data.conditions !== undefined || data.actions !== undefined) {
+      throw createApiServiceError(
+        'Express rule conditions and actions in code instead of the legacy conditions/actions fields.'
+      );
+    }
+    let { events, enabled, conditions: _conditions, actions: _actions, ...fields } = data;
+    let response = await this.http.post('/rules', {
+      ...fields,
+      event_types: events?.map(event => event.type).join(','),
+      deactivated_datetime: enabled === false ? new Date().toISOString() : null
+    });
     return response.data;
   }
 
@@ -362,13 +408,28 @@ export class Client {
       name?: string;
       description?: string;
       events?: Array<{ type: string }>;
+      code?: string;
       conditions?: any;
       actions?: Array<{ type: string; args?: any }>;
       enabled?: boolean;
       priority?: number;
     }
   ): Promise<any> {
-    let response = await this.http.put(`/rules/${ruleId}`, data);
+    if (data.conditions !== undefined || data.actions !== undefined) {
+      throw createApiServiceError(
+        'Express rule conditions and actions in code instead of the legacy conditions/actions fields.'
+      );
+    }
+    let { events, enabled, conditions: _conditions, actions: _actions, ...fields } = data;
+    let response = await this.http.put(`/rules/${ruleId}`, {
+      ...fields,
+      ...(events !== undefined
+        ? { event_types: events.map(event => event.type).join(',') }
+        : {}),
+      ...(enabled !== undefined
+        ? { deactivated_datetime: enabled ? null : new Date().toISOString() }
+        : {})
+    });
     return response.data;
   }
 
@@ -514,9 +575,17 @@ export class Client {
       cursor?: string;
     }
   ): Promise<any> {
+    if (
+      params?.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > 50)
+    ) {
+      throw createApiServiceError('Search limit must be a whole number between 1 and 50.');
+    }
     let response = await this.http.post('/search', {
       query,
-      ...params
+      type: params?.type ?? 'customer',
+      size: params?.limit,
+      cursor: params?.cursor
     });
     return response.data;
   }
@@ -533,6 +602,7 @@ export class Client {
   async listViews(params?: {
     cursor?: string;
     limit?: number;
+    category?: 'system' | 'user';
   }): Promise<PaginatedResponse<any>> {
     let response = await this.http.get('/views', { params });
     return response.data as PaginatedResponse<any>;

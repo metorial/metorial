@@ -102,3 +102,28 @@ let mapPromotion = (data: any): any => {
     usage: data.usage != null ? Number(data.usage) : undefined
   };
 };
+
+export let deletePromotionTool = SlateTool.create(spec, {
+  name: 'Delete Promotion',
+  key: 'delete_promotion',
+  description:
+    'Delete a promotion or coupon code. Existing bookings keep their discount; the code can no longer be used for new bookings.',
+  tags: { destructive: true }
+})
+  .input(
+    z.object({
+      promotionCode: z
+        .string()
+        .min(1)
+        .describe('Coupon code to delete. Call list_promotions to discover codes.')
+    })
+  )
+  .output(z.object({ deleted: z.boolean(), code: z.string() }))
+  .handleInvocation(async ctx => {
+    await new Client(ctx.auth).deletePromotion(ctx.input.promotionCode);
+    return {
+      output: { deleted: true, code: ctx.input.promotionCode },
+      message: `Deleted promotion **${ctx.input.promotionCode}**.`
+    };
+  })
+  .build();

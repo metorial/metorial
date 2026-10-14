@@ -12,6 +12,7 @@ export let updateTask = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       taskId: z.string().describe('ID of the task to update'),
@@ -40,18 +41,6 @@ export let updateTask = SlateTool.create(spec, {
       brand: ctx.auth.brand
     });
 
-    if (ctx.input.markComplete) {
-      let result = await client.completeTask(ctx.input.taskId);
-      let task = result.data;
-      return {
-        output: {
-          taskId: String(task.id ?? ctx.input.taskId),
-          title: task.heading as string | undefined
-        },
-        message: `Marked task **${ctx.input.taskId}** as complete.`
-      };
-    }
-
     let updateData: Record<string, unknown> = {};
     if (ctx.input.title !== undefined) updateData.heading = ctx.input.title;
     if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
@@ -61,7 +50,9 @@ export let updateTask = SlateTool.create(spec, {
     if (ctx.input.startDate !== undefined) updateData.start_date = ctx.input.startDate;
     if (ctx.input.priority !== undefined) updateData.priority = ctx.input.priority;
 
-    let result = await client.updateTask(ctx.input.taskId, updateData);
+    let result = ctx.input.markComplete
+      ? await client.completeTask(ctx.input.taskId, updateData)
+      : await client.updateTask(ctx.input.taskId, updateData);
     let task = result.data;
 
     return {
@@ -69,7 +60,9 @@ export let updateTask = SlateTool.create(spec, {
         taskId: String(task.id ?? ctx.input.taskId),
         title: task.heading as string | undefined
       },
-      message: `Updated task **${ctx.input.taskId}**.`
+      message: ctx.input.markComplete
+        ? `Marked task **${ctx.input.taskId}** as complete.`
+        : `Updated task **${ctx.input.taskId}**.`
     };
   })
   .build();

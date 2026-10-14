@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let createBusiness = SlateTool.create(spec, {
   key: 'create_business',
   description: `Create a new business location in GatherUp. Requires business name, type, full address, and phone number. Optionally creates a business owner/manager account.`,
   instructions: [
-    'Use the "List Business Types" tool to find valid business type values.',
+    'Call list_business_types to find valid business type values.',
     'Organisation type must be one of: company, corporation, non profit, school, office, practice, agency, church, restaurant, event, firm, store, dealership.'
   ],
   tags: {
@@ -69,6 +69,9 @@ export let createBusiness = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.createOwnerAccount && !ctx.input.ownerEmail?.trim()) {
+      throw createApiServiceError('ownerEmail is required when createOwnerAccount is true.');
+    }
     let client = createClient(ctx);
     let data = await client.createBusiness({
       businessName: ctx.input.businessName,
@@ -89,12 +92,6 @@ export let createBusiness = SlateTool.create(spec, {
       businessOwnerLastName: ctx.input.ownerLastName,
       businessOwnerSendPasswordEmail: ctx.input.sendOwnerPasswordEmail ? 1 : 0
     });
-
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to create business: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
 
     return {
       output: {

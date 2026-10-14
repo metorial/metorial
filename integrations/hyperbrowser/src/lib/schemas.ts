@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+export let browserAgentTypeSchema = z.enum([
+  'browser_use',
+  'claude_computer_use',
+  'openai_cua'
+]);
+
 export let screenConfigSchema = z
   .object({
     width: z.number().optional().describe('Screen width in pixels'),

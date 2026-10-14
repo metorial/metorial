@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -38,9 +38,12 @@ export let manageNotebook = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.projectId) throw new Error('projectId is required to create a notebook');
-      if (!ctx.input.name) throw new Error('name is required to create a notebook');
-      if (!ctx.input.content) throw new Error('content is required to create a notebook');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required to create a notebook');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required to create a notebook');
+      if (!ctx.input.content)
+        throw createApiServiceError('content is required to create a notebook');
       let result = await client.createNotebook(ctx.input.projectId, {
         name: ctx.input.name,
         content: ctx.input.content,
@@ -60,7 +63,7 @@ export let manageNotebook = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.notebookId)
-        throw new Error('notebookId is required to update a notebook');
+        throw createApiServiceError('notebookId is required to update a notebook');
       await client.updateNotebook(ctx.input.notebookId, {
         name: ctx.input.name,
         content: ctx.input.content,
@@ -75,7 +78,7 @@ export let manageNotebook = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.notebookId)
-        throw new Error('notebookId is required to delete a notebook');
+        throw createApiServiceError('notebookId is required to delete a notebook');
       await client.deleteNotebook(ctx.input.notebookId);
       return {
         output: { notebookId: ctx.input.notebookId, deleted: true },
@@ -83,6 +86,6 @@ export let manageNotebook = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

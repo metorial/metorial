@@ -14,7 +14,11 @@ export let updateTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project containing the task'),
+      projectId: z
+        .string()
+        .describe(
+          'The ID of the project containing the task. Call list_projects to discover available projects.'
+        ),
       taskId: z.string().describe('The ID of the task to update'),
       name: z.string().optional().describe('New name for the task'),
       description: z.string().optional().describe('New description for the task')

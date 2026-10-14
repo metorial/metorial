@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let sendSms = SlateTool.create(spec, {
@@ -45,7 +45,7 @@ export let sendSms = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.sendSms({
       message: ctx.input.message,
@@ -58,10 +58,10 @@ export let sendSms = SlateTool.create(spec, {
     return {
       output: {
         smsId: String(result.id),
-        status: result.status,
-        cost: result.cost,
-        phoneNumber: result.phone_number,
-        messageParts: result.message_parts
+        status: result.status ?? undefined,
+        cost: result.cost != null ? String(result.cost) : undefined,
+        phoneNumber: result.phone_number ?? undefined,
+        messageParts: result.message_parts != null ? Number(result.message_parts) : undefined
       },
       message: ctx.input.test
         ? `Test SMS created (ID: ${result.id}). No message was dispatched.`

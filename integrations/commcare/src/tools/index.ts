@@ -1,6 +1,8 @@
 export * from './bulk-cases';
+export * from './bulk-get-cases';
 export * from './create-case';
 export * from './get-case';
+export * from './get-current-user';
 export * from './get-form';
 export * from './list-applications';
 export * from './list-cases';
@@ -8,6 +10,7 @@ export * from './list-forms';
 export * from './list-groups';
 export * from './list-lookup-tables';
 export * from './list-mobile-workers';
+export * from './list-projects';
 export * from './list-web-users';
 export * from './manage-group';
 export * from './manage-mobile-worker';

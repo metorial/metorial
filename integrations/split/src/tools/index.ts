@@ -3,6 +3,8 @@ export * from './delete-feature-flag';
 export * from './get-feature-flag';
 export * from './list-environments';
 export * from './list-feature-flags';
+export * from './list-flag-definitions';
+export * from './list-rollout-statuses';
 export * from './list-segments';
 export * from './list-traffic-types';
 export * from './list-workspaces';

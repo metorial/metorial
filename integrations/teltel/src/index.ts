@@ -1,11 +1,14 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getAccountBalanceTool,
+  getCampaignStatsTool,
   hlrLookupTool,
   initiateCallTool,
   listCallsTool,
   listCampaignsTool,
   listSmsTool,
+  listUserCallerIdGroupsTool,
   listUsersTool,
   manageCampaignTool,
   manageContactsTool,
@@ -18,8 +21,11 @@ export let provider = Slate.create({
     sendSmsTool,
     listSmsTool,
     listCallsTool,
+    getAccountBalanceTool,
+    getCampaignStatsTool,
     hlrLookupTool,
     listUsersTool,
+    listUserCallerIdGroupsTool,
     listCampaignsTool,
     manageCampaignTool,
     manageContactsTool

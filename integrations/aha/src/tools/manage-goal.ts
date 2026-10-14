@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AhaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,12 +46,13 @@ export let manageGoal = SlateTool.create(spec, {
   )
   .output(goalOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new AhaClient(ctx.config.subdomain, ctx.auth.token);
+    let client = AhaClient.fromContext(ctx);
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.productId) throw new Error('productId is required to create a goal');
-      if (!ctx.input.name) throw new Error('name is required to create a goal');
+      if (!ctx.input.productId)
+        throw createApiServiceError('productId is required to create a goal');
+      if (!ctx.input.name) throw createApiServiceError('name is required to create a goal');
 
       let goal = await client.createGoal(ctx.input.productId, {
         name: ctx.input.name,
@@ -74,7 +75,7 @@ export let manageGoal = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.goalId) throw new Error('goalId is required for this action');
+    if (!ctx.input.goalId) throw createApiServiceError('goalId is required for this action');
 
     if (action === 'delete') {
       await client.deleteGoal(ctx.input.goalId);

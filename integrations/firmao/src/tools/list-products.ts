@@ -65,15 +65,15 @@ export let listProducts = SlateTool.create(spec, {
     let products = result.data.map((p: any) => ({
       productId: p.id,
       name: p.name,
-      productCode: p.productCode,
-      saleable: p.saleable,
-      purchaseNetPrice: p.purchasePriceGroup?.netPrice,
-      purchaseGrossPrice: p.purchasePriceGroup?.grossPrice,
-      saleNetPrice: p.salePriceGroup?.netPrice,
-      saleGrossPrice: p.salePriceGroup?.grossPrice,
-      currentStoreState: p.currentStoreState,
-      unit: p.unit,
-      creationDate: p.creationDate
+      productCode: p.productCode ?? undefined,
+      saleable: p.saleable ?? undefined,
+      purchaseNetPrice: p.purchasePriceGroup?.netPrice ?? p.netPrice ?? undefined,
+      purchaseGrossPrice: p.purchasePriceGroup?.grossPrice ?? p.grossPrice ?? undefined,
+      saleNetPrice: p.salePriceGroup?.netPrice ?? p.saleNetPrice ?? undefined,
+      saleGrossPrice: p.salePriceGroup?.grossPrice ?? p.saleGrossPrice ?? undefined,
+      currentStoreState: p.currentStoreState ?? undefined,
+      unit: p.unit ?? undefined,
+      creationDate: p.creationDate ?? undefined
     }));
 
     return {

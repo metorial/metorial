@@ -4,8 +4,11 @@ import {
   agenticScrape,
   crawlWebsite,
   discoverSitemap,
+  extractData,
+  generateSchema,
   getCredits,
   getRequestStatus,
+  listHistory,
   markdownify,
   rawScrape,
   smartScrape,
@@ -22,7 +25,10 @@ export let provider = Slate.create({
     discoverSitemap,
     agenticScrape,
     getCredits,
-    getRequestStatus
+    getRequestStatus,
+    extractData,
+    generateSchema,
+    listHistory
   ],
   triggers: []
 });

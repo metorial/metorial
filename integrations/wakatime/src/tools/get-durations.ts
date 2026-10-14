@@ -18,7 +18,16 @@ export let getDurations = SlateTool.create(spec, {
       branches: z.string().optional().describe('Filter by branch name(s), comma-separated'),
       timezone: z.string().optional().describe('Timezone for the date'),
       sliceBy: z
-        .enum(['project', 'entity', 'language', 'editor', 'os', 'category', 'machine'])
+        .enum([
+          'project',
+          'entity',
+          'language',
+          'dependencies',
+          'editor',
+          'os',
+          'category',
+          'machine'
+        ])
         .optional()
         .describe('Dimension to slice durations by')
     })
@@ -46,7 +55,7 @@ export let getDurations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let result = await client.getDurations({
       date: ctx.input.date,
@@ -60,11 +69,11 @@ export let getDurations = SlateTool.create(spec, {
       project: d.project ?? '',
       time: d.time ?? 0,
       duration: d.duration ?? 0,
-      color: d.color,
-      entity: d.entity,
-      language: d.language,
-      category: d.category,
-      branch: d.branch
+      color: d.color ?? undefined,
+      entity: d.entity ?? undefined,
+      language: d.language ?? undefined,
+      category: d.category ?? undefined,
+      branch: d.branch ?? undefined
     }));
 
     let totalDurationSeconds = durations.reduce(

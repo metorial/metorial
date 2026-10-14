@@ -1,4 +1,5 @@
 export * from './get-api-usage';
+export * from './get-current-user';
 export * from './get-threat-report';
 export * from './lookup-app-profile';
 export * from './lookup-dns-whois';

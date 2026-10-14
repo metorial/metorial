@@ -167,8 +167,8 @@ export let getProjects = SlateTool.create(spec, {
     return {
       output: {
         projects,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${projects.length} project(s).`
     };
@@ -207,16 +207,16 @@ export let deleteProject = SlateTool.create(spec, {
 
 let mapProject = (p: any) => ({
   projectId: p.id,
-  clientId: p.client_id,
+  clientId: p.client_id ?? p.client?.id ?? undefined,
   name: p.name,
-  number: p.number,
-  rate: p.rate,
-  budgetType: p.budget_type,
-  projectType: p.project_type,
-  budget: p.budget,
-  workedHours: p.worked_hours,
-  unbilledHours: p.unbilled_hours,
-  cost: p.cost,
-  status: p.status,
-  description: p.description
+  number: p.number ?? undefined,
+  rate: p.rate ?? undefined,
+  budgetType: p.budget_type ?? undefined,
+  projectType: p.project_type ?? undefined,
+  budget: p.budget ?? undefined,
+  workedHours: p.worked_hours ?? undefined,
+  unbilledHours: p.unbilled_hours ?? undefined,
+  cost: p.cost ?? undefined,
+  status: p.status ?? undefined,
+  description: p.description ?? undefined
 });

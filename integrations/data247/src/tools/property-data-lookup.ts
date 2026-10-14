@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRawData247Result } from '../lib/client';
 import { spec } from '../spec';
 
 export let propertyDataLookup = SlateTool.create(spec, {
@@ -22,6 +22,10 @@ export let propertyDataLookup = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResult: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider result in its original JSON types'),
       ownerName: z.string().optional().describe('Name of the property owner'),
       address: z.string().optional().describe('Property address'),
       city: z.string().optional().describe('City'),
@@ -44,11 +48,12 @@ export let propertyDataLookup = SlateTool.create(spec, {
     let { owner_name, address: addr, city: c, state: s, zip: z2, ...rest } = raw;
 
     let result = {
+      rawResult: getRawData247Result(raw),
       ownerName: owner_name,
-      address: addr,
-      city: c,
-      state: s,
-      zip: z2,
+      address: raw.property_address || addr,
+      city: raw.property_city || c,
+      state: raw.property_state || s,
+      zip: raw.property_zip || z2,
       propertyAttributes: Object.keys(rest).length > 0 ? rest : undefined
     };
 

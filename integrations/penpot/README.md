@@ -1,6 +1,6 @@
 # Penpot
 
-Create, manage, and export design files and prototyping projects. Manage teams with role-based access, organize projects, and manipulate design elements including shapes, components, pages, and media assets. Search and filter shapes by type, color, font, or text content. Upload media assets, add comments for collaboration, export design tokens for code workflows, and export files in native .penpot format.
+Manage Penpot teams, projects, files, pages, comments, libraries, and media imports. Read design data, save and restore file versions, and download native .penpot exports. Connect to the hosted service or a self-hosted instance using a personal access token.
 
 ## License
 

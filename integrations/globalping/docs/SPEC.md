@@ -1,6 +1,4 @@
-Now let me fetch the API spec to get more details on authentication and features:I now have enough information to write the specification.
-
-# Slates Specification for Globalping
+# Globalping Specification
 
 ## Overview
 
@@ -31,7 +29,9 @@ Create and run network diagnostic tests from globally distributed probes. Suppor
 - **Target**: A domain name or IP address to test against.
 - **Measurement type**: `ping`, `traceroute`, `dns`, `mtr`, or `http`.
 - **Measurement options**: Type-specific options such as packet count for ping, protocol selection for traceroute, query type for DNS, and HTTP method/headers for HTTP tests. For ping, you can use `packets` to define how many packets to send and `ipVersion` to select IPv4 or IPv6.
-- You can specify measurement IDs from previous tests to reuse the same probes.
+- Set `previousMeasurementId` to reuse probes from a previous measurement. This cannot be combined with explicit `locations`.
+- Global and per-location probe limits cannot be combined.
+- Set `timeout` to a probe test timeout from 5 to 30 seconds, or `inProgressUpdates` to request partial updates.
 - Only public endpoints can be targeted; no local network tests are allowed.
 
 ### Probe Location Targeting
@@ -48,7 +48,7 @@ List and filter all available online probes by location or network, enabling tar
 
 ### API Health Check
 
-Validate Globalping API health and availability to ensure reliable automation before running critical network tests.
+Check the documented rate-limit endpoint for API health and availability to ensure reliable automation before running critical network tests.
 
 ## Events
 

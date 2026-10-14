@@ -17,7 +17,20 @@ let userSchema = z.object({
     .optional()
     .nullable()
     .describe('Default mailbox ID for this user'),
-  salesforceId: z.string().optional().nullable().describe('Salesforce ID if connected')
+  salesforceId: z.string().optional().nullable().describe('Salesforce ID if connected'),
+  mailboxes: z
+    .array(
+      z.object({
+        mailboxId: z.string().describe('Mailbox ID for campaign enrollment'),
+        email: z.string().optional().describe('Mailbox email address'),
+        campaignIds: z
+          .array(z.string())
+          .optional()
+          .describe('Campaign IDs associated with the mailbox')
+      })
+    )
+    .optional()
+    .describe('Available sending mailboxes')
 });
 
 export let listUsers = SlateTool.create(spec, {
@@ -28,27 +41,46 @@ export let listUsers = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      page: z.number().int().min(0).optional().describe('Page number for pagination')
+    })
+  )
   .output(
     z.object({
-      users: z.array(userSchema).describe('List of users')
+      users: z.array(userSchema).describe('List of users'),
+      hasMore: z.boolean().optional().describe('Whether more users are available'),
+      nextPage: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Provider continuation value for the next page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.listUsers();
+    let result = await client.listUsers(ctx.input.page);
 
-    let users = (result.users || []).map((u: any) => ({
+    let users = (result.users || []).map(u => ({
       userId: u.id,
       email: u.email,
       name: u.name,
       activated: u.activated,
       defaultMailboxId: u.default_mailbox_id,
-      salesforceId: u.salesforce_id
+      salesforceId: u.salesforce_id,
+      mailboxes: u.mailboxes?.map(mailbox => ({
+        mailboxId: mailbox.id,
+        email: mailbox.email,
+        campaignIds: mailbox.campaign_ids
+      }))
     }));
 
     return {
-      output: { users },
+      output: {
+        users,
+        hasMore: result.has_more ?? !!result.next_page,
+        nextPage: result.next_page
+      },
       message: `Retrieved **${users.length}** users.`
     };
   })

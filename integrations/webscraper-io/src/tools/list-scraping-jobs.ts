@@ -32,7 +32,7 @@ export let listScrapingJobs = SlateTool.create(spec, {
           pagesExecuted: z.number().describe('Pages executed'),
           pagesFailed: z.number().describe('Pages failed'),
           storedRecordCount: z.number().describe('Records stored'),
-          driver: z.string().describe('Driver used'),
+          driver: z.string().optional().describe('Driver used, when reported'),
           timeCreated: z.number().describe('Unix timestamp when created')
         })
       ),
@@ -63,7 +63,9 @@ export let listScrapingJobs = SlateTool.create(spec, {
           pagesExecuted: j.jobs_executed,
           pagesFailed: j.jobs_failed,
           storedRecordCount: j.stored_record_count,
-          driver: j.driver,
+          driver:
+            j.driver ??
+            (typeof j.render_js === 'boolean' ? (j.render_js ? 'fulljs' : 'fast') : undefined),
           timeCreated: j.time_created
         })),
         currentPage: result.currentPage,

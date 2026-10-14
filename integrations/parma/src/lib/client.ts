@@ -1,51 +1,98 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, pickDefined } from 'slates';
+
+export interface ParmaRelationship {
+  id: number | string;
+  name: string;
+  type?: string;
+  about?: string;
+  company_id?: number | string | null;
+  group_ids?: (number | string)[];
+  contact_details?: { type: string; value: string }[];
+  email?: string | null;
+  phone?: string | null;
+  company?: string | null;
+  title?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ParmaUser {
+  id: number | string;
+  name?: string;
+  full_name?: string;
+  email?: string;
+  avatar_url?: string;
+  image_url?: string;
+}
+
+export interface ParmaNote {
+  id: number | string;
+  body: string;
+  relationship_ids: (number | string)[];
+  datetime?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ParmaList<T> {
+  data: T[];
+  meta?: { count?: number };
+}
 
 export class ParmaClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://app.parma.ai/api/v1',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      }
+      authHeader: { value: `Bearer ${token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Parma', reason: 'parma_api_error' })
     });
   }
 
-  // ─── Users ──────────────────────────────────────────────────────
-
   async getMe() {
-    let response = await this.http.get('/users/me');
-    return response.data;
+    let response = await this.http.get<{ data: { user: ParmaUser } }>('/users/me');
+    return response.data.data.user;
   }
 
-  // ─── Relationships ──────────────────────────────────────────────
+  async listGroups(query?: string) {
+    let response = await this.http.get<ParmaList<{ id: number | string; name: string }>>(
+      '/groups',
+      { params: pickDefined({ query }) }
+    );
+    return response.data.data;
+  }
 
   async listRelationships(
     params: {
       page?: number;
       perPage?: number;
       query?: string;
-      sort?: string;
-      order?: string;
+      email?: string;
+      phone?: string;
+      type?: 'person' | 'company';
     } = {}
   ) {
-    let queryParams: Record<string, any> = {};
-    if (params.page !== undefined) queryParams.page = params.page;
-    if (params.perPage !== undefined) queryParams.per_page = params.perPage;
-    if (params.query !== undefined) queryParams.q = params.query;
-    if (params.sort !== undefined) queryParams.sort = params.sort;
-    if (params.order !== undefined) queryParams.order = params.order;
-
-    let response = await this.http.get('/relationships', { params: queryParams });
+    let response = await this.http.get<ParmaList<ParmaRelationship>>('/relationships', {
+      params: pickDefined({
+        page: params.page,
+        per_page: params.perPage,
+        name: params.query,
+        email: params.email,
+        phone: params.phone,
+        type: params.type
+      })
+    });
     return response.data;
   }
 
   async getRelationship(relationshipId: string) {
-    let response = await this.http.get(`/relationships/${relationshipId}`);
-    return response.data;
+    let response = await this.http.get<{ data: ParmaRelationship }>(
+      `/relationships/${encodeURIComponent(relationshipId)}`
+    );
+    return response.data.data;
   }
 
   async createRelationship(data: {
@@ -55,52 +102,44 @@ export class ParmaClient {
     company?: string;
     title?: string;
     notes?: string;
+    groupIds: number[];
+    type?: 'person' | 'company';
+    companyId?: number;
   }) {
-    let response = await this.http.post('/relationships', data);
-    return response.data;
+    let response = await this.http.post<{ data: ParmaRelationship }>(
+      '/relationships',
+      pickDefined({
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        company: data.company,
+        title: data.title,
+        type: data.type ?? 'person',
+        group_ids: data.groupIds,
+        company_id: data.companyId,
+        about: data.notes
+      })
+    );
+    return response.data.data;
   }
 
-  async searchRelationships(
-    query: string,
-    params: {
-      page?: number;
-      perPage?: number;
-    } = {}
-  ) {
-    let queryParams: Record<string, any> = { q: query };
-    if (params.page !== undefined) queryParams.page = params.page;
-    if (params.perPage !== undefined) queryParams.per_page = params.perPage;
-
-    let response = await this.http.get('/relationships', { params: queryParams });
-    return response.data;
+  async createNote(relationshipId: string, data: { content: string; datetime?: string }) {
+    let response = await this.http.post<{ data: ParmaNote }>(
+      '/notes',
+      pickDefined({
+        body: data.content,
+        relationship_ids: [Number(relationshipId)],
+        datetime: data.datetime
+      })
+    );
+    return response.data.data;
   }
 
-  // ─── Notes ──────────────────────────────────────────────────────
-
-  async createNote(
-    relationshipId: string,
-    data: {
-      content: string;
-    }
-  ) {
-    let response = await this.http.post(`/relationships/${relationshipId}/notes`, data);
-    return response.data;
-  }
-
-  async listNotes(
-    relationshipId: string,
-    params: {
-      page?: number;
-      perPage?: number;
-    } = {}
-  ) {
-    let queryParams: Record<string, any> = {};
-    if (params.page !== undefined) queryParams.page = params.page;
-    if (params.perPage !== undefined) queryParams.per_page = params.perPage;
-
-    let response = await this.http.get(`/relationships/${relationshipId}/notes`, {
-      params: queryParams
-    });
-    return response.data;
+  async listNotes(relationshipId: string, page?: number) {
+    let response = await this.http.get<ParmaList<ParmaNote>>(
+      `/relationships/${encodeURIComponent(relationshipId)}/notes`,
+      { params: pickDefined({ page }) }
+    );
+    return response.data.data;
   }
 }

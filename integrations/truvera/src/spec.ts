@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'truvera',
   name: 'Truvera',
   description:
-    'Decentralized identity platform for issuing, verifying, and managing W3C-compliant verifiable credentials with DID management, credential schemas, revocation registries, and ecosystem governance.',
+    'Issue, verify, and manage W3C-compliant verifiable credentials with decentralized identifiers, credential schemas, revocation registries, and proof requests.',
   metadata: {},
   config,
   auth

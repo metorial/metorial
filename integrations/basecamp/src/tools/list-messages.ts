@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let messageSchema = z.object({
@@ -17,7 +18,7 @@ let messageSchema = z.object({
 export let listMessagesTool = SlateTool.create(spec, {
   name: 'List Messages',
   key: 'list_messages',
-  description: `List messages from a Basecamp project's message board. Returns a paginated list of active messages.`,
+  description: `Call list_accounts to discover the accountId for this operation. List messages from a Basecamp project's message board. Returns a paginated list of active messages.`,
   instructions: ['Use Get Project to find the message_board dock item and its ID.'],
   tags: {
     readOnly: true
@@ -25,6 +26,7 @@ export let listMessagesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project (bucket)'),
       messageBoardId: z.string().describe('ID of the message board (found in project dock)')
     })
@@ -37,7 +39,8 @@ export let listMessagesTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let messages = await client.listMessages(ctx.input.projectId, ctx.input.messageBoardId);

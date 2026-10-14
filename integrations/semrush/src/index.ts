@@ -4,6 +4,7 @@ import {
   analyzeBacklinks,
   analyzeTraffic,
   compareDomains,
+  getApiUnitBalance,
   getDomainCompetitors,
   getDomainKeywords,
   getDomainOverview,
@@ -18,6 +19,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getApiUnitBalance,
     getDomainOverview,
     getDomainKeywords,
     getDomainCompetitors,

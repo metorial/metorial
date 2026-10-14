@@ -34,11 +34,13 @@ export let imageMetadata = SlateTool.create(spec, {
       hasExifData: z.boolean().optional().describe('Whether EXIF data exists'),
       exifDataJson: z.string().optional().describe('EXIF data as JSON string'),
       hasXmpData: z.boolean().optional().describe('Whether XMP data exists'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     let result = await client.getImageMetadata({
       fileContent: ctx.input.fileContent,
@@ -58,9 +60,13 @@ export let imageMetadata = SlateTool.create(spec, {
         hasExifData: result.hasExifData,
         exifDataJson: result.exifDataJson,
         hasXmpData: result.hasXmpData,
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId || ''
       },
-      message: `Extracted image metadata: **${result.imageFormat}**, ${result.width}x${result.height}px, ${result.fileSize}`
+      message: client.message(
+        `Extracted image metadata: **${result.imageFormat}**, ${result.width}x${result.height}px, ${result.fileSize}`
+      )
     };
   })
   .build();

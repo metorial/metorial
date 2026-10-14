@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Apaleo
 
-Manage hotel and serviced apartment operations through a cloud-based property management system (PMS). Create, modify, cancel, and manage reservations and bookings, including check-in, check-out, no-show handling, and room assignments. Manage property inventory including units (rooms), unit groups (room types), and unit attributes. Set up and update rate plans, rates, restrictions, and availability in real-time. Handle guest folios by posting charges, payments, refunds, and allowances, and move items between folios. Create, cancel, and render invoices as PDFs. Process payments via terminals and pay-by-link, manage payment authorizations, and track transaction lifecycles including settlements, refunds, and disputes. Manage company profiles for corporate bookings. Handle group bookings and room blocks with confirmation, release, and wash operations. Subscribe to ARI (Availability, Rates, Inventory) change notifications for channel distribution. Configure property settings, services, and city taxes. Trigger night audit operations. Manage account users. Retrieve reports and accounting transaction data.
+Manage hotel and serviced apartment operations with Apaleo. Discover the connected account and properties, search room offers, create bookings, retrieve bookings and reservations, manage reservation lifecycle actions, inspect rooms and rate plans, post folio charges and payments, manage invoices and company profiles, list room blocks, and run night audits.
+
+Booking creation requires a booker or the first reservation's primary guest, plus a rate plan for every reservation time slice. Company creation requires a code and address. Posting a charge requires a VAT type. Invoice creation uses the account's default language unless one is supplied; marking an invoice paid requires its payment method and receipt.
 
 ## License
 

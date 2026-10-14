@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MockServiceClient } from '../lib/mock-client';
 import { spec } from '../spec';
@@ -67,12 +67,13 @@ export let manageVirtualService = SlateTool.create(spec, {
     let client = new MockServiceClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     if (ctx.input.action === 'list') {
       if (!ctx.input.workspaceId)
-        throw new Error('workspaceId is required for listing virtual services');
+        throw createApiServiceError('workspaceId is required for listing virtual services');
       let services = await client.listVirtualServices(ctx.input.workspaceId);
       let mapped = services.map((s: any) => ({
         serviceId: s.id,
@@ -88,7 +89,9 @@ export let manageVirtualService = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.workspaceId || !ctx.input.name) {
-        throw new Error('workspaceId and name are required for creating a virtual service');
+        throw createApiServiceError(
+          'workspaceId and name are required for creating a virtual service'
+        );
       }
       let service = await client.createVirtualService(ctx.input.workspaceId, {
         name: ctx.input.name,
@@ -106,7 +109,7 @@ export let manageVirtualService = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.serviceId)
-        throw new Error('serviceId is required for updating a virtual service');
+        throw createApiServiceError('serviceId is required for updating a virtual service');
       let service = await client.updateVirtualService(ctx.input.serviceId, {
         name: ctx.input.name,
         description: ctx.input.description,
@@ -123,7 +126,7 @@ export let manageVirtualService = SlateTool.create(spec, {
 
     if (ctx.input.action === 'deploy') {
       if (!ctx.input.serviceId)
-        throw new Error('serviceId is required for deploying a virtual service');
+        throw createApiServiceError('serviceId is required for deploying a virtual service');
       let _result = await client.deployVirtualService(ctx.input.serviceId);
       return {
         output: { serviceId: ctx.input.serviceId, status: 'deployed' },
@@ -133,7 +136,7 @@ export let manageVirtualService = SlateTool.create(spec, {
 
     if (ctx.input.action === 'undeploy') {
       if (!ctx.input.serviceId)
-        throw new Error('serviceId is required for undeploying a virtual service');
+        throw createApiServiceError('serviceId is required for undeploying a virtual service');
       let _result = await client.undeployVirtualService(ctx.input.serviceId);
       return {
         output: { serviceId: ctx.input.serviceId, status: 'undeployed' },
@@ -143,7 +146,7 @@ export let manageVirtualService = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.serviceId)
-        throw new Error('serviceId is required for deleting a virtual service');
+        throw createApiServiceError('serviceId is required for deleting a virtual service');
       await client.deleteVirtualService(ctx.input.serviceId);
       return {
         output: { serviceId: ctx.input.serviceId, deleted: true },
@@ -151,6 +154,6 @@ export let manageVirtualService = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

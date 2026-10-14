@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,7 +45,10 @@ export let compareNamesTool = SlateTool.create(spec, {
 
     let result = await client.nameSimilarity(ctx.input.name1, ctx.input.name2);
 
-    let score = result.score ?? 0;
+    let score = result.score;
+    if (typeof score !== 'number') {
+      throw createApiServiceError('The Analytics API did not return a name similarity score.');
+    }
 
     return {
       output: {

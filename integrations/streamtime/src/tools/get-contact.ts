@@ -34,8 +34,8 @@ export let getContact = SlateTool.create(spec, {
       output: {
         contactId: contact.id,
         firstName: contact.firstName,
-        lastName: contact.lastName,
-        email: contact.email,
+        lastName: contact.lastName ?? '',
+        email: contact.email ?? undefined,
         raw: contact
       },
       message: `Retrieved contact **${contact.firstName} ${contact.lastName}** (ID: ${contact.id}).`

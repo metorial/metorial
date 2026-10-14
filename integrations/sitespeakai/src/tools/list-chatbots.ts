@@ -7,6 +7,11 @@ let chatbotSchema = z.object({
   chatbotId: z.string().describe('Chatbot identifier.'),
   name: z.string().describe('Chatbot display name.'),
   type: z.string().nullable().describe('Chatbot type (e.g. "assistant").'),
+  teamId: z.string().nullable().optional().describe('ID of the team that owns the chatbot.'),
+  headerIcon: z.string().nullable().optional().describe('Chatbot header icon URL.'),
+  launcherIcon: z.string().nullable().optional().describe('Chatbot launcher icon URL.'),
+  openCount: z.number().nullable().optional().describe('Number of unarchived conversations.'),
+  unreadCount: z.number().nullable().optional().describe('Number of unread conversations.'),
   createdAt: z.string().nullable().describe('Creation timestamp.'),
   updatedAt: z.string().nullable().describe('Last update timestamp.')
 });
@@ -37,6 +42,11 @@ export let listChatbots = SlateTool.create(spec, {
       chatbotId: c.id?.toString() ?? '',
       name: c.name ?? '',
       type: c.type ?? null,
+      teamId: c.team_id?.toString() ?? null,
+      headerIcon: c.header_icon ?? null,
+      launcherIcon: c.launcher_icon ?? null,
+      openCount: c.open_count ?? null,
+      unreadCount: c.unread_count ?? null,
       createdAt: c.created_at ?? null,
       updatedAt: c.updated_at ?? null
     }));

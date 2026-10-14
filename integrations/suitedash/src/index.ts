@@ -3,6 +3,9 @@ import { spec } from './spec';
 import {
   createCompany,
   createContact,
+  getCompany,
+  getCompanyMetadata,
+  getContact,
   getMetadata,
   listCompanies,
   listContacts,
@@ -20,7 +23,10 @@ export let provider = Slate.create({
     updateCompany,
     listCompanies,
     getMetadata,
-    subscribeMarketingAudience
+    subscribeMarketingAudience,
+    getContact,
+    getCompany,
+    getCompanyMetadata
   ],
   triggers: []
 });

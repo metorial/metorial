@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -57,6 +57,14 @@ Email reverse lookup is limited to contacts **outside the EU**.`,
         ),
       positions: z.array(z.any()).optional().describe('Work history (email lookup)'),
       schools: z.array(z.any()).optional().describe('Education history (email lookup)'),
+      positionsDetails: z
+        .any()
+        .optional()
+        .describe('Work history and position count returned by Datagma'),
+      schoolsDetails: z
+        .any()
+        .optional()
+        .describe('Education history and education count returned by Datagma'),
       skills: z.any().optional().describe('Skills and endorsements (email lookup)')
     })
   )
@@ -64,8 +72,8 @@ Email reverse lookup is limited to contacts **outside the EU**.`,
     let client = new Client(ctx.auth.token);
 
     if (ctx.input.lookupType === 'phone') {
-      if (!ctx.input.phoneNumber) {
-        throw new Error('phoneNumber is required for phone reverse lookup');
+      if (!ctx.input.phoneNumber?.trim()) {
+        throw createApiServiceError('phoneNumber is required for phone reverse lookup.');
       }
 
       let result = await client.reversePhoneLookup({
@@ -82,25 +90,32 @@ Email reverse lookup is limited to contacts **outside the EU**.`,
         message: `Reverse phone lookup for **${ctx.input.countryCode || ''}${ctx.input.phoneNumber}**: ${result?.name ? `found **${result.name}**` : 'no match found'}.`
       };
     } else {
-      if (!ctx.input.email) {
-        throw new Error('email is required for email reverse lookup');
+      if (!ctx.input.email?.trim()) {
+        throw createApiServiceError('email is required for email reverse lookup.');
       }
 
       let result = await client.reverseEmailLookup({
         email: ctx.input.email
       });
 
-      let personName = result?.personalInformation?.name || 'Unknown';
+      let name = result?.personalInformation?.displayName || result?.personalInformation?.name;
+      let personName = name || 'Unknown';
 
       return {
         output: {
-          name: result?.personalInformation?.name,
+          name,
           personalInformation: result?.personalInformation,
-          positions: result?.positions,
-          schools: result?.schools,
+          positions: Array.isArray(result?.positions)
+            ? result.positions
+            : result?.positions?.positionHistory,
+          schools: Array.isArray(result?.schools)
+            ? result.schools
+            : result?.schools?.educationHistory,
+          positionsDetails: result?.positions,
+          schoolsDetails: result?.schools,
           skills: result?.skillsAndEndorsements
         },
-        message: `Reverse email lookup for **${ctx.input.email}**: ${result?.personalInformation?.name ? `found **${personName}**` : 'no match found'}.`
+        message: `Reverse email lookup for **${ctx.input.email}**: ${name ? `found **${personName}**` : 'no match found'}.`
       };
     }
   })

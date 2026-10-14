@@ -1,12 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { DiffbotClient } from '../lib/client';
+import { DiffbotClient, withJobStatus } from '../lib/client';
 import { spec } from '../spec';
 
 let crawlJobSchema = z
   .object({
     jobName: z.string().optional().describe('Name of the crawl job'),
     jobStatus: z.string().optional().describe('Current status of the crawl'),
+    jobStatusDetails: z
+      .object({ status: z.number().optional(), message: z.string().optional() })
+      .passthrough()
+      .optional()
+      .describe('Original provider job status object, including its status code and message'),
     sentDone: z.boolean().optional().describe('Whether the crawl has finished sending URLs'),
     objectsFound: z.number().optional().describe('Number of objects found'),
     urlsHarvested: z.number().optional().describe('Number of URLs discovered'),
@@ -119,7 +124,9 @@ export let manageCrawl = SlateTool.create(spec, {
 
     if (action === 'list') {
       let result = await client.listCrawls();
-      let jobs = result.jobs || [];
+      let jobs = (result.jobs || [])
+        .filter((job: any) => !job.type || job.type === 'crawl')
+        .map(withJobStatus);
       return {
         output: {
           success: true,
@@ -129,13 +136,13 @@ export let manageCrawl = SlateTool.create(spec, {
       };
     }
 
-    if (!crawlName) {
-      throw new Error('crawlName is required for this action.');
+    if (!crawlName?.trim()) {
+      throw createApiServiceError('crawlName is required for this action.');
     }
 
     if (action === 'create') {
       if (!ctx.input.seeds || ctx.input.seeds.length === 0) {
-        throw new Error('At least one seed URL is required to create a crawl.');
+        throw createApiServiceError('At least one seed URL is required to create a crawl.');
       }
 
       let result = await client.createCrawl({
@@ -153,7 +160,7 @@ export let manageCrawl = SlateTool.create(spec, {
         onlyProcessIfNew: ctx.input.onlyProcessIfNew
       });
 
-      let job = result.jobs?.[0] || result;
+      let job = withJobStatus(result.jobs?.[0] || result);
 
       return {
         output: {
@@ -166,19 +173,19 @@ export let manageCrawl = SlateTool.create(spec, {
 
     if (action === 'status') {
       let result = await client.getCrawlStatus(crawlName);
-      let job = result.jobs?.[0] || result;
+      let job = withJobStatus(result.jobs?.[0] || result);
       return {
         output: {
           success: true,
           crawlJob: job
         },
-        message: `Crawl **${crawlName}** status: **${job.jobStatus?.message || job.jobStatus || 'unknown'}**.`
+        message: `Crawl **${crawlName}** status: **${job.jobStatus || 'unknown'}**.`
       };
     }
 
     if (action === 'pause') {
       let result = await client.pauseCrawl(crawlName);
-      let job = result.jobs?.[0] || result;
+      let job = withJobStatus(result.jobs?.[0] || result);
       return {
         output: {
           success: true,
@@ -190,7 +197,7 @@ export let manageCrawl = SlateTool.create(spec, {
 
     if (action === 'resume') {
       let result = await client.resumeCrawl(crawlName);
-      let job = result.jobs?.[0] || result;
+      let job = withJobStatus(result.jobs?.[0] || result);
       return {
         output: {
           success: true,
@@ -202,7 +209,7 @@ export let manageCrawl = SlateTool.create(spec, {
 
     if (action === 'restart') {
       let result = await client.restartCrawl(crawlName);
-      let job = result.jobs?.[0] || result;
+      let job = withJobStatus(result.jobs?.[0] || result);
       return {
         output: {
           success: true,
@@ -223,7 +230,26 @@ export let manageCrawl = SlateTool.create(spec, {
     }
 
     if (action === 'results') {
+      if (
+        ctx.input.resultCount !== undefined &&
+        (!Number.isSafeInteger(ctx.input.resultCount) || ctx.input.resultCount <= 0)
+      ) {
+        throw createApiServiceError('resultCount must be a positive whole number.');
+      }
       let results = await client.getCrawlResults(crawlName, undefined, ctx.input.resultCount);
+      await ctx.addAttachment({
+        type: 'url',
+        url: 'https://api.diffbot.com/v3/crawl/data',
+        query: {
+          token: ctx.auth.token,
+          name: crawlName,
+          ...(ctx.input.resultCount !== undefined
+            ? { num: String(ctx.input.resultCount) }
+            : {})
+        },
+        mimeType: 'application/json',
+        filename: `${crawlName}.json`
+      });
       return {
         output: {
           success: true,
@@ -233,6 +259,6 @@ export let manageCrawl = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

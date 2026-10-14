@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
@@ -20,12 +21,14 @@ export let listUsers = SlateTool.create(spec, {
         .describe('Filter users by type'),
       emailId: z.string().optional().describe('Look up a specific user by email address'),
       userId: z.number().optional().describe('Look up a specific user by ID'),
+      pageToken: pageTokenSchema,
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Maximum number of users to return')
     })
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       users: z
         .array(
           z.object({
@@ -54,10 +57,14 @@ export let listUsers = SlateTool.create(spec, {
     }
 
     if (ctx.input.emailId) {
-      let result = await client.getUserByEmail(ctx.input.emailId);
+      let result = await client.getUserByEmail(ctx.input.emailId, {
+        pageToken: ctx.input.pageToken,
+        offset: ctx.input.offset,
+        limit: ctx.input.limit
+      });
       let users = Array.isArray(result) ? result : (result.users ?? result.data ?? [result]);
       return {
-        output: { users },
+        output: { users, pagination: result.pagination },
         message:
           users.length > 0
             ? `Found **${users.length}** user(s) matching email.`
@@ -68,22 +75,28 @@ export let listUsers = SlateTool.create(spec, {
     let result: any;
     if (ctx.input.userType === 'customer') {
       result = await client.listCustomerUsers({
+        pageToken: ctx.input.pageToken,
         offset: ctx.input.offset,
         limit: ctx.input.limit
       });
     } else if (ctx.input.userType === 'vendor') {
       result = await client.listVendorUsers({
+        pageToken: ctx.input.pageToken,
         offset: ctx.input.offset,
         limit: ctx.input.limit
       });
     } else {
-      result = await client.listUsers({ offset: ctx.input.offset, limit: ctx.input.limit });
+      result = await client.listUsers({
+        pageToken: ctx.input.pageToken,
+        offset: ctx.input.offset,
+        limit: ctx.input.limit
+      });
     }
 
     let users = Array.isArray(result) ? result : (result.users ?? result.data ?? []);
 
     return {
-      output: { users },
+      output: { users, pagination: result.pagination },
       message: `Found **${users.length}** user(s).`
     };
   })

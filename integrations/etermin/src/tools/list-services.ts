@@ -33,7 +33,7 @@ export let listServices = SlateTool.create(spec, {
     });
 
     let result = await client.listServices({
-      servicegroupid: ctx.input.serviceGroupId,
+      ServiceGroupID: ctx.input.serviceGroupId,
       id: ctx.input.serviceId,
       enabled: ctx.input.enabled
     });

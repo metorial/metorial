@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  requestAxiosData
+} from 'slates';
 
 let LEVERLY_BASE_URL = 'https://app.leverly.com';
 
@@ -33,6 +38,12 @@ export class LeverlyClient {
   private accountId: string;
 
   constructor(config: { username: string; token: string; accountId: string }) {
+    if (!config.accountId.trim()) {
+      throw createApiServiceError(
+        'A Leverly account ID is required. Reconnect with your account ID.'
+      );
+    }
+
     this.accountId = config.accountId;
     this.axios = createAxios({
       baseURL: LEVERLY_BASE_URL,
@@ -42,7 +53,11 @@ export class LeverlyClient {
     });
   }
 
-  async createCall(params: CreateCallParams): Promise<string> {
+  async createCall(params: CreateCallParams): Promise<unknown> {
+    if (!params.phone.trim()) {
+      throw createApiServiceError('A lead phone number is required to submit a call.');
+    }
+
     let formData = new URLSearchParams();
 
     formData.append('Phone1', params.phone);
@@ -66,22 +81,34 @@ export class LeverlyClient {
     if (params.callDelay !== undefined) formData.append('callDelay', String(params.callDelay));
     if (params.groupId) formData.append('groupId', params.groupId);
 
-    let response = await this.axios.post(`/main/ingestor/process`, formData.toString(), {
-      params: { AccountID: this.accountId }
-    });
-
-    return response.data;
+    return this.submitLead(formData, 'create call');
   }
 
-  async stopReattempts(params: StopReattemptsParams): Promise<string> {
+  async stopReattempts(params: StopReattemptsParams): Promise<unknown> {
+    if (!params.phone.trim()) {
+      throw createApiServiceError('A lead phone number is required to stop call reattempts.');
+    }
+
     let formData = new URLSearchParams();
     formData.append('Phone1', params.phone);
     formData.append('stopReattempts', '1');
 
-    let response = await this.axios.post(`/main/ingestor/process`, formData.toString(), {
-      params: { AccountID: this.accountId }
-    });
+    return this.submitLead(formData, 'stop call reattempts');
+  }
 
-    return response.data;
+  private async submitLead(formData: URLSearchParams, operation: string) {
+    return requestAxiosData(
+      operation,
+      () =>
+        this.axios.post<unknown>('/main/ingestor/process', formData.toString(), {
+          params: { AccountID: this.accountId }
+        }),
+      (error, failedOperation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Leverly',
+          reason: 'leverly_api_error',
+          operation: failedOperation
+        })
+    );
   }
 }

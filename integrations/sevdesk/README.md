@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Sevdesk
 
-Create, manage, and search invoices, credit notes, vouchers, orders, and contacts for cloud-based accounting. Send invoices via email with PDF attachments, book payments, and create dunning notices. Manage parts/inventory with stock tracking. Upload and attach receipt files to vouchers. Export accounting data in DATEV format for tax advisors. Query valid tax rules, booking accounts, and tax rates for GoBD-compliant German accounting. Create and manage accounting contacts with debitor/creditor numbers.
+Create and search invoices, credit notes, vouchers, orders, contacts, and inventory parts. Retrieve invoice, voucher, and order details; send invoices by email; record payments; and prepare downloadable invoice PDFs and DATEV CSV exports. Discover check accounts, receipt guidance, and the connected bookkeeping system version. Add contact communication details and manage accounting contact numbers.
 
 ## License
 

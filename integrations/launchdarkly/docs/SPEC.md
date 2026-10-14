@@ -2,7 +2,7 @@
 
 ## Overview
 
-This integration manages feature flags, projects, environments, segments, and account invitations. It can inspect credentials, contexts, members, metrics, experiments, and audit entries, and can receive signed change notifications. It calls LaunchDarkly REST API version `20240415` and supports commercial, EU, and US federal API hosts.
+This integration manages feature flags, projects, environments, segments, and account invitations. It can inspect credentials, contexts, members, metrics, experiments, and audit entries. It calls LaunchDarkly REST API version `20240415` and supports commercial, EU, and US federal API hosts.
 
 ## Authentication
 
@@ -57,11 +57,11 @@ Create and manage projects and environments. Each project can contain multiple e
 
 Experimentation lets you validate the impact of features you roll out to your app or infrastructure. You can measure things like page views, clicks, load time, infrastructure costs, and more.
 
-The integration lists experiments and their current iteration details. Experiment creation and mutation are not exposed.
+The integration lists experiments and retrieves individual experiment details. The detail tool supports optional expansion of prior iterations, draft iteration, secondary metrics, treatments, and analysis configuration. Experiment creation and mutation are not exposed.
 
 ### Metrics
 
-List custom metrics used by experiments, including their type, active state, numeric settings, tags, and creation date. Metric creation and mutation are not exposed.
+List custom metrics used by experiments, including their type, active state, numeric settings, tags, and creation date. Retrieve an individual metric with its full event definition, optional usage expansions, or a specific version ID. Metric creation and mutation are not exposed.
 
 ### Account and Team Management
 
@@ -86,7 +86,7 @@ LaunchDarkly's webhooks allow you to build your own integrations that subscribe 
 - If LaunchDarkly receives a non-2xx response to a webhook POST, it will retry the delivery one time. Webhook delivery is not guaranteed. If you build an integration on webhooks, make sure it is tolerant of delivery failures.
 - Webhooks may not be delivered in chronological order. We recommend using the payload's "date" field as a timestamp to reorder webhooks as they are received.
 
-The resource-change trigger registers a signed webhook and verifies LaunchDarkly's `X-LD-Signature` header. The flag-change trigger polls the audit log. Both parse canonical string resource specifiers to expose project, environment, flag, segment, or member identifiers.
+This integration does not register triggers. Use Query Audit Log to inspect change history.
 
 ## Official API references
 
@@ -95,4 +95,6 @@ The resource-change trigger registers a signed webhook and verifies LaunchDarkly
 - [Feature flags](https://launchdarkly.com/docs/api/feature-flags)
 - [Segments](https://launchdarkly.com/docs/api/segments)
 - [Caller identity](https://launchdarkly.com/docs/api/other/get-caller-identity)
+- [Get metric](https://launchdarkly.com/docs/api/metrics/get-metric)
+- [Get experiment](https://launchdarkly.com/docs/api/experiments/get-experiment)
 - [Webhooks](https://launchdarkly.com/docs/api/webhooks)

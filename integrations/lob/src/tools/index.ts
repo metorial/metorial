@@ -1,3 +1,5 @@
+export * from './download-mail-piece-preview';
+export * from './lookup-us-zip';
 export * from './manage-addresses';
 export * from './manage-bank-accounts';
 export * from './manage-campaigns';

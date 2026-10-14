@@ -14,7 +14,15 @@ export let listContacts = SlateTool.create(spec, {
   .input(
     z.object({
       listId: z.string().describe('ID of the contact list to retrieve contacts from'),
-      search: z.string().optional().describe('Search contacts by email or name'),
+      search: z.string().optional().describe('Search value for the selected searchField'),
+      searchField: z
+        .string()
+        .optional()
+        .describe('Field to search, such as email, firstname, or lastname; defaults to email'),
+      searchType: z
+        .enum(['starts_with', 'exact', 'contains', 'ends_with'])
+        .optional()
+        .describe('How to match the search value; defaults to contains'),
       status: z
         .enum(['active', 'unsubscribed'])
         .optional()
@@ -48,12 +56,20 @@ export let listContacts = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let filterMap: Record<string, string> = {
-      active: '0',
+      active: '100',
       unsubscribed: '2'
     };
 
     let result = await client.listContacts(ctx.input.listId, {
       searchFilter: ctx.input.search,
+      searchField:
+        ctx.input.search !== undefined ? (ctx.input.searchField ?? 'email') : undefined,
+      searchType:
+        ctx.input.search !== undefined
+          ? { starts_with: '1', exact: '2', contains: '3', ends_with: '4' }[
+              ctx.input.searchType ?? 'contains'
+            ]
+          : undefined,
       filter: ctx.input.status ? filterMap[ctx.input.status] : undefined,
       pageNumber: ctx.input.pageNumber,
       pageSize: ctx.input.pageSize

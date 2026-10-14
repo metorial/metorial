@@ -1,6 +1,4 @@
-Now let me look at the web search API and jobs API to complete my understanding:Now I have enough information to write the specification.
-
-# Slates Specification for Crustdata
+# Crustdata Integration Specification
 
 ## Overview
 
@@ -25,6 +23,12 @@ curl 'https://api.crustdata.com/screener/company?company_domain=hubspot.com' \
 API tokens are obtained by signing up for a Crustdata account. Access to certain fields may be restricted based on your user permissions; requesting fields you do not have access to will return an unauthorized access error.
 
 ## Features
+
+### Account Credits and Permissions
+
+- `get_credit_balance` reads `GET /account/credits`, including recurring grant details and optional wallet/top-up balances. Nullable grant cadence and refresh dates are preserved.
+- `list_endpoint_permissions` reads `GET /account/endpoints` with optional exact `path`, case-insensitive `category`, and `enabled`/`disabled` status filters. Results include field permissions, rate limits, and any account-specific prices returned by the provider.
+- These free account reads use `Authorization: Bearer <api_token>` and `x-api-version: 2025-11-01` as required by the current API. Existing data tools retain their legacy `Token` authorization and `/screener/*` request contracts.
 
 ### Company Enrichment
 

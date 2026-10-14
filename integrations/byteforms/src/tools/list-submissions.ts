@@ -17,12 +17,19 @@ export let listSubmissionsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      formId: z.string().describe('The ID of the form to retrieve submissions for'),
-      limit: z.number().optional().describe('Maximum number of submissions to return'),
+      formId: z
+        .string()
+        .describe(
+          'The form ID to retrieve submissions for. Call list_forms to find form IDs.'
+        ),
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum number of submissions to return. Must be a positive whole number.'),
       order: z
         .enum(['asc', 'desc'])
         .optional()
-        .describe('Sort order by creation time. Defaults to ascending.'),
+        .describe('Sort order of submissions: ascending or descending.'),
       query: z.string().optional().describe('Search query to filter submissions'),
       after: z
         .string()
@@ -59,7 +66,12 @@ export let listSubmissionsTool = SlateTool.create(spec, {
             .describe('Submission data as key-value pairs'),
           ip: z.string().optional().describe('IP address of the submitter'),
           createdAt: z.string().describe('ISO timestamp when the submission was created'),
-          updatedAt: z.string().describe('ISO timestamp when the submission was last updated')
+          updatedAt: z.string().describe('ISO timestamp when the submission was last updated'),
+          deletedAt: z
+            .string()
+            .nullable()
+            .optional()
+            .describe('Deletion timestamp, if deleted')
         })
       )
     })
@@ -79,9 +91,10 @@ export let listSubmissionsTool = SlateTool.create(spec, {
       submissionId: item.id,
       formId: item.form_id,
       responses: item.response,
-      ip: item.options?.ip as string | undefined,
+      ip: typeof item.options?.ip === 'string' ? item.options.ip : undefined,
       createdAt: item.created_at,
-      updatedAt: item.updated_at
+      updatedAt: item.updated_at,
+      deletedAt: item.deleted_at
     }));
 
     return {

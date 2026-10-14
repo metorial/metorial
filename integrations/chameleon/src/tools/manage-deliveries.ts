@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ChameleonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -120,6 +120,15 @@ Use this to schedule or send experiences to individual users on demand.`,
     }
 
     if (ctx.input.action === 'create') {
+      if (
+        !ctx.input.modelKind ||
+        !ctx.input.experienceId ||
+        (!ctx.input.profileId && !ctx.input.uid && !ctx.input.email)
+      ) {
+        throw createApiServiceError(
+          'Creating a delivery requires modelKind, experienceId, and one of profileId, uid, or email.'
+        );
+      }
       let result = await client.createDelivery({
         profileId: ctx.input.profileId,
         uid: ctx.input.uid,
@@ -141,7 +150,8 @@ Use this to schedule or send experiences to individual users on demand.`,
       };
     }
 
-    // delete
+    if (!ctx.input.deliveryId)
+      throw createApiServiceError('Provide deliveryId to delete a delivery.');
     await client.deleteDelivery(ctx.input.deliveryId!);
     return {
       output: { deleted: true },

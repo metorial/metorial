@@ -5,6 +5,7 @@ export * from './get-backlinks';
 export * from './get-brand-radar';
 export * from './get-domain-history';
 export * from './get-keyword-ideas';
+export * from './get-limits-and-usage';
 export * from './get-linked-domains';
 export * from './get-metrics-by-country';
 export * from './get-organic-competitors';

@@ -13,7 +13,11 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('Workspace ID to list projects from')
+      workspaceId: z
+        .string()
+        .describe(
+          'Workspace ID to list projects from. Call list_workspaces to discover workspace IDs.'
+        )
     })
   )
   .output(
@@ -49,7 +53,7 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new StudioClient(ctx.auth.token);
+    let client = new StudioClient(ctx.auth);
     let result = await client.listProjects(ctx.input.workspaceId);
 
     return {

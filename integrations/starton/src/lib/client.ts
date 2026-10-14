@@ -1,14 +1,28 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class StartonClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (typeof config.token !== 'string' || !config.token.trim()) {
+      throw createApiServiceError(
+        'A Starton API key is required. Reconnect with a valid API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.starton.com/v3',
-      headers: {
-        'x-api-key': config.token
+      authHeader: { name: 'x-api-key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Starton', reason: 'starton_api_error' })
+    });
+    this.axios.interceptors.request.use(request => {
+      for (let field of ['limit', 'page']) {
+        let value = request.params?.[field];
+        if (value !== undefined && !Number.isInteger(value)) {
+          throw createApiServiceError(`${field} must be a whole number for pagination.`);
+        }
       }
+      return request;
     });
   }
 
@@ -256,7 +270,11 @@ export class StartonClient {
       isPaused?: boolean;
     }
   ) {
-    let response = await this.axios.patch(`/watcher/${watcherId}`, params);
+    let response = await this.axios.patch(`/watcher/${watcherId}`, {
+      name: params.name,
+      description: params.description,
+      paused: params.isPaused
+    });
     return response.data;
   }
 
@@ -274,6 +292,11 @@ export class StartonClient {
 
   // Wallet - Create
   async createWallet(params: { description?: string; name?: string; kmsId?: string }) {
+    if (!params.kmsId) {
+      throw createApiServiceError(
+        'kmsId is required to create a wallet. Call list_kms to find a KMS identifier.'
+      );
+    }
     let response = await this.axios.post('/kms/wallet', params);
     return response.data;
   }
@@ -325,8 +348,25 @@ export class StartonClient {
   }
 
   // Network - List supported
-  async listNetworks() {
-    let response = await this.axios.get('/network');
+  async listNetworks(params?: {
+    limit?: number;
+    page?: number;
+    testnet?: boolean;
+    deprecated?: boolean;
+  }) {
+    let response = await this.axios.get('/network', { params });
+    return response.data;
+  }
+
+  async listKms(params: { limit: number; page: number }) {
+    let response = await this.axios.get('/kms', { params });
+    return response.data;
+  }
+
+  async getBalance(network: string, address: string) {
+    let response = await this.axios.get(
+      `/data/${encodeURIComponent(network)}/address/${encodeURIComponent(address)}/balance/native`
+    );
     return response.data;
   }
 

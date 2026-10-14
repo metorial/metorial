@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -17,7 +17,21 @@ export let listArticles = SlateTool.create(spec, {
       searchTerm: z
         .string()
         .optional()
-        .describe('Search term to find articles across all collections')
+        .describe('Search term to find articles across all collections'),
+      helpCenterDomain: z
+        .string()
+        .optional()
+        .describe(
+          'Help center hostname (for example acme.gleap.help) for published-article search'
+        ),
+      password: z
+        .string()
+        .optional()
+        .describe('Password for a protected help center, used with helpCenterDomain'),
+      lang: z
+        .string()
+        .optional()
+        .describe('Language for published-article search; defaults to en')
     })
   )
   .output(
@@ -28,17 +42,26 @@ export let listArticles = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let articles: any;
     if (ctx.input.searchTerm) {
-      let result = await client.searchArticles({ searchTerm: ctx.input.searchTerm });
-      articles = Array.isArray(result) ? result : result.articles || result.data || [];
+      let result = await client.searchArticles({
+        searchTerm: ctx.input.searchTerm,
+        helpCenterDomain: ctx.input.helpCenterDomain,
+        password: ctx.input.password,
+        lang: ctx.input.lang,
+        collectionId: ctx.input.collectionId
+      });
+      articles = Array.isArray(result)
+        ? result
+        : (result?.data?.hits ?? result?.articles ?? result?.data ?? []);
     } else if (ctx.input.collectionId) {
       articles = await client.listArticles(ctx.input.collectionId);
     } else {
-      throw new Error('Either collectionId or searchTerm must be provided');
+      throw createApiServiceError('Either collectionId or searchTerm must be provided');
     }
 
     let articleList = Array.isArray(articles) ? articles : [];

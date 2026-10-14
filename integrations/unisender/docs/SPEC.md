@@ -1,99 +1,47 @@
-# Slates Specification for Unisender
+# Unisender Integration Specification
 
-## Overview
+## Authentication and API
 
-Unisender is one of the leading email marketing service providers in Eastern Europe, providing Email and SMS deliveries. It is a platform that empowers users to execute email and SMS marketing campaigns, allowing automation of managing contacts, designing emails, initiating campaigns, and analyzing results.
+The Unisender marketing API uses an API key from account settings. Requests use UTF-8 URL-encoded POST parameters at `https://api.unisender.com/{locale}/api/{method}`, with `api_key` and `format=json`. The locale is `en` or `ru`. Unisender Go uses a separate API and credentials.
 
-## Authentication
+Successful responses normally contain `result`; failures contain `error` and `code`. The test email endpoint also documents a direct `message` confirmation. Provider failures and invalid input combinations are returned as structured errors.
 
-Unisender uses API keys for authentication. The API key can be obtained from the Unisender account settings panel (under the API section of account settings).
+## Tools
 
-All API requests are made to the base URL `https://api.unisender.com/{lang}/api/{method}` where `{lang}` is the locale (`en` or `ru`) and `{method}` is the API method name. The `api_key` parameter must be included as a query parameter or POST parameter in every request.
+| Workflow | Tools |
+| --- | --- |
+| Lists | `get_lists`, `manage_lists` |
+| Contacts | `subscribe_contact`, `unsubscribe_contact`, `get_contact`, `import_contacts` |
+| Fields and tags | `manage_fields`, `get_fields_and_tags`, `delete_tag` |
+| Email messages | `create_email_message`, `update_email_message`, `list_messages`, `send_test_email` |
+| Campaigns | `launch_campaign`, `cancel_campaign`, `list_campaigns`, `get_campaign_stats` |
+| Individual messages | `send_email`, `send_sms`, `check_email_delivery`, `check_sms_delivery` |
+| Templates | `manage_templates`, `get_templates` |
+| Account and sender addresses | `get_account_info`, `validate_sender` |
 
-Example:
+Contact imports accept up to 500 rows. Each row must match the field names, including `email`. Use `email_list_ids` with comma-separated IDs from `get_lists` to set list memberships. Contact lookups request list memberships, custom fields, and activity details.
 
-```
-https://api.unisender.com/en/api/getLists?api_key=YOUR_API_KEY&format=json
-```
+Email message updates can produce a new version ID. Use the returned `messageId` when launching the updated message. Campaign `count` is retained for compatibility; the current API documents it as always zero. Campaign status filtering applies to the retrieved page.
 
-A locale must be specified in the URL path (`en` for English, `ru` for Russian). The `format` parameter can be set to `json` to receive JSON responses.
+Date-only listing filters are expanded to the beginning or end of that UTC day. Message listing supplies an all-history start and the current UTC end when dates are omitted. Campaign listing supplies an all-history start when omitted. Pagination uses provider limits: 1–100 messages/templates and 1–10,000 campaigns, with non-negative offsets.
 
-**Note:** Unisender also has a separate product called **Unisender Go** for transactional email, which uses its own distinct API key and different API endpoints (`go1.unisender.ru` or `go2.unisender.ru` depending on the data center). This specification covers the main Unisender marketing platform API.
+`send_test_email` previews an existing message for verified recipient addresses. `check_email_delivery` accepts up to 500 individual email IDs; the API retains their statuses for one month. `check_sms_delivery` accepts the SMS ID as a string to retain compound IDs exactly.
 
-## Features
+## Compatibility and documented limits
 
-### Contact List Management
+Existing tool keys, input types, optionality, and output values are preserved. Sender remains optional in the `send_sms` schema, with runtime validation because the API requires a registered sender. Template subject/body remain optional in the schema, with validation for the create action. Custom field type defaults to `string` when omitted. Legacy subscription opt-in value `1` is retained; the current provider documentation lists `0`, `3`, and `4`.
 
-Create, update, delete, and retrieve subscription lists. Subscribe or unsubscribe contacts (email addresses and/or phone numbers) to one or multiple lists. Import and export contacts in bulk with support for custom fields and tags. Check whether a contact belongs to specific lists and retrieve detailed contact information.
+The existing `getUserInfo`, `validateSender`, and `getCheckedEmail` endpoints are retained. Their current official method pages could not be retrieved during this refresh, so their exact provider payloads remain unverified. Import `doubleOptin`, autoresponder series parameters, and template `listId` are also retained for compatibility despite their omission from the retrieved method documentation.
 
-- Supports double opt-in configuration for subscriptions.
-- Tags are shared across all lists (not list-specific), and custom fields are also global across all lists.
+## Official documentation
 
-### Custom Fields and Tags
+- [Marketing API](https://www.unisender.com/ru/support/api/common/bulk-email/)
+- [Contact methods](https://www.unisender.com/ru/support/category/api/contacts/)
+- [Message methods](https://www.unisender.com/ru/support/category/api/messages/)
+- [Statistics methods](https://www.unisender.com/ru/support/category/api/statistics/)
+- [Template methods](https://www.unisender.com/ru/support/category/api/templates/)
+- [Custom fields and tags](https://www.unisender.com/ru/support/category/api/inputs/)
 
-Create, update, delete, and retrieve custom contact fields and tags. Fields allow storing additional data (e.g., name, city) on contacts. Tags are used to categorize and segment contacts for targeted messaging.
+## Verification
 
-### Email Campaigns
-
-Create email messages (templates for campaigns), update them, and launch campaigns to send emails to contact lists. Supports scheduling campaigns for future delivery, A/B testing, read and link tracking, and cancellation of pending campaigns. You can also send individual emails to specific addresses and send test emails before launching a campaign.
-
-- Sender domain verification is supported for managing authorized sender addresses.
-
-### SMS Campaigns
-
-Create and send SMS messages to contact lists or individual phone numbers. Check delivery status of sent SMS messages.
-
-### Email Templates
-
-Create, update, delete, list, and retrieve reusable email templates. Templates can be used when composing email messages for campaigns.
-
-### Campaign Statistics and Reporting
-
-Retrieve campaign status, common stats (opens, clicks, bounces), delivery statistics, visited links, and message lists. Get detailed information about individual messages and campaigns.
-
-### Subscriber Notes
-
-Create, update, delete, and retrieve notes attached to individual subscribers. Useful for adding internal annotations or CRM-like context to contacts.
-
-### Account Management
-
-Retrieve user account information. For reseller accounts, additional methods are available for managing sub-users, transferring funds, viewing payments, and managing tariffs.
-
-## Events
-
-Unisender supports webhooks for real-time event notifications. Webhooks are managed via the `setHook`, `listHooks`, and `removeHook` API methods. Events are delivered as JSON POST requests (optionally gzip-compressed) to a user-specified URL.
-
-### Email Status Changes
-
-Notifications when the delivery status of a sent email changes. Supported statuses include: sent, delivered, read, link visited, delivery retry, and various error/bounce statuses. Includes metadata such as email address, campaign ID, and delivery info (IP, user agent).
-
-### Unsubscribe Events
-
-Triggered when a contact unsubscribes from a list. Includes the email address, the campaign that prompted the unsubscribe, and the list IDs affected.
-
-### Subscribe Events
-
-Triggered when a contact subscribes to a list. Can be filtered to specific list IDs or triggered on any list subscription. A separate `subscribe_primary` event fires only when a contact subscribes for the first time.
-
-### Campaign Status Changes
-
-Triggered when a mass campaign's status changes (e.g., completed). Includes the campaign ID, status, contact count, and cost information.
-
-### Email Verification
-
-Triggered when a new sender email address is confirmed/verified for use as a return address.
-
-### User Payment Changes (Resellers only)
-
-Triggered when the account balance changes (main or bonus balance). Available only for reseller accounts.
-
-### User Info Changes
-
-Triggered when user profile information is modified (e.g., email, name, phone, company, timezone).
-
-**Configuration options:**
-
-- `event_format`: Choose between `json_post`, `json_post_gzip` (recommended), or `http_get` (deprecated).
-- `single_event`: When enabled, each webhook call contains only one event rather than batched arrays.
-- `max_parallel`: Configure maximum number of parallel webhook calls (default 10).
-- Webhooks can be filtered to specific event types and subtypes (e.g., only specific email statuses or specific list IDs for subscribe events).
+Local package build, scoped formatting/lint, registration, schema compatibility, and diff checks are recorded in the refresh report. Provider execution and live delivery were not checked during this refresh.

@@ -57,9 +57,9 @@ Returns user details including username, name, contact info, groups, and custom 
     let users = result.objects.map(u => ({
       userId: u.id,
       username: u.username,
-      firstName: u.first_name,
-      lastName: u.last_name,
-      email: u.email,
+      firstName: u.first_name ?? '',
+      lastName: u.last_name ?? '',
+      email: u.email ?? '',
       phoneNumber: u.default_phone_number,
       phoneNumbers: u.phone_numbers,
       groups: u.groups,

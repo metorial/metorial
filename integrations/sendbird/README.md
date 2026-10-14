@@ -1,6 +1,8 @@
 # <img src="logo.svg" height="20"> Sendbird
 
-Manage real-time chat messaging, voice/video calls, and customer support activities within Sendbird applications. Create, update, and delete users with metadata and authentication tokens. Create and manage group channels and open channels, including inviting members, freezing/unfreezing, and configuring channel properties. Send, update, delete, and search text, file, and admin messages with support for threading, reactions, and delivery receipts. Moderate users by blocking, muting, or banning them, and moderate content with profanity filters and image moderation. Send broadcast announcements to multiple channels or user segments. Initiate, accept, and end direct and group voice/video calls. Manage customer support tickets, agents, groups, bots, and proactive chats via Desk API. Configure push notifications for FCM and APNs. Register GDPR data export requests for compliance. Create and manage Sendbird applications, features, and organization members at the organization level.
+Manage users, group channels, open channels, and messages in a Sendbird Chat application. Create and update user profiles, invite or remove channel members, send text, file, or admin messages, and retrieve, edit, delete, or search messages. Block users, ban or mute channel members, and freeze or unfreeze channels.
+
+Message search requires the application's message search feature and exactly one search scope: a group channel URL or a user ID. Message timestamps use Unix milliseconds; channel creation timestamps use Unix seconds.
 
 ## License
 

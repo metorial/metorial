@@ -16,6 +16,9 @@ let userSchema = z.object({
   userUuid: z.string().describe('UUID of the user'),
   name: z.string().describe('Full name of the user'),
   email: z.string().describe('Email address of the user'),
+  active: z.boolean().optional().describe('Whether the user is active'),
+  license: z.string().optional().describe('Assigned license, if any'),
+  roles: z.array(z.string()).optional().describe('User roles'),
   createdAt: z.string().describe('ISO 8601 timestamp when the user was created'),
   updatedAt: z.string().describe('ISO 8601 timestamp when the user was last updated'),
   team: teamSchema.describe('Team the user belongs to')
@@ -41,7 +44,8 @@ export let listUsers = SlateTool.create(spec, {
       pagination: z.object({
         page: z.number().describe('Current page number'),
         items: z.number().describe('Items per page'),
-        count: z.number().describe('Total number of users')
+        count: z.number().describe('Total number of users'),
+        pages: z.number().optional().describe('Total number of pages')
       })
     })
   )
@@ -56,6 +60,9 @@ export let listUsers = SlateTool.create(spec, {
       userUuid: u.uuid,
       name: u.name,
       email: u.email,
+      active: u.active,
+      license: u.license,
+      roles: u.roles,
       createdAt: u.created_at,
       updatedAt: u.updated_at,
       team: u.team

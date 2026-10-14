@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { FindAllCandidate } from '../lib/client';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let getFindallResults = SlateTool.create(spec, {
   name: 'Get FindAll Results',
   key: 'get_findall_results',
-  description: `Check the status of a FindAll entity discovery run and retrieve matched entities when complete.
+  description: `Check the status of a FindAll entity discovery run and retrieve candidate results or an in-progress snapshot.
 Use the run ID returned by the **Find Entities** tool.`,
   instructions: [
-    'Set includeResults to true to retrieve the list of matched candidates.',
-    'If the run is not yet complete, only status and metrics are returned.'
+    'Set includeResults to true to retrieve available candidates once the run has stopped; inspect matchStatus to identify matches.',
+    'Set includePartialResults to retrieve the current snapshot while a run is active.',
+    'Terminal runs, including cancelled runs, retain their available candidates.'
   ],
   tags: {
     readOnly: true
@@ -22,13 +24,25 @@ Use the run ID returned by the **Find Entities** tool.`,
       includeResults: z
         .boolean()
         .optional()
-        .describe('If true and run is completed, fetch the full results. Defaults to false.')
+        .describe(
+          'If true and run has stopped, fetch its available results. Defaults to false.'
+        ),
+      includePartialResults: z
+        .boolean()
+        .optional()
+        .describe(
+          'Fetch a candidate snapshot even while the run is active. Defaults to false.'
+        )
     })
   )
   .output(
     z.object({
       findallId: z.string().describe('FindAll run ID'),
-      status: z.string().describe('Current status: queued, running, or completed'),
+      status: z
+        .string()
+        .describe(
+          'Current run status, including queued, running, completed, failed, or cancelled'
+        ),
       metrics: z
         .object({
           generatedCandidatesCount: z.number().describe('Number of candidates generated'),
@@ -46,7 +60,9 @@ Use the run ID returned by the **Find Entities** tool.`,
             name: z.string().describe('Entity name'),
             url: z.string().describe('Entity URL'),
             description: z.string().describe('Entity description'),
-            matchStatus: z.string().describe('Match status: generated, matched, or unmatched'),
+            matchStatus: z
+              .string()
+              .describe('Match status: generated, matched, unmatched, or discarded'),
             output: z
               .record(
                 z.string(),
@@ -56,6 +72,12 @@ Use the run ID returned by the **Find Entities** tool.`,
                 })
               )
               .describe('Per-condition match results'),
+            rawOutput: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe(
+                'Original provider field values, including structured enrichment data'
+              ),
             basis: z
               .array(
                 z.object({
@@ -76,15 +98,17 @@ Use the run ID returned by the **Find Entities** tool.`,
           })
         )
         .nullable()
-        .describe('Matched candidates (null if results not requested or run not complete)')
+        .describe(
+          'Available candidates; null if results were not requested or an active snapshot was not requested'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let run = await client.getFindAllRun(ctx.input.findallId);
 
-    let candidates: any = null;
-    if (ctx.input.includeResults && run.status === 'completed') {
+    let candidates: FindAllCandidate[] | null = null;
+    if (ctx.input.includePartialResults || (ctx.input.includeResults && !run.isActive)) {
       let results = await client.getFindAllResults(ctx.input.findallId);
       candidates = results.candidates;
     }

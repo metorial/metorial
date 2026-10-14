@@ -1,6 +1,10 @@
 # <img src="logo.svg" height="20"> App Drag
 
-Execute SQL queries on cloud databases, manage cloud functions, and build serverless backends. Create and manage database tables, run SELECT/INSERT/UPDATE/DELETE queries, upload and manage files in cloud storage, send transactional emails, manage newsletter contacts, post blog articles, and handle e-commerce orders. Supports cloud function execution on AWS Lambda in multiple languages (Node.js, Python, C#, GO, Java, Ruby, SQL).
+Execute SQL queries, call existing Cloud Backend functions, manage stored files and directories, send transactional emails, manage newsletter contacts, retrieve failed newsletter deliveries, and delete newsletter lists.
+
+AppDrag has stopped accepting new customers and projects and [announced permanent shutdown on November 1, 2026](https://support.appdrag.com/doc/Sunset-of-AppDrag). This integration supports existing projects while the service remains available. Follow the provider's migration guides to preserve project data.
+
+Connect using the project's API key and its App ID, the subdomain in `https://{appId}.appdrag.site`. Both are shown in the CloudBackend Portal. The sender address for transactional email must be verified with AppDrag.
 
 ## License
 

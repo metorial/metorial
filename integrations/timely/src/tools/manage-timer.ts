@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTimer = SlateTool.create(spec, {
   name: 'Manage Timer',
   key: 'manage_timer',
-  description: `Start or stop a timer on an existing time entry for real-time time tracking. Use **start** to begin tracking and **stop** to end it.`,
+  description: `Call list_accounts to choose a workspace when needed. Start or stop a timer on an existing time entry for real-time time tracking. Use **start** to begin tracking and **stop** to end it.`,
   tags: { destructive: false }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       eventId: z.string().describe('ID of the time entry'),
       action: z.enum(['start', 'stop']).describe('Whether to start or stop the timer')
     })
@@ -23,10 +25,7 @@ export let manageTimer = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let event =
       ctx.input.action === 'start'

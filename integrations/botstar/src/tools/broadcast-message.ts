@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BroadcastClient } from '../lib/broadcast-client';
 import { spec } from '../spec';
@@ -32,7 +32,7 @@ export let broadcastMessage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.botToken) {
-      throw new Error(
+      throw createApiServiceError(
         'Bot-level access token (botToken) is required for broadcasting messages. Configure it in authentication settings.'
       );
     }

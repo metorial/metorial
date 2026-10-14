@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listNotes = SlateTool.create(spec, {
   name: 'List Notes',
   key: 'list_notes',
-  description: `List notes in Pipeline CRM. Can list all notes or filter by association (deal, person, or company). Returns paginated results.`,
+  description: `List notes for one deal, person, or company in Pipeline CRM. Provide exactly one associated record ID. Returns paginated results.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -16,9 +16,15 @@ export let listNotes = SlateTool.create(spec, {
     z.object({
       page: z.number().optional().describe('Page number (default: 1)'),
       perPage: z.number().optional().describe('Results per page (default: 200, max: 200)'),
-      dealId: z.number().optional().describe('Filter notes by deal ID'),
-      personId: z.number().optional().describe('Filter notes by person ID'),
-      companyId: z.number().optional().describe('Filter notes by company ID')
+      dealId: z.number().optional().describe('Deal ID; provide this or personId or companyId'),
+      personId: z
+        .number()
+        .optional()
+        .describe('Person ID; provide this or dealId or companyId'),
+      companyId: z
+        .number()
+        .optional()
+        .describe('Company ID; provide this or dealId or personId')
     })
   )
   .output(

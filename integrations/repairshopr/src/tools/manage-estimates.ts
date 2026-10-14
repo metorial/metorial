@@ -22,17 +22,17 @@ let estimateSchema = z.object({
 let mapEstimate = (e: any) => ({
   estimateId: e.id,
   number: e.number?.toString(),
-  customerId: e.customer_id,
+  customerId: e.customer_id ?? undefined,
   customerName: e.customer_business_then_name || e.customer?.fullname,
-  ticketId: e.ticket_id,
-  date: e.date,
-  subtotal: e.subtotal ? Number(e.subtotal) : undefined,
-  total: e.total ? Number(e.total) : undefined,
-  tax: e.tax ? Number(e.tax) : undefined,
-  status: e.status,
-  notes: e.notes,
-  createdAt: e.created_at,
-  updatedAt: e.updated_at
+  ticketId: e.ticket_id ?? undefined,
+  date: e.date ?? undefined,
+  subtotal: e.subtotal == null ? undefined : Number(e.subtotal),
+  total: e.total == null ? undefined : Number(e.total),
+  tax: e.tax == null ? undefined : Number(e.tax),
+  status: e.status ?? undefined,
+  notes: e.note ?? e.notes ?? undefined,
+  createdAt: e.created_at ?? undefined,
+  updatedAt: e.updated_at ?? undefined
 });
 
 export let searchEstimates = SlateTool.create(spec, {

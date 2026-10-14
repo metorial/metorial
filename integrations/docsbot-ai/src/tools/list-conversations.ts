@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listConversations = SlateTool.create(spec, {
   name: 'List Conversations',
   key: 'list_conversations',
-  description: `Retrieve paginated conversation sessions for a bot. Returns conversation summaries including title, sentiment, resolution status, escalation status, and timestamps. Use **Get Conversation** to retrieve full message history.`,
+  description: `Retrieve paginated conversation sessions for a bot. Returns conversation summaries including title, sentiment, resolution status, escalation status, and timestamps. Use **Get Conversation** to retrieve full message history. Call list_teams to discover accessible team IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID to list conversations for'),
       page: z.number().optional().describe('Page number (zero-indexed, default: 0)'),
       perPage: z.number().optional().describe('Results per page (default: 25)')
@@ -50,10 +52,14 @@ export let listConversations = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new DocsBotAdminClient(ctx.auth.token);
-    let result = await client.listConversations(ctx.config.teamId, ctx.input.botId, {
-      page: ctx.input.page,
-      perPage: ctx.input.perPage
-    });
+    let result = await client.listConversations(
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
+      ctx.input.botId,
+      {
+        page: ctx.input.page,
+        perPage: ctx.input.perPage
+      }
+    );
 
     let conversations = result.conversations.map(c => ({
       conversationId: c.id,

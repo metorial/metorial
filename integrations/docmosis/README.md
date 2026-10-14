@@ -1,6 +1,6 @@
 # <img src="logo.jpeg" height="20"> Docmosis
 
-Generate documents by merging data with pre-uploaded templates (DOCX or ODT) to produce output in PDF, DOCX, ODT, TXT, HTML, and other formats. Upload, download, list, and delete document templates. Analyze template structure to retrieve expected field names. Deliver generated documents via direct response, email, AWS S3, or webhook. Track document generation usage with tags for reporting. Check service health and account usage quotas.
+Generate downloadable documents by merging data with templates to produce PDF, DOCX, ODT, RTF, TXT, or HTML files. Upload, download, list, and delete templates. Analyze template fields and retrieve sample data before rendering. Deliver documents directly, by email, or to configured AWS S3 storage. Track tagged usage and check environment health and page quotas.
 
 ## License
 

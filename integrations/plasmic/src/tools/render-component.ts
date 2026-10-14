@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProjectClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,11 @@ export let renderComponent = SlateTool.create(spec, {
         .optional()
         .describe('Embed hydration scripts inline in the HTML'),
       prepass: z.boolean().optional().describe('Enable server-side prefetching of content'),
-      maxAge: z.number().optional().describe('Cache duration in seconds'),
+      maxAge: z
+        .number()
+        .nonnegative()
+        .optional()
+        .describe('Cache duration in seconds when prepass is enabled'),
       componentProps: z
         .record(z.string(), z.unknown())
         .optional()
@@ -59,13 +63,16 @@ export let renderComponent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.projectId || !ctx.auth.projectToken) {
-      throw new Error('Project ID and project token are required to render components');
+    if (!ctx.auth.projectId || !(ctx.auth.projectToken || ctx.auth.projectSecretToken)) {
+      throw createApiServiceError(
+        'Project ID and project token are required to render components'
+      );
     }
 
     let client = new ProjectClient({
       projectId: ctx.auth.projectId,
-      projectToken: ctx.auth.projectToken
+      projectToken: ctx.auth.projectToken,
+      projectSecretToken: ctx.auth.projectSecretToken
     });
 
     let result = await client.renderComponent({

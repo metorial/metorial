@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CertCentralClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,10 +8,10 @@ export let manageDomain = SlateTool.create(spec, {
   key: 'manage_domain',
   description: `Add a new domain to your account, retrieve domain details, activate/deactivate a domain, or submit a domain for validation. Combines domain lifecycle operations into a single tool.`,
   instructions: [
-    'To add a domain, provide "name" and "organizationId". Optionally set the DCV method and validation types.',
-    'To get details, provide only "domainId" with no action.',
+    'To add a domain, provide "name" and "organizationId". Optionally set the DCV method and validation types (default OV).',
+    'To get details, set "action" to "get" and provide "domainId".',
     'To activate or deactivate, set "action" to "activate" or "deactivate".',
-    'To submit for domain control validation, set "action" to "submit_for_validation" and provide a "dcvMethod".'
+    'To submit for domain control validation, set "action" to "submit_for_validation" and provide a "dcvMethod". Validation types default to OV when omitted.'
   ],
   tags: {
     destructive: false,
@@ -35,7 +35,9 @@ export let manageDomain = SlateTool.create(spec, {
       validationTypes: z
         .array(z.enum(['ov', 'ev']))
         .optional()
-        .describe('Validation types to request when adding'),
+        .describe(
+          'Validation types to request when adding or submitting for validation (default OV)'
+        ),
       dcvMethod: z
         .enum(['email', 'dns-cname-token', 'dns-txt-token', 'http-token'])
         .optional()
@@ -87,14 +89,21 @@ export let manageDomain = SlateTool.create(spec, {
 
     if (action === 'add') {
       if (!ctx.input.name || !ctx.input.organizationId) {
-        throw new Error('Domain name and organizationId are required when adding a domain');
+        throw createApiServiceError(
+          'Domain name and organizationId are required when adding a domain'
+        );
+      }
+      if (ctx.input.validationTypes?.length === 0) {
+        throw createApiServiceError(
+          'Provide at least one validation type or omit validationTypes to request OV validation.'
+        );
       }
 
       ctx.progress('Adding domain...');
       let result = await client.addDomain({
         name: ctx.input.name,
         organization: { id: ctx.input.organizationId },
-        validations: ctx.input.validationTypes?.map(t => ({ type: t })),
+        validations: (ctx.input.validationTypes ?? ['ov']).map(type => ({ type })),
         dcv_method: ctx.input.dcvMethod
       });
 
@@ -110,7 +119,12 @@ export let manageDomain = SlateTool.create(spec, {
     }
 
     if (!ctx.input.domainId) {
-      throw new Error('domainId is required for this action');
+      throw createApiServiceError('domainId is required for this action');
+    }
+    if (!/^\d+$/.test(ctx.input.domainId) || Number(ctx.input.domainId) < 1) {
+      throw createApiServiceError(
+        'domainId must be a positive numeric ID. Use list_domains to find the domain.'
+      );
     }
 
     if (action === 'get') {
@@ -128,7 +142,7 @@ export let manageDomain = SlateTool.create(spec, {
           validations: domain.validations?.map((v: any) => ({
             type: v.type,
             status: v.status,
-            expiresAt: v.expires_at
+            expiresAt: v.validated_until ?? v.expires_at ?? undefined
           })),
           dcvToken: domain.dcv_token
             ? {
@@ -169,12 +183,18 @@ export let manageDomain = SlateTool.create(spec, {
 
     if (action === 'submit_for_validation') {
       if (!ctx.input.dcvMethod) {
-        throw new Error('dcvMethod is required when submitting for validation');
+        throw createApiServiceError('dcvMethod is required when submitting for validation');
+      }
+      if (ctx.input.validationTypes?.length === 0) {
+        throw createApiServiceError(
+          'Provide at least one validation type or omit validationTypes to request OV validation.'
+        );
       }
 
       ctx.progress('Submitting domain for validation...');
       let result = await client.submitDomainForValidation(ctx.input.domainId, {
-        dcv_method: ctx.input.dcvMethod
+        dcv_method: ctx.input.dcvMethod,
+        validations: (ctx.input.validationTypes ?? ['ov']).map(type => ({ type }))
       });
 
       return {
@@ -193,6 +213,6 @@ export let manageDomain = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

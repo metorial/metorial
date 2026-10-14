@@ -51,15 +51,22 @@ export let getCall = SlateTool.create(spec, {
     return {
       output: {
         callId: String(result.id),
-        startedAt: result.started_at,
-        direction: result.direction,
-        status: result.status,
-        leadStatus: result.lead_status,
-        duration: result.seconds ?? result.duration,
-        recordingUrl: result.recording_url,
-        transcript: result.transcript,
-        lead: result.lead,
-        agent: result.user ?? result.member
+        startedAt: result.started_at ?? undefined,
+        direction: result.direction ?? undefined,
+        status: result.status ?? undefined,
+        leadStatus: result.lead_status ?? undefined,
+        duration:
+          typeof result.seconds === 'number'
+            ? result.seconds
+            : typeof result.duration === 'number'
+              ? result.duration
+              : undefined,
+        recordingUrl: result.recording_url ?? undefined,
+        transcript: result.transcript ?? undefined,
+        lead: Array.isArray(result.lead) ? undefined : (result.lead ?? undefined),
+        agent:
+          result.user ??
+          (Array.isArray(result.member) ? undefined : (result.member ?? undefined))
       },
       message: `Call **${result.id}** — ${result.direction ?? 'unknown'} ${result.status ?? 'unknown'}, duration: ${result.seconds ?? result.duration ?? 0}s.`
     };

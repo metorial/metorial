@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   authorizeCertificate,
   authorizePublicKey,
+  getMonitoredDomain,
   listMonitoredDomains,
   manageMonitoredDomain,
   searchCertificates
@@ -12,6 +13,7 @@ export let provider = Slate.create({
   tools: [
     searchCertificates,
     listMonitoredDomains,
+    getMonitoredDomain,
     manageMonitoredDomain,
     authorizeCertificate,
     authorizePublicKey

@@ -1,7 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cancelCrawl,
   captureScreenshot,
+  downloadCrawlArtifact,
   extractData,
   getAccountInfo,
   getCrawlResults,
@@ -18,6 +20,8 @@ export let provider = Slate.create({
     startCrawl,
     getCrawlStatus,
     getCrawlResults,
+    cancelCrawl,
+    downloadCrawlArtifact,
     getAccountInfo
   ],
   triggers: []

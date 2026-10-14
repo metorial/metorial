@@ -12,7 +12,7 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      apiKey: z.string().describe('Emelia API key from https://app.emelia.io/settings/api')
+      apiKey: z.string().describe('Emelia API key from https://v3.emelia.io/settings/api')
     }),
     getOutput: async ctx => {
       return {

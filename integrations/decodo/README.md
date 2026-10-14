@@ -1,6 +1,8 @@
-# Smartproxy
+# Decodo
 
-Scrape and extract structured data from websites using 100+ pre-built templates for eCommerce, search engines, and social media platforms. Route web requests through residential, mobile, ISP, and datacenter proxy pools across 195+ geo-locations. Manage proxy users, whitelisted IPs, and traffic limits via the Public API. Supports real-time and asynchronous scraping with configurable JavaScript rendering, CAPTCHA solving, device emulation, and output parsing (JSON, HTML, Markdown, screenshots). Schedule recurring scrape jobs with delivery via email, webhook, or Google Drive. Track traffic usage, request success rates, and spend across all proxy products.
+Scrape websites in real time or create asynchronous tasks using Decodo's Web Scraping API. Existing target templates, JavaScript rendering, custom request headers and cookies, parsed JSON, Markdown, and PNG screenshots are supported. PNG results are also available as downloadable files.
+
+Manage residential proxy sub-users, whitelisted IPs, subscriptions, and proxy endpoint locations through the Public API. Inspect an individual sub-user or total allocated traffic to check proxy capacity. Web Scraping API tools use Basic authentication; Public API tools use the account API key. Provider plan and target restrictions apply.
 
 ## License
 

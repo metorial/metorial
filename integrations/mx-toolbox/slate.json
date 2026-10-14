@@ -1,14 +1,13 @@
 {
   "name": "@metorial/mxtoolbox",
-  "description": "Run DNS and email authentication lookups for domains and IP addresses, including MX, SPF, DKIM, DMARC, BIMI, MTA-STS, PTR, and TXT records. Check domain blacklist status and diagnose email deliverability issues. Create, update, delete, and query infrastructure monitors for blacklist, SMTP, HTTP, TCP, DNS, and mail flow health. Manage monitor tags for organizing and filtering monitors. Set up short-term Quickwatch monitors that auto-expire. Track API usage against plan limits.",
+  "description": "Run DNS, email authentication, blacklist, and network diagnostics. List and retrieve infrastructure monitors and their tags, filter by command or target, and create or delete monitors. Track DNS and network API quotas separately.",
   "categories": ["apis-and-http-requests", "email-and-messaging", "security"],
   "skills": [
     "lookup DNS records",
     "check blacklist status",
     "verify email authentication",
     "manage infrastructure monitors",
-    "create Quickwatch monitors",
-    "organize monitors with tags",
+    "retrieve monitor tags",
     "diagnose SMTP servers",
     "track API usage",
     "check domain health"

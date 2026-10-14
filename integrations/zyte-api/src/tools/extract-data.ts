@@ -46,6 +46,8 @@ For single product pages, use **Extract Product**. For single article pages, use
   instructions: [
     'Only one dataType can be used per request.',
     'Use extractFrom to control extraction source.',
+    'Use browserHtml or httpResponseBody. The legacy browserHtmlOnly option is unsupported by the current API.',
+    'Model pinning is currently supported only by Extract Product; omit modelVersion here.',
     'Custom attributes allow additional fields via natural language descriptions.'
   ],
   tags: {
@@ -61,9 +63,12 @@ For single product pages, use **Extract Product**. For single article pages, use
         .enum(['httpResponseBody', 'browserHtml', 'browserHtmlOnly'])
         .optional()
         .describe(
-          'Extraction source. "browserHtml" (default), "browserHtmlOnly", or "httpResponseBody" (fastest).'
+          'Extraction source. Use browserHtml for rendered HTML or httpResponseBody for raw HTTP. The legacy browserHtmlOnly option is unsupported by the current API.'
         ),
-      modelVersion: z.string().optional().describe('Pin a specific AI model version'),
+      modelVersion: z
+        .string()
+        .optional()
+        .describe('Legacy model option; omit for this data type'),
       customAttributes: z
         .record(z.string(), customAttributePropertySchema)
         .optional()
@@ -87,7 +92,7 @@ For single product pages, use **Extract Product**. For single article pages, use
       customAttributes: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Values of custom extracted attributes')
+        .describe('Custom extraction response containing values and metadata')
     })
   )
   .handleInvocation(async ctx => {
@@ -100,9 +105,7 @@ For single product pages, use **Extract Product**. For single article pages, use
         ? { extractFrom: ctx.input.extractFrom, model: ctx.input.modelVersion }
         : undefined;
 
-    let customAttributes = ctx.input.customAttributes
-      ? { type: 'object' as const, properties: ctx.input.customAttributes }
-      : undefined;
+    let customAttributes = ctx.input.customAttributes;
 
     let request: ExtractRequest = {
       url: ctx.input.url,

@@ -24,7 +24,7 @@ export let createForm = SlateTool.create(spec, {
       returnUrl: z
         .string()
         .optional()
-        .describe('URL to redirect the user to after a successful submission'),
+        .describe('Success redirect URL. Also provide failUrl; omit thankYouPage.'),
       failUrl: z
         .string()
         .optional()
@@ -69,6 +69,10 @@ export let createForm = SlateTool.create(spec, {
       formUrl: z
         .string()
         .describe('The unique form endpoint URL to use as the form action target'),
+      formId: z
+        .string()
+        .optional()
+        .describe('Form ID from the endpoint URL, for submission and deletion tools'),
       statusMessage: z.string().describe('Status message from the API')
     })
   )
@@ -90,6 +94,7 @@ export let createForm = SlateTool.create(spec, {
     return {
       output: {
         formUrl: result.formUrl,
+        formId: new URL(result.formUrl).pathname.match(/^\/s\/([^/]+)\/?$/)?.[1],
         statusMessage: result.message
       },
       message: `Created form **${ctx.input.formName}**. Form endpoint: ${result.formUrl}`

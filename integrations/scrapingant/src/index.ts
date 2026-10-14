@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   checkUsage,
+  downloadMarkdown,
   extractData,
   scrapeAsMarkdown,
   scrapeExtended,
@@ -10,6 +11,13 @@ import {
 
 export let provider = Slate.create({
   spec,
-  tools: [scrapeWebpage, scrapeAsMarkdown, extractData, scrapeExtended, checkUsage],
+  tools: [
+    scrapeWebpage,
+    scrapeAsMarkdown,
+    extractData,
+    scrapeExtended,
+    checkUsage,
+    downloadMarkdown
+  ],
   triggers: []
 });

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/klazify",
-  "description": "Classify and categorize any website, domain, IP address, or email into structured business data. Retrieve company profiles including revenue, employee range, industry classification, HQ location, and tech stack. Look up brand logos, social media links, competitor domains, domain registration data, and parked domain status. Supports IAB Content Taxonomy with 620+ categories and confidence scores. Enrich data in batch via CSV upload.",
+  "description": "Classify websites, domains, IP addresses, and emails into structured business data. Retrieve company profiles, revenue estimates, headquarters, technologies, social profiles, competitors, and domain registration data. Download brand logos, inspect IAB labels and category taxonomies, and discover domains by category, technology, headquarters country, company size, or traffic rank.",
   "categories": ["apis-and-http-requests", "security"],
   "skills": [
     "categorize websites and domains",
@@ -12,6 +12,7 @@
     "detect parked domains",
     "lookup domain registration data",
     "classify mobile apps",
-    "batch enrich via CSV"
+    "inspect IAB labels and category taxonomies",
+    "discover domains by company and technology filters"
   ]
 }

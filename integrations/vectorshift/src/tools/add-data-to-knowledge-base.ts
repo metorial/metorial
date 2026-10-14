@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { addTextToKnowledgeBase, addUrlToKnowledgeBase, createApiClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,12 +51,18 @@ export let addDataToKnowledgeBaseTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.url !== undefined && ctx.input.text !== undefined) {
+      throw createApiServiceError('Provide either a URL or text content, not both.');
+    }
+    if (ctx.input.urlLimit !== undefined && !Number.isInteger(ctx.input.urlLimit)) {
+      throw createApiServiceError('urlLimit must be a whole number.');
+    }
     let api = createApiClient(ctx.auth.token);
     let result: { document_ids?: string[] };
 
     if (ctx.input.sourceType === 'url') {
       if (!ctx.input.url) {
-        throw new Error('URL is required when sourceType is "url"');
+        throw createApiServiceError('URL is required when sourceType is "url".');
       }
       result = await addUrlToKnowledgeBase(api, ctx.input.knowledgeBaseId, {
         url: ctx.input.url,
@@ -66,7 +72,7 @@ export let addDataToKnowledgeBaseTool = SlateTool.create(spec, {
       });
     } else {
       if (!ctx.input.text) {
-        throw new Error('Text content is required when sourceType is "text"');
+        throw createApiServiceError('Text content is required when sourceType is "text".');
       }
       result = await addTextToKnowledgeBase(api, ctx.input.knowledgeBaseId, {
         text: ctx.input.text,

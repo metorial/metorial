@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { siteIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateAction = SlateTool.create(spec, {
@@ -13,7 +14,10 @@ export let updateAction = SlateTool.create(spec, {
       actionId: z.string().describe('ID of the action to update'),
       title: z.string().optional().describe('New title'),
       description: z.string().optional().describe('New description'),
-      status: z.string().optional().describe('New status (e.g., "IN PROGRESS", "DONE")'),
+      status: z
+        .string()
+        .optional()
+        .describe('New status ID or name: to do, in progress, complete, or done'),
       priority: z
         .string()
         .optional()
@@ -23,7 +27,7 @@ export let updateAction = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('New list of assigned user IDs (replaces existing)'),
-      siteId: z.string().optional().describe('New site ID to associate with')
+      siteId: siteIdSchema.optional()
     })
   )
   .output(
@@ -36,6 +40,13 @@ export let updateAction = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { actionId } = ctx.input;
     let updatedFields: string[] = [];
+    if (
+      !Object.entries(ctx.input).some(
+        ([key, value]) => key !== 'actionId' && value !== undefined
+      )
+    ) {
+      throw createApiServiceError('Provide at least one field to update.');
+    }
 
     if (ctx.input.title !== undefined) {
       await client.updateActionTitle(actionId, ctx.input.title);

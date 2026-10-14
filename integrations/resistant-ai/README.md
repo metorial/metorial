@@ -1,6 +1,13 @@
-# <img src="logo.png" height="20"> Identitycheck
+# <img src="logo.svg" height="20"> Resistant AI
 
-Verify individual identities using government-issued documents and biometric selfies across 200+ countries. Run KYC identity checks, AML screening (PEP, sanctions, adverse media), proof of address verification, US background checks, and credit reports. Perform Know Your Business (KYB) verification including UBO and ASIC director reports. Send branded ID check request emails to contacts, receive verification outcomes via webhooks, and write results back to connected CRMs. Supports custom onboarding forms and Bring Your Own Key (BYOK) provider configuration.
+Submit original PDF or image documents to Resistant Documents for fraud analysis,
+retrieve complete results, and permanently delete submissions. Connect with the
+client credentials and deployment cell provisioned by Resistant AI.
+
+The original StackGo IdentityCheck verification, AML, and KYB tools remain
+available for existing workflows with a separate legacy IdentityCheck API key.
+IdentityCheck is a separate product; its credentials cannot be used for the
+Resistant Documents tools. See the [capability and authentication guide](docs/SPEC.md).
 
 ## License
 

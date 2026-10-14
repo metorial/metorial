@@ -26,11 +26,13 @@ export let pdfFillForm = SlateTool.create(spec, {
     z.object({
       fileName: z.string().describe('Output filename'),
       fileContent: z.string().describe('Base64-encoded filled PDF'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     let result = await client.fillPdfForm({
       fileContent: ctx.input.fileContent,
@@ -42,9 +44,13 @@ export let pdfFillForm = SlateTool.create(spec, {
       output: {
         fileName: result.Filename,
         fileContent: result.FileContent,
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId
       },
-      message: `Successfully filled PDF form${ctx.input.flatten ? ' and flattened fields' : ''}.`
+      message: client.message(
+        `Successfully filled PDF form${ctx.input.flatten ? ' and flattened fields' : ''}.`
+      )
     };
   })
   .build();

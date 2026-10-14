@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageCollection = SlateTool.create(spec, {
   key: 'manage_collection',
   description: `Create, update, or delete a help center collection (category). Collections organize help center articles into groups.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -37,12 +37,13 @@ export let manageCollection = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.title) {
-        throw new Error('Title is required when creating a collection');
+        throw createApiServiceError('Title is required when creating a collection');
       }
       let collection = await client.createCollection({
         title: ctx.input.title,
@@ -59,7 +60,7 @@ export let manageCollection = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.collectionId) {
-        throw new Error('collectionId is required when updating a collection');
+        throw createApiServiceError('collectionId is required when updating a collection');
       }
       let collection = await client.updateCollection(ctx.input.collectionId, {
         title: ctx.input.title,
@@ -75,7 +76,7 @@ export let manageCollection = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.collectionId) {
-        throw new Error('collectionId is required when deleting a collection');
+        throw createApiServiceError('collectionId is required when deleting a collection');
       }
       await client.deleteCollection(ctx.input.collectionId);
       return {
@@ -84,6 +85,6 @@ export let manageCollection = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

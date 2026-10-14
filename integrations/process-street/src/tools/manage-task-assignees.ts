@@ -1,9 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorSchema, getNextCursor, nextCursorSchema } from '../lib/pagination';
 import { spec } from '../spec';
 
 let assigneeSchema = z.object({
+  userId: z.string().optional().describe('ID of the assigned user'),
   email: z.string().describe('Email address of the assignee'),
   username: z.string().optional().describe('Username of the assignee')
 });
@@ -18,6 +20,7 @@ export let manageTaskAssignees = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      cursor: cursorSchema,
       workflowRunId: z.string().describe('ID of the workflow run'),
       taskId: z
         .string()
@@ -32,6 +35,7 @@ export let manageTaskAssignees = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextCursor: nextCursorSchema,
       assignees: z
         .array(assigneeSchema)
         .optional()
@@ -48,20 +52,21 @@ export let manageTaskAssignees = SlateTool.create(spec, {
       if (taskId) {
         data = await client.listTaskAssignees(workflowRunId, taskId);
       } else {
-        data = await client.listWorkflowRunAssignees(workflowRunId);
+        data = await client.listWorkflowRunAssignees(workflowRunId, ctx.input.cursor);
       }
       let assignees = (data.assignees || []).map((a: any) => ({
+        userId: a.id,
         email: a.email,
         username: a.username
       }));
       return {
-        output: { assignees, success: true },
+        output: { assignees, nextCursor: getNextCursor(data), success: true },
         message: `Found **${assignees.length}** assignee(s).`
       };
     }
 
     if (!email) {
-      throw new Error('Email is required for assign/unassign actions');
+      throw createApiServiceError('Email is required for assign/unassign actions');
     }
 
     if (action === 'assign') {

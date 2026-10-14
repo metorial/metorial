@@ -73,7 +73,7 @@ export let searchClasses = SlateTool.create(spec, {
     });
 
     let classes = Array.isArray(result) ? result : result.classes || result.data || [];
-    let totalCount = result.totalCount || result.total || classes.length;
+    let totalCount = result.totalCount ?? result.total ?? classes.length;
 
     return {
       output: {

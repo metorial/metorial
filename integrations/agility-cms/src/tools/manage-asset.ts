@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MgmtClient } from '../lib/client';
 import { spec } from '../spec';
@@ -34,7 +34,8 @@ export let manageAsset = SlateTool.create(spec, {
       token: ctx.auth.token,
       guid: ctx.config.guid,
       locale: ctx.config.locale,
-      region: ctx.auth.region
+      region: ctx.auth.region,
+      authMethod: ctx.auth.authMethod
     });
 
     if (ctx.input.operation === 'delete') {
@@ -46,7 +47,7 @@ export let manageAsset = SlateTool.create(spec, {
     }
 
     if (!ctx.input.destinationFolder) {
-      throw new Error('destinationFolder is required for move operations');
+      throw createApiServiceError('destinationFolder is required for move operations');
     }
     await client.moveAsset(ctx.input.mediaId, ctx.input.destinationFolder);
     return {

@@ -25,9 +25,16 @@ export let manageWallets = SlateTool.create(spec, {
       kmsId: z
         .string()
         .optional()
-        .describe('KMS identifier to use (when creating, defaults to Starton KMS)'),
-      limit: z.number().default(20).describe('Number of wallets to return (when listing)'),
-      page: z.number().default(0).describe('Page number for pagination (when listing)')
+        .describe(
+          'KMS identifier required when creating. Call list_kms to discover KMS identifiers.'
+        ),
+      limit: z
+        .number()
+        .min(1)
+        .max(2500)
+        .default(20)
+        .describe('Number of wallets to return (when listing)'),
+      page: z.number().min(0).default(0).describe('Page number for pagination (when listing)')
     })
   )
   .output(
@@ -60,8 +67,8 @@ export let manageWallets = SlateTool.create(spec, {
           wallets: [
             {
               walletAddress: result.address || '',
-              name: result.name,
-              description: result.description,
+              name: result.name ?? undefined,
+              description: result.description ?? undefined,
               createdAt: result.createdAt
             }
           ],
@@ -76,17 +83,17 @@ export let manageWallets = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let items = result.items || result || [];
+    let items = result.items ?? (Array.isArray(result) ? result : []);
 
     return {
       output: {
         wallets: items.map((w: any) => ({
           walletAddress: w.address || '',
-          name: w.name,
-          description: w.description,
+          name: w.name ?? undefined,
+          description: w.description ?? undefined,
           createdAt: w.createdAt
         })),
-        totalCount: result.meta?.totalCount || items.length
+        totalCount: result.meta?.totalItems ?? result.meta?.totalCount ?? items.length
       },
       message: `Found **${items.length}** wallets.`
     };

@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTodoListTool = SlateTool.create(spec, {
   name: 'Manage To-Do List',
   key: 'manage_todo_list',
-  description: `Create or update a to-do list within a Basecamp project. To-do lists are containers for individual to-do items.
+  description: `Call list_accounts to discover the accountId for this operation. Create or update a to-do list within a Basecamp project. To-do lists are containers for individual to-do items.
 To **create**, provide the \`projectId\`, \`todoSetId\`, and \`name\`.
 To **update**, provide the \`projectId\`, \`todoListId\`, and the new \`name\`.`,
   instructions: [
@@ -15,6 +16,7 @@ To **update**, provide the \`projectId\`, \`todoListId\`, and the new \`name\`.`
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project (bucket)'),
       action: z.enum(['create', 'update']).describe('Action to perform'),
       todoSetId: z
@@ -41,14 +43,15 @@ To **update**, provide the \`projectId\`, \`todoListId\`, and the new \`name\`.`
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let { action, projectId } = ctx.input;
 
     if (action === 'create') {
       if (!ctx.input.todoSetId)
-        throw new Error('todoSetId is required for creating a to-do list');
+        throw createApiServiceError('todoSetId is required for creating a to-do list');
 
       let list = await client.createTodoList(projectId, ctx.input.todoSetId, {
         name: ctx.input.name,
@@ -71,7 +74,7 @@ To **update**, provide the \`projectId\`, \`todoListId\`, and the new \`name\`.`
 
     // update
     if (!ctx.input.todoListId)
-      throw new Error('todoListId is required for updating a to-do list');
+      throw createApiServiceError('todoListId is required for updating a to-do list');
 
     let list = await client.updateTodoList(projectId, ctx.input.todoListId, {
       name: ctx.input.name,
@@ -86,8 +89,12 @@ To **update**, provide the \`projectId\`, \`todoListId\`, and the new \`name\`.`
         completedCount: list.completed_ratio?.split('/')[0]
           ? Number(list.completed_ratio.split('/')[0])
           : 0,
-        incompletedCount: list.completed_ratio?.split('/')[1]
-          ? Number(list.completed_ratio.split('/')[1])
+        incompletedCount: list.completed_ratio
+          ? Math.max(
+              0,
+              Number(list.completed_ratio.split('/')[1]) -
+                Number(list.completed_ratio.split('/')[0])
+            )
           : 0
       },
       message: `Updated to-do list **${list.name}**.`

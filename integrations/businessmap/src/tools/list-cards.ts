@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let listCardsTool = SlateTool.create(spec, {
   name: 'List Cards',
   key: 'list_cards',
-  description: `List and filter cards across one or more boards. Supports filtering by board, column, lane, workflow, owner, and card type. Returns paginated results with up to 200 cards per page.`,
+  description: `List and filter cards across one or more boards. Supports filtering by board, column, lane, workflow, owner, and card type. Returns paginated results with up to 200 cards per state per page; includeArchived combines active and archived results.`,
   instructions: [
     'Use boardIds to scope results to specific boards.',
-    'Use page parameter to navigate through large result sets (200 cards per page).'
+    'Use page parameter to navigate through large result sets (200 cards per state per page).'
   ],
   tags: {
     readOnly: true
@@ -27,7 +27,12 @@ export let listCardsTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Whether to include archived cards. Defaults to false.'),
-      page: z.number().optional().describe('Page number for pagination (starts at 1)')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Page must be a safe whole number.')
+        .positive()
+        .optional()
+        .describe('Page number for pagination (starts at 1)')
     })
   )
   .output(
@@ -51,7 +56,7 @@ export let listCardsTool = SlateTool.create(spec, {
             section: z
               .number()
               .optional()
-              .describe('Section (1=Backlog, 2=In Progress, 3=Done)')
+              .describe('Section (1=Backlog, 2=Requested, 3=In Progress, 4=Done, 5=Archive)')
           })
         )
         .describe('List of cards'),
@@ -60,24 +65,35 @@ export let listCardsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
-    let result = await client.listCards({
+    let params = {
       boardIds: ctx.input.boardIds,
       columnId: ctx.input.columnId,
       laneId: ctx.input.laneId,
       workflowId: ctx.input.workflowId,
       ownerId: ctx.input.ownerId,
       typeId: ctx.input.typeId,
-      isArchived: ctx.input.includeArchived ? undefined : 0,
-      page: ctx.input.page
-    });
-
-    let cards = result?.data ?? [];
-    let pagination = result?.pagination;
+      page: ctx.input.page ?? 1
+    };
+    let states: ('active' | 'archived')[] = ctx.input.includeArchived
+      ? ['active', 'archived']
+      : ['active'];
+    let results = await Promise.all(
+      states.map(async state => {
+        let first = await client.listCards({ ...params, state, page: 1 });
+        if (params.page === 1) return first;
+        if (params.page > (first?.pagination?.all_pages ?? 0)) {
+          return { ...first, data: [] };
+        }
+        return client.listCards({ ...params, state });
+      })
+    );
+    let cards = results.flatMap(result => result?.data ?? []);
+    let pagination = {
+      all_pages: Math.max(0, ...results.map(result => result?.pagination?.all_pages ?? 0)),
+      current_page: params.page
+    };
 
     return {
       output: {

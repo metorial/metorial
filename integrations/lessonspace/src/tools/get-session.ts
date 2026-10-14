@@ -40,8 +40,17 @@ export let getSession = SlateTool.create(spec, {
       guests: z
         .array(
           z.object({
-            socketId: z.string().describe('Socket identifier of the guest.'),
-            name: z.string().nullable().describe('Guest display name.')
+            socketId: z
+              .string()
+              .optional()
+              .describe('Socket identifier when provided by the API.'),
+            name: z.string().nullable().describe('Guest display name when available.'),
+            guestId: z.number().optional().describe('Internal guest record ID.'),
+            guestUuid: z.string().optional().describe('Stable UUID of the guest record.'),
+            sessionId: z
+              .number()
+              .optional()
+              .describe('Internal session ID associated with the guest.')
           })
         )
         .describe('Guest participants in the session.'),
@@ -51,15 +60,16 @@ export let getSession = SlateTool.create(spec, {
       playbackUrl: z
         .string()
         .nullable()
-        .describe('URL to access the session recording playback.'),
+        .describe(
+          'Authenticated API endpoint for playback. Call get_recording for a viewing URL.'
+        ),
       recordingAvailable: z.boolean().describe('Whether a recording is available.'),
       recordingDeleted: z.boolean().describe('Whether the recording has been deleted.')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      organisationId: ctx.config.organisationId
+      token: ctx.auth.token
     });
 
     let session = await client.getSession(ctx.input.sessionUuid);
@@ -79,7 +89,10 @@ export let getSession = SlateTool.create(spec, {
         })),
         guests: session.guests.map(g => ({
           socketId: g.socketId,
-          name: g.name
+          name: g.name,
+          guestId: g.id,
+          guestUuid: g.uuid,
+          sessionId: g.session
         })),
         billableSeconds: session.billableSeconds,
         tags: session.tags,

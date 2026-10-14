@@ -23,11 +23,7 @@ export let deleteTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.taskIds.length === 1) {
       await client.deleteTask(ctx.input.taskIds[0]!);

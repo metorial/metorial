@@ -1,16 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { tagSchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let tagSchema = z.object({
-  tagId: z.string().describe('Unique identifier for the tag'),
-  name: z.string().optional().describe('Name of the tag'),
-  userId: z.string().optional().describe('ID of the user who owns the tag'),
-  location: z.string().optional().describe('Location reference for the tag'),
-  createdAt: z.string().optional().describe('When the tag was created'),
-  updatedAt: z.string().optional().describe('When the tag was last updated')
-});
 
 export let listTags = SlateTool.create(spec, {
   name: 'List Tags',
@@ -51,14 +43,16 @@ export let listTags = SlateTool.create(spec, {
       updatedAt: tag.updatedAt
     }));
 
+    let totalResults = response.total ?? response.totalResults;
+
     return {
       output: {
         tags: tagItems,
-        totalResults: response.totalResults,
+        totalResults,
         page: response.page,
         pageSize: response.pageSize
       },
-      message: `Found **${tagItems.length}** tags${response.totalResults ? ` out of ${response.totalResults} total` : ''}.`
+      message: `Found **${tagItems.length}** tags${totalResults !== undefined ? ` out of ${totalResults} total` : ''}.`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,7 +33,12 @@ export let listLanguages = SlateTool.create(spec, {
       searchEngine: ctx.input.searchEngine
     });
 
-    let languages = response?.results ?? [];
+    let rawLanguages = response?.results;
+    let languages = Array.isArray(rawLanguages)
+      ? rawLanguages
+      : isApiErrorRecord(rawLanguages)
+        ? Object.entries(rawLanguages).map(([code, name]) => ({ code, name }))
+        : [];
 
     return {
       output: {

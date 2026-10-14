@@ -92,15 +92,18 @@ export let sendEvent = SlateTool.create(spec, {
     if (ctx.input.content) data.content = ctx.input.content;
     if (ctx.input.term) data.term = ctx.input.term;
 
-    let result = await client.createEvent(data);
+    let response = await client.createEvent(data);
+    let accepted = response.status !== 204;
+    let person = response.data;
 
     return {
       output: {
-        eventId: result.id,
-        personId: result.personId,
-        created: true
+        personId: accepted ? person?.id : undefined,
+        created: accepted
       },
-      message: `Created event${ctx.input.type ? ` of type **${ctx.input.type}**` : ''}${result.personId ? ` for person ID **${result.personId}**` : ''}.`
+      message: accepted
+        ? `Recorded event${ctx.input.type ? ` of type **${ctx.input.type}**` : ''}${person?.id ? ` for person ID **${person.id}**` : ''}.`
+        : 'Follow Up Boss ignored the event because the lead flow for this source is archived.'
     };
   })
   .build();

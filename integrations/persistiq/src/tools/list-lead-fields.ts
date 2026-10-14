@@ -29,10 +29,10 @@ export let listLeadFields = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listLeadFields();
 
-    let fields = (result.lead_fields || result.fields || []).map((f: any) => ({
+    let fields = (result.lead_fields || []).map(f => ({
       fieldId: f.id,
-      name: f.name,
-      key: f.key || f.field_key
+      name: f.label ?? f.name,
+      key: f.key || f.field_key || f.name
     }));
 
     return {

@@ -14,7 +14,11 @@ export let createTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project to create the task in'),
+      projectId: z
+        .string()
+        .describe(
+          'The ID of the project to create the task in. Call list_projects to discover available projects.'
+        ),
       name: z.string().describe('Name of the task'),
       description: z.string().optional().describe('Description of the task')
     })

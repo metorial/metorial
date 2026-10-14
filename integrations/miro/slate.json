@@ -1,6 +1,6 @@
 {
   "name": "@metorial/miro",
-  "description": "Create, manage, and organize collaborative whiteboard boards. Add and update board items including sticky notes, shapes, cards, text, images, documents, embeds, and frames. Connect items with configurable connectors, group items together, and categorize with tags. Share boards and manage board members with role-based permissions. Create mind maps and flowcharts (experimental). Enterprise features include project management, organization and team administration, audit logs, data classification, eDiscovery, and SCIM user provisioning.",
+  "description": "Create, copy, update, and delete collaborative whiteboard boards. Add and manage sticky notes, cards, text, shapes, images from URLs, embeds, and frames. Connect items, manage tags, discover frame contents, share boards, and manage board members. Retrieve the connected user and authorized team.",
   "categories": ["document-processing", "email-and-messaging", "task-and-project-management"],
   "skills": [
     "create and manage boards",
@@ -9,9 +9,9 @@
     "connect items with connectors",
     "tag and categorize items",
     "share boards and manage members",
-    "upload images and documents",
+    "add images from URLs",
     "organize items in frames",
-    "manage projects and teams"
+    "discover connected user and team"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/miro.svg"
 }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { collectTextContent, type SketchPage } from '../lib/client';
+import { collectTextContent } from '../lib/client';
+import { parseSketchPages } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let extractTextContentTool = SlateTool.create(spec, {
@@ -36,7 +37,7 @@ Use this for content auditing, localization workflows, copy extraction, or check
     })
   )
   .handleInvocation(async ctx => {
-    let pages = ctx.input.pages as SketchPage[];
+    let pages = parseSketchPages(ctx.input.pages);
     let textEntries = collectTextContent(pages);
 
     return {

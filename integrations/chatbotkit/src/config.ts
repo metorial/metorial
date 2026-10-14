@@ -6,8 +6,6 @@ export let config = SlateConfig.create(
     runAsUserId: z
       .string()
       .optional()
-      .describe(
-        'Optional child user ID for Partner API impersonation (X-RunAs-User-ID header)'
-      )
+      .describe('Optional child user ID for Partner API impersonation (X-RunAs-UserId header)')
   })
 );

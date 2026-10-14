@@ -1,6 +1,4 @@
-Now let me get the webhook details:Now I have all the information I need. Let me compile the specification.
-
-# Slates Specification for Superchat
+# Superchat API Specification
 
 ## Overview
 
@@ -91,3 +89,25 @@ All conversation event payloads include conversation details such as channel, st
 ### Note Events
 
 - **Note Created** (`note_created`): Triggered when a new internal note is added to a conversation. Includes note content and author details.
+
+## Implemented API behavior
+
+- Authentication uses `X-API-KEY` and the `/me` response's nested `user` object.
+- Message analytics uses `GET /analytics/messages` with repeated `message_ids` query parameters.
+- Contact creation sends nullable name/gender values and `id: null` for new handles; list membership sends the required contact-list `id`.
+- Pagination reads `next_cursor` and `previous_cursor`; limits are whole numbers from 1 to 100.
+- Email message `body` is sent as the API's `text` field. Template messages require `template_id`, and ordered variables are sent as `{ position, value }`. Media messages require an uploaded `file_id`; remote URLs cannot replace the required uploaded file ID. The legacy caption field is forwarded for compatibility, although the current OpenAPI request schema does not document it. Legacy names, language codes, and media URLs remain available input fields with remediation messages.
+- `get_message`, `list_conversation_messages`, and `list_contact_attributes` expose message history and custom-attribute discovery.
+- `get_file` returns file metadata; it does not download file contents.
+
+## Official references
+
+- [Authentication](https://developers.superchat.com/reference/authentication)
+- [Current user](https://developers.superchat.com/reference/get_me)
+- [Send a message](https://developers.superchat.com/reference/post_messages)
+- [Message analytics](https://developers.superchat.com/reference/get_analytics-messages)
+- [Create a contact](https://developers.superchat.com/reference/post_contacts)
+- [Get a message](https://developers.superchat.com/reference/get_messages-id)
+- [Conversation messages](https://developers.superchat.com/reference/get_conversations-id-messages)
+- [Custom attributes](https://developers.superchat.com/reference/get_custom-attributes)
+- [Contact list membership](https://developers.superchat.com/reference/post_contacts-contactid-contact-lists)

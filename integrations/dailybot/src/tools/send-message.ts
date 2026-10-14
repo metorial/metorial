@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DailyBotClient } from '../lib/client';
 import { spec } from '../spec';
@@ -29,7 +29,12 @@ export let sendMessage = SlateTool.create(spec, {
       targetChannels: z
         .array(
           z.object({
-            channelId: z.string().describe('ID of the channel on the connected chat platform')
+            channelId: z.string().describe('ID of the channel on the connected chat platform'),
+            channelType: z.string().optional().describe('Connected-platform channel type'),
+            thread: z
+              .string()
+              .optional()
+              .describe('Parent message timestamp or ID to reply in an existing thread')
           })
         )
         .optional()
@@ -40,11 +45,20 @@ export let sendMessage = SlateTool.create(spec, {
           z.object({
             label: z.string().describe('Button label text'),
             value: z.string().describe('Button value'),
-            type: z.string().optional().describe('Button type')
+            type: z.string().optional().describe('Button type: interactive (default) or link'),
+            url: z.string().optional().describe('HTTPS destination for a link button'),
+            callbackUrl: z
+              .string()
+              .optional()
+              .describe('HTTPS callback endpoint for an interactive button')
           })
         )
         .optional()
-        .describe('Interactive buttons to include in the message')
+        .describe('Interactive buttons to include in the message'),
+      botMessageId: z
+        .string()
+        .optional()
+        .describe('Custom message ID. Reuse within 72 hours to edit the original message.')
     })
   )
   .output(
@@ -53,9 +67,28 @@ export let sendMessage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !(
+        ctx.input.targetUserUuids?.length ||
+        ctx.input.targetTeamUuids?.length ||
+        ctx.input.targetChannels?.length
+      )
+    ) {
+      throw createApiServiceError(
+        'Provide at least one user, team, or channel to receive the message.',
+        {
+          reason: 'dailybot_missing_message_targets'
+        }
+      );
+    }
+
     let client = new DailyBotClient({ token: ctx.auth.token });
 
-    let channels = ctx.input.targetChannels?.map(c => ({ id: c.channelId }));
+    let channels = ctx.input.targetChannels?.map(c => ({
+      id: c.channelId,
+      channel_type: c.channelType,
+      thread: c.thread
+    }));
 
     await client.sendMessage({
       message: ctx.input.message,
@@ -63,7 +96,8 @@ export let sendMessage = SlateTool.create(spec, {
       targetTeams: ctx.input.targetTeamUuids,
       targetChannels: channels,
       imageUrl: ctx.input.imageUrl,
-      buttons: ctx.input.buttons
+      buttons: ctx.input.buttons,
+      botMessageId: ctx.input.botMessageId
     });
 
     return {

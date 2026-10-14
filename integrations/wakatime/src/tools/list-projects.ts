@@ -46,21 +46,24 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let projects = await client.getProjects({ query: ctx.input.query });
 
     let mapped = (projects || []).map((p: any) => ({
       projectId: p.id ?? '',
       name: p.name ?? '',
-      repository: p.repository?.url || p.repository,
-      badge: p.badge,
-      color: p.color,
-      hasPublicUrl: p.has_public_url,
-      humanReadableLastHeartbeatAt: p.human_readable_last_heartbeat_at,
-      lastHeartbeatAt: p.last_heartbeat_at,
-      url: p.url,
-      createdAt: p.created_at
+      repository:
+        typeof p.repository === 'string'
+          ? p.repository
+          : (p.repository?.html_url ?? p.repository?.url ?? undefined),
+      badge: p.badge ?? undefined,
+      color: p.color ?? undefined,
+      hasPublicUrl: p.has_public_url ?? undefined,
+      humanReadableLastHeartbeatAt: p.human_readable_last_heartbeat_at ?? undefined,
+      lastHeartbeatAt: p.last_heartbeat_at ?? undefined,
+      url: p.url ?? undefined,
+      createdAt: p.created_at ?? undefined
     }));
 
     return {

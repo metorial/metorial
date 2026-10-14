@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getApiErrorStatus,
+  isApiErrorRecord
+} from 'slates';
 import { getFetchBaseUrl, getMgmtBaseUrl } from './urls';
 
 export interface FetchClientConfig {
@@ -6,6 +12,7 @@ export interface FetchClientConfig {
   guid: string;
   locale: string;
   region: string;
+  authMethod?: 'api_key' | 'oauth';
   apiType?: 'fetch' | 'preview';
 }
 
@@ -14,6 +21,7 @@ export interface MgmtClientConfig {
   guid: string;
   locale: string;
   region: string;
+  authMethod?: 'api_key' | 'oauth';
 }
 
 // --- Content Fetch API Client ---
@@ -28,16 +36,52 @@ export class FetchClient {
     this.guid = config.guid;
     this.locale = config.locale;
     this.apiType = config.apiType || 'fetch';
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: getFetchBaseUrl(config.region),
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Agility CMS',
+          reason: 'agility_api_error'
+        }),
       headers: {
         APIKey: config.token
       }
     });
+    if (config.authMethod === 'oauth') {
+      let management = createAuthenticatedAxios({
+        baseURL: getMgmtBaseUrl(config.region),
+        authHeader: { value: `Bearer ${config.token}` },
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Agility CMS',
+            reason: 'agility_api_error'
+          })
+      });
+      let apiKeyPromise: Promise<string> | undefined;
+      this.axios.interceptors.request.use(async request => {
+        apiKeyPromise ??= management
+          .get(`/oauth/get${this.apiType === 'preview' ? 'preview' : 'fetch'}key`, {
+            params: { guid: this.guid }
+          })
+          .then(response => {
+            if (typeof response.data !== 'string' || !response.data) {
+              throw createApiServiceError('Agility CMS did not return a content API key.');
+            }
+            return response.data;
+          });
+        try {
+          request.headers.set('APIKey', await apiKeyPromise);
+        } catch (error) {
+          apiKeyPromise = undefined;
+          throw error;
+        }
+        return request;
+      });
+    }
   }
 
   private basePath(): string {
-    return `/${this.guid}/${this.apiType}/${this.locale}`;
+    return `/${encodeURIComponent(this.guid)}/${this.apiType}/${encodeURIComponent(this.locale)}`;
   }
 
   async getContentItem(contentId: number): Promise<any> {
@@ -109,16 +153,32 @@ export class FetchClient {
 
 // --- Content Management API Client ---
 
+export interface BatchResult {
+  batchId: number;
+  completed: boolean;
+  itemIds: number[];
+}
+
 export class MgmtClient {
   private axios;
   private guid: string;
   private locale: string;
 
   constructor(config: MgmtClientConfig) {
+    if (config.authMethod === 'api_key') {
+      throw createApiServiceError(
+        'This operation requires an Agility CMS OAuth connection. Fetch and preview API keys only read content.'
+      );
+    }
     this.guid = config.guid;
     this.locale = config.locale;
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: getMgmtBaseUrl(config.region),
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Agility CMS',
+          reason: 'agility_api_error'
+        }),
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Cache-Control': 'no-cache'
@@ -127,11 +187,65 @@ export class MgmtClient {
   }
 
   private basePath(): string {
-    return `/api/v1/instance/${this.guid}`;
+    return `/api/v1/instance/${encodeURIComponent(this.guid)}`;
   }
 
   private localePath(): string {
-    return `${this.basePath()}/${this.locale}`;
+    return `${this.basePath()}/${encodeURIComponent(this.locale)}`;
+  }
+
+  async getCurrentUser(): Promise<Record<string, any>> {
+    let response = await this.axios.get('/api/v1/users/me');
+    return response.data;
+  }
+
+  async getBatch(batchId: number): Promise<Record<string, any>> {
+    let response = await this.axios.get(`${this.basePath()}/batch/${batchId}`, {
+      params: { expandItems: true }
+    });
+    return response.data;
+  }
+
+  private async waitForBatch(batchId: unknown): Promise<BatchResult> {
+    if (typeof batchId !== 'number' || !Number.isInteger(batchId) || batchId <= 0) {
+      throw createApiServiceError(
+        'Agility CMS did not return a valid batch ID for the queued write.'
+      );
+    }
+    for (let attempt = 0; attempt < 20; attempt++) {
+      try {
+        let batch = await this.getBatch(batchId);
+        if (batch.abortYN || batch.errorData || batch.batchState === 4) {
+          throw createApiServiceError(
+            `Agility CMS batch ${batchId} failed: ${batch.errorData || batch.statusMessage || 'The batch was aborted or deleted.'}`
+          );
+        }
+        if (batch.batchState === 3) {
+          let items = Array.isArray(batch.items) ? batch.items : [];
+          let failedItem = items.find(item => item.errorMessage || item.itemID < 0);
+          if (failedItem) {
+            throw createApiServiceError(
+              `Agility CMS batch ${batchId} failed: ${failedItem.errorMessage || 'An item could not be processed.'}`
+            );
+          }
+          return {
+            batchId,
+            completed: true,
+            itemIds: items
+              .map(item => item.itemID)
+              .filter(id => typeof id === 'number' && id > 0)
+          };
+        }
+      } catch (error) {
+        let status = getApiErrorStatus(error);
+        if (isApiErrorRecord(error) && isApiErrorRecord(error.data)) {
+          status ??= error.data.upstreamStatus as number | undefined;
+        }
+        if (String(status) !== '404') throw error;
+      }
+      if (attempt < 19) await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    return { batchId, completed: false, itemIds: [] };
   }
 
   // -- Content Items --
@@ -141,69 +255,78 @@ export class MgmtClient {
     return response.data;
   }
 
-  async saveContentItem(item: Record<string, any>): Promise<any> {
+  async saveContentItem(item: Record<string, any>): Promise<BatchResult> {
     let response = await this.axios.post(`${this.localePath()}/item`, item);
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async saveContentItemsBulk(items: Record<string, any>[]): Promise<any> {
+  async saveContentItemsBulk(items: Record<string, any>[]): Promise<BatchResult> {
     let response = await this.axios.post(`${this.localePath()}/item/multi`, items);
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async deleteContentItem(contentId: number, comments?: string): Promise<any> {
+  async deleteContentItem(contentId: number, comments?: string): Promise<BatchResult> {
     let response = await this.axios.delete(`${this.localePath()}/item/${contentId}`, {
       params: { comments }
     });
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async publishContentItem(contentId: number, comments?: string): Promise<any> {
+  async publishContentItem(contentId: number, comments?: string): Promise<BatchResult> {
     let response = await this.axios.get(`${this.localePath()}/item/${contentId}/publish`, {
       params: { comments }
     });
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async unpublishContentItem(contentId: number, comments?: string): Promise<any> {
+  async unpublishContentItem(contentId: number, comments?: string): Promise<BatchResult> {
     let response = await this.axios.get(`${this.localePath()}/item/${contentId}/unpublish`, {
       params: { comments }
     });
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async requestApproval(contentId: number, comments?: string): Promise<any> {
+  async requestApproval(contentId: number, comments?: string): Promise<BatchResult> {
     let response = await this.axios.get(
       `${this.localePath()}/item/${contentId}/request-approval`,
       {
         params: { comments }
       }
     );
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async approveContentItem(contentId: number, comments?: string): Promise<any> {
+  async approveContentItem(contentId: number, comments?: string): Promise<BatchResult> {
     let response = await this.axios.get(`${this.localePath()}/item/${contentId}/approve`, {
       params: { comments }
     });
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async declineContentItem(contentId: number, comments?: string): Promise<any> {
+  async declineContentItem(contentId: number, comments?: string): Promise<BatchResult> {
     let response = await this.axios.get(`${this.localePath()}/item/${contentId}/decline`, {
       params: { comments }
     });
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async batchWorkflow(contentIds: number[], operation: string): Promise<any> {
+  async batchWorkflow(
+    contentIds: number[],
+    operation: 'publish' | 'unpublish' | 'approve' | 'decline' | 'request-approval'
+  ): Promise<BatchResult> {
     let response = await this.axios.post(`${this.localePath()}/item/batch-workflow`, null, {
       params: {
         contentIDs: contentIds.join(','),
-        operation
+        operation: {
+          publish: 'Publish',
+          unpublish: 'Unpublish',
+          approve: 'Approve',
+          decline: 'Decline',
+          'request-approval': 'RequestApproval'
+        }[operation]
       }
     });
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
   async getContentList(
@@ -249,24 +372,26 @@ export class MgmtClient {
     return response.data;
   }
 
-  async savePage(page: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`${this.localePath()}/page`, page);
-    return response.data;
+  async savePage(page: Record<string, any>, parentPageId?: number): Promise<BatchResult> {
+    let response = await this.axios.post(`${this.localePath()}/page`, page, {
+      params: { parentPageID: parentPageId }
+    });
+    return this.waitForBatch(response.data);
   }
 
-  async deletePage(pageId: number): Promise<any> {
+  async deletePage(pageId: number): Promise<BatchResult> {
     let response = await this.axios.delete(`${this.localePath()}/page/${pageId}`);
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async publishPage(pageId: number): Promise<any> {
+  async publishPage(pageId: number): Promise<BatchResult> {
     let response = await this.axios.get(`${this.localePath()}/page/${pageId}/publish`);
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
-  async unpublishPage(pageId: number): Promise<any> {
+  async unpublishPage(pageId: number): Promise<BatchResult> {
     let response = await this.axios.get(`${this.localePath()}/page/${pageId}/unpublish`);
-    return response.data;
+    return this.waitForBatch(response.data);
   }
 
   async getSitemap(): Promise<any> {
@@ -302,7 +427,13 @@ export class MgmtClient {
     recordOffset?: number;
     galleryID?: number;
   }): Promise<any> {
-    let response = await this.axios.get(`${this.basePath()}/asset/list`, { params });
+    let response = await this.axios.get(`${this.basePath()}/asset/list`, {
+      params: {
+        ...params,
+        pageSize: params?.pageSize ?? 20,
+        recordOffset: params?.recordOffset ?? 0
+      }
+    });
     return response.data;
   }
 
@@ -322,31 +453,32 @@ export class MgmtClient {
   }
 
   async moveAsset(mediaId: number, destinationFolder: string): Promise<any> {
-    let response = await this.axios.post(`${this.basePath()}/asset/move/${mediaId}`, {
-      folder: destinationFolder
+    let response = await this.axios.post(`${this.basePath()}/asset/move/${mediaId}`, null, {
+      params: { newFolder: destinationFolder }
     });
     return response.data;
   }
 
   async createFolder(folderName: string, parentFolder?: string): Promise<any> {
-    let response = await this.axios.post(`${this.basePath()}/asset/folder`, {
-      name: folderName,
-      parentFolder
+    let originKey = parentFolder
+      ? `${parentFolder.replace(/\/$/, '')}/${folderName}`
+      : folderName;
+    let response = await this.axios.post(`${this.basePath()}/asset/folder`, null, {
+      params: { originKey }
     });
     return response.data;
   }
 
   async deleteFolder(folderPath: string): Promise<any> {
-    let response = await this.axios.post(`${this.basePath()}/asset/folder/delete`, {
-      folder: folderPath
+    let response = await this.axios.post(`${this.basePath()}/asset/folder/delete`, null, {
+      params: { originKey: folderPath, mediaID: 0 }
     });
     return response.data;
   }
 
   async renameFolder(folderPath: string, newName: string): Promise<any> {
-    let response = await this.axios.post(`${this.basePath()}/asset/folder/rename`, {
-      folder: folderPath,
-      newName
+    let response = await this.axios.post(`${this.basePath()}/asset/folder/rename`, null, {
+      params: { folderName: folderPath, newFolderName: newName, mediaID: 0 }
     });
     return response.data;
   }
@@ -388,7 +520,9 @@ export class MgmtClient {
   }
 
   async getModel(idOrReferenceName: string | number): Promise<any> {
-    let response = await this.axios.get(`${this.basePath()}/model/${idOrReferenceName}`);
+    let response = await this.axios.get(
+      `${this.basePath()}/model/${encodeURIComponent(String(idOrReferenceName))}`
+    );
     return response.data;
   }
 
@@ -471,11 +605,6 @@ export class MgmtClient {
   }
 
   // -- Batches --
-
-  async getBatch(batchId: number): Promise<any> {
-    let response = await this.axios.get(`${this.basePath()}/batch/${batchId}`);
-    return response.data;
-  }
 
   async publishBatch(batchId: number): Promise<any> {
     let response = await this.axios.post(`${this.basePath()}/batch/${batchId}/publish`);

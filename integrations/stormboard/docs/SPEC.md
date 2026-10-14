@@ -1,116 +1,57 @@
-# Slates Specification for Stormboard
+# Stormboard integration
 
-## Overview
-
-Stormboard is a collaborative digital whiteboard platform where teams can brainstorm, plan projects, and organize ideas using digital sticky notes, sections, and templates. It is an online sticky note whiteboard for brainstorming and project collaboration, helping teams organize ideas and run more productive meetings. It offers integrations with tools like Jira, Azure DevOps, Rally, Microsoft Teams, and Slack.
+Stormboard supports collaborative digital whiteboards with ideas, sections,
+templates, connectors, tags, chat, and participants.
 
 ## Authentication
 
-There are 2 ways to authenticate through the Stormboard v1 API.
+The integration uses an API key in the `X-API-Key` header. Retrieve the key from
+the API tab in your [Stormboard account](https://www.stormboard.com/users/account#api).
+The provider's [authentication documentation](https://api.stormboard.com/docs/auth)
+uses `GET /users` to identify the connected user.
 
-### API Key
+The configuration schema is empty. No workspace or team ID is required to
+connect. Team Storm creation accepts a team ID as tool input. OAuth clients
+require contacting Stormboard support and are not implemented by this integration.
 
-Your API key can be found on the API tab of your Stormboard account at https://www.stormboard.com/users/account#api.
+## Implemented tools
 
-The API key is passed via a request header:
+| Tool | Capability |
+| --- | --- |
+| `list_storms` | List Storms accessible to the connected user. |
+| `create_storm` | Create a Storm; a team plan requires `teamId`. |
+| `get_storm` | Retrieve Storm metadata. |
+| `manage_storm_status` | Close, reopen, duplicate, favorite, or unfavorite a Storm. |
+| `list_ideas` | Retrieve the ideas in a Storm. |
+| `create_idea` | Create an idea with content, type, and color. |
+| `get_idea` | Retrieve an idea's content and position metadata. |
+| `get_storm_template` | Retrieve a Storm's template structure. |
+| `update_storm_section` | Update section properties or a legend label. |
+| `manage_connectors` | List, create, update, or delete connectors. |
+| `manage_tags` | List or create tags and read or apply idea tag data. |
+| `manage_chat` | List or send chat messages and retrieve or mark unread messages. |
+| `manage_participants` | List or invite participants, accept or decline invitations, join a Storm, or check access. |
+| `get_user_profile` | Read the connected user's profile. |
 
-- Header name: `X-API-Key`
-- Header value: Your API key
+These tools preserve their existing input and output field types. Required
+action-specific fields and empty update requests produce actionable errors.
+Unexpected collection responses are reported as errors instead of being presented
+as successful empty lists. Nullable optional metadata is omitted from typed outputs.
 
-Example:
+## Provider documentation and limits
 
-```
-X-API-Key: your_api_key_here
-```
+The [API overview](https://api.stormboard.com/) documents request errors,
+HTTP methods, timestamps, rate limiting, and subscription-dependent access.
+`401` may reflect a plan restriction; `403` may reflect access or authentication.
 
-### OAuth 2.0
+At the October 13, 2026 review, the public documentation's API Reference section
+exposed no endpoint details. The [official GitHub organization](https://github.com/stormboard)
+linked from the overview exposed no public repositories. Existing endpoint paths,
+HTTP methods, and request fields were retained; their individual payload contracts
+could not be independently checked against a current public endpoint reference.
+No additional tools were added without that evidence. Team-ID discovery and
+pagination contracts remain unverified.
 
-Stormboard also supports OAuth 2.0 authentication. However, you must contact Stormboard support to register your OAuth client. The OAuth login endpoint is at `https://api.stormboard.com/oauth2/login`. No further public documentation on scopes or flow details is available; registration and configuration details are provided upon request.
-
-All requests that require authentication will return 403 Forbidden if authentication fails.
-
-## Features
-
-### Storm Management
-
-Create, retrieve, duplicate, close, and reopen Storms (collaborative workspaces/boards). When creating a Storm, you can configure the title, description, plan type (personal or team), votes per user (0–100), whether to show real-time user avatars, and whether to show the idea creator's avatar on ideas. Team Storms require a team ID and Storm Administrator permissions.
-
-- Storms can be closed to make them read-only and reopened later.
-- You can favorite/unfavorite Storms on the dashboard.
-- Storms can be duplicated to create copies of existing workspaces.
-
-### Idea Management
-
-Create, update, and manage ideas captured in Stormboard in real-time. Ideas (sticky notes) are the core content units within Storms. When creating an idea, you specify the Storm, type, content data, and color.
-
-- Retrieve all ideas in a Storm or detailed data for a specific idea.
-- Retrieve detailed data and metadata for a specific idea.
-
-### Sections and Templates
-
-- Update a section's title, description, and/or character in a Storm.
-- Update the color labels of the legend for a Storm.
-- Retrieve template data for a Storm including all sections and subsections.
-
-### Connectors
-
-Create, update, and delete line connectors between ideas to visualize relationships and dependencies.
-
-- Update a specific line connector between two ideas.
-- Retrieve a list of all connectors within a Storm.
-
-### Tags
-
-- Retrieve the list of tags that have been created in a Storm.
-- Create new tags in a Storm and associate tag data with specific ideas.
-
-### Chat
-
-- Retrieve a list of chat messages from a Stormboard Storm.
-- Create new chat messages, retrieve unread messages, and mark messages as read.
-
-### Participants and Invitations
-
-- Retrieve a list of all participants in a Storm.
-- Invite people to join a Storm by email.
-- Accept or decline Storm invitations.
-- Join a Storm using its ID and access key.
-- Check if the authenticated user has access to a Storm and retrieve their permission level.
-
-### User Management
-
-- Retrieve authenticated user profile information.
-- Update user profile information and notification preferences.
-- Create new user accounts and verify accounts using a verification code.
-- Some endpoints are restricted based on plan type (Public, Team Members, or Team Owners).
-
-## Events
-
-Stormboard supports webhooks that can be configured from the Webhooks section of your account settings (My Account → Webhooks). When adding a webhook, you provide a Payload URL and choose which events to subscribe to — either "Send me everything" or "Let me select specific events."
-
-The following event categories are available:
-
-### Idea Created
-
-- Triggered when an idea is added to a Storm.
-- Includes details about the Storm, idea content, type, and the user who created it.
-
-### Idea Deleted
-
-- Triggered when an idea is deleted from a Storm.
-- Includes details about the Storm, the deleted idea, and the user who performed the action.
-
-### Idea Moved
-
-- Triggered when an idea is moved to a different section of a Storm.
-- Includes the destination section's character identifier and title.
-
-### Comment Created
-
-- Triggered when a new comment is posted on an idea.
-- Includes the comment text, related Storm and idea details, and the commenting user.
-
-### Legend Change
-
-- Triggered when the color legend of a Storm is modified.
-- Includes the updated colour and label name.
+The integration does not implement idea updates or deletion, profile editing,
+or webhook triggers. API availability and permissions can depend on the connected
+user's subscription. No live-provider calls were made for this refresh.

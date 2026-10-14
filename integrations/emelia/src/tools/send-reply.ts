@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -12,7 +12,25 @@ export let sendReply = SlateTool.create(spec, {
     z.object({
       campaignId: z.string().describe('ID of the campaign'),
       contactId: z.string().describe('ID of the contact to reply to'),
-      body: z.string().describe('Reply message body (HTML or plain text)')
+      body: z.string().describe('Reply message body as HTML'),
+      providerId: z
+        .string()
+        .optional()
+        .describe(
+          'Sender mailbox ID from manage_email_providers; use this or senderEmail for the documented reply API'
+        ),
+      senderEmail: z
+        .string()
+        .optional()
+        .describe('Sender mailbox address, alternative to providerId'),
+      messageId: z.string().optional().describe('Original Message-ID for threading the reply'),
+      to: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Recipient addresses when composing a message without an original Message-ID'
+        ),
+      subject: z.string().optional().describe('Reply subject')
     })
   )
   .output(
@@ -22,11 +40,26 @@ export let sendReply = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.providerId && ctx.input.senderEmail)
+      throw createApiServiceError('Use either providerId or senderEmail, not both.');
+    if (
+      (ctx.input.providerId || ctx.input.senderEmail) &&
+      !ctx.input.messageId &&
+      !ctx.input.to?.length
+    )
+      throw createApiServiceError(
+        'Provide an original messageId or recipient addresses in to.'
+      );
     let client = new EmeliaClient(ctx.auth.token);
     let result = await client.replyToEmeliaReply({
       campaignId: ctx.input.campaignId,
       contactId: ctx.input.contactId,
-      body: ctx.input.body
+      body: ctx.input.body,
+      providerId: ctx.input.providerId,
+      senderEmail: ctx.input.senderEmail,
+      messageId: ctx.input.messageId,
+      to: ctx.input.to,
+      subject: ctx.input.subject
     });
     return {
       output: { success: true, reply: result },

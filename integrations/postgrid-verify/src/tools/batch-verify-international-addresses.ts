@@ -18,6 +18,16 @@ let addressInputSchema = z.union([
 ]);
 
 let intlResultSchema = z.object({
+  status: z
+    .enum(['verified', 'corrected', 'failed'])
+    .optional()
+    .describe('Verification status'),
+  error: z.string().optional().describe('Failure reason for an address'),
+  countryName: z.string().optional().describe('Full country name'),
+  details: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Additional parsed address details'),
   formattedAddress: z.string().optional().describe('Full formatted address'),
   line1: z.string().optional().describe('Address line 1'),
   line2: z.string().optional().describe('Address line 2'),
@@ -33,6 +43,9 @@ let intlResultSchema = z.object({
   summary: z
     .object({
       status: z.string().describe('Verification status code'),
+      verificationStatus: z.string().optional().describe('Provider verification status'),
+      matchScore: z.number().optional().describe('Address match score from 0 to 100'),
+      message: z.string().optional().describe('Verification summary message'),
       inputMatchLevel: z.string().optional(),
       verifiedMatchLevel: z.string().optional(),
       parsingStatus: z.string().optional()

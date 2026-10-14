@@ -9,7 +9,8 @@ let programSchema = z.object({
   currency: z.string().optional().describe('Currency code'),
   defaultLandingPageUrl: z.string().optional().describe('Default landing page URL'),
   commissionTypes: z.array(z.any()).optional().describe('Available commission types'),
-  mlmLevels: z.array(z.any()).optional().describe('MLM level configurations')
+  mlmLevels: z.array(z.any()).optional().describe('MLM level configurations'),
+  bonuses: z.array(z.any()).optional().describe('Program bonus configurations')
 });
 
 export let listPrograms = SlateTool.create(spec, {
@@ -37,9 +38,9 @@ export let listPrograms = SlateTool.create(spec, {
 
     let programs = results.map((r: any) => ({
       programId: r.id,
-      title: r.title,
-      currency: r.currency,
-      defaultLandingPageUrl: r.default_landing_page_url
+      title: r.title ?? undefined,
+      currency: r.currency ?? undefined,
+      defaultLandingPageUrl: r.default_landing_page_url ?? undefined
     }));
 
     return {
@@ -66,20 +67,22 @@ export let getProgram = SlateTool.create(spec, {
   .output(programSchema)
   .handleInvocation(async ctx => {
     let client = new TapfiliateClient({ token: ctx.auth.token });
-    let [program, commissionTypes, mlmLevels] = await Promise.all([
+    let [program, commissionTypes, mlmLevels, bonuses] = await Promise.all([
       client.getProgram(ctx.input.programId),
-      client.listProgramCommissionTypes(ctx.input.programId).catch(() => []),
-      client.listProgramMlmLevels(ctx.input.programId).catch(() => [])
+      client.listProgramCommissionTypes(ctx.input.programId),
+      client.listProgramMlmLevels(ctx.input.programId),
+      client.listProgramBonuses(ctx.input.programId)
     ]);
 
     return {
       output: {
         programId: program.id,
-        title: program.title,
-        currency: program.currency,
-        defaultLandingPageUrl: program.default_landing_page_url,
+        title: program.title ?? undefined,
+        currency: program.currency ?? undefined,
+        defaultLandingPageUrl: program.default_landing_page_url ?? undefined,
         commissionTypes,
-        mlmLevels
+        mlmLevels,
+        bonuses
       },
       message: `Retrieved program **${program.title}** (\`${program.id}\`).`
     };
@@ -100,7 +103,10 @@ export let manageProgramAffiliate = SlateTool.create(spec, {
       programId: z.string().describe('ID of the program'),
       affiliateId: z.string().describe('ID of the affiliate'),
       action: z.enum(['add', 'approve', 'disapprove', 'update']).describe('Action to perform'),
-      approved: z.boolean().optional().describe('Approval status (for "add" action)'),
+      approved: z
+        .boolean()
+        .optional()
+        .describe('Approval status (for "add" or "update" action)'),
       coupon: z
         .string()
         .optional()
@@ -112,6 +118,10 @@ export let manageProgramAffiliate = SlateTool.create(spec, {
       affiliateId: z.string().describe('ID of the affiliate'),
       programId: z.string().describe('ID of the program'),
       approved: z.boolean().optional().describe('Current approval status'),
+      approvalStatus: z
+        .enum(['approved', 'disapproved', 'pending'])
+        .optional()
+        .describe('Approval state, including pending'),
       coupon: z.string().optional().describe('Assigned coupon code')
     })
   )
@@ -155,8 +165,16 @@ export let manageProgramAffiliate = SlateTool.create(spec, {
       output: {
         affiliateId: ctx.input.affiliateId,
         programId: ctx.input.programId,
-        approved: result?.approved,
-        coupon: result?.coupon
+        approved: result?.approved ?? undefined,
+        approvalStatus:
+          result?.approved === null
+            ? 'pending'
+            : result?.approved === true
+              ? 'approved'
+              : result?.approved === false
+                ? 'disapproved'
+                : undefined,
+        coupon: result?.coupon ?? undefined
       },
       message: `${ctx.input.action === 'add' ? 'Added' : ctx.input.action === 'approve' ? 'Approved' : ctx.input.action === 'disapprove' ? 'Disapproved' : 'Updated'} affiliate \`${ctx.input.affiliateId}\` in program \`${ctx.input.programId}\`.`
     };
@@ -185,6 +203,10 @@ export let listProgramAffiliates = SlateTool.create(spec, {
           z.object({
             affiliateId: z.string().describe('Affiliate ID'),
             approved: z.boolean().optional().describe('Approval status'),
+            approvalStatus: z
+              .enum(['approved', 'disapproved', 'pending'])
+              .optional()
+              .describe('Approval state, including pending'),
             coupon: z.string().optional().describe('Assigned coupon code'),
             referralLink: z.any().optional().describe('Referral link for this program')
           })
@@ -200,8 +222,16 @@ export let listProgramAffiliates = SlateTool.create(spec, {
 
     let affiliates = results.map((r: any) => ({
       affiliateId: r.affiliate?.id || r.id,
-      approved: r.approved,
-      coupon: r.coupon,
+      approved: r.approved ?? undefined,
+      approvalStatus:
+        r.approved === null
+          ? 'pending'
+          : r.approved === true
+            ? 'approved'
+            : r.approved === false
+              ? 'disapproved'
+              : undefined,
+      coupon: r.coupon ?? undefined,
       referralLink: r.referral_link
     }));
 

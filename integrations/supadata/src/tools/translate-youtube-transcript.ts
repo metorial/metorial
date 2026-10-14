@@ -52,7 +52,7 @@ This is specific to YouTube and uses YouTube's built-in translation capabilities
     let contentSummary =
       typeof result.content === 'string'
         ? `${result.content.length} characters`
-        : `${(result.content as any[])?.length ?? 0} segments`;
+        : `${Array.isArray(result.content) ? result.content.length : 0} segments`;
 
     return {
       output: {

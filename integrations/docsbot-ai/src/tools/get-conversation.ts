@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getConversation = SlateTool.create(spec, {
   name: 'Get Conversation',
   key: 'get_conversation',
-  description: `Retrieve full details of a conversation session including the complete message history, summary, sentiment, resolution/escalation status, and user metadata.`,
+  description: `Retrieve full details of a conversation session including the complete message history, summary, sentiment, resolution/escalation status, and user metadata. Call list_teams to discover accessible team IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID the conversation belongs to'),
       conversationId: z.string().describe('Conversation ID to retrieve')
     })
@@ -54,7 +56,7 @@ export let getConversation = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DocsBotAdminClient(ctx.auth.token);
     let conv = await client.getConversation(
-      ctx.config.teamId,
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
       ctx.input.botId,
       ctx.input.conversationId
     );
@@ -82,7 +84,7 @@ export let getConversation = SlateTool.create(spec, {
         alias: conv.alias,
         ticketSubject: conv.ticketSubject ?? undefined,
         ticketContent: conv.ticketContent ?? undefined,
-        metadata: conv.metadata,
+        metadata: conv.metadata ?? undefined,
         messages
       },
       message: `Conversation **${conv.title ?? conv.id}**: ${messages.length} messages, sentiment: ${conv.sentiment ?? 'unknown'}, resolved: ${conv.resolved ?? 'unknown'}`

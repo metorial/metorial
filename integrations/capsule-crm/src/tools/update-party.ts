@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
+import { customFieldValuesSchema, websiteServiceSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateParty = SlateTool.create(spec, {
@@ -22,8 +23,11 @@ export let updateParty = SlateTool.create(spec, {
       title: z.string().optional().describe('Updated title prefix'),
       jobTitle: z.string().optional().describe('Updated job title'),
       about: z.string().optional().describe('Updated description or notes'),
-      ownerId: z.number().optional().describe('New owner user ID'),
-      teamId: z.number().optional().describe('New team ID'),
+      ownerId: z
+        .number()
+        .optional()
+        .describe('New owner user ID. Use list_users to discover IDs.'),
+      teamId: z.number().optional().describe('New team ID. Use list_teams to discover IDs.'),
       emailAddresses: z
         .array(
           z.object({
@@ -71,22 +75,29 @@ export let updateParty = SlateTool.create(spec, {
               .number()
               .optional()
               .describe('ID of existing website to update/delete'),
-            type: z.string().optional(),
+            type: z.string().optional().describe('Website label: Home or Work'),
+            service: websiteServiceSchema
+              .optional()
+              .describe(
+                'Website or social network service; defaults to URL for a new website'
+              ),
             address: z.string().optional(),
             delete: z.boolean().optional().describe('Set true to remove this website')
           })
         )
         .optional()
         .describe('Website changes'),
+      fields: customFieldValuesSchema,
       tags: z
         .array(
           z.object({
             tagId: z.number().optional().describe('Existing tag ID'),
-            name: z.string().optional().describe('Tag name')
+            name: z.string().optional().describe('Tag name'),
+            delete: z.boolean().optional().describe('Remove the tag identified by tagId')
           })
         )
         .optional()
-        .describe('Tags to set (replaces existing tags)')
+        .describe('Tags to add or remove; unspecified tags remain unchanged')
     })
   )
   .output(
@@ -114,8 +125,8 @@ export let updateParty = SlateTool.create(spec, {
       party.emailAddresses = ctx.input.emailAddresses.map(e => {
         let item: Record<string, any> = {};
         if (e.emailId) item.id = e.emailId;
-        if (e.type) item.type = e.type;
-        if (e.address) item.address = e.address;
+        if (e.type !== undefined) item.type = e.type;
+        if (e.address !== undefined) item.address = e.address;
         if (e.delete) item._delete = true;
         return item;
       });
@@ -125,8 +136,8 @@ export let updateParty = SlateTool.create(spec, {
       party.phoneNumbers = ctx.input.phoneNumbers.map(p => {
         let item: Record<string, any> = {};
         if (p.phoneId) item.id = p.phoneId;
-        if (p.type) item.type = p.type;
-        if (p.number) item.number = p.number;
+        if (p.type !== undefined) item.type = p.type;
+        if (p.number !== undefined) item.number = p.number;
         if (p.delete) item._delete = true;
         return item;
       });
@@ -136,12 +147,12 @@ export let updateParty = SlateTool.create(spec, {
       party.addresses = ctx.input.addresses.map(a => {
         let item: Record<string, any> = {};
         if (a.addressId) item.id = a.addressId;
-        if (a.type) item.type = a.type;
-        if (a.street) item.street = a.street;
-        if (a.city) item.city = a.city;
-        if (a.state) item.state = a.state;
-        if (a.zip) item.zip = a.zip;
-        if (a.country) item.country = a.country;
+        if (a.type !== undefined) item.type = a.type;
+        if (a.street !== undefined) item.street = a.street;
+        if (a.city !== undefined) item.city = a.city;
+        if (a.state !== undefined) item.state = a.state;
+        if (a.zip !== undefined) item.zip = a.zip;
+        if (a.country !== undefined) item.country = a.country;
         if (a.delete) item._delete = true;
         return item;
       });
@@ -151,16 +162,30 @@ export let updateParty = SlateTool.create(spec, {
       party.websites = ctx.input.websites.map(w => {
         let item: Record<string, any> = {};
         if (w.websiteId) item.id = w.websiteId;
-        if (w.type) item.type = w.type;
-        if (w.address) item.address = w.address;
+        let legacyService = websiteServiceSchema.safeParse(w.type?.toUpperCase());
+        if (w.type !== undefined && !legacyService.success) item.type = w.type;
+        if (w.service !== undefined) item.service = w.service;
+        else if (legacyService.success) item.service = legacyService.data;
+        else if (w.websiteId === undefined && !w.delete) item.service = 'URL';
+        if (w.address !== undefined) item.address = w.address;
         if (w.delete) item._delete = true;
         return item;
       });
     }
 
+    if (ctx.input.fields) {
+      party.fields = ctx.input.fields.map(field => ({
+        definition: { id: field.definitionId },
+        value: field.value
+      }));
+    }
+
     if (ctx.input.tags) {
+      if (ctx.input.tags.some(tag => tag.delete && !tag.tagId)) {
+        throw createApiServiceError('Provide tagId when removing a tag.');
+      }
       party.tags = ctx.input.tags.map(t => {
-        if (t.tagId) return { id: t.tagId };
+        if (t.tagId) return { id: t.tagId, ...(t.delete ? { _delete: true } : {}) };
         return { name: t.name };
       });
     }
@@ -170,8 +195,8 @@ export let updateParty = SlateTool.create(spec, {
     return {
       output: {
         partyId: result.id,
-        type: result.type,
-        updatedAt: result.updatedAt
+        type: result.type ?? undefined,
+        updatedAt: result.updatedAt ?? undefined
       },
       message: `Updated party **#${result.id}** (${result.type}).`
     };

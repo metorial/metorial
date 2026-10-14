@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,8 +8,8 @@ export let createMeetingRequest = SlateTool.create(spec, {
   key: 'create_meeting_request',
   description: `Send a meeting request to one or more contacts. CalendarHero will automatically find the best available time within the specified timeframe based on calendar availability. The contacts will receive an invitation to accept the meeting.`,
   instructions: [
-    'Provide at least one contact with an email address.',
-    'The dateStart and dateEnd define the window in which CalendarHero should find availability, not the exact meeting time.'
+    'Provide a subject and at least one invitee using contacts or contactIds.',
+    'The dates define the availability range; the time components define the daily availability start and end.'
   ]
 })
   .input(
@@ -22,20 +22,43 @@ export let createMeetingRequest = SlateTool.create(spec, {
           })
         )
         .min(1)
-        .describe('Contacts to invite to the meeting'),
-      subject: z.string().optional().describe('Meeting subject line'),
-      dateStart: z.string().describe('Start of availability window (ISO 8601 date string)'),
-      dateEnd: z.string().describe('End of availability window (ISO 8601 date string)'),
+        .optional()
+        .describe('Contacts to invite by email. Provide contacts or contactIds.'),
+      contactIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Existing contact IDs to invite. Call search_contacts to discover IDs. Provide contacts or contactIds.'
+        ),
+      subject: z
+        .string()
+        .optional()
+        .describe('Meeting subject line. Required by CalendarHero.'),
+      description: z.string().optional().describe('Meeting agenda or description'),
+      dateStart: z
+        .string()
+        .describe(
+          'Availability range start date and daily start time (ISO 8601 with timezone)'
+        ),
+      dateEnd: z
+        .string()
+        .describe('Availability range end date and daily end time (ISO 8601 with timezone)'),
       meetingLength: z
         .number()
         .optional()
         .describe('Meeting duration in minutes (e.g. 30, 60)'),
-      type: z.string().optional().describe('Meeting type slug to use for this request'),
+      type: z
+        .string()
+        .optional()
+        .describe('Meeting type slug. Call list_meeting_types to discover configured types.'),
       locations: z
         .array(z.string())
         .optional()
         .describe('Preferred meeting locations or video providers'),
-      capacity: z.number().optional().describe('Maximum number of attendees')
+      capacity: z
+        .number()
+        .optional()
+        .describe('Seats required for a meeting room. Zero means no room is booked.')
     })
   )
   .output(
@@ -49,19 +72,53 @@ export let createMeetingRequest = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.subject?.trim()) {
+      throw createApiServiceError('Provide a non-empty subject for the meeting request.');
+    }
+    if (!ctx.input.contacts?.length && !ctx.input.contactIds?.length) {
+      throw createApiServiceError('Provide at least one invitee in contacts or contactIds.');
+    }
+    if (
+      ctx.input.contacts?.some(contact => !contact.email.trim()) ||
+      ctx.input.contactIds?.some(id => !id.trim())
+    ) {
+      throw createApiServiceError(
+        'Invitees must have a non-empty email address or contact ID.'
+      );
+    }
+    let start = Date.parse(ctx.input.dateStart);
+    let end = Date.parse(ctx.input.dateEnd);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) {
+      throw createApiServiceError(
+        'Provide valid dateStart and dateEnd values, with dateEnd after dateStart.'
+      );
+    }
+    if (ctx.input.meetingLength !== undefined && ctx.input.meetingLength <= 0) {
+      throw createApiServiceError('meetingLength must be greater than zero.');
+    }
+    if (ctx.input.capacity !== undefined && ctx.input.capacity < 0) {
+      throw createApiServiceError(
+        'capacity cannot be negative. Use zero when no meeting room is needed.'
+      );
+    }
     let client = new Client(ctx.auth.token);
     let result = await client.createMeetingRequest({
-      contacts: ctx.input.contacts,
+      contacts: ctx.input.contactIds?.map(id => ({ id })),
+      contactEmails: ctx.input.contacts?.map(contact => contact.email),
       subject: ctx.input.subject,
+      description: ctx.input.description,
       dateStart: ctx.input.dateStart,
       dateEnd: ctx.input.dateEnd,
       meetingLength: ctx.input.meetingLength,
       type: ctx.input.type,
-      locations: ctx.input.locations,
+      locations: ctx.input.locations?.map(name => ({ name })),
       capacity: ctx.input.capacity
     });
 
-    let contactNames = ctx.input.contacts.map(c => c.name || c.email).join(', ');
+    let contactNames = [
+      ...(ctx.input.contacts?.map(c => c.name || c.email) ?? []),
+      ...(ctx.input.contactIds ?? [])
+    ].join(', ');
 
     return {
       output: {

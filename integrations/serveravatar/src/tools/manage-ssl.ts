@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageSsl = SlateTool.create(spec, {
   name: 'Manage SSL',
   key: 'manage_ssl',
-  description: `Manage SSL certificates for an application: view current SSL status, install automatic (Let's Encrypt) or custom certificates, update/renew SSL after adding a domain, uninstall SSL, or toggle force HTTPS redirection.`,
+  description: `Manage SSL certificates for an application: view current SSL status, install automatic (Let's Encrypt) or custom certificates, update/renew SSL after adding a domain, uninstall SSL, or toggle force HTTPS redirection.
+${organizationScopeGuidance}`,
   instructions: [
     'After adding a new domain to an application, use the "update" action to renew the SSL certificate.',
     'For automatic SSL, set sslType to "automatic". For custom SSL, provide the certificate and private key.'
@@ -18,7 +20,7 @@ export let manageSsl = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       applicationId: z.string().describe('Application ID'),
       action: z
@@ -49,7 +51,8 @@ export let manageSsl = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId, applicationId, action } = ctx.input;
 
@@ -62,7 +65,16 @@ export let manageSsl = SlateTool.create(spec, {
     }
 
     if (action === 'install') {
-      if (!ctx.input.sslType) throw new Error('sslType is required for install action');
+      if (!ctx.input.sslType)
+        throw createApiServiceError('sslType is required for install action');
+      if (
+        ctx.input.sslType === 'custom' &&
+        (!ctx.input.sslCertificate || !ctx.input.privateKey)
+      ) {
+        throw createApiServiceError(
+          'sslCertificate and privateKey are required when installing custom SSL.'
+        );
+      }
 
       let result = await client.installSSL(orgId, serverId, applicationId, {
         sslType: ctx.input.sslType,
@@ -129,6 +141,6 @@ export let manageSsl = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

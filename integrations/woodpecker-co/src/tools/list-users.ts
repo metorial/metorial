@@ -11,7 +11,12 @@ export let listUsers = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      page: z.number().optional().describe('Results page number (0-based)'),
+      sort: z.enum(['+id', '-id']).optional().describe('Sort users by ID')
+    })
+  )
   .output(
     z.object({
       users: z
@@ -33,8 +38,8 @@ export let listUsers = SlateTool.create(spec, {
       companyId: ctx.config.companyId
     });
 
-    let data: any = await client.listUsers();
-    let users: any[] = Array.isArray(data) ? data : (data?.users ?? []);
+    let data: any = await client.listUsers({ page: ctx.input.page, sort: ctx.input.sort });
+    let users: any[] = Array.isArray(data) ? data : (data?.content ?? data?.users ?? []);
 
     let mapped = users.map((u: any) => ({
       userId: u.id,

@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Ayrshare
 
-Publish, schedule, and manage social media posts across 13 platforms (Facebook, X/Twitter, Instagram, LinkedIn, TikTok, YouTube, Reddit, Telegram, Pinterest, Snapchat, Google Business Profile, Threads, and Bluesky) through a single unified API. Retrieve post and account-level analytics including likes, clicks, and engagement. Manage comments by retrieving, posting, replying to, and deleting them. Send and receive direct messages on Facebook and Instagram. Get, respond to, and delete reviews on Facebook Pages and Google Business Profile. Upload and host media files for use in posts. Auto-generate hashtags, shorten links, and validate content before publishing. Create Facebook ads by boosting posts. Monitor brand presence across platforms. Subscribe to RSS feeds for automatic posting. Manage multiple user profiles and their linked social accounts.
+Publish, schedule, and manage social media posts across 13 networks through Ayrshare. Check publication history, retry failed posts, retrieve post and account analytics, manage comments, send and retrieve direct messages, read reviews, upload media, generate hashtags, and validate post content. Manage user profiles and RSS feed subscriptions, and discover the current profile and its linked social accounts.
+
+X operations require an X Developer App API key and secret in the connection. Messaging and profile management depend on the account's Ayrshare plan and enabled features. RSS auto-posting to X ended on March 31, 2026.
 
 ## License
 

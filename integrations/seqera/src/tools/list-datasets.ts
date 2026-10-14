@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDatasets = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listDatasets = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       search: z.string().optional().describe('Search filter for dataset name'),
       max: z.number().optional().describe('Maximum number of results'),
       offset: z.number().optional().describe('Offset for pagination')
@@ -38,8 +40,8 @@ export let listDatasets = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     let result = await client.listDatasets({
@@ -49,12 +51,12 @@ export let listDatasets = SlateTool.create(spec, {
     });
 
     let datasets = result.datasets.map(d => ({
-      datasetId: d.id,
-      name: d.name,
-      description: d.description,
-      mediaType: d.mediaType,
-      dateCreated: d.dateCreated,
-      lastUpdated: d.lastUpdated
+      datasetId: d.id ?? undefined,
+      name: d.name ?? undefined,
+      description: d.description ?? undefined,
+      mediaType: d.mediaType ?? undefined,
+      dateCreated: d.dateCreated ?? undefined,
+      lastUpdated: d.lastUpdated ?? undefined
     }));
 
     return {

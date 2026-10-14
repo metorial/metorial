@@ -8,8 +8,7 @@ export let createBroadcastTool = SlateTool.create(spec, {
   key: 'create_broadcast',
   description: `Create a new broadcast campaign on a channel. Broadcasts allow you to send messages to many contacts at once for marketing outreach or re-engagement. You can schedule broadcasts, set recurrence, and include template variables.`,
   instructions: [
-    'A workflowId is required — use the List Workflows tool or Trigger Workflow tool to find available workflow IDs.',
-    'You can add up to 5000 contacts directly during creation.',
+    'A workflowId is required — use the List Workflows tool to find available workflow IDs.',
     'After creating a broadcast, add recipients and then start it.'
   ]
 })
@@ -131,7 +130,7 @@ export let listBroadcastsTool = SlateTool.create(spec, {
 export let startBroadcastTool = SlateTool.create(spec, {
   name: 'Start Broadcast',
   key: 'start_broadcast',
-  description: `Start a previously created broadcast campaign. Requires a media ID that was uploaded via the file upload tool. Once started, the broadcast will begin sending messages to its recipients.`
+  description: `Start a previously created broadcast campaign using a media ID already uploaded to Heyy. Once started, the broadcast will begin sending messages to its recipients.`
 })
   .input(
     z.object({

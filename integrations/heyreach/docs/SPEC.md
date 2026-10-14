@@ -1,73 +1,49 @@
-Now let me get the detailed API documentation and webhook details:Now let me get more details on the API endpoints:I now have enough information to compile the specification. Let me put it together.
+# HeyReach API specification
 
-# Slates Specification for Heyreach
-
-## Overview
-
-HeyReach is a cloud-based LinkedIn outreach automation platform designed for lead generation agencies and sales teams. It allows users to automate and scale LinkedIn outreach campaigns by sending connection requests, personalized messages, and InMails using multiple LinkedIn accounts. The platform centralizes all accounts and outreach efforts into a unified inbox, simplifying the management of multiple accounts and conversations.
+HeyReach provides LinkedIn outreach campaigns, lead lists, sender accounts, an inbox, and campaign analytics.
 
 ## Authentication
 
-HeyReach uses API key authentication. The API key is used to authenticate incoming requests and map them to your organization.
+Use an API key in the `X-API-KEY` header. Create it under Integrations > API in HeyReach. The API base URL is `https://api.heyreach.io/api/public`.
 
-- **Obtaining the API key**: Log in to your HeyReach account, in the left sidebar click Integrations, find the API section, and click to generate a new API key.
-- **Using the API key**: Add the `X-API-KEY` request header to every request and set your API key as the value.
-- **Base URL**: `https://api.heyreach.io/api/public/`
-- **Key validity**: API keys never expire, however they can be deleted/deactivated.
-- **Verification endpoint**: You can verify your API key by sending a GET request to `https://api.heyreach.io/api/public/auth/CheckApiKey` with the `X-API-KEY` header. If everything is working properly, you should get a `200` HTTP status code.
+`GET /auth/CheckApiKey` validates the key through its HTTP success status; it does not document a profile or a boolean response body. The integration's connection profile is a generic HeyReach Account label.
 
-## Features
+## Supported workflows
 
-### Campaign Management
+| Tool | API request |
+| --- | --- |
+| `list_campaigns` | `POST /campaign/GetAll` |
+| `get_campaign` | `GET /campaign/GetById?campaignId=...` |
+| `toggle_campaign_status` | `POST /campaign/Pause` or `/campaign/Resume` with campaignId in the query |
+| `add_leads_to_campaign` | `POST /campaign/AddLeadsToCampaign` |
+| `stop_lead_in_campaign` | `POST /campaign/StopLeadInCampaign` |
+| `get_lead` | `POST /lead/GetLead` |
+| `get_leads_from_list` | `POST /list/GetLeadsFromList` |
+| `add_leads_to_list` | `POST /list/AddLeadsToListV2` |
+| `delete_leads_from_list` | `DELETE /list/DeleteLeadsFromListByProfileUrl` with a JSON body |
+| `list_lead_lists` | `POST /list/GetAll` |
+| `create_list` | `POST /list/CreateEmptyList` |
+| `get_conversations` | `POST /inbox/GetConversationsV2` |
+| `send_message` | `POST /inbox/SendMessage` |
+| `get_linkedin_accounts` | `POST /li_account/GetAll` |
+| `get_overall_stats` | `POST /stats/GetOverallStats` |
 
-Retrieve, monitor, and control LinkedIn outreach campaigns. You can list all campaigns with pagination, get detailed campaign information, and toggle campaign status to pause or resume campaigns. Campaigns cannot be created via the API — they must be created in the HeyReach UI first. You can also get detailed campaign performance metrics including response rates and connection rates.
+Campaign lead imports map each supplied lead to an `accountLeadPairs` item with an optional `linkedInAccountId`. Both resume flags default to true, preserving automatic activation of paused and finished campaigns; callers can disable either behavior. Campaigns must have been launched once before importing leads. Custom field names must match sequence variables and contain only alphanumeric characters or underscores.
 
-### Lead Management
+Sending a message requires an existing conversation and its LinkedIn sender account ID. The `accountId` input maps to `linkedInAccountId`; the legacy `senderId` input remains accepted but is no longer required. An optional subject is sent as an empty string when omitted.
 
-Add and manage leads within campaigns and lists. You can get lead details, retrieve all lead lists, and create new empty lead or company lists. Leads can be added to campaigns or lists with personalization data including first name, last name, LinkedIn profile URL, location, company, position, email, and custom fields. You can add up to 100 leads per request. Custom field names must exactly match the variable names defined in HeyReach sequences and can only contain alphanumeric characters and underscores. The campaign should be launched once; only then can you add leads via API.
+Analytics use the existing dateFrom/dateTo inputs as the API's startDate/endDate fields. Empty account and campaign ID arrays select all senders and campaigns. Collection outputs retain HeyReach's totalCount metadata.
 
-### List Management
+List removals return `notFoundInList` usernames, because a successful HTTP status may include leads that were absent from the list. Stopping an individual campaign lead uses its `linkedin_id` and LinkedIn profile URL.
 
-Create and manage lead and company lists. You can create empty lists, retrieve all lists, get leads from a specific list, and delete leads from a list. Lists serve as containers for organizing leads before or during campaign assignment.
+HeyReach also documents campaign creation, sequence/schedule configuration, tags, account management, organization administration, and webhooks. Those capabilities are outside this integration's current tool surface; no triggers are registered.
 
-### Messaging and Conversations
+## Official references
 
-Get a LinkedIn conversation with its messages by ID. You can also send a direct message to a lead and retrieve conversations with advanced filtering options.
-
-### LinkedIn Sender Accounts
-
-Retrieve information about connected LinkedIn sender accounts. You can get network profiles for specific LinkedIn accounts to understand sender capacity and availability.
-
-### Analytics and Statistics
-
-Get comprehensive analytics and statistics across your campaigns, including overall performance metrics such as total leads, contacted count, replied count, connected count, response rate, and connection rate.
-
-## Events
-
-HeyReach supports webhooks that push data out in real time when specific LinkedIn outreach events occur. HeyReach offers 20+ webhook events. When creating a webhook, you configure the webhook URL, select specific campaigns (or all campaigns), and choose the event type. Webhooks can be scoped to the account level or to specific campaigns.
-
-### Connection Events
-
-- **Connection Request Sent**: Notifies when a connection request has been sent to a LinkedIn account through a HeyReach campaign.
-- **Connection Request Accepted**: Triggered when a LinkedIn account accepts your connection request as part of a HeyReach campaign.
-
-### Messaging Events
-
-- **Message Sent**: Occurs when you send a LinkedIn message through a HeyReach campaign (connection request messages are not tracked).
-- **Message Reply Received**: Activated when you receive the first reply to a LinkedIn message as part of a HeyReach campaign.
-- **InMail Sent**: Fires when an InMail is sent through a campaign.
-- **InMail Reply Received**: Triggers when a prospect replies to an InMail message.
-
-### Engagement Events
-
-- **Liked Post**: Triggers when a post is liked through a campaign action.
-- **Viewed Profile**: Triggers when a profile is viewed as part of a campaign.
-- **Follow Sent**: Fires when a follow action is performed through a campaign.
-
-### Campaign Events
-
-- **Campaign Completed**: Triggers when a campaign finishes.
-
-### Lead Events
-
-- **Lead Tag Updated**: Fires when a lead's tag is updated. The "Every reply received" and "Lead tag updated" events trigger regardless of the campaign, while other events are campaign-scoped.
+- [API documentation and endpoint index](https://docs.heyreach.io/llms.txt)
+- [OpenAPI contract](https://docs.heyreach.io/openapi.json)
+- [Campaign lead imports](https://docs.heyreach.io/hey-reach-api/campaigns/add-leads-to-campaign)
+- [Stop an individual campaign lead](https://docs.heyreach.io/hey-reach-api/campaigns/stop-lead-in-campaign)
+- [Remove leads from a list](https://docs.heyreach.io/hey-reach-api/lists/delete-leads-from-list-by-profile-url)
+- [Send a message](https://docs.heyreach.io/hey-reach-api/inbox/send-message)
+- [Analytics](https://docs.heyreach.io/hey-reach-api/analytics/get-overall-stats)

@@ -1,53 +1,92 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   CrawlerPage,
   DataHistoryResponse,
   Folder,
   FolderContentResponse,
+  NotificationContent,
   NotificationListResponse,
   Wachet
 } from './types';
 
-let http = createAxios({
-  baseURL: 'https://api.wachete.com/thirdparty/v1'
-});
-
 export class Client {
-  private headers: Record<string, string>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.headers = {
-      Authorization: `bearer ${config.token}`,
-      'Content-Type': 'application/json'
-    };
+    if (!config.token?.trim()) {
+      throw createApiServiceError('Reconnect Wachete to obtain an access token.');
+    }
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.wachete.com/thirdparty/v1',
+      timeout: 30000,
+      authHeader: { value: `bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Wachete',
+          reason: 'wachete_api_error'
+        })
+    });
   }
 
   // --- Task (Wachet) Management ---
 
   async createOrUpdateWachet(wachet: Wachet): Promise<Wachet> {
-    let response = await http.put('/task', wachet, { headers: this.headers });
+    if (
+      wachet.recurrenceInSeconds != null &&
+      (!Number.isInteger(wachet.recurrenceInSeconds) ||
+        wachet.recurrenceInSeconds < -2147483648 ||
+        wachet.recurrenceInSeconds > 2147483647)
+    ) {
+      throw createApiServiceError(
+        "Check frequency must be a whole number of seconds in the API's 32-bit integer range."
+      );
+    }
+    if (wachet.crawlingDepth != null && !Number.isInteger(wachet.crawlingDepth)) {
+      throw createApiServiceError('Crawling depth must be a whole number.');
+    }
+    let response = await this.http.put('/task', wachet);
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid response object.');
+    }
     return response.data;
   }
 
   async getWachet(wachetId: string): Promise<Wachet> {
-    let response = await http.get(`/task/${wachetId}`, { headers: this.headers });
+    if (!wachetId.trim()) {
+      throw createApiServiceError('Provide a nonempty monitor ID.');
+    }
+    let response = await this.http.get(`/task/${encodeURIComponent(wachetId)}`);
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid response object.');
+    }
     return response.data;
   }
 
   async deleteWachet(wachetId: string): Promise<void> {
-    await http.delete(`/task/${wachetId}`, { headers: this.headers });
+    if (!wachetId.trim()) {
+      throw createApiServiceError('Provide a nonempty monitor ID.');
+    }
+    await this.http.delete(`/task/${encodeURIComponent(wachetId)}`);
   }
 
   async searchWachets(query: string): Promise<Wachet[]> {
-    let response = await http.get('/task/search', {
-      headers: this.headers,
+    let response = await this.http.get('/task/search', {
       params: { query }
     });
+    if (!Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid list of results.');
+    }
     return response.data;
   }
 
   async getCrawlerPages(wachetId: string): Promise<CrawlerPage[]> {
-    let response = await http.get(`/task/${wachetId}/pages`, { headers: this.headers });
+    if (!wachetId.trim()) {
+      throw createApiServiceError('Provide a nonempty monitor ID.');
+    }
+    let response = await this.http.get(`/task/${encodeURIComponent(wachetId)}/pages`);
+    if (!Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid list of results.');
+    }
     return response.data;
   }
 
@@ -61,22 +100,33 @@ export class Client {
     continuationToken?: string;
     html?: boolean;
   }): Promise<NotificationListResponse> {
-    let response = await http.get('/notification/list', {
-      headers: this.headers,
+    if (
+      params.count !== undefined &&
+      (!Number.isInteger(params.count) ||
+        params.count < -2147483648 ||
+        params.count > 2147483647)
+    ) {
+      throw createApiServiceError(
+        "Notification count must be a whole number in the API's 32-bit integer range."
+      );
+    }
+    let response = await this.http.get('/notification/list', {
       params
     });
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid response object.');
+    }
     return response.data;
   }
 
-  async getNotificationContent(alertId: string): Promise<{
-    jobType?: string;
-    syntheticExpression?: string;
-    url?: string;
-    name?: string;
-    html?: string;
-    timestampUtc?: string;
-  }> {
-    let response = await http.get(`/notification/${alertId}`, { headers: this.headers });
+  async getNotificationContent(alertId: string): Promise<NotificationContent> {
+    if (!alertId.trim()) {
+      throw createApiServiceError('Provide a nonempty notification ID.');
+    }
+    let response = await this.http.get(`/notification/${encodeURIComponent(alertId)}`);
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid response object.');
+    }
     return response.data;
   }
 
@@ -92,10 +142,25 @@ export class Client {
       continuationToken?: string;
     }
   ): Promise<DataHistoryResponse> {
-    let response = await http.get(`/data/list/${wachetId}`, {
-      headers: this.headers,
+    if (!wachetId.trim()) {
+      throw createApiServiceError('Provide a nonempty monitor ID.');
+    }
+    if (
+      params?.count !== undefined &&
+      (!Number.isInteger(params.count) ||
+        params.count < -2147483648 ||
+        params.count > 2147483647)
+    ) {
+      throw createApiServiceError(
+        "History count must be a whole number in the API's 32-bit integer range."
+      );
+    }
+    let response = await this.http.get(`/data/list/${encodeURIComponent(wachetId)}`, {
       params
     });
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid response object.');
+    }
     return response.data;
   }
 
@@ -105,20 +170,28 @@ export class Client {
     parentId?: string;
     continuationToken?: string;
   }): Promise<FolderContentResponse> {
-    let response = await http.get('/folder/list', {
-      headers: this.headers,
+    let response = await this.http.get('/folder/list', {
       params
     });
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid response object.');
+    }
     return response.data;
   }
 
   async createOrUpdateFolder(folder: Folder): Promise<Folder> {
-    let response = await http.post('/folder', folder, { headers: this.headers });
+    let response = await this.http.post('/folder', folder);
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw createApiServiceError('Wachete returned an invalid response object.');
+    }
     return response.data;
   }
 
   async deleteFolder(folderId: string): Promise<void> {
-    await http.delete(`/folder/${folderId}`, { headers: this.headers });
+    if (!folderId.trim()) {
+      throw createApiServiceError('Provide a nonempty folder ID.');
+    }
+    await this.http.delete(`/folder/${encodeURIComponent(folderId)}`);
   }
 
   async moveItems(params: {
@@ -126,6 +199,6 @@ export class Client {
     folderIds?: string[];
     folderId?: string;
   }): Promise<void> {
-    await http.post('/folder/move', params, { headers: this.headers });
+    await this.http.post('/folder/move', params);
   }
 }

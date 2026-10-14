@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateProject = SlateTool.create(spec, {
   name: 'Update Project',
   key: 'update_project',
-  description: `Update an existing project in Timely. Modify name, description, client, billing, budget, rates, label settings, team assignments, user assignments, or archive/unarchive it.`,
+  description: `Call list_accounts to choose a workspace when needed. Update an existing project in Timely. Modify name, description, client, billing, budget, rates, label settings, team assignments, user assignments, or archive/unarchive it.`,
   tags: { destructive: false }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project to update'),
       name: z.string().optional().describe('Updated project name'),
       description: z.string().optional().describe('Updated description'),
@@ -50,10 +52,7 @@ export let updateProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let project = await client.updateProject(ctx.input.projectId, {
       name: ctx.input.name,

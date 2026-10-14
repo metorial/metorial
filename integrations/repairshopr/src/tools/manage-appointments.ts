@@ -21,18 +21,18 @@ let appointmentSchema = z.object({
 
 let mapAppointment = (a: any) => ({
   appointmentId: a.id,
-  summary: a.summary,
-  description: a.description,
-  customerId: a.customer_id,
+  summary: a.summary ?? undefined,
+  description: a.description ?? undefined,
+  customerId: a.customer_id ?? undefined,
   customerName: a.customer?.fullname || a.customer?.business_then_name,
-  ticketId: a.ticket_id,
-  startAt: a.start_at,
-  endAt: a.end_at,
-  duration: a.duration,
-  location: a.location,
-  allDay: a.all_day,
-  createdAt: a.created_at,
-  updatedAt: a.updated_at
+  ticketId: a.ticket_id ?? undefined,
+  startAt: a.start_at ?? undefined,
+  endAt: a.end_at ?? undefined,
+  duration: a.duration ?? undefined,
+  location: a.location ?? undefined,
+  allDay: a.all_day ?? undefined,
+  createdAt: a.created_at ?? undefined,
+  updatedAt: a.updated_at ?? undefined
 });
 
 export let searchAppointments = SlateTool.create(spec, {
@@ -68,7 +68,9 @@ export let searchAppointments = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, subdomain: ctx.config.subdomain });
     let result = await client.listAppointments(ctx.input);
-    let appointments = (result.appointments || []).map(mapAppointment);
+    let appointments = (result.appointments || []).map((item: any) =>
+      mapAppointment(item.appointment ?? item)
+    );
 
     return {
       output: {

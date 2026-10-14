@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Scrapegraph Ai
 
-Extract structured data from webpages using natural language prompts and AI. Scrape single pages or crawl entire websites with configurable depth and rules. Perform AI-powered web searches across multiple sources with structured results. Convert webpages to clean Markdown. Fetch raw HTML with JavaScript rendering. Automate browser interactions (clicking, typing, form filling, logging in) before extracting data. Discover website sitemaps. Supports custom output schemas, stealth mode, proxy routing, geo-targeting, and webhook notifications for crawl job completion. Check API credit balance and retrieve past request history.
+Extract structured data from webpages, HTML, or Markdown using natural language prompts. Generate extraction schemas and inspect paginated request history through the current ScrapeGraphAI API. Existing tools also support legacy scraping, search, crawling, HTML and Markdown conversion, browser automation, sitemap discovery, and credit/status checks.
+
+`extract_data`, `generate_schema`, and `list_history` require a current API key from [scrapegraphai.com](https://scrapegraphai.com). The other tools retain the deprecated v1 API and require compatible legacy credentials; provider availability may vary. See the [specification](docs/SPEC.md) for compatibility details.
 
 ## License
 

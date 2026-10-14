@@ -1,23 +1,91 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+
+export let numericId = (value: string, label: string) => {
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) <= 0) {
+    throw createApiServiceError(`${label} must be a positive numeric ID.`);
+  }
+  return Number(value);
+};
+
+let contactIdentifier = (type: string, value: string) => {
+  if (!value.trim()) throw createApiServiceError('A contact identifier is required.');
+  if (type === 'id') numericId(value, 'Contact ID');
+  return `${type}:${encodeURIComponent(value)}`;
+};
+
+export let nextCursorId = (data: any): string | undefined => {
+  let next = data?.pagination?.next;
+  if (typeof next === 'string' && next) {
+    try {
+      return (
+        new URL(next, 'https://api.respond.io/v2/').searchParams.get('cursorId') ?? undefined
+      );
+    } catch {
+      throw createApiServiceError('Respond.io returned an invalid pagination URL.');
+    }
+  }
+  let cursor = data?.nextCursorId ?? data?.cursorId;
+  return cursor == null ? undefined : String(cursor);
+};
+
+export let contactOutput = (contact: any) => ({
+  contactId: String(contact.id ?? contact.contactId ?? ''),
+  firstName: contact.firstName ?? undefined,
+  lastName: contact.lastName ?? undefined,
+  email: contact.email ?? undefined,
+  phone: contact.phone ?? undefined,
+  language: contact.language ?? undefined,
+  countryCode: contact.countryCode ?? undefined,
+  profilePictureUrl: contact.profilePic ?? contact.profilePictureUrl ?? undefined,
+  tags: contact.tags ?? undefined,
+  assignee: contact.assignee ?? undefined,
+  customFields: Array.isArray(contact.custom_fields)
+    ? Object.fromEntries(contact.custom_fields.map((field: any) => [field.name, field.value]))
+    : (contact.custom_fields ?? contact.customFields ?? undefined),
+  status: contact.status ?? undefined,
+  createdAt:
+    contact.created_at == null ? (contact.createdAt ?? undefined) : String(contact.created_at)
+});
+
+export let messageOutput = (message: any) => ({
+  messageId: String(message.messageId ?? message.id ?? ''),
+  type: message.message?.type ?? message.type ?? undefined,
+  text: message.message?.text ?? message.text ?? undefined,
+  direction: message.traffic ?? message.direction ?? undefined,
+  channelId: message.channelId == null ? undefined : String(message.channelId),
+  createdAt: message.createdAt == null ? undefined : String(message.createdAt),
+  status: Array.isArray(message.status)
+    ? message.status.at(-1)?.value
+    : (message.status ?? undefined)
+});
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim())
+      throw createApiServiceError('A Respond.io API access token is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.respond.io/v2',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token.trim()}` },
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Respond.io',
+          reason: 'respond_io_api_error'
+        })
     });
   }
 
-  // ─── Contact Methods ───
-
   async getContact(identifierType: string, identifierValue: string) {
-    let response = await this.axios.get(`/contact/${identifierType}:${identifierValue}`);
-    return response.data;
+    return (
+      await this.axios.get(`/contact/${contactIdentifier(identifierType, identifierValue)}`)
+    ).data;
   }
 
   async createContact(
@@ -25,11 +93,13 @@ export class Client {
     identifierValue: string,
     fields: Record<string, any>
   ) {
-    let response = await this.axios.post(
-      `/contact/${identifierType}:${identifierValue}`,
+    if (!fields.firstName?.trim())
+      throw createApiServiceError('Provide firstName when creating a contact.');
+    await this.axios.post(
+      `/contact/${contactIdentifier(identifierType, identifierValue)}`,
       fields
     );
-    return response.data;
+    return this.getContact(identifierType, identifierValue);
   }
 
   async updateContact(
@@ -37,137 +107,244 @@ export class Client {
     identifierValue: string,
     fields: Record<string, any>
   ) {
+    if (Object.keys(fields).length === 0)
+      throw createApiServiceError('Provide at least one contact field to update.');
     let response = await this.axios.put(
-      `/contact/${identifierType}:${identifierValue}`,
+      `/contact/${contactIdentifier(identifierType, identifierValue)}`,
       fields
+    );
+    let contactId = response.data?.contactId;
+    return contactId == null
+      ? this.getContact(identifierType, identifierValue)
+      : this.getContact('id', String(contactId));
+  }
+
+  async deleteContact(contactId: string) {
+    return (await this.axios.delete(`/contact/${contactIdentifier('id', contactId)}`)).data;
+  }
+
+  async listContacts(
+    filters?: Record<string, any>,
+    limit?: number,
+    cursorId?: string,
+    search?: string,
+    timezone = 'UTC'
+  ) {
+    let convert = (conditions: any[] | undefined) =>
+      conditions?.map(condition => {
+        let category =
+          condition.category ?? (condition.field === 'tag' ? 'contactTag' : 'contactField');
+        let operator =
+          ({ eq: 'isEqualTo', ne: 'isNotEqualTo' } as Record<string, string>)[
+            condition.operator
+          ] ?? condition.operator;
+        if (category === 'contactTag' && operator === 'isEqualTo') operator = 'hasAnyOf';
+        if (
+          ![
+            'isEqualTo',
+            'isNotEqualTo',
+            'isTimestampAfter',
+            'isTimestampBefore',
+            'isTimestampBetween',
+            'exists',
+            'doesNotExist',
+            'isGreaterThan',
+            'isLessThan',
+            'isBetween',
+            'hasAnyOf',
+            'hasAllOf',
+            'hasNoneOf'
+          ].includes(operator)
+        ) {
+          throw createApiServiceError(
+            `Unsupported filter operator "${condition.operator}". Use a documented Respond.io filter operator.`
+          );
+        }
+        return {
+          category,
+          field:
+            category === 'contactTag' || category === 'lifecycle' ? null : condition.field,
+          operator,
+          value:
+            category === 'contactTag' && typeof condition.value === 'string'
+              ? [condition.value]
+              : condition.value
+        };
+      });
+    let response = await this.axios.post(
+      '/contact/list',
+      {
+        search: search ?? '',
+        timezone,
+        filter:
+          !filters?.and && !filters?.or
+            ? { $and: [] }
+            : pickDefined({ $and: convert(filters?.and), $or: convert(filters?.or) })
+      },
+      { params: this.pagination(limit, cursorId) }
     );
     return response.data;
   }
 
-  async deleteContact(contactId: string) {
-    let response = await this.axios.delete(`/contact/${contactId}`);
-    return response.data;
-  }
-
-  async listContacts(filters?: Record<string, any>, limit?: number, cursorId?: string) {
-    let params: Record<string, any> = {};
-    if (limit) params.limit = limit;
-    if (cursorId) params.cursorId = cursorId;
-    let response = await this.axios.post('/contact/list', filters || {}, { params });
-    return response.data;
-  }
-
   async mergeContacts(primaryContactId: string, secondaryContactId: string) {
-    let response = await this.axios.post('/contact/merge', {
-      primaryContactId,
-      secondaryContactId
-    });
-    return response.data;
+    if (primaryContactId === secondaryContactId)
+      throw createApiServiceError('Choose two different contacts to merge.');
+    return (
+      await this.axios.post('/contact/merge', {
+        contactIds: [
+          numericId(primaryContactId, 'Primary contact ID'),
+          numericId(secondaryContactId, 'Secondary contact ID')
+        ]
+      })
+    ).data;
   }
 
   async addContactTags(contactId: string, tags: string[]) {
-    let response = await this.axios.post(`/contact/${contactId}/tag`, tags);
-    return response.data;
+    return (await this.axios.post(`/contact/${contactIdentifier('id', contactId)}/tag`, tags))
+      .data;
   }
 
   async removeContactTags(contactId: string, tags: string[]) {
-    let response = await this.axios.delete(`/contact/${contactId}/tag`, { data: tags });
-    return response.data;
+    return (
+      await this.axios.delete(`/contact/${contactIdentifier('id', contactId)}/tag`, {
+        data: tags
+      })
+    ).data;
   }
 
-  // ─── Messaging Methods ───
-
   async sendMessage(contactId: string, message: Record<string, any>, channelId?: string) {
-    let body: Record<string, any> = { message };
-    if (channelId) {
-      body.channelId = channelId;
-    }
-    let response = await this.axios.post(`/contact/${contactId}/message`, body);
-    return response.data;
+    return (
+      await this.axios.post(`/contact/${contactIdentifier('id', contactId)}/message`, {
+        message,
+        ...pickDefined({
+          channelId: channelId === undefined ? undefined : numericId(channelId, 'Channel ID')
+        })
+      })
+    ).data;
   }
 
   async getMessage(contactId: string, messageId: string) {
-    let response = await this.axios.get(`/contact/${contactId}/message/${messageId}`);
-    return response.data;
+    return (
+      await this.axios.get(
+        `/contact/${contactIdentifier('id', contactId)}/message/${numericId(messageId, 'Message ID')}`
+      )
+    ).data;
   }
 
   async listMessages(contactId: string, limit?: number, cursorId?: string) {
-    let params: Record<string, any> = {};
-    if (limit) params.limit = limit;
-    if (cursorId) params.cursorId = cursorId;
-    let response = await this.axios.get(`/contact/${contactId}/message`, { params });
-    return response.data;
+    return (
+      await this.axios.get(`/contact/${contactIdentifier('id', contactId)}/message/list`, {
+        params: this.pagination(limit, cursorId)
+      })
+    ).data;
   }
 
-  async listMessageTemplates(channelId: string) {
-    let response = await this.axios.get(`/space/channel/${channelId}/template`);
-    return response.data;
+  async listContactChannels(contactId: string, limit?: number, cursorId?: string) {
+    return (
+      await this.axios.get(`/contact/${contactIdentifier('id', contactId)}/channels`, {
+        params: this.pagination(limit, cursorId)
+      })
+    ).data;
   }
 
-  // ─── Conversation Methods ───
+  async listMessageTemplates(channelId: string, limit?: number, cursorId?: string) {
+    return (
+      await this.axios.get(`/space/channel/${numericId(channelId, 'Channel ID')}/template`, {
+        params: this.pagination(limit, cursorId)
+      })
+    ).data;
+  }
 
   async openConversation(contactId: string) {
-    let response = await this.axios.post(`/contact/${contactId}/conversation`, {
-      status: 'open'
-    });
-    return response.data;
+    return (
+      await this.axios.post(
+        `/contact/${contactIdentifier('id', contactId)}/conversation/status`,
+        { status: 'open' }
+      )
+    ).data;
   }
 
   async closeConversation(contactId: string, category?: string, summary?: string) {
-    let body: Record<string, any> = { status: 'closed' };
-    if (category) body.category = category;
-    if (summary) body.summary = summary;
-    let response = await this.axios.post(`/contact/${contactId}/conversation`, body);
-    return response.data;
+    return (
+      await this.axios.post(
+        `/contact/${contactIdentifier('id', contactId)}/conversation/status`,
+        {
+          status: 'close',
+          ...pickDefined({ category, summary })
+        }
+      )
+    ).data;
   }
 
   async assignConversation(contactId: string, assigneeId: number) {
-    let response = await this.axios.post(`/contact/${contactId}/assignee`, {
-      assignee: { id: assigneeId }
-    });
-    return response.data;
+    if (!Number.isSafeInteger(assigneeId) || assigneeId <= 0)
+      throw createApiServiceError('Assignee ID must be a positive whole number.');
+    return (
+      await this.axios.post(
+        `/contact/${contactIdentifier('id', contactId)}/conversation/assignee`,
+        { assignee: assigneeId }
+      )
+    ).data;
   }
 
   async unassignConversation(contactId: string) {
-    let response = await this.axios.post(`/contact/${contactId}/assignee`, {
-      assignee: null
-    });
-    return response.data;
+    return (
+      await this.axios.post(
+        `/contact/${contactIdentifier('id', contactId)}/conversation/assignee`,
+        { assignee: null }
+      )
+    ).data;
   }
-
-  // ─── Comment Methods ───
 
   async addComment(contactId: string, text: string) {
-    let response = await this.axios.post(`/contact/${contactId}/comment`, { text });
-    return response.data;
+    if (!text.trim()) throw createApiServiceError('Provide non-empty comment text.');
+    return (
+      await this.axios.post(`/contact/${contactIdentifier('id', contactId)}/comment`, { text })
+    ).data;
   }
-
-  // ─── Custom Fields Methods ───
 
   async getCustomField(customFieldId: string) {
-    let response = await this.axios.get(`/space/custom_field/${customFieldId}`);
-    return response.data;
+    return (
+      await this.axios.get(
+        `/space/custom_field/${numericId(customFieldId, 'Custom field ID')}`
+      )
+    ).data;
   }
 
-  async listCustomFields() {
-    let response = await this.axios.get('/space/custom_fields');
-    return response.data;
+  async listCustomFields(limit?: number, cursorId?: string) {
+    return (
+      await this.axios.get('/space/custom_field', { params: this.pagination(limit, cursorId) })
+    ).data;
   }
 
-  // ─── Workspace Methods ───
-
-  async listChannels() {
-    let response = await this.axios.get('/space/channels');
-    return response.data;
+  async listChannels(limit?: number, cursorId?: string) {
+    return (
+      await this.axios.get('/space/channel', { params: this.pagination(limit, cursorId) })
+    ).data;
   }
 
-  async listUsers() {
-    let response = await this.axios.get('/space/users');
-    return response.data;
+  async listUsers(limit?: number, cursorId?: string) {
+    return (await this.axios.get('/space/user', { params: this.pagination(limit, cursorId) }))
+      .data;
   }
 
   async getUser(userId: string) {
-    let response = await this.axios.get(`/space/user/${userId}`);
-    return response.data;
+    return (await this.axios.get(`/space/user/${numericId(userId, 'User ID')}`)).data;
+  }
+
+  private pagination(limit?: number, cursorId?: string) {
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100))
+      throw createApiServiceError('Limit must be a whole number between 1 and 100.');
+    if (
+      cursorId !== undefined &&
+      (!/^\d+$/.test(cursorId) || !Number.isSafeInteger(Number(cursorId)))
+    )
+      throw createApiServiceError(
+        'cursorId must be a non-negative numeric cursor from the previous page.'
+      );
+    return pickDefined({
+      limit,
+      cursorId: cursorId === undefined ? undefined : Number(cursorId)
+    });
   }
 }

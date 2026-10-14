@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HyperbrowserClient } from '../lib/client';
 import { sessionDetailSchema } from '../lib/schemas';
@@ -11,7 +11,7 @@ export let createSession = SlateTool.create(spec, {
 Returns connection endpoints (WebSocket, WebDriver) and a live view URL for real-time observation.
 The session can be connected to via Playwright, Puppeteer, or Selenium.`,
   instructions: [
-    'Use sessionOptions to configure proxy, stealth mode, CAPTCHA solving, and other browser settings.',
+    'Use the optional browser settings to configure proxy, stealth mode, CAPTCHA solving, and recording.',
     'Remember to stop sessions when you are done with them to save credits.',
     'Use a profile to persist login state across sessions.'
   ],
@@ -173,6 +173,11 @@ export let stopSession = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HyperbrowserClient({ token: ctx.auth.token });
     let result = await client.stopSession(ctx.input.sessionId);
+    if (result.success !== true) {
+      throw createApiServiceError(
+        'Hyperbrowser did not confirm that the session was stopped.'
+      );
+    }
 
     return {
       output: {
@@ -195,6 +200,10 @@ export let listSessions = SlateTool.create(spec, {
   .input(
     z.object({
       page: z.number().optional().describe('Page number for pagination'),
+      status: z
+        .enum(['active', 'closed', 'error', 'close-error'])
+        .optional()
+        .describe('Filter sessions by their status'),
       perPage: z.number().optional().describe('Number of sessions per page')
     })
   )
@@ -219,6 +228,7 @@ export let listSessions = SlateTool.create(spec, {
     let client = new HyperbrowserClient({ token: ctx.auth.token });
     let result = await client.listSessions({
       page: ctx.input.page,
+      status: ctx.input.status,
       perPage: ctx.input.perPage
     });
 
@@ -234,7 +244,7 @@ export let listSessions = SlateTool.create(spec, {
         })),
         totalCount: result.totalCount as number | undefined,
         page: result.page as number | undefined,
-        perPage: result.perPage as number | undefined
+        perPage: (result.pageSize ?? result.perPage) as number | undefined
       },
       message: `Found **${result.totalCount ?? sessions.length}** sessions. Showing **${sessions.length}** on this page.`
     };

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -28,6 +28,13 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      for (let [key, value] of Object.entries(ctx.input)) {
+        if (!value.trim() || /[;\r\n]/.test(value)) {
+          throw createApiServiceError(
+            `Provide a non-empty ${key} without semicolons or line breaks.`
+          );
+        }
+      }
       let token = `${ctx.input.accountNumber};${ctx.input.authToken};${ctx.input.orgToken}`;
       return {
         output: {

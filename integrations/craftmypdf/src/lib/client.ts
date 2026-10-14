@@ -1,10 +1,68 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 let REGION_BASE_URLS: Record<string, string> = {
   default: 'https://api.craftmypdf.com/v1',
   us: 'https://api-us.craftmypdf.com/v1',
   eu: 'https://api-de.craftmypdf.com/v1',
   au: 'https://api-au.craftmypdf.com/v1'
+};
+
+let validateWholeNumber = (
+  value: number | undefined,
+  name: string,
+  minimum: number,
+  maximum = Number.MAX_SAFE_INTEGER
+) => {
+  if (
+    value !== undefined &&
+    (!Number.isSafeInteger(value) || value < minimum || value > maximum)
+  ) {
+    throw createApiServiceError(
+      `${name} must be a whole number between ${minimum} and ${maximum}.`
+    );
+  }
+};
+
+let validateGeneration = (params: CreatePdfParams | CreateImageParams) => {
+  validateWholeNumber(params.expiration, 'expiration', 1, 10080);
+  validateWholeNumber(params.version, 'version', 0);
+  if ('passwordProtected' in params && params.passwordProtected && !params.password) {
+    throw createApiServiceError('Provide a password when passwordProtected is true.');
+  }
+};
+
+// Signed file URLs cannot be renewed through the documented API. Download them
+// once during generation rather than re-running a billable generation on refresh.
+export let downloadGeneratedFile = async (url: string) => {
+  if (!/^https?:\/\//i.test(url)) {
+    throw createApiServiceError('CraftMyPDF did not return a valid download URL.');
+  }
+  try {
+    let response = await fetch(url, { signal: AbortSignal.timeout(100_000) });
+    if (!response.ok) {
+      throw createApiServiceError(
+        `CraftMyPDF file download failed (HTTP ${response.status}). Generate the file again.`,
+        { upstreamStatus: response.status }
+      );
+    }
+    if (
+      !response.body ||
+      /(?:text\/html|application\/json|application\/xml|text\/xml)/i.test(
+        response.headers.get('content-type') ?? ''
+      )
+    ) {
+      throw createApiServiceError(
+        'CraftMyPDF returned an unexpected response instead of the generated file. Generate the file again.'
+      );
+    }
+    return response;
+  } catch (error) {
+    throw buildApiServiceError(error, {
+      providerLabel: 'CraftMyPDF',
+      reason: 'file_download_failed',
+      operation: 'file download'
+    });
+  }
 };
 
 export interface CreatePdfParams {
@@ -133,17 +191,46 @@ export class Client {
   private http: ReturnType<typeof createAxios>;
 
   constructor(config: { token: string; region?: string }) {
+    if (!config.token.trim())
+      throw createApiServiceError('Connect a CraftMyPDF API key before using this tool.');
     let baseURL = REGION_BASE_URLS[config.region || 'default'] || REGION_BASE_URLS.default;
     this.http = createAxios({
       baseURL,
       headers: {
         'X-API-KEY': config.token,
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: config.region === 'au' ? 30_000 : 100_000
     });
+    this.http.interceptors.response.use(
+      response => {
+        if (response.data?.status === 'error') {
+          throw createApiServiceError(
+            `CraftMyPDF request failed: ${response.data.message || 'The provider rejected the request.'}`,
+            { reason: 'provider_request_failed', upstreamStatus: response.status }
+          );
+        }
+        return response;
+      },
+      error =>
+        Promise.reject(
+          buildApiServiceError(error, {
+            providerLabel: 'CraftMyPDF',
+            reason: 'provider_request_failed'
+          })
+        )
+    );
   }
 
   async createPdf(params: CreatePdfParams) {
+    validateGeneration(params);
+    validateWholeNumber(params.imageResampleRes, 'imageResampleRes', 1);
+    if (
+      params.pdfVersion !== undefined &&
+      !['1.4', '1.7', 'Auto'].includes(params.pdfVersion)
+    ) {
+      throw createApiServiceError('pdfVersion must be "1.4", "1.7", or "Auto".');
+    }
     let body: Record<string, unknown> = {
       template_id: params.templateId
     };
@@ -175,6 +262,7 @@ export class Client {
   }
 
   async createAsyncPdf(params: CreateAsyncPdfParams) {
+    validateGeneration(params);
     let body: Record<string, unknown> = {
       template_id: params.templateId,
       webhook_url: params.webhookUrl
@@ -206,6 +294,7 @@ export class Client {
   }
 
   async createImage(params: CreateImageParams) {
+    validateGeneration(params);
     let body: Record<string, unknown> = {
       template_id: params.templateId
     };
@@ -226,6 +315,7 @@ export class Client {
   }
 
   async createMerge(params: MergeTemplatesParams) {
+    validateWholeNumber(params.expiration, 'expiration', 1, 10080);
     let body: Record<string, unknown> = {
       templates: params.templates.map(t => ({
         template_id: t.templateId,
@@ -247,6 +337,7 @@ export class Client {
   }
 
   async mergePdfUrls(params: MergePdfUrlsParams) {
+    validateWholeNumber(params.expiration, 'expiration', 1, 10080);
     let body: Record<string, unknown> = {
       urls: params.urls
     };
@@ -262,6 +353,9 @@ export class Client {
   }
 
   async addWatermark(params: WatermarkParams) {
+    validateWholeNumber(params.expiration, 'expiration', 1, 10080);
+    if (params.opacity !== undefined && (params.opacity < 0 || params.opacity > 1))
+      throw createApiServiceError('opacity must be between 0 and 1.');
     let body: Record<string, unknown> = {
       url: params.url,
       text: params.text
@@ -282,14 +376,17 @@ export class Client {
   }
 
   async addTextToPdf(params: AddTextToPdfParams) {
+    validateWholeNumber(params.expiration, 'expiration', 1, 10080);
     let body: Record<string, unknown> = {
       url: params.url,
       textSettings: params.textSettings.map(ts => {
         let setting: Record<string, unknown> = {
           text: ts.text
         };
-        if (ts.pageSelector) setting.page_selector = ts.pageSelector;
-        if (ts.position) setting.position = ts.position;
+        setting.page_selector = ts.pageSelector ?? '1-*';
+        setting.position = ts.position ?? 'top-left';
+        if (ts.opacity !== undefined && (ts.opacity < 0 || ts.opacity > 1))
+          throw createApiServiceError('Text opacity must be between 0 and 1.');
         if (ts.offsetX !== undefined) setting.offset_x = ts.offsetX;
         if (ts.offsetY !== undefined) setting.offset_y = ts.offsetY;
         if (ts.fontSize !== undefined) setting.font_size = ts.fontSize;
@@ -311,9 +408,11 @@ export class Client {
   }
 
   async updatePdfFields(params: UpdatePdfFieldsParams) {
+    validateWholeNumber(params.expiration, 'expiration', 1, 10080);
     let body: Record<string, unknown> = {
       url: params.url,
       fields: params.fields.map(f => {
+        validateWholeNumber(f.fontSize, 'fontSize', 1);
         let field: Record<string, unknown> = {
           id: f.fieldName,
           value: f.value
@@ -329,8 +428,8 @@ export class Client {
     return response.data as {
       status: string;
       file: string;
-      transaction_ref: string;
-      fields: Array<{ id: string; status: string }>;
+      transaction_ref?: string;
+      field_statuses?: Array<{ id: string; status: string; message?: string }>;
     };
   }
 
@@ -340,13 +439,23 @@ export class Client {
     });
     return response.data as {
       status: string;
-      page_count: number;
-      pages: Array<{ width: number; height: number }>;
-      fields: Array<{ name: string; type: string; value: string }>;
+      totalPages: number;
+      pages?: Array<{ width: number; height: number }>;
+      fields?: Array<{ name: string; type: string; value: string }>;
+      title?: string;
+      author?: string;
+      subject?: string;
+      creator?: string;
+      keywords?: string;
+      producer?: string;
+      creationDate?: string;
+      modificationDate?: string;
     };
   }
 
   async listTemplates(params?: { limit?: number; offset?: number; groupName?: string }) {
+    validateWholeNumber(params?.limit, 'limit', 1);
+    validateWholeNumber(params?.offset, 'offset', 0);
     let queryParams: Record<string, unknown> = {};
     if (params?.limit !== undefined) queryParams.limit = params.limit;
     if (params?.offset !== undefined) queryParams.offset = params.offset;
@@ -366,21 +475,23 @@ export class Client {
   }
 
   async getTemplate(templateId: string, version?: number) {
+    validateWholeNumber(version, 'version', 0);
     let queryParams: Record<string, unknown> = { template_id: templateId };
     if (version !== undefined) queryParams.version = version;
 
     let response = await this.http.get('/get-template', { params: queryParams });
     return response.data as {
       status: string;
-      template_id: string;
+      template_id?: string;
       name: string;
-      group_name: string;
+      group_name?: string;
       json: string;
       body: unknown;
     };
   }
 
   async createTemplate(params: NewTemplateParams) {
+    validateWholeNumber(params.version, 'version', 0);
     let body: Record<string, unknown> = {
       template_id: params.templateId
     };
@@ -392,16 +503,27 @@ export class Client {
     return response.data as {
       status: string;
       template_id: string;
-      name: string;
+      name?: string;
+      from_template_id: string;
+      from_template_version: string;
     };
   }
 
   async updateTemplate(params: UpdateTemplateParams) {
+    if (params.name === undefined && params.json === undefined)
+      throw createApiServiceError('Provide name or sampleJson to update the template.');
     let body: Record<string, unknown> = {
       template_id: params.templateId
     };
-    if (params.name) body.name = params.name;
-    if (params.json) body.json = params.json;
+    if (params.name !== undefined) body.name = params.name;
+    if (params.json !== undefined) {
+      try {
+        JSON.parse(params.json);
+      } catch {
+        throw createApiServiceError('sampleJson must be valid JSON.');
+      }
+      body.json = params.json;
+    }
 
     let response = await this.http.post('/update-template', body);
     return response.data as {
@@ -419,8 +541,10 @@ export class Client {
   }
 
   async createEditorSession(params: CreateEditorSessionParams) {
+    validateWholeNumber(params.expiration, 'expiration', 1);
     let body: Record<string, unknown> = {
-      template_id: params.templateId
+      template_id: params.templateId,
+      expiration: params.expiration ?? 1440
     };
     if (params.expiration !== undefined) body.expiration = params.expiration;
     if (params.canSave !== undefined) body.canSave = params.canSave;
@@ -447,6 +571,7 @@ export class Client {
       status: string;
       url: string;
       token_uuid: string;
+      expire_after?: string;
     };
   }
 
@@ -463,14 +588,22 @@ export class Client {
     let response = await this.http.get('/get-account-info');
     return response.data as {
       status: string;
-      account_name: string;
-      credits: number;
-      team_id: string;
-      subscription: string;
+      username: string;
+      quota_counter: number;
+      quota_max: number;
+      template_counter: string | number;
+      template_max: number;
+      created_at: string;
+      account_name?: string;
+      credits?: number;
+      team_id?: string;
+      subscription?: string;
     };
   }
 
   async listTransactions(params?: { limit?: number; offset?: number }) {
+    validateWholeNumber(params?.limit, 'limit', 1);
+    validateWholeNumber(params?.offset, 'offset', 0);
     let queryParams: Record<string, unknown> = {};
     if (params?.limit !== undefined) queryParams.limit = params.limit;
     if (params?.offset !== undefined) queryParams.offset = params.offset;
@@ -480,11 +613,30 @@ export class Client {
       status: string;
       transactions: Array<{
         transaction_ref: string;
-        template_id: string;
-        credits: number;
+        template_id?: string;
+        credit: string;
         created_at: string;
-        operation: string;
-        file: string;
+        transaction_type: string;
+        resp_status?: string;
+        exec_tm?: number;
+        resp_file_size?: number;
+        file?: string;
+      }>;
+    };
+  }
+
+  async listTemplateVersions(templateId: string) {
+    let response = await this.http.get('/list-template-versions', {
+      params: { template_id: templateId }
+    });
+    return response.data as {
+      status: string;
+      template_id: string;
+      versions: Array<{
+        version: number;
+        description?: string;
+        updated_at?: string;
+        keep?: boolean;
       }>;
     };
   }

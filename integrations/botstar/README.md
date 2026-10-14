@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Botstar
 
-Manage chatbots, broadcast messages, and handle CMS content on the BotStar platform. List and retrieve bots, send messages to specific chatbot users, manage CMS entities and items for product catalogs and digital content, access and update audience/user data with custom fields and tags, and control a livechat website widget programmatically. Supports webhook events for new subscribers, user attribute updates, human takeover requests, new tags, CMS item creation, and checkpoint records.
+Create, list, retrieve, and publish BotStar chatbots. Send messages to existing audiences, manage bot and user attributes, and create, retrieve, update, or delete CMS entities and items. Account operations use an account-level API token; broadcasts additionally require a bot-level access token.
 
 ## License
 

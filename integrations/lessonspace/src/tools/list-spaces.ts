@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -59,9 +59,13 @@ export let listSpaces = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.tagKey === undefined) !== (ctx.input.tagValue === undefined)) {
+      throw createApiServiceError(
+        'Provide both tagKey and tagValue to filter spaces by a tag.'
+      );
+    }
     let client = new Client({
-      token: ctx.auth.token,
-      organisationId: ctx.config.organisationId
+      token: ctx.auth.token
     });
 
     let result = await client.listSpaces({

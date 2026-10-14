@@ -102,7 +102,7 @@ Use this to check if a URL is associated with phishing, malware distribution, or
     if (ctx.input.includeHistory) {
       ctx.progress('Fetching categorization history...');
       let historyData = await client.getUrlHistory(ctx.input.url);
-      result.history = (historyData.result || []).map((h: any) => ({
+      result.history = (historyData.history || historyData.result || []).map((h: any) => ({
         url: h.url,
         categories: h.cats,
         score: h.score,
@@ -114,7 +114,7 @@ Use this to check if a URL is associated with phishing, malware distribution, or
       ctx.progress('Fetching associated malware...');
       let malwareData = await client.getUrlMalware(ctx.input.url);
       let malware = malwareData.malware || [];
-      result.malwareCount = malware.length;
+      result.malwareCount = malwareData.count ?? malware.length;
       result.malwareSamples = malware.slice(0, 20).map((m: any) => ({
         hash: m.md5 || m.sha256,
         type: m.md5 ? 'MD5' : 'SHA256',

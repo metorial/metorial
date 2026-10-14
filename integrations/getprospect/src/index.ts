@@ -17,6 +17,8 @@ import {
   deleteTag,
   findEmail,
   getCompany,
+  getCreditBalances,
+  getCurrentUser,
   getDomains,
   getLead,
   getNote,
@@ -37,6 +39,8 @@ export let provider = Slate.create({
   tools: [
     findEmail,
     verifyEmail,
+    getCurrentUser,
+    getCreditBalances,
     getLead,
     searchLeads,
     createLead,

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/simple-analytics",
-  "description": "Retrieve privacy-focused web analytics data including aggregated statistics, event counts, and raw data exports. Query pageviews, visitors, referrers, countries, UTM parameters, browser/OS info, and device types with flexible date ranges and filtering. Track custom event counts with metadata. Export raw page view and event data in CSV or JSON format. Manage tracked websites including adding new sites and assigning labels.",
+  "description": "Retrieve privacy-focused website statistics and event counts with date ranges, page filters, and exact metadata filters. Export raw page views and events as records or downloadable CSV and JSON files, including custom metadata. List tracked websites and add sites with a timezone, visibility, and label.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "retrieve aggregated website statistics",

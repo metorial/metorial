@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/client';
 import { spec } from '../spec';
@@ -67,6 +67,12 @@ export let webSearch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.scrapeTopN !== undefined &&
+      (!Number.isInteger(ctx.input.scrapeTopN) || ctx.input.scrapeTopN < 0)
+    ) {
+      throw createApiServiceError('"scrapeTopN" must be a non-negative whole number.');
+    }
     let client = createClient(ctx);
     let searchResults: Array<{ url: string; title: string; description?: string }> | undefined;
     let scrapedContent:
@@ -75,7 +81,7 @@ export let webSearch = SlateTool.create(spec, {
 
     if (ctx.input.action === 'search' || ctx.input.action === 'search_and_scrape') {
       if (!ctx.input.query) {
-        throw new Error('A "query" is required for search actions.');
+        throw createApiServiceError('A "query" is required for search actions.');
       }
 
       let searchResult = await client.search({
@@ -86,7 +92,9 @@ export let webSearch = SlateTool.create(spec, {
         results: ctx.input.results
       });
 
-      let mappedResults = (searchResult.results ?? []).map((r: any) => ({
+      let mappedResults = (
+        Array.isArray(searchResult) ? searchResult : (searchResult.results ?? [])
+      ).map((r: any) => ({
         url: r.url as string,
         title: r.title as string,
         description: r.description as string | undefined
@@ -122,7 +130,7 @@ export let webSearch = SlateTool.create(spec, {
       }
     } else if (ctx.input.action === 'scrape') {
       if (!ctx.input.url) {
-        throw new Error('A "url" is required for the scrape action.');
+        throw createApiServiceError('A "url" is required for the scrape action.');
       }
 
       let scraped = await client.scrape({

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listStatuses = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listStatuses = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('ID of the workspace to list statuses for')
+      workspaceId: workspaceIdSchema
     })
   )
   .output(
@@ -41,11 +42,14 @@ export let listStatuses = SlateTool.create(spec, {
 
     return {
       output: {
-        statuses: statusList.map((s: any) => ({
-          name: s.name,
-          isDefaultStatus: s.isDefaultStatus,
-          isResolvedStatus: s.isResolvedStatus
-        }))
+        statuses: statusList.map((item: any) => {
+          let status = item.status ?? item;
+          return {
+            name: status.name,
+            isDefaultStatus: status.isDefaultStatus,
+            isResolvedStatus: status.isResolvedStatus
+          };
+        })
       },
       message: `Found **${statusList.length}** status(es) for workspace`
     };

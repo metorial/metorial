@@ -24,10 +24,14 @@ export let createDocument = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      documentId: z.number().describe('ID of the created document'),
+      documentId: z.number().optional().describe('Legacy numeric document ID, when available'),
+      documentUuid: z.string().describe('UUID of the created document'),
       title: z.string().describe('Title of the document'),
       appUrl: z.string().describe('URL to view the document in Shortcut'),
-      createdAt: z.string().describe('Creation timestamp')
+      createdAt: z
+        .string()
+        .optional()
+        .describe('Creation timestamp, when returned by the provider')
     })
   )
   .handleInvocation(async ctx => {
@@ -44,7 +48,8 @@ export let createDocument = SlateTool.create(spec, {
 
     return {
       output: {
-        documentId: doc.id,
+        documentId: typeof doc.id === 'number' ? doc.id : undefined,
+        documentUuid: String(doc.id),
         title: doc.title,
         appUrl: doc.app_url,
         createdAt: doc.created_at

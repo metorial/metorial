@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let makeCall = SlateTool.create(spec, {
@@ -44,14 +44,14 @@ export let makeCall = SlateTool.create(spec, {
       to: ctx.input.phoneNumber,
       prompt_dynamic_variables: ctx.input.promptVariables
     });
-    let data = result.data || result;
+    let data = getObjectResult(result);
 
     return {
       output: {
         conversationId: data.conversation_id || data.id,
-        contactId: data.contact_id,
-        widgetId: data.widget_id,
-        assistantId: data.assistant_id,
+        contactId: data.contact_id ?? undefined,
+        widgetId: data.widget_id ?? undefined,
+        assistantId: data.assistant_id ?? undefined,
         direction: data.direction,
         fromNumber: data.from_number,
         toNumber: data.to_number

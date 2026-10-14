@@ -31,11 +31,12 @@ export let createSubproject = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.equipmentPeriodFrom)
+    if (ctx.input.equipmentPeriodFrom !== undefined)
       body.equipment_period_from = ctx.input.equipmentPeriodFrom;
-    if (ctx.input.equipmentPeriodTo) body.equipment_period_to = ctx.input.equipmentPeriodTo;
-    if (ctx.input.location) body.location = ctx.input.location;
-    if (ctx.input.memo) body.memo = ctx.input.memo;
+    if (ctx.input.equipmentPeriodTo !== undefined)
+      body.equipment_period_to = ctx.input.equipmentPeriodTo;
+    if (ctx.input.location !== undefined) body.location = ctx.input.location;
+    if (ctx.input.memo !== undefined) body.memo = ctx.input.memo;
 
     let result = await client.createNested(
       'projects',
@@ -49,7 +50,7 @@ export let createSubproject = SlateTool.create(spec, {
       output: {
         subprojectId: s.id,
         name: s.name,
-        createdAt: s.created
+        createdAt: s.created ?? undefined
       },
       message: `Created subproject **${s.name}** (ID: ${s.id}) under project **${ctx.input.projectId}**.`
     };

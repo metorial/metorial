@@ -60,7 +60,7 @@ Requires Business plan.`,
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token
+      ...ctx.auth
     });
 
     let result = await client.createProfile({
@@ -132,7 +132,7 @@ export let getProfiles = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token
+      ...ctx.auth
     });
 
     let result = await client.getProfiles({
@@ -147,16 +147,16 @@ export let getProfiles = SlateTool.create(spec, {
       title: p.title || p.displayTitle,
       refId: p.refId,
       status: p.status,
-      created: p.createdUTC || p.created,
+      created: p.createdUTC || (typeof p.created === 'string' ? p.created : p.created?.utc),
       activeSocialAccounts: p.activeSocialAccounts
     }));
 
     return {
       output: {
         profiles,
-        count: result.count || profiles.length,
+        count: result.count ?? profiles.length,
         hasMore: result.pagination?.hasMore,
-        nextCursor: result.pagination?.nextCursor
+        nextCursor: result.pagination?.nextCursor ?? undefined
       },
       message: `Retrieved **${profiles.length}** profiles.${result.pagination?.hasMore ? ' More profiles available.' : ''}`
     };
@@ -193,7 +193,7 @@ export let deleteProfile = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token
+      ...ctx.auth
     });
 
     let result = await client.deleteProfile({

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MgmtClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,7 +39,11 @@ export let managePage = SlateTool.create(spec, {
   .output(
     z.object({
       pageId: z.number().optional().describe('Page ID of the affected page'),
-      success: z.boolean().describe('Whether the operation succeeded')
+      batchId: z
+        .number()
+        .optional()
+        .describe('Queued batch ID. Use get_batch_status if success is false.'),
+      success: z.boolean().describe('Whether the write batch completed successfully')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,52 +51,72 @@ export let managePage = SlateTool.create(spec, {
       token: ctx.auth.token,
       guid: ctx.config.guid,
       locale: ctx.input.locale || ctx.config.locale,
-      region: ctx.auth.region
+      region: ctx.auth.region,
+      authMethod: ctx.auth.authMethod
     });
 
-    switch (ctx.input.operation) {
-      case 'delete': {
-        if (!ctx.input.pageId) throw new Error('pageId is required for delete');
-        await client.deletePage(ctx.input.pageId);
-        return {
-          output: { pageId: ctx.input.pageId, success: true },
-          message: `Deleted page **#${ctx.input.pageId}**`
-        };
-      }
-      case 'publish': {
-        if (!ctx.input.pageId) throw new Error('pageId is required for publish');
-        await client.publishPage(ctx.input.pageId);
-        return {
-          output: { pageId: ctx.input.pageId, success: true },
-          message: `Published page **#${ctx.input.pageId}**`
-        };
-      }
-      case 'unpublish': {
-        if (!ctx.input.pageId) throw new Error('pageId is required for unpublish');
-        await client.unpublishPage(ctx.input.pageId);
-        return {
-          output: { pageId: ctx.input.pageId, success: true },
-          message: `Unpublished page **#${ctx.input.pageId}**`
-        };
-      }
-      case 'save': {
-        let page: Record<string, any> = { ...(ctx.input.pageData || {}) };
-        if (ctx.input.pageId) page.pageID = ctx.input.pageId;
-        if (ctx.input.name) page.name = ctx.input.name;
-        if (ctx.input.title) page.title = ctx.input.title;
-        if (ctx.input.templateId) page.templateID = ctx.input.templateId;
-        if (ctx.input.parentPageId) page.parentPageID = ctx.input.parentPageId;
-
-        let result = await client.savePage(page);
-        let savedId = result?.pageID ?? ctx.input.pageId;
-
-        return {
-          output: { pageId: savedId, success: true },
-          message: ctx.input.pageId
-            ? `Updated page **#${savedId}**`
-            : `Created page **#${savedId}** — "${ctx.input.name || ctx.input.title || 'Untitled'}"`
-        };
+    for (let [name, value] of Object.entries({
+      pageId: ctx.input.pageId,
+      templateId: ctx.input.templateId,
+      parentPageId: ctx.input.parentPageId
+    })) {
+      if (value !== undefined && !Number.isInteger(value)) {
+        throw createApiServiceError(`${name} must be a whole number.`);
       }
     }
+    if (ctx.input.operation !== 'save') {
+      if (ctx.input.pageId === undefined || ctx.input.pageId <= 0) {
+        throw createApiServiceError(
+          `A positive pageId is required for ${ctx.input.operation}.`
+        );
+      }
+      let operations = {
+        delete: () => client.deletePage(ctx.input.pageId!),
+        publish: () => client.publishPage(ctx.input.pageId!),
+        unpublish: () => client.unpublishPage(ctx.input.pageId!)
+      };
+      let result = await operations[ctx.input.operation]();
+      return {
+        output: {
+          pageId: ctx.input.pageId,
+          batchId: result.batchId,
+          success: result.completed
+        },
+        message: result.completed
+          ? `Completed **${ctx.input.operation}** for page **#${ctx.input.pageId}**`
+          : `Page operation is still pending in batch **#${result.batchId}**. Call get_batch_status to check completion.`
+      };
+    }
+    let updating = ctx.input.pageId !== undefined && ctx.input.pageId > 0;
+    let page: Record<string, any> = updating
+      ? await client.getPage(ctx.input.pageId!)
+      : { pageID: -1 };
+    if (!page || typeof page !== 'object') {
+      throw createApiServiceError('The page to update was not found.');
+    }
+    page = { ...page, ...ctx.input.pageData };
+    if (ctx.input.pageId !== undefined) page.pageID = ctx.input.pageId;
+    if (ctx.input.name !== undefined) page.name = ctx.input.name;
+    if (ctx.input.title !== undefined) page.title = ctx.input.title;
+    if (ctx.input.templateId !== undefined) {
+      let template = await client.getPageTemplate(ctx.input.templateId);
+      let templateName = template?.pageTemplateName;
+      if (typeof templateName !== 'string' || !templateName)
+        throw createApiServiceError('The selected page template was not found.');
+      page.templateName = templateName;
+    }
+    let result = await client.savePage(page, ctx.input.parentPageId);
+    let savedId = result.itemIds[0] ?? (updating ? ctx.input.pageId : undefined);
+    if (result.completed && !savedId) {
+      throw createApiServiceError(
+        `Agility CMS batch ${result.batchId} completed without a page ID. Call get_batch_status to inspect it.`
+      );
+    }
+    return {
+      output: { pageId: savedId, batchId: result.batchId, success: result.completed },
+      message: result.completed
+        ? `${updating ? 'Updated' : 'Created'} page **#${savedId}**`
+        : `Page save is still pending in batch **#${result.batchId}**. Call get_batch_status to check completion.`
+    };
   })
   .build();

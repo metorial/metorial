@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
+import { customFieldValuesSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createProject = SlateTool.create(spec, {
@@ -14,9 +15,28 @@ export let createProject = SlateTool.create(spec, {
       name: z.string().describe('Name of the project'),
       description: z.string().optional().describe('Description of the project'),
       partyId: z.number().describe('ID of the primary party (contact) for this project'),
-      ownerId: z.number().optional().describe('Owner user ID'),
-      teamId: z.number().optional().describe('Team ID'),
+      ownerId: z
+        .number()
+        .optional()
+        .describe('Owner user ID. Use list_users to discover IDs.'),
+      teamId: z.number().optional().describe('Team ID. Use list_teams to discover IDs.'),
+      startOn: z.string().optional().describe('Scheduled start date (YYYY-MM-DD)'),
+      opportunityId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Related opportunity ID. Use list_opportunities or search_opportunities to discover IDs.'
+        ),
+      stageId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Existing project stage ID, for example a stage returned by get_project'),
       expectedCloseOn: z.string().optional().describe('Expected close date (YYYY-MM-DD)'),
+      fields: customFieldValuesSchema,
       tags: z
         .array(
           z.object({
@@ -48,6 +68,18 @@ export let createProject = SlateTool.create(spec, {
     if (ctx.input.teamId) kase.team = { id: ctx.input.teamId };
     if (ctx.input.expectedCloseOn) kase.expectedCloseOn = ctx.input.expectedCloseOn;
 
+    if (ctx.input.fields) {
+      kase.fields = ctx.input.fields.map(field => ({
+        definition: { id: field.definitionId },
+        value: field.value
+      }));
+    }
+
+    if (ctx.input.startOn !== undefined) kase.startOn = ctx.input.startOn;
+    if (ctx.input.opportunityId !== undefined)
+      kase.opportunity = { id: ctx.input.opportunityId };
+    if (ctx.input.stageId !== undefined) kase.stage = { id: ctx.input.stageId };
+
     if (ctx.input.tags) {
       kase.tags = ctx.input.tags.map(t => (t.tagId ? { id: t.tagId } : { name: t.name }));
     }
@@ -57,8 +89,8 @@ export let createProject = SlateTool.create(spec, {
     return {
       output: {
         projectId: result.id,
-        name: result.name,
-        createdAt: result.createdAt
+        name: result.name ?? undefined,
+        createdAt: result.createdAt ?? undefined
       },
       message: `Created project **${result.name}** (ID: ${result.id}).`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BackendlessClient } from '../lib/client';
 import { spec } from '../spec';
@@ -42,19 +42,20 @@ export let registerUser = SlateTool.create(spec, {
     });
 
     let userData: Record<string, unknown> = {
+      ...ctx.input.additionalProperties,
       email: ctx.input.email,
       password: ctx.input.password
     };
     if (ctx.input.name) userData.name = ctx.input.name;
-    if (ctx.input.additionalProperties) {
-      Object.assign(userData, ctx.input.additionalProperties);
-    }
 
     let user = await client.registerUser(userData);
+    if (typeof user.objectId !== 'string' || !user.objectId) {
+      throw createApiServiceError('Backendless did not return the registered user ID.');
+    }
 
     return {
       output: {
-        userId: user.objectId as string,
+        userId: user.objectId,
         user
       },
       message: `Registered new user **${ctx.input.email}** with ID **${user.objectId}**.`

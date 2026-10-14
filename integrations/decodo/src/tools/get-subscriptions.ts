@@ -40,13 +40,13 @@ export let getSubscriptions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PublicApiClient(ctx.auth.token);
+    let client = new PublicApiClient(ctx.auth.token, ctx.auth.authMethod);
     let subscriptions = await client.getSubscriptions();
 
     let summary = subscriptions
       .map(
         s =>
-          `${s.serviceType || 'unknown'}: ${s.trafficLimit || 'unlimited'} GB limit, valid until ${s.validUntil || 'N/A'}`
+          `${s.serviceType || 'unknown'}: ${s.trafficLimit ?? 'unlimited'} GB limit, valid until ${s.validUntil || 'N/A'}`
       )
       .join('\n');
 

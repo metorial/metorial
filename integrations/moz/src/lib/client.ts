@@ -1,4 +1,11 @@
-import { createAxios } from 'slates';
+import { randomUUID } from 'node:crypto';
+import { setTimeout } from 'node:timers/promises';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  requestAxiosData
+} from 'slates';
 
 interface ClientConfig {
   token: string;
@@ -7,10 +14,11 @@ interface ClientConfig {
 export class MozClient {
   private v2: ReturnType<typeof createAxios>;
   private v3: ReturnType<typeof createAxios>;
-  private token: string;
 
   constructor(config: ClientConfig) {
-    this.token = config.token;
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Moz API token or legacy credentials are required.');
+    }
 
     let isBasicAuth = config.token.startsWith('Basic ');
 
@@ -32,13 +40,34 @@ export class MozClient {
 
     this.v2 = createAxios({
       baseURL: 'https://lsapi.seomoz.com/v2',
-      headers: v2Headers
+      headers: v2Headers,
+      timeout: 30000
     });
 
     this.v3 = createAxios({
       baseURL: 'https://api.moz.com',
-      headers: v3Headers
+      headers: v3Headers,
+      timeout: 30000
     });
+  }
+
+  private async post(path: string, body: Record<string, unknown>): Promise<any> {
+    if (
+      typeof body.limit === 'number' &&
+      (!Number.isSafeInteger(body.limit) || body.limit < 1 || body.limit > 50)
+    ) {
+      throw createApiServiceError('limit must be a whole number between 1 and 50.');
+    }
+    return requestAxiosData<any>(
+      path,
+      () => this.v2.post(path, body),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Moz',
+          reason: 'moz_api_error',
+          operation
+        })
+    );
   }
 
   // --- V2 REST Methods ---
@@ -60,8 +89,7 @@ export class MozClient {
     if (params.monthlyHistoryValues) body.monthly_history_values = params.monthlyHistoryValues;
     if (params.distributions !== undefined) body.distributions = params.distributions;
 
-    let response = await this.v2.post('/url_metrics', body);
-    return response.data;
+    return this.post('/url_metrics', body);
   }
 
   async getLinks(params: {
@@ -87,8 +115,7 @@ export class MozClient {
     if (params.limit) body.limit = params.limit;
     if (params.nextToken) body.next_token = params.nextToken;
 
-    let response = await this.v2.post('/links', body);
-    return response.data;
+    return this.post('/links', body);
   }
 
   async getAnchorText(params: {
@@ -104,8 +131,7 @@ export class MozClient {
     if (params.limit) body.limit = params.limit;
     if (params.nextToken) body.next_token = params.nextToken;
 
-    let response = await this.v2.post('/anchor_text', body);
-    return response.data;
+    return this.post('/anchor_text', body);
   }
 
   async getLinkingRootDomains(params: {
@@ -129,8 +155,7 @@ export class MozClient {
     if (params.beginDate) body.begin_date = params.beginDate;
     if (params.endDate) body.end_date = params.endDate;
 
-    let response = await this.v2.post('/linking_root_domains', body);
-    return response.data;
+    return this.post('/linking_root_domains', body);
   }
 
   async getTopPages(params: {
@@ -150,8 +175,7 @@ export class MozClient {
     if (params.limit) body.limit = params.limit;
     if (params.nextToken) body.next_token = params.nextToken;
 
-    let response = await this.v2.post('/top_pages', body);
-    return response.data;
+    return this.post('/top_pages', body);
   }
 
   async getGlobalTopPages(params: { limit?: number; nextToken?: string }): Promise<any> {
@@ -159,8 +183,7 @@ export class MozClient {
     if (params.limit) body.limit = params.limit;
     if (params.nextToken) body.next_token = params.nextToken;
 
-    let response = await this.v2.post('/global_top_pages', body);
-    return response.data;
+    return this.post('/global_top_pages', body);
   }
 
   async getGlobalTopRootDomains(params: { limit?: number; nextToken?: string }): Promise<any> {
@@ -168,8 +191,7 @@ export class MozClient {
     if (params.limit) body.limit = params.limit;
     if (params.nextToken) body.next_token = params.nextToken;
 
-    let response = await this.v2.post('/global_top_root_domains', body);
-    return response.data;
+    return this.post('/global_top_root_domains', body);
   }
 
   async getLinkIntersect(params: {
@@ -181,25 +203,41 @@ export class MozClient {
     sourceScope?: string;
     sort?: string;
   }): Promise<any> {
-    let body: Record<string, any> = {
-      is_linking_to: params.isLinkingTo
+    if (params.isLinkingTo.length + (params.notLinkingTo?.length ?? 0) > 6) {
+      throw createApiServiceError('Provide at most 6 combined positive and negative targets.');
+    }
+    if (
+      params.minimumMatchingTargets !== undefined &&
+      (!Number.isSafeInteger(params.minimumMatchingTargets) ||
+        params.minimumMatchingTargets < 1 ||
+        params.minimumMatchingTargets > params.isLinkingTo.length)
+    ) {
+      throw createApiServiceError(
+        'minimumMatchingTargets must be a whole number between 1 and the number of positive targets.'
+      );
+    }
+    if (params.sourceScope === 'subdomain') {
+      throw createApiServiceError('Link intersect sourceScope must be page or root_domain.');
+    }
+    let body: Record<string, unknown> = {
+      positive_targets: params.isLinkingTo.map(({ query, scope }) => ({
+        target: query,
+        scope
+      }))
     };
-    if (params.notLinkingTo) body.not_linking_to = params.notLinkingTo;
+    if (params.notLinkingTo)
+      body.negative_targets = params.notLinkingTo.map(({ query, scope }) => ({
+        target: query,
+        scope
+      }));
+    if (params.limit !== undefined) body.limit = params.limit;
+    if (params.nextToken !== undefined) body.next_token = params.nextToken;
+    if (params.minimumMatchingTargets !== undefined)
+      body.min_matching_targets = params.minimumMatchingTargets;
+    if (params.sourceScope !== undefined) body.source_scope = params.sourceScope;
+    if (params.sort !== undefined) body.sort = params.sort;
 
-    let offset: Record<string, any> = {};
-    if (params.limit) offset.limit = params.limit;
-    if (params.nextToken) offset.token = params.nextToken;
-    if (Object.keys(offset).length > 0) body.offset = offset;
-
-    let options: Record<string, any> = {};
-    if (params.minimumMatchingTargets)
-      options.minimum_matching_targets = params.minimumMatchingTargets;
-    if (params.sourceScope) options.scope = params.sourceScope;
-    if (params.sort) options.sort = params.sort;
-    if (Object.keys(options).length > 0) body.options = options;
-
-    let response = await this.v2.post('/link_intersect', body);
-    return response.data;
+    return this.post('/link_intersect', body);
   }
 
   async getLinkStatus(params: {
@@ -215,48 +253,83 @@ export class MozClient {
     if (params.targetScope) body.target_scope = params.targetScope;
     if (params.sourceScope) body.source_scope = params.sourceScope;
 
-    let response = await this.v2.post('/link_status', body);
-    return response.data;
+    return this.post('/link_status', body);
   }
 
   async getIndexMetadata(): Promise<any> {
-    let response = await this.v2.post('/index_metadata', {});
-    return response.data;
+    return this.post('/index_metadata', {});
   }
 
   async getUsageData(params: { start?: string; end?: string }): Promise<any> {
+    for (let value of [params.start, params.end]) {
+      if (
+        value !== undefined &&
+        (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))
+      ) {
+        throw createApiServiceError(
+          'Usage timestamps must be Unix seconds expressed as whole-number strings.'
+        );
+      }
+    }
+    if (
+      params.start !== undefined &&
+      params.end !== undefined &&
+      Number(params.start) >= Number(params.end)
+    ) {
+      throw createApiServiceError(
+        'The usage start timestamp must be earlier than the end timestamp.'
+      );
+    }
     let body: Record<string, any> = {};
-    if (params.start) body.start = params.start;
-    if (params.end) body.end = params.end;
+    if (params.start !== undefined) body.start = params.start;
+    if (params.end !== undefined) body.end = params.end;
 
-    let response = await this.v2.post('/usage_data', body);
-    return response.data;
+    return this.post('/usage_data', body);
   }
 
   // --- V3 JSON-RPC Methods ---
 
-  private generateId(): string {
-    let chars = 'abcdef0123456789';
-    let segments = [8, 4, 4, 4, 12];
-    return segments
-      .map(len => {
-        let s = '';
-        for (let i = 0; i < len; i++) {
-          s += chars[Math.floor(Math.random() * chars.length)];
-        }
-        return s;
-      })
-      .join('-');
+  private async jsonrpc(method: string, data: Record<string, unknown>): Promise<any> {
+    let response = await requestAxiosData<any>(
+      method,
+      () =>
+        this.v3.post('/jsonrpc', {
+          jsonrpc: '2.0',
+          id: randomUUID(),
+          method,
+          params: { data }
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Moz',
+          reason: 'moz_api_error',
+          operation
+        })
+    );
+    if (response?.error) {
+      throw buildApiServiceError(
+        { response: { status: response.error.status, data: response.error } },
+        { providerLabel: 'Moz', reason: 'moz_rpc_error', operation: method }
+      );
+    }
+    if (response?.result === undefined || response.result === null) {
+      throw createApiServiceError(`Moz returned no result for ${method}.`);
+    }
+    return response.result;
   }
 
-  private async jsonrpc(method: string, data: Record<string, any>): Promise<any> {
-    let response = await this.v3.post('/jsonrpc', {
-      jsonrpc: '2.0',
-      id: this.generateId(),
-      method,
-      params: { data }
-    });
-    return response.data?.result;
+  private serpQuery(params: {
+    keyword: string;
+    locale?: string;
+    device?: string;
+    engine?: string;
+  }) {
+    return {
+      keyword: params.keyword,
+      locale: params.locale ?? 'en-US',
+      device: params.device === 'mobile' ? 'mobile_android' : (params.device ?? 'desktop'),
+      engine: params.engine ?? 'google'
+    };
   }
 
   async getKeywordMetrics(params: {
@@ -265,12 +338,7 @@ export class MozClient {
     device?: string;
     engine?: string;
   }): Promise<any> {
-    return this.jsonrpc('data.keyword.metrics.fetch', {
-      keyword: params.keyword,
-      locale: params.locale || 'en-US',
-      device: params.device || 'desktop',
-      engine: params.engine || 'google'
-    });
+    return this.jsonrpc('data.keyword.metrics.fetch', { serp_query: this.serpQuery(params) });
   }
 
   async getKeywordDifficulty(params: {
@@ -280,10 +348,7 @@ export class MozClient {
     engine?: string;
   }): Promise<any> {
     return this.jsonrpc('data.keyword.metrics.difficulty.fetch', {
-      keyword: params.keyword,
-      locale: params.locale || 'en-US',
-      device: params.device || 'desktop',
-      engine: params.engine || 'google'
+      serp_query: this.serpQuery(params)
     });
   }
 
@@ -294,10 +359,7 @@ export class MozClient {
     engine?: string;
   }): Promise<any> {
     return this.jsonrpc('data.keyword.metrics.volume.fetch', {
-      keyword: params.keyword,
-      locale: params.locale || 'en-US',
-      device: params.device || 'desktop',
-      engine: params.engine || 'google'
+      serp_query: this.serpQuery(params)
     });
   }
 
@@ -305,13 +367,52 @@ export class MozClient {
     keyword: string;
     locale?: string;
     limit?: number;
+    page?: number;
+    asyncCallId?: string;
   }): Promise<any> {
-    let data: Record<string, any> = {
-      keyword: params.keyword,
-      locale: params.locale || 'en-US'
-    };
-    if (params.limit) data.limit = params.limit;
-    return this.jsonrpc('data.keyword.suggestions.list', data);
+    let result = params.asyncCallId
+      ? await this.jsonrpc('async.call.lookup', { id: params.asyncCallId })
+      : await this.jsonrpc('data.keyword.suggestion.list', {
+          serp_query: this.serpQuery(params),
+          page: {
+            n: params.page ?? 0,
+            ...(params.limit !== undefined ? { limit: params.limit } : {})
+          }
+        });
+    for (let poll = 0; poll <= 12; poll++) {
+      let call = result?.async_call;
+      if (!call) return result;
+      if (call.action !== 'data.keyword.suggestion.list') {
+        throw createApiServiceError(
+          'The asyncCallId must identify a keyword suggestion request.'
+        );
+      }
+      if (call.status === 'complete') {
+        if (call.error) {
+          throw buildApiServiceError(
+            { response: { status: call.error.status, data: call.error } },
+            { providerLabel: 'Moz', reason: 'moz_async_error', operation: call.action }
+          );
+        }
+        if (call.result === null || call.result === undefined) {
+          throw createApiServiceError(
+            'Moz completed the keyword suggestion request without a result.'
+          );
+        }
+        return call.result;
+      }
+      if (typeof call.id !== 'string' || !call.id) {
+        throw createApiServiceError('Moz returned an asynchronous request without an ID.');
+      }
+      if (poll === 12 || call.ttl <= 5) {
+        throw createApiServiceError(
+          `Moz keyword suggestions are still pending. Retry with asyncCallId "${call.id}" before the request expires.`,
+          { reason: 'moz_async_pending' }
+        );
+      }
+      await setTimeout(5000);
+      result = await this.jsonrpc('async.call.lookup', { id: call.id });
+    }
   }
 
   async getSearchIntent(params: {
@@ -320,11 +421,8 @@ export class MozClient {
     device?: string;
     engine?: string;
   }): Promise<any> {
-    return this.jsonrpc('data.keyword.search.intent.fetch', {
-      keyword: params.keyword,
-      locale: params.locale || 'en-US',
-      device: params.device || 'desktop',
-      engine: params.engine || 'google'
+    return this.jsonrpc('data.keyword.metrics.intent.fetch', {
+      serp_query: this.serpQuery(params)
     });
   }
 
@@ -335,10 +433,7 @@ export class MozClient {
     engine?: string;
   }): Promise<any> {
     return this.jsonrpc('data.keyword.metrics.opportunity.fetch', {
-      keyword: params.keyword,
-      locale: params.locale || 'en-US',
-      device: params.device || 'desktop',
-      engine: params.engine || 'google'
+      serp_query: this.serpQuery(params)
     });
   }
 
@@ -349,28 +444,23 @@ export class MozClient {
     engine?: string;
   }): Promise<any> {
     return this.jsonrpc('data.keyword.metrics.priority.fetch', {
-      keyword: params.keyword,
-      locale: params.locale || 'en-US',
-      device: params.device || 'desktop',
-      engine: params.engine || 'google'
+      serp_query: this.serpQuery(params)
     });
   }
 
   async getBrandAuthority(params: { query: string; scope?: string }): Promise<any> {
-    let data: Record<string, any> = { query: params.query };
-    if (params.scope) data.scope = params.scope;
+    let data = { site_query: { query: params.query, scope: params.scope ?? 'domain' } };
     return this.jsonrpc('data.site.metrics.brand.authority.fetch', data);
   }
 
   async getSiteMetrics(params: { query: string; scope?: string }): Promise<any> {
-    let data: Record<string, any> = { query: params.query };
-    if (params.scope) data.scope = params.scope;
+    let data = { site_query: { query: params.query, scope: params.scope ?? 'domain' } };
     return this.jsonrpc('data.site.metrics.fetch', data);
   }
 
   async getSiteMetricsMultiple(params: { sites: string[] }): Promise<any> {
     return this.jsonrpc('data.site.metrics.fetch.multiple', {
-      sites: params.sites
+      site_queries: params.sites.map(query => ({ query, scope: 'domain' }))
     });
   }
 
@@ -379,17 +469,27 @@ export class MozClient {
     engine?: string;
     locale?: string;
     limit?: number;
+    page?: number;
   }): Promise<any> {
-    let data: Record<string, any> = { site: params.site };
-    if (params.engine) data.engine = params.engine;
-    if (params.locale) data.locale = params.locale;
-    if (params.limit) data.limit = params.limit;
-    return this.jsonrpc('data.site.ranking.keywords.list', data);
+    if (params.engine && params.engine !== 'google') {
+      throw createApiServiceError('Moz ranking keyword data is available for Google only.');
+    }
+    return this.jsonrpc('data.site.ranking-keyword.list', {
+      target_query: { query: params.site, scope: 'domain', locale: params.locale ?? 'en-US' },
+      page: {
+        n: params.page ?? 0,
+        ...(params.limit !== undefined ? { limit: params.limit } : {})
+      }
+    });
   }
 
-  async getQuota(): Promise<any> {
+  async getFinalRedirect(query: string): Promise<any> {
+    return this.jsonrpc('data.site.redirect.fetch', { site_query: { query, scope: 'url' } });
+  }
+
+  async getQuota(path = 'api.limits.data.rows'): Promise<any> {
     return this.jsonrpc('quota.lookup', {
-      path: 'api.limits.data.rows'
+      path
     });
   }
 }

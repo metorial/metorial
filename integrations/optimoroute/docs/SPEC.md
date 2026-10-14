@@ -1,4 +1,4 @@
-# Slates Specification for OptimoRoute
+# OptimoRoute Integration Specification
 
 ## Overview
 
@@ -18,7 +18,7 @@ https://api.optimoroute.com/v1/{endpoint}?key=AUTH_KEY
 
 Using SSL (https) is required to avoid passing the authentication key and confidential data in clear text over the web.
 
-There are no OAuth flows, scopes, or additional credentials required. The API is available during the free trial period and on all pricing plans.
+There are no OAuth flows, scopes, or additional credentials required. The API is available during the free trial period. Features such as weekly planning and proof of delivery depend on account configuration and plan.
 
 ## Features
 
@@ -60,7 +60,11 @@ Push driver GPS positions into OptimoRoute from external sources. Accepts timest
 
 ### Order Completion & Proof of Delivery
 
-Retrieve detailed completion information for orders including status (unscheduled, scheduled, on_route, servicing, success, failed, rejected, cancelled), start/end times, GPS positions at service start/end, and proof of delivery data. Proof of delivery can include notes, digital signatures, photos, and barcode scan results (with statuses like success, unscannable, replaced, missing). Completion details can also be updated programmatically to set order statuses and timestamps. A real-time order tracking URL is provided per order when order tracking is enabled.
+Retrieve detailed completion information for orders including status (unscheduled, scheduled, on_route, servicing, success, failed, rejected, cancelled), start/end times, GPS positions at service start/end, and proof of delivery data. Proof of delivery can include notes, digital signatures, photos, and barcode scan results (with statuses like success, unscannable, replaced, missing). Completion details can also be updated programmatically to set order statuses and timestamps; note updates are not documented by this API. A real-time order tracking URL is provided per order when order tracking is enabled.
+
+### Route Dispatch
+
+Send planned routes for a date to drivers and optionally send configured customer notifications. Dispatch completes asynchronously; use the dispatch status tool to verify send completion, live-route status, and route changes.
 
 ### Customer Notifications
 

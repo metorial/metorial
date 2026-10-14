@@ -9,8 +9,8 @@ export let googleSearch = SlateTool.create(spec, {
   description: `Search Google and get structured JSON results. Supports regular search, news, maps, images, Google Lens, shopping, and AI mode. Returns organic results, ads, knowledge graph, and other SERP features.`,
   instructions: [
     'Use searchType to specify the type of Google search (default is regular web search).',
-    'Supported search types: "news", "maps", "images", "lens", "shopping", "ai_mode".',
-    'Use additionalParams to pass any extra Google parameters like "gl", "hl", "tbs", etc.'
+    'Supported search types: "classic", "news", "maps", "images", "lens", "shopping", "ai_mode", "ads". The existing "search" value selects classic web search.',
+    'Use additionalParams for supported extra Google URL parameters such as "tbs", "safe", "locale", or "filter".'
   ],
   tags: {
     readOnly: true
@@ -20,7 +20,17 @@ export let googleSearch = SlateTool.create(spec, {
     z.object({
       query: z.string().describe('The search query'),
       searchType: z
-        .enum(['search', 'news', 'maps', 'images', 'lens', 'shopping', 'ai_mode'])
+        .enum([
+          'search',
+          'classic',
+          'news',
+          'maps',
+          'images',
+          'lens',
+          'shopping',
+          'ai_mode',
+          'ads'
+        ])
         .optional()
         .describe('Type of Google search to perform'),
       language: z
@@ -43,7 +53,9 @@ export let googleSearch = SlateTool.create(spec, {
       additionalParams: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Additional Google search parameters (e.g., gl, hl, tbs)')
+        .describe(
+          'Extra Google URL parameters: filter, fpstate, locale, nfpr, safe, safe_search, tbm, tbs, or udm'
+        )
     })
   )
   .output(

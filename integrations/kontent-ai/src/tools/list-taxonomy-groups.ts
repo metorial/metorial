@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 let taxonomyTermSchema: z.ZodType<any> = z.lazy(() =>
@@ -21,7 +22,7 @@ export let listTaxonomyGroups = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ environmentId: environmentIdInput }))
   .output(
     z.object({
       taxonomyGroups: z.array(
@@ -39,7 +40,7 @@ export let listTaxonomyGroups = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
     let groups = await client.listTaxonomyGroups();

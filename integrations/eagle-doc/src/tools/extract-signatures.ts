@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { EagleDocClient } from '../lib/client';
+import { addSignatureImages } from '../lib/signatures';
 import { spec } from '../spec';
 
 export let extractSignatures = SlateTool.create(spec, {
   name: 'Extract Signatures',
   key: 'extract_signatures',
-  description: `Detect and extract signatures from any document. Returns base64-encoded signature images, bounding box coordinates, page numbers, and confidence scores for each detected signature.`,
+  description: `Detect and extract signatures from any document. Provides downloadable signature images, bounding box coordinates, page numbers, and confidence scores for each detected signature.`,
   instructions: ['Provide the document as a base64-encoded file with its original file name.'],
   constraints: ['Supported file formats: PDF, PNG, JPG/JPEG, TIF/TIFF.'],
   tags: {
@@ -57,6 +58,8 @@ export let extractSignatures = SlateTool.create(spec, {
       fileBase64: ctx.input.fileBase64,
       fileName: ctx.input.fileName
     });
+
+    await addSignatureImages(ctx, result.signatures);
 
     let signatureCount = result.signatures?.length || 0;
 

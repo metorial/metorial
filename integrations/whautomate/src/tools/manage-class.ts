@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -51,9 +51,9 @@ export let manageClass = SlateTool.create(spec, {
       return {
         output: {
           classId: result.id || result._id,
-          status: result.status,
-          date: result.date,
-          time: result.time,
+          status: result.status ?? undefined,
+          date: result.date ?? undefined,
+          time: result.time ?? undefined,
           success: true
         },
         message: `Created class on **${result.date}** at **${result.time}**.`
@@ -61,14 +61,14 @@ export let manageClass = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!classId) throw new Error('classId is required for update');
+      if (!classId) throw createApiServiceError('classId is required for update');
       let result = await client.updateClass(classId, fields);
       return {
         output: {
           classId: result.id || result._id || classId,
-          status: result.status,
-          date: result.date,
-          time: result.time,
+          status: result.status ?? undefined,
+          date: result.date ?? undefined,
+          time: result.time ?? undefined,
           success: true
         },
         message: `Updated class **${classId}**.`
@@ -76,7 +76,7 @@ export let manageClass = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!classId) throw new Error('classId is required for delete');
+      if (!classId) throw createApiServiceError('classId is required for delete');
       await client.deleteClass(classId);
       return {
         output: {
@@ -87,6 +87,6 @@ export let manageClass = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

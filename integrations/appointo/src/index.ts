@@ -6,6 +6,7 @@ import {
   getAvailability,
   listAppointments,
   listBookings,
+  listCancelledBookings,
   listProducts,
   listSubscriptionContracts,
   rescheduleBooking,
@@ -17,6 +18,7 @@ export let provider = Slate.create({
   tools: [
     listProducts,
     listBookings,
+    listCancelledBookings,
     createBooking,
     rescheduleBooking,
     cancelBooking,

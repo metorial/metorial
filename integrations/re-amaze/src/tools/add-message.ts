@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { mapPerson, personSchema, validateSuppressSurveys } from '../lib/conversations';
@@ -79,6 +79,9 @@ export let addMessage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     validateSuppressSurveys(ctx.input.suppressSurveys);
+    if (ctx.input.senderName !== undefined && !ctx.input.senderEmail) {
+      throw createApiServiceError('Provide senderEmail when specifying senderName.');
+    }
 
     let client = new Client({
       token: ctx.auth.token,
@@ -102,13 +105,32 @@ export let addMessage = SlateTool.create(spec, {
       suppressSurveys: ctx.input.suppressSurveys
     });
 
-    let m = result.message || result;
+    let parsed = z
+      .object({
+        body: z.string(),
+        visibility: z.number(),
+        created_at: z.string().nullable().optional(),
+        origin_id: z.string().nullable().optional(),
+        user: z.unknown().optional(),
+        conversation: z
+          .object({ slug: z.string().nullable().optional() })
+          .nullable()
+          .optional()
+      })
+      .safeParse(result?.message ?? result);
+    if (!parsed.success) {
+      throw createApiServiceError(
+        'Re:amaze returned an unexpected message response. Call list_messages to verify the conversation before retrying the write.',
+        { reason: 'reamaze_invalid_response' }
+      );
+    }
+    let m = parsed.data;
 
     return {
       output: {
-        messageBody: m.body ?? ctx.input.messageBody,
-        visibility: m.visibility ?? visibilityCode,
-        createdAt: m.created_at,
+        messageBody: m.body,
+        visibility: m.visibility,
+        createdAt: m.created_at ?? undefined,
         originId: m.origin_id,
         sender: mapPerson(m.user),
         conversationSlug: m.conversation?.slug ?? ctx.input.conversationSlug

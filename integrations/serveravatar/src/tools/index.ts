@@ -1,11 +1,13 @@
 export { createApplication } from './create-application';
 export { createServer } from './create-server';
+export { getOrganization } from './get-organization';
 export { getServerDetails } from './get-server-details';
 export { listApplications } from './list-applications';
 export { listBackups } from './list-backups';
 export { listOrganizations } from './list-organizations';
 export { listServerProviders } from './list-server-providers';
 export { listServers } from './list-servers';
+export { listTimezones } from './list-timezones';
 export { manageApplication } from './manage-application';
 export { manageCronJobs } from './manage-cron-jobs';
 export { manageDatabase } from './manage-database';

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,6 +15,14 @@ export let cancelAppointment = SlateTool.create(spec, {
     z.object({
       appointmentId: z.number().describe('The ID of the appointment to cancel'),
       cancelNote: z.string().optional().describe('Reason or note for the cancellation'),
+      admin: z
+        .boolean()
+        .optional()
+        .describe('Cancel as an administrator, bypassing client cancellation rules'),
+      noShow: z
+        .boolean()
+        .optional()
+        .describe('Mark the canceled appointment as a no-show; requires admin=true'),
       noEmail: z
         .boolean()
         .optional()
@@ -37,9 +45,15 @@ export let cancelAppointment = SlateTool.create(spec, {
       authMethod: ctx.auth.authMethod
     });
 
+    if (ctx.input.noShow !== undefined && ctx.input.admin !== true) {
+      throw createApiServiceError('Setting noShow requires admin=true.');
+    }
+
     let a = await client.cancelAppointment(ctx.input.appointmentId, {
       cancelNote: ctx.input.cancelNote,
-      noEmail: ctx.input.noEmail
+      noEmail: ctx.input.noEmail,
+      admin: ctx.input.admin,
+      noShow: ctx.input.noShow
     });
 
     return {

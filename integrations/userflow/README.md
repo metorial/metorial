@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/userflow.png" height="20"> Userflow
 
-Manage users, groups, and events for in-app onboarding experiences. Create, update, retrieve, list, and delete users with custom attributes. Manage groups (companies/accounts) and memberships. Track custom events for segmentation and personalization. Retrieve content objects like flows, checklists, and launchers. Manage webhook subscriptions to receive notifications for user, group, flow, checklist, and launcher events. Administer account settings, team members, and invitations.
+Manage users, companies, memberships, and events for in-app onboarding. Filter users and companies by attributes, retrieve onboarding content and session progress, discover attribute and event definitions, and manage webhook subscriptions.
 
 ## Tools
 
@@ -32,6 +32,14 @@ Retrieves a group (company) by its ID. Returns the group's attributes and option
 
 Retrieves a user by ID or finds a user by email. Returns the user's attributes, groups, and memberships. Supports expanding related objects.
 
+### List Attribute Definitions
+
+Discover attribute names, data types, and scopes. Filter definitions by object type or event names and paginate through results.
+
+### List Content Sessions
+
+Inspect onboarding progress, completion state, timestamps, and survey answers. Filter sessions by user or content and paginate through results.
+
 ### List Content
 
 Lists all content objects (flows, checklists, and launchers) in the account. Can expand draft and published versions to include the actual content details.
@@ -50,7 +58,7 @@ Lists users with pagination support. Returns a paginated list of users and their
 
 ### Manage Webhook Subscription
 
-Creates, retrieves, lists, or deletes webhook subscriptions. Webhooks notify your application when events occur in Userflow (user created/updated, group changes, events tracked). Use topic \*\*\
+Creates, retrieves, lists, or deletes webhook subscriptions. Webhooks notify your application when events occur in Userflow (user created/updated, group changes, events tracked). Use topic `*` to subscribe to all events.
 
 ### Remove Group Membership
 

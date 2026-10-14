@@ -50,7 +50,7 @@ export let getProjectCommits = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let result = await client.getCommits(ctx.input.projectId, {
       author: ctx.input.author,
@@ -61,13 +61,13 @@ export let getProjectCommits = SlateTool.create(spec, {
     let commits = (result.commits || []).map((c: any) => ({
       commitHash: c.hash ?? '',
       message: c.message ?? '',
-      authorName: c.author_name,
-      authorEmail: c.author_email,
-      authorDate: c.author_date,
-      branch: c.branch,
-      totalSeconds: c.total_seconds,
-      humanReadableTotal: c.human_readable_total,
-      url: c.url || c.html_url
+      authorName: c.author_name ?? undefined,
+      authorEmail: c.author_email ?? undefined,
+      authorDate: c.author_date ?? undefined,
+      branch: c.branch ?? undefined,
+      totalSeconds: c.total_seconds ?? undefined,
+      humanReadableTotal: c.human_readable_total ?? undefined,
+      url: c.url || c.html_url || undefined
     }));
 
     return {

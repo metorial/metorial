@@ -29,7 +29,7 @@ export let listVoices = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
     let result = await client.listVoices();
 
     let voices = result.data.map(v => ({

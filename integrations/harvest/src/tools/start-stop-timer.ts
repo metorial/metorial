@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let startStopTimer = SlateTool.create(spec, {
   name: 'Start or Stop Timer',
   key: 'start_stop_timer',
-  description: `Start or stop a running timer on an existing time entry. Use "restart" to resume tracking time on an entry, and "stop" to pause it.`,
+  description: `Start or stop a running timer on an existing time entry. Use "restart" to resume tracking time on an entry, and "stop" to pause it. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let startStopTimer = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       timeEntryId: z.number().describe('ID of the time entry to start or stop'),
       action: z.enum(['restart', 'stop']).describe('Whether to restart or stop the timer')
     })
@@ -31,7 +33,7 @@ export let startStopTimer = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     let entry: any;

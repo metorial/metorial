@@ -62,7 +62,7 @@ export let forwardGeocode = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      status: z.string().describe('Response status (e.g., "ok", "ZERO_RESULTS")'),
+      status: z.string().describe('Response status (e.g., "ok", "OK", "ZERO_RESULTS")'),
       results: z.array(resultSchema).describe('Array of matching geocoded locations')
     })
   )
@@ -74,19 +74,15 @@ export let forwardGeocode = SlateTool.create(spec, {
       country: ctx.input.countryCode
     });
 
-    if (response.status !== 'ok') {
-      ctx.warn(`Geokeo returned status: ${response.status}`);
-    }
-
-    let results = (response.results || []).map(r => ({
+    let results = response.results.map(r => ({
       placeClass: r.class,
       placeType: r.type,
-      name: r.address_components.name,
-      street: r.address_components.street,
-      city: r.address_components.city,
-      state: r.address_components.state,
-      postcode: r.address_components.postcode,
-      country: r.address_components.country,
+      name: r.address_components?.name ?? '',
+      street: r.address_components?.street ?? '',
+      city: r.address_components?.city ?? '',
+      state: r.address_components?.state ?? '',
+      postcode: r.address_components?.postcode ?? '',
+      country: r.address_components?.country ?? '',
       formattedAddress: r.formatted_address,
       latitude: r.geometry.location.lat,
       longitude: r.geometry.location.lng,

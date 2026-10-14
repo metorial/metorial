@@ -12,6 +12,7 @@ export let createContact = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       name: z.string().describe('Full name of the contact'),

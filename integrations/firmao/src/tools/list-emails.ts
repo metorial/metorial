@@ -62,14 +62,14 @@ export let listEmails = SlateTool.create(spec, {
 
     let emails = result.data.map((e: any) => ({
       emailId: e.id,
-      subject: e.subject,
-      from: e.from,
-      to: e.to,
-      status: e.status,
-      box: e.box,
-      customerId: e.customer?.id,
-      customerName: e.customer?.name,
-      creationDate: e.creationDate
+      subject: e.subject ?? undefined,
+      from: e.sender ?? e.from ?? undefined,
+      to: e.to ?? undefined,
+      status: e.status ?? undefined,
+      box: e.box ?? undefined,
+      customerId: e.customer?.id ?? undefined,
+      customerName: e.customer?.name ?? e.customer?.label ?? undefined,
+      creationDate: e.creationDate ?? undefined
     }));
 
     return {

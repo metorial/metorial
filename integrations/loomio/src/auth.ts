@@ -14,7 +14,9 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Loomio API key. Found at https://www.loomio.com/help/api2 when logged in.')
+        .describe(
+          'Loomio API key. Found at https://www.loomio.com/profile/api_access when logged in.'
+        )
     }),
     getOutput: async ctx => {
       return {

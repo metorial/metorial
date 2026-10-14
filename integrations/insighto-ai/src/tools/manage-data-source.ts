@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageDataSource = SlateTool.create(spec, {
@@ -25,6 +25,15 @@ export let manageDataSource = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Name for the data source (used in create/add_text)'),
+      sourceType: z
+        .enum(['pdf', 'doc', 'http', 'tool', 'text_blob', 'image', 'text_image'])
+        .optional()
+        .describe('Type for a new data source. Defaults to text_blob.'),
+      description: z.string().optional().describe('Description of a new data source'),
+      attributes: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider configuration for a new data source, such as a website URL'),
       text: z.string().optional().describe('Text content to add (for add_text action)'),
       assistantId: z
         .string()
@@ -45,18 +54,26 @@ export let manageDataSource = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      let result = await client.createDataSource({ name: ctx.input.name });
-      let data = result.data || result;
+      let result = await client.createDataSource({
+        name: ctx.input.name,
+        ds_type: ctx.input.sourceType ?? 'text_blob',
+        description: ctx.input.description,
+        attributes: ctx.input.attributes
+      });
+      let data = getObjectResult(result);
       return {
         output: {
           datasourceId: data.id,
-          name: data.name
+          name: data.name ?? undefined
         },
         message: `Created data source **${data.name || data.id}**.`
       };
     }
 
     if (ctx.input.action === 'add_text') {
+      if (!ctx.input.text?.trim()) {
+        throw createApiServiceError('text is required to add content to a data source.');
+      }
       await client.addTextBlob(ctx.input.datasourceId!, {
         text: ctx.input.text!,
         name: ctx.input.name

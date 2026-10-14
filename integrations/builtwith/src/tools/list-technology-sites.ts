@@ -27,7 +27,7 @@ Supports pagination with offset and date filtering to find sites detected since 
   instructions: [
     'Use the exact technology name as it appears on BuiltWith (e.g., "Shopify", "WordPress", "Google Analytics").',
     'Enable includeMetaData to get company contact information alongside domains.',
-    'Use the offset parameter for pagination through large result sets.'
+    'Pass nextOffsetToken as offsetToken for the next page. END means there are no more results.'
   ],
   tags: {
     readOnly: true
@@ -47,11 +47,19 @@ Supports pagination with offset and date filtering to find sites detected since 
       offset: z
         .number()
         .optional()
-        .describe('Pagination offset for retrieving additional results'),
+        .describe(
+          'Legacy numeric pagination offset; use offsetToken for current cursor pagination'
+        ),
+      offsetToken: z
+        .string()
+        .optional()
+        .describe(
+          'Exact nextOffsetToken returned by the previous page; do not combine with offset'
+        ),
       since: z
         .string()
         .optional()
-        .describe('Only return sites detected since this date (Unix timestamp in ms)')
+        .describe('Only return sites detected since a date such as YYYY-MM-DD or 30 Days Ago')
     })
   )
   .output(
@@ -61,7 +69,12 @@ Supports pagination with offset and date filtering to find sites detected since 
       nextOffset: z
         .number()
         .optional()
-        .describe('Offset value for retrieving the next page of results'),
+        .describe('Legacy numeric offset when the provider returns a number'),
+      nextOffsetToken: z
+        .string()
+        .optional()
+        .describe('Exact pagination cursor; END means there are no more results'),
+      hasMore: z.boolean().describe('Whether another page is available'),
       total: z.number().optional().describe('Total number of sites found')
     })
   )
@@ -72,11 +85,18 @@ Supports pagination with offset and date filtering to find sites detected since 
       technology: ctx.input.technology,
       includeMetaData: ctx.input.includeMetaData,
       offset: ctx.input.offset,
+      offsetToken: ctx.input.offsetToken,
       since: ctx.input.since
     });
 
-    let sites = data?.Results ?? [];
-    let nextOffset = data?.NextOffset ?? undefined;
+    let sites = (data?.Results ?? []).map((site: Record<string, unknown>) => ({
+      ...site,
+      domain: typeof site.D === 'string' ? site.D : site.domain,
+      firstDetected: typeof site.FD === 'number' ? String(site.FD) : site.firstDetected,
+      lastDetected: typeof site.LD === 'number' ? String(site.LD) : site.lastDetected
+    }));
+    let nextOffset = typeof data?.NextOffset === 'number' ? data.NextOffset : undefined;
+    let nextOffsetToken = typeof data?.NextOffset === 'string' ? data.NextOffset : undefined;
     let total = data?.Total ?? undefined;
 
     return {
@@ -84,6 +104,9 @@ Supports pagination with offset and date filtering to find sites detected since 
         technology: ctx.input.technology,
         sites,
         nextOffset,
+        nextOffsetToken,
+        hasMore:
+          nextOffsetToken !== undefined ? nextOffsetToken !== 'END' : nextOffset !== undefined,
         total
       },
       message: `Found **${sites.length}** sites using **${ctx.input.technology}**${total ? ` (${total} total)` : ''}.`

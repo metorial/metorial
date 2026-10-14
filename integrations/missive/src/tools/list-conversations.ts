@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -86,6 +86,13 @@ Use cursor-based pagination with the \`until\` parameter for subsequent pages.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      [ctx.input.email, ctx.input.domain, ctx.input.contactOrganization].filter(
+        value => value !== undefined
+      ).length > 1
+    ) {
+      throw createApiServiceError('Use only one of email, domain, or contactOrganization.');
+    }
     let client = new Client({ token: ctx.auth.token });
     let params: Record<string, string | number | boolean> = {};
 
@@ -107,9 +114,9 @@ Use cursor-based pagination with the \`until\` parameter for subsequent pages.`,
     let data = await client.listConversations(params);
     let conversations = (data.conversations || []).map((c: any) => ({
       conversationId: c.id,
-      subject: c.subject,
-      latestMessageSubject: c.latest_message?.subject,
-      latestMessagePreview: c.latest_message?.preview,
+      subject: c.subject ?? undefined,
+      latestMessageSubject: c.latest_message_subject ?? undefined,
+      latestMessagePreview: c.latest_message?.preview ?? undefined,
       assignees: c.assignees?.map((a: any) => ({ userId: a.id, name: a.name })),
       teamId: c.team?.id,
       organizationId: c.organization?.id,

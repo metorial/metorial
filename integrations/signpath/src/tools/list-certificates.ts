@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SignPathClient } from '../lib/client';
+import { createSignPathClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCertificates = SlateTool.create(spec, {
   name: 'List Certificates',
   key: 'list_certificates',
-  description: `List all certificates in the organization. Returns certificate metadata including name, thumbprint, active status, and certificate chain information.`,
+  description: `List all certificates in the organization. Returns certificate names and active status. Use get_certificate to retrieve the X.509 thumbprint and validity details.`,
   tags: {
     readOnly: true
   }
@@ -27,19 +27,15 @@ export let listCertificates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SignPathClient({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createSignPathClient(ctx);
 
     let certificates = await client.listCertificates();
 
     let mapped = certificates.map(c => ({
       slug: c.slug || '',
       name: c.name || '',
-      thumbprint: c.thumbprint || '',
-      isActive: c.isActive ?? true
+      thumbprint: c.thumbprint ?? '',
+      isActive: c.isActive ?? c.status === 'Valid'
     }));
 
     return {

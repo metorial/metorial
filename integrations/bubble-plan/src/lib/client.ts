@@ -1,26 +1,47 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private token: string;
   private domain: string;
 
-  constructor(config: { token: string; domain: string }) {
-    this.token = config.token;
-    this.domain = config.domain;
+  constructor(config: { token: string; domain?: unknown }) {
+    if (!config.token?.trim()) {
+      throw createApiServiceError('Enter your Project Bubble API key.', {
+        reason: 'missing_api_key'
+      });
+    }
+    if (typeof config.domain !== 'string' || !config.domain.trim()) {
+      throw createApiServiceError(
+        'Reconnect with your Project Bubble API key and account domain.',
+        { reason: 'missing_account_domain' }
+      );
+    }
+    this.token = config.token.trim();
+    this.domain = config.domain.trim();
   }
 
   private get axios() {
-    return createAxios({
+    return createAuthenticatedAxios({
       baseURL: 'https://api.projectbubble.com/v2',
       headers: {
         key: this.token,
         domain: this.domain,
         'Content-Type': 'application/json'
-      }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Project Bubble',
+          reason: 'project_bubble_api_error'
+        })
     });
   }
 
   // ── Company & Users ──────────────────────────────────────────
+
+  async getCurrentUser(): Promise<any> {
+    let response = await this.axios.get('/user');
+    return response.data;
+  }
 
   async getCompany(): Promise<any> {
     let response = await this.axios.get('/company');
@@ -62,8 +83,8 @@ export class Client {
     if (params?.createdTo) queryParams.created_to = params.createdTo;
     if (params?.tag) queryParams.tag = params.tag;
     if (params?.status) queryParams.status = params.status;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     if (params?.order) queryParams.order = params.order;
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
@@ -103,8 +124,8 @@ export class Client {
     if (data.active !== undefined) body.active = data.active ? 1 : 0;
     if (data.important !== undefined) body.important = data.important ? 1 : 0;
     if (data.notifications !== undefined) body.notifications = data.notifications ? 1 : 0;
-    if (data.users !== undefined) body.users = data.users;
-    if (data.teams !== undefined) body.teams = data.teams;
+    if (data.users !== undefined) body.users = data.users.map(String);
+    if (data.teams !== undefined) body.teams = data.teams.map(String);
     let response = await this.axios.post('/projects', body);
     return response.data;
   }
@@ -151,8 +172,8 @@ export class Client {
     if (data.closed !== undefined) body.closed = data.closed ? 1 : 0;
     if (data.archived !== undefined) body.archived = data.archived ? 1 : 0;
     if (data.notifications !== undefined) body.notifications = data.notifications ? 1 : 0;
-    if (data.users !== undefined) body.users = data.users;
-    if (data.teams !== undefined) body.teams = data.teams;
+    if (data.users !== undefined) body.users = data.users.map(String);
+    if (data.teams !== undefined) body.teams = data.teams.map(String);
     let response = await this.axios.put(`/projects/${projectId}`, body);
     return response.data;
   }
@@ -189,8 +210,8 @@ export class Client {
     if (params?.completedTo) queryParams.completed_to = params.completedTo;
     if (params?.tag) queryParams.tag = params.tag;
     if (params?.status) queryParams.status = params.status;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
   }
@@ -228,8 +249,8 @@ export class Client {
     if (data.active !== undefined) body.active = data.active ? 1 : 0;
     if (data.important !== undefined) body.important = data.important ? 1 : 0;
     if (data.recurring !== undefined) body.recurring = data.recurring;
-    if (data.users !== undefined) body.users = data.users;
-    if (data.teams !== undefined) body.teams = data.teams;
+    if (data.users !== undefined) body.users = data.users.map(String);
+    if (data.teams !== undefined) body.teams = data.teams.map(String);
     let response = await this.axios.post(`/tasks/${projectId}`, body);
     return response.data;
   }
@@ -270,8 +291,8 @@ export class Client {
     if (data.active !== undefined) body.active = data.active ? 1 : 0;
     if (data.important !== undefined) body.important = data.important ? 1 : 0;
     if (data.recurring !== undefined) body.recurring = data.recurring;
-    if (data.users !== undefined) body.users = data.users;
-    if (data.teams !== undefined) body.teams = data.teams;
+    if (data.users !== undefined) body.users = data.users.map(String);
+    if (data.teams !== undefined) body.teams = data.teams.map(String);
     let response = await this.axios.put(`/tasks/${taskId}`, body);
     return response.data;
   }
@@ -316,8 +337,8 @@ export class Client {
     if (params?.completedFrom) queryParams.completed_from = params.completedFrom;
     if (params?.completedTo) queryParams.completed_to = params.completedTo;
     if (params?.status) queryParams.status = params.status;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
   }
@@ -349,8 +370,8 @@ export class Client {
     if (data.important !== undefined) body.important = data.important ? 1 : 0;
     if (data.notifications !== undefined) body.notifications = data.notifications ? 1 : 0;
     if (data.recurring !== undefined) body.recurring = data.recurring;
-    if (data.users !== undefined) body.users = data.users;
-    if (data.teams !== undefined) body.teams = data.teams;
+    if (data.users !== undefined) body.users = data.users.map(String);
+    if (data.teams !== undefined) body.teams = data.teams.map(String);
     let response = await this.axios.post(`/subtasks/${taskId}`, body);
     return response.data;
   }
@@ -385,8 +406,8 @@ export class Client {
     if (data.important !== undefined) body.important = data.important ? 1 : 0;
     if (data.notifications !== undefined) body.notifications = data.notifications ? 1 : 0;
     if (data.recurring !== undefined) body.recurring = data.recurring;
-    if (data.users !== undefined) body.users = data.users;
-    if (data.teams !== undefined) body.teams = data.teams;
+    if (data.users !== undefined) body.users = data.users.map(String);
+    if (data.teams !== undefined) body.teams = data.teams.map(String);
     let response = await this.axios.put(`/subtasks/${subtaskId}`, body);
     return response.data;
   }
@@ -431,8 +452,8 @@ export class Client {
     if (params?.hideBilled) queryParams.hide_billed = 1;
     if (params?.createdFrom) queryParams.created_from = params.createdFrom;
     if (params?.createdTo) queryParams.created_to = params.createdTo;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
   }
@@ -497,8 +518,8 @@ export class Client {
     if (params?.projectId) queryParams.project_id = params.projectId;
     if (params?.taskId) queryParams.task_id = params.taskId;
     if (params?.subtaskId) queryParams.subtask_id = params.subtaskId;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
   }
@@ -540,8 +561,8 @@ export class Client {
     if (params?.taskId) queryParams.task_id = params.taskId;
     if (params?.subtaskId) queryParams.subtask_id = params.subtaskId;
     if (params?.order) queryParams.order = params.order;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     let response = await this.axios.get('/files', { params: queryParams });
     return response.data;
   }
@@ -569,8 +590,8 @@ export class Client {
     if (params?.startTo) queryParams.start_to = params.startTo;
     if (params?.dueFrom) queryParams.due_from = params.dueFrom;
     if (params?.dueTo) queryParams.due_to = params.dueTo;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
   }
@@ -627,9 +648,39 @@ export class Client {
   }): Promise<any> {
     let url = params?.clientId ? `/clients/${params.clientId}` : '/clients';
     let queryParams: Record<string, any> = {};
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     let response = await this.axios.get(url, { params: queryParams });
+    return response.data;
+  }
+
+  async createClient(data: {
+    clientName: string;
+    contactId?: string;
+    email?: string;
+    tel?: string;
+    mobile?: string;
+    website?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+    background?: string;
+  }): Promise<any> {
+    let body: Record<string, unknown> = { client_name: data.clientName };
+    if (data.contactId !== undefined) body.contact_id = data.contactId;
+    if (data.email !== undefined) body.email = data.email;
+    if (data.tel !== undefined) body.tel = data.tel;
+    if (data.mobile !== undefined) body.mobile = data.mobile;
+    if (data.website !== undefined) body.website = data.website;
+    if (data.address !== undefined) body.address = data.address;
+    if (data.city !== undefined) body.city = data.city;
+    if (data.state !== undefined) body.state = data.state;
+    if (data.postcode !== undefined) body.postcode = data.postcode;
+    if (data.country !== undefined) body.country = data.country;
+    if (data.background !== undefined) body.background = data.background;
+    let response = await this.axios.post('/clients', body);
     return response.data;
   }
 
@@ -644,8 +695,8 @@ export class Client {
     let url = params?.contactId ? `/contacts/${params.contactId}` : '/contacts';
     let queryParams: Record<string, any> = {};
     if (params?.clientId) queryParams.client_id = params.clientId;
-    if (params?.limit) queryParams.limit = params.limit;
-    if (params?.offset) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
     let response = await this.axios.get(url, { params: queryParams });
     return response.data;
   }

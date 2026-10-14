@@ -1,17 +1,11 @@
 {
   "name": "@metorial/botbaba",
-  "description": "Manage and deploy no-code chatbots for WhatsApp and web channels. Retrieve bot listings, send WhatsApp template messages via 360Dialog or Gupshup, and handle e-commerce workflows including ordering, payments, and cart abandonment. Supports lead generation, SMS campaigns, and integration with e-commerce platforms like Shopify and WooCommerce.",
+  "description": "List Botbaba chatbots and submit approved WhatsApp template messages through 360Dialog or Gupshup, including complete JSON requests copied from your dashboard.",
   "categories": ["crm-and-sales-tools", "e-commerce-and-retail"],
   "skills": [
-    "list and manage chatbots",
+    "list chatbots",
     "send WhatsApp template messages",
-    "track cart abandonment events",
-    "process payment events",
-    "launch SMS campaigns",
-    "handle chat completion triggers",
-    "send outbound webhook requests",
-    "manage e-commerce orders",
-    "track chatbot analytics"
+    "submit dashboard-generated template requests"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/botbaba.png"
 }

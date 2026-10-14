@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CustomGPTClient } from '../lib/client';
 import { spec } from '../spec';
@@ -22,7 +22,13 @@ export let manageSettings = SlateTool.create(spec, {
       action: z
         .enum(['get', 'update', 'list_personas', 'restore_persona'])
         .describe('Action to perform'),
-      projectId: z.number().describe('ID of the agent'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
       settings: z
         .record(z.string(), z.unknown())
         .optional()
@@ -31,6 +37,10 @@ export let manageSettings = SlateTool.create(spec, {
         ),
       personaVersion: z
         .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
         .optional()
         .describe('Persona version number (for restore_persona)')
     })
@@ -65,7 +75,7 @@ export let manageSettings = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.settings) {
-        throw new Error('settings are required for update action');
+        throw createApiServiceError('settings are required for update action');
       }
       let settings = await client.updateSettings(projectId, ctx.input.settings);
       return {
@@ -84,7 +94,7 @@ export let manageSettings = SlateTool.create(spec, {
 
     // restore_persona
     if (ctx.input.personaVersion === undefined) {
-      throw new Error('personaVersion is required for restore_persona action');
+      throw createApiServiceError('personaVersion is required for restore_persona action');
     }
     let restored = await client.restorePersonaVersion(projectId, ctx.input.personaVersion);
     return {

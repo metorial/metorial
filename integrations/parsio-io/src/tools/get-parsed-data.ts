@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getParsedData = SlateTool.create(spec, {
   name: 'Get Parsed Data',
   key: 'get_parsed_data',
-  description: `Retrieve structured parsed data from all documents in a mailbox. Supports filtering by date range. Returns the extracted fields from successfully parsed documents.`,
+  description: `Retrieve one page of structured parsed data from a mailbox. Supports filtering by date range. Returns the extracted fields from successfully parsed documents.`,
   tags: {
     readOnly: true
   }
@@ -14,8 +14,9 @@ export let getParsedData = SlateTool.create(spec, {
   .input(
     z.object({
       mailboxId: z.string().describe('ID of the mailbox to retrieve parsed data from'),
-      dateFrom: z.string().optional().describe('Start date filter (ISO 8601 format)'),
-      dateTo: z.string().optional().describe('End date filter (ISO 8601 format)')
+      page: z.number().int().min(1).optional().describe('Page number, starting at 1'),
+      dateFrom: z.string().optional().describe('Start date filter (YYYY-MM-DD)'),
+      dateTo: z.string().optional().describe('End date filter (YYYY-MM-DD)')
     })
   )
   .output(
@@ -26,11 +27,14 @@ export let getParsedData = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getParsedData(ctx.input.mailboxId, {
+      page: ctx.input.page,
       from: ctx.input.dateFrom,
       to: ctx.input.dateTo
     });
 
-    let records = Array.isArray(result) ? result : result?.data || result?.records || [];
+    let records = Array.isArray(result)
+      ? result
+      : result?.docs || result?.data || result?.records || [];
 
     return {
       output: { records },

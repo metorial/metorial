@@ -20,8 +20,14 @@ export let reportLocation = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Position timestamp in ISO 8601 format (defaults to now)'),
-      speed: z.number().optional().describe('Current speed in km/h'),
-      heading: z.number().optional().describe('Heading in degrees (0-359)')
+      speed: z
+        .number()
+        .optional()
+        .describe('Legacy speed input; omit because speed is estimated from positions'),
+      heading: z
+        .number()
+        .optional()
+        .describe('Legacy heading input; omit because heading is estimated from positions')
     })
   )
   .output(
@@ -51,7 +57,7 @@ export let reportLocation = SlateTool.create(spec, {
 export let getLocationHistory = SlateTool.create(spec, {
   name: 'Get Location History',
   key: 'get_location_history',
-  description: `Retrieve the position history for a tracked object. Returns a chronological list of recorded positions within an optional time range. Useful for fleet tracking and route analysis.`,
+  description: `Retrieve a page of position history for a tracked object from a specified time. Requires an Admin Key; the requested time range cannot exceed 24 hours.`,
   tags: {
     readOnly: true
   }
@@ -59,8 +65,22 @@ export let getLocationHistory = SlateTool.create(spec, {
   .input(
     z.object({
       objectId: z.string().describe('ID of the tracked object'),
-      from: z.string().optional().describe('Start of time range in ISO 8601 format'),
-      to: z.string().optional().describe('End of time range in ISO 8601 format')
+      from: z
+        .string()
+        .optional()
+        .describe('Start time in ISO 8601 format; required by the provider'),
+      to: z
+        .string()
+        .optional()
+        .describe('End time in ISO 8601 format (within 24 hours of from)'),
+      maxResult: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum positions per page (default 100)'),
+      pageNumber: z.number().int().min(1).optional().describe('Page to retrieve (default 1)')
     })
   )
   .output(
@@ -84,15 +104,20 @@ export let getLocationHistory = SlateTool.create(spec, {
     let data = await client.getObjectLocationHistory({
       objectId: ctx.input.objectId,
       from: ctx.input.from,
-      to: ctx.input.to
+      to: ctx.input.to,
+      maxResult: ctx.input.maxResult,
+      pageNumber: ctx.input.pageNumber
     });
 
-    let positions = (data.positions || []).map((p: any) => ({
-      lat: p.position?.latitude || p.latitude || p.lat,
-      lon: p.position?.longitude || p.longitude || p.lon,
+    let rawPositions = Array.isArray(data.positions)
+      ? data.positions
+      : (data.positions?.features ?? []);
+    let positions = rawPositions.map((p: any) => ({
+      lat: p.geometry?.coordinates?.[1] ?? p.position?.latitude ?? p.latitude ?? p.lat,
+      lon: p.geometry?.coordinates?.[0] ?? p.position?.longitude ?? p.longitude ?? p.lon,
       timestamp: p.timestamp,
-      speed: p.speed,
-      heading: p.heading
+      speed: p.estimatedSpeed ?? p.speed ?? undefined,
+      heading: p.estimatedDirection ?? p.heading ?? undefined
     }));
 
     return {

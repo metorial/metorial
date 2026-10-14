@@ -38,7 +38,17 @@ export let getEventsTool = SlateTool.create(spec, {
       timezone: z
         .string()
         .optional()
-        .describe('IANA timezone identifier (e.g. "Europe/Amsterdam").')
+        .describe('IANA timezone identifier (e.g. "Europe/Amsterdam").'),
+      pages: z
+        .array(z.string())
+        .optional()
+        .describe('Filter event counts by page paths or trailing wildcard patterns.'),
+      metadataFilters: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional()
+        .describe(
+          'Exact metadata filters joined with AND. Use normalized keys without storage type suffixes.'
+        )
     })
   )
   .output(
@@ -61,7 +71,9 @@ export let getEventsTool = SlateTool.create(spec, {
         events: ctx.input.eventNames,
         start: ctx.input.start,
         end: ctx.input.end,
-        timezone: ctx.input.timezone
+        timezone: ctx.input.timezone,
+        pages: ctx.input.pages,
+        metadataFilters: ctx.input.metadataFilters
       }
     );
 

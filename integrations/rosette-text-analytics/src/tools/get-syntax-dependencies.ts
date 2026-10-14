@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -53,7 +53,37 @@ export let getSyntaxDependenciesTool = SlateTool.create(spec, {
 
     let result = await client.syntaxDependencies(ctx.input.content, ctx.input.language);
 
-    let sentences = result.sentences ?? [];
+    let sentences =
+      result.sentences ??
+      (result.sentence ?? []).map(
+        (sentence: {
+          startTokenIndex?: number;
+          dependencies?: {
+            dependentTokenIndex: number;
+            governorTokenIndex: number;
+            dependencyType: string;
+          }[];
+        }) => ({
+          tokens: (sentence.dependencies ?? []).map(dependency => {
+            let text = result.tokens?.[dependency.dependentTokenIndex];
+            if (typeof text !== 'string') {
+              throw createApiServiceError(
+                'The Analytics API returned a syntax dependency without its token text.'
+              );
+            }
+            let startIndex = sentence.startTokenIndex ?? 0;
+            return {
+              tokenIndex: dependency.dependentTokenIndex - startIndex,
+              text,
+              dependencyType: dependency.dependencyType,
+              governorIndex:
+                dependency.governorTokenIndex < 0
+                  ? dependency.governorTokenIndex
+                  : dependency.governorTokenIndex - startIndex
+            };
+          })
+        })
+      );
 
     return {
       output: {

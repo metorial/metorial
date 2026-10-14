@@ -2,10 +2,12 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createClientAccount,
+  createClientOrganization,
   createProspect,
   createShortLink,
   deleteProspect,
   enrichData,
+  getCurrentUser,
   getProspect,
   listImpressions,
   listProspects,
@@ -15,6 +17,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     listTemplates,
     createProspect,
     updateProspect,
@@ -24,7 +27,8 @@ export let provider = Slate.create({
     createShortLink,
     enrichData,
     listImpressions,
-    createClientAccount
+    createClientAccount,
+    createClientOrganization
   ],
   triggers: []
 });

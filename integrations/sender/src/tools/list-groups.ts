@@ -26,8 +26,8 @@ export let listGroups = SlateTool.create(spec, {
             title: z.string().describe('Group title'),
             recipientCount: z.number().describe('Total subscriber count'),
             activeSubscribers: z.number().describe('Active subscriber count'),
-            opensRate: z.number().describe('Open rate'),
-            clickRate: z.number().describe('Click rate'),
+            opensRate: z.number().optional().describe('Open rate, when returned by Sender'),
+            clickRate: z.number().optional().describe('Click rate, when returned by Sender'),
             createdAt: z.string().describe('Creation timestamp')
           })
         )

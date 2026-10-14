@@ -35,9 +35,9 @@ export let listDomains = SlateTool.create(spec, {
       query: ctx.input.query
     });
 
-    let items = Array.isArray(data) ? data : (data?.items ?? data?.domains ?? []);
+    let items = data;
 
-    let domains = items.map((d: any) => ({
+    let domains = items.map(d => ({
       domainId: d.id,
       name: d.name ?? ''
     }));

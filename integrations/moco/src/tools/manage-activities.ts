@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let activityOutputSchema = z.object({
@@ -32,6 +33,7 @@ export let listActivities = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       from: z.string().optional().describe('Start date for filtering (YYYY-MM-DD)'),
       to: z.string().optional().describe('End date for filtering (YYYY-MM-DD)'),
       userId: z.number().optional().describe('Filter by user ID'),
@@ -52,6 +54,8 @@ export let listActivities = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.from) params.from = ctx.input.from;
     if (ctx.input.to) params.to = ctx.input.to;
     if (ctx.input.userId) params.user_id = ctx.input.userId;
@@ -67,14 +71,14 @@ export let listActivities = SlateTool.create(spec, {
     let activities = (data as any[]).map((a: any) => ({
       activityId: a.id,
       date: a.date,
-      description: a.description,
+      description: a.description ?? undefined,
       seconds: a.seconds,
       workedSeconds: a.worked_seconds,
       billable: a.billable,
       billed: a.billed,
-      hourlyRate: a.hourly_rate,
-      tag: a.tag,
-      timerStartedAt: a.timer_started_at,
+      hourlyRate: a.hourly_rate ?? undefined,
+      tag: a.tag ?? undefined,
+      timerStartedAt: a.timer_started_at ?? undefined,
       project: a.project,
       task: a.task,
       customer: a.customer,
@@ -93,7 +97,7 @@ export let listActivities = SlateTool.create(spec, {
 export let createActivity = SlateTool.create(spec, {
   name: 'Create Activity',
   key: 'create_activity',
-  description: `Log a new time entry against a project task. Specify date, duration, and optionally a description. Can also start a timer for current-day entries.`,
+  description: `Log a new time entry against a project task. Specify date, duration, and optionally a description. Use manage_timer to start a timer for a current-day entry.`,
   tags: {
     destructive: false
   }
@@ -106,7 +110,7 @@ export let createActivity = SlateTool.create(spec, {
       seconds: z
         .number()
         .optional()
-        .describe('Duration in seconds (use 0 or omit to start a timer)'),
+        .describe('Duration in seconds; use manage_timer to start the timer'),
       hours: z
         .number()
         .optional()
@@ -142,14 +146,14 @@ export let createActivity = SlateTool.create(spec, {
       output: {
         activityId: a.id,
         date: a.date,
-        description: a.description,
+        description: a.description ?? undefined,
         seconds: a.seconds,
         workedSeconds: a.worked_seconds,
         billable: a.billable,
         billed: a.billed,
-        hourlyRate: a.hourly_rate,
-        tag: a.tag,
-        timerStartedAt: a.timer_started_at,
+        hourlyRate: a.hourly_rate ?? undefined,
+        tag: a.tag ?? undefined,
+        timerStartedAt: a.timer_started_at ?? undefined,
         project: a.project,
         task: a.task,
         customer: a.customer,
@@ -203,14 +207,14 @@ export let updateActivity = SlateTool.create(spec, {
       output: {
         activityId: a.id,
         date: a.date,
-        description: a.description,
+        description: a.description ?? undefined,
         seconds: a.seconds,
         workedSeconds: a.worked_seconds,
         billable: a.billable,
         billed: a.billed,
-        hourlyRate: a.hourly_rate,
-        tag: a.tag,
-        timerStartedAt: a.timer_started_at,
+        hourlyRate: a.hourly_rate ?? undefined,
+        tag: a.tag ?? undefined,
+        timerStartedAt: a.timer_started_at ?? undefined,
         project: a.project,
         task: a.task,
         customer: a.customer,
@@ -279,14 +283,14 @@ export let manageTimer = SlateTool.create(spec, {
       output: {
         activityId: a.id,
         date: a.date,
-        description: a.description,
+        description: a.description ?? undefined,
         seconds: a.seconds,
         workedSeconds: a.worked_seconds,
         billable: a.billable,
         billed: a.billed,
-        hourlyRate: a.hourly_rate,
-        tag: a.tag,
-        timerStartedAt: a.timer_started_at,
+        hourlyRate: a.hourly_rate ?? undefined,
+        tag: a.tag ?? undefined,
+        timerStartedAt: a.timer_started_at ?? undefined,
         project: a.project,
         task: a.task,
         customer: a.customer,

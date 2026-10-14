@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -38,7 +38,7 @@ export let manageNetwork = SlateTool.create(spec, {
     let { action, networkId } = ctx.input;
 
     if (action === 'delete') {
-      if (!networkId) throw new Error('networkId is required for delete');
+      if (!networkId) throw createApiServiceError('networkId is required for delete');
       await client.deleteNetwork(networkId);
       return {
         output: { deleted: true },
@@ -47,8 +47,11 @@ export let manageNetwork = SlateTool.create(spec, {
     }
 
     let params: Record<string, any> = {};
+    if (ctx.input.policyId && !/^\d+$/.test(ctx.input.policyId)) {
+      throw createApiServiceError('policyId must be a numeric policy ID from list_policies.');
+    }
     if (ctx.input.name) params.name = ctx.input.name;
-    if (ctx.input.policyId) params.policy_id = ctx.input.policyId;
+    if (ctx.input.policyId) params.policy_ids = [Number(ctx.input.policyId)];
     if (ctx.input.organizationId) params.organization_id = ctx.input.organizationId;
     if (ctx.input.attributes) Object.assign(params, ctx.input.attributes);
 
@@ -60,7 +63,7 @@ export let manageNetwork = SlateTool.create(spec, {
       };
     }
 
-    if (!networkId) throw new Error('networkId is required for update');
+    if (!networkId) throw createApiServiceError('networkId is required for update');
     let network = await client.updateNetwork(networkId, params);
     return {
       output: { network },

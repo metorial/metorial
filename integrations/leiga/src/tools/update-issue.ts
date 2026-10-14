@@ -7,7 +7,9 @@ export let updateIssueTool = SlateTool.create(spec, {
   name: 'Update Issue',
   key: 'update_issue',
   description: `Update an existing issue in Leiga. Modify any fields such as summary, description, priority, status, assignee, dates, story points, and custom fields.`,
-  instructions: ['Only include fields you want to change in the `fields` parameter.']
+  instructions: [
+    'Only include fields you want to change in the `fields` parameter. Call get_issue_schema to discover valid field codes and option IDs.'
+  ]
 })
   .input(
     z.object({
@@ -15,7 +17,7 @@ export let updateIssueTool = SlateTool.create(spec, {
       fields: z
         .record(z.string(), z.any())
         .describe(
-          'Fields to update. May include summary, description, priority, status, assignee, owner, startDate, dueDate, storyPoint, sprint, epic, labels, and custom fields.'
+          'Fields to update using codes from get_issue_schema, such as summary, description, priority, status, assignee, owner, estimatePoint, sprint, epic, label, and custom fields.'
         )
     })
   )
@@ -32,10 +34,6 @@ export let updateIssueTool = SlateTool.create(spec, {
       issueId: ctx.input.issueId,
       data: ctx.input.fields
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to update issue');
-    }
 
     return {
       output: {

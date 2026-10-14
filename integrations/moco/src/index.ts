@@ -8,6 +8,7 @@ import {
   createContact,
   createDeal,
   createInvoice,
+  createInvoicePayment,
   createOffer,
   createPlanningEntry,
   createPresence,
@@ -31,6 +32,7 @@ import {
   getDeal,
   getInvoice,
   getOffer,
+  getProfile,
   getProject,
   getProjectReport,
   getPurchase,
@@ -40,6 +42,7 @@ import {
   listCompanies,
   listContacts,
   listDeals,
+  listInvoicePayments,
   listInvoices,
   listOffers,
   listPlanningEntries,
@@ -63,6 +66,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getProfile,
+    listInvoicePayments,
+    createInvoicePayment,
     listProjects,
     getProject,
     createProject,

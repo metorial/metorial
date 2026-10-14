@@ -1,54 +1,43 @@
-Let me fetch the Swagger documentation to see the full list of endpoints.Let me check the Stoplight documentation for more details on the API endpoints.The Stoplight pages require JavaScript. Let me try fetching the help center page for more details.Now I have a good understanding of Humanitix's API. Based on the research, the API tracker site indicates no webhooks are available. Let me also note that the API appears to be primarily read-only with a beta create/update events capability. Let me compile the specification.
+# Humanitix API integration
 
-# Slates Specification for Humanitix
-
-## Overview
-
-Humanitix is a not-for-profit ticketing platform, in which all booking fees are donated to a charity of the event organiser's choice. The Humanitix Public API allows fetching event, order, ticket, or tag information. A beta API for creating and updating events is available by request to Humanitix support.
+Humanitix provides event, order, ticket, and tag information, together with ticket check-in and check-out operations.
 
 ## Authentication
 
-Humanitix uses API key authentication.
+Use the public API key from **Account > Advanced > Public API Key**, sent in the `x-api-key` header. The API base URL is `https://api.humanitix.com/v1`. Generating a new API key invalidates the previous one. The documented rate limit is 200 requests per minute.
 
-- **API Key**: You can generate and find your public API key by navigating to **account > advanced > public API key** via the top menu bar.
-- **Header**: All requests require an `x-api-key` header with your API key.
-- **Important**: Generating a new API key will break any existing one. Do not share your API key with anyone. Your API key allows access to sensitive data on your events and should be kept private.
-- **Base URL**: `https://api.humanitix.com/v1`
+Sources: [official API key guide](https://help.humanitix.com/en/articles/8888275-public-api-documentation), [official OpenAPI specification](https://api.humanitix.com/v1/documentation/json).
 
-Example request header:
+## Tools
 
-```
-x-api-key: your_api_key_here
-Content-Type: application/json
-```
+| Tool | Provider operation | Behavior |
+| --- | --- | --- |
+| `list_events` | `GET /events` | Lists owned/shared events; optional future-only, since, and location filters. |
+| `get_event` | `GET /events/{eventId}` | Retrieves event details, public URL, and event date entries. |
+| `list_orders` | `GET /events/{eventId}/orders` | Lists orders; optional event date, since, and location filters. |
+| `get_order` | `GET /events/{eventId}/orders/{orderId}` | Retrieves an internal order and buyer/payment details. |
+| `list_tickets` | `GET /events/{eventId}/tickets` | Lists tickets; optional event date, complete/cancelled status, since, and location filters. |
+| `get_ticket` | `GET /events/{eventId}/tickets/{ticketId}` | Retrieves ticket details, associated order, seating, and check-in state. |
+| `list_tags` | `GET /tags` | Lists account tags. |
+| `get_tag` | `GET /tags/{tagId}` | Retrieves a tag by ID. |
+| `manage_ticket_check_in` | `POST /events/{eventId}/tickets/{ticketId}/check-in` or `/check-out` | Checks a ticket in/out and returns the provider's scanning messages. No request body is sent. |
 
-## Features
+All endpoint paths are relative to the `/v1` base URL. The location override is an ISO 3166-1 alpha-2 country code. `since` accepts an ISO 8601 date-time.
 
-### Event Retrieval
+## Pagination and discovery
 
-Retrieve details about events owned by or shared with your account. All events owned/created by your account and shared with your account can be synced through the API. Events are identified by an automatically generated event ID found in the console URL.
+List tools retrieve one page per invocation. The provider requires `page`, so omitting the optional tool input sends page 1. Pages start at 1, and page size is a whole number from 1 through 100. Existing number input schemas remain unchanged; invalid fractional values are rejected at invocation time. Provider `total` is returned as the existing `totalResults` field.
 
-### Order Management
+Call `list_events` to discover event IDs and its `dates` entries, then use an event date `_id` for optional `eventDateId` filters. Call `list_orders`, `list_tickets`, and `list_tags` to discover their IDs. Buyer-facing order references differ from internal IDs.
 
-Retrieve order information associated with specific events. Orders are queried per event using the event ID. The internal order ID string is different from the buyer-facing "Order ID" visible in the orders report (e.g., "7QVD6HEL"), so ensure you use the correct internal ID from the URL.
+## Compatibility
 
-### Ticket Retrieval
+Existing tool keys and field types are preserved. The legacy `get_order.businessPurpose` string remains a string: a documented provider boolean becomes `"true"` or `"false"`, while an existing provider string remains unchanged. The optional `isBusinessPurpose` field returns the documented boolean without changing the legacy field's type. Existing `orderName`, `qrCodeData`, and `totalsV2` mappings remain available when returned by the provider.
 
-Fetch ticket information for events, allowing you to inspect individual ticket details associated with orders and events.
+The ticket read tools expose current `checkIn`, check-in history, event date, associated order reference, currency, seating, question answers, and timestamps. Scanning messages may contain HTML and are returned as provided by Humanitix.
 
-### Tag Management
+## Limits
 
-Tags can be used to help categorise and filter your events in a collection page and widget or passed as an additional data point via an API. Tags are created on account-level and can then be applied to individual events.
+Tags may require activation by Humanitix support; see the [official tag guide](https://help.humanitix.com/en/articles/9997955-how-to-create-tags-for-your-event). Global event discovery requires special Humanitix permission and is not exposed here. The beta check-in-count endpoint is not exposed. The public OpenAPI specification has no current-account/profile endpoint.
 
-- Tags are not enabled by default for an account. If you would like tags enabled for your account please contact the Humanitix support team.
-
-### Event Creation and Updates (Beta)
-
-Looking to create and update events in Humanitix through an API connected to your app? Contact the Humanitix support team to request that a beta version of the create and update events API be enabled for your account.
-
-- This is not available by default and requires explicit approval from Humanitix.
-- You need to share your use-case with the team in your request.
-
-## Events
-
-The provider does not support webhooks or event subscriptions. The API tracker listing for Humanitix shows no webhooks or webhooks management API available. The public API is read-only and does not include any built-in mechanism for receiving push notifications about changes.
+This integration does not expose event creation, event updates, or file exports. Consult the [current official API reference](https://api.humanitix.com/v1/documentation/) for supported provider capabilities.

@@ -10,12 +10,15 @@ import {
   deleteCustomer,
   getBusiness,
   getFacebookRecommendations,
+  getFeedbackResponses,
   getFeedbacks,
   getGoogleQA,
   getOnlineReviews,
   getReviewWidget,
   getSurveyResults,
+  listAgencyClients,
   listBusinesses,
+  listBusinessTypes,
   listCustomers,
   replyToReview,
   searchBusiness,
@@ -46,7 +49,10 @@ export let provider = Slate.create({
     getGoogleQA,
     getFacebookRecommendations,
     configureAutoFeedback,
-    createUser
+    createUser,
+    listBusinessTypes,
+    getFeedbackResponses,
+    listAgencyClients
   ],
   triggers: []
 });

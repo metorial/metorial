@@ -19,17 +19,24 @@ export let startVotingSessionTool = SlateTool.create(spec, {
   .input(
     z.object({
       muralId: z.string().describe('ID of the mural to start a voting session on'),
+      title: z
+        .string()
+        .optional()
+        .describe('Title of the voting session; defaults to Voting session'),
       votesPerUser: z
         .number()
+        .min(1)
+        .max(100)
         .optional()
         .describe('Maximum number of votes each user can cast')
     })
   )
   .output(votingSessionOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let vs = await client.startVotingSession(ctx.input.muralId, {
-      votesPerUser: ctx.input.votesPerUser
+      votesPerUser: ctx.input.votesPerUser,
+      title: ctx.input.title
     });
 
     return {
@@ -66,7 +73,7 @@ export let getVotingResultsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let results = await client.getVotingSessionResults(
       ctx.input.muralId,
       ctx.input.votingSessionId
@@ -101,7 +108,7 @@ export let listVotingSessionsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listVotingSessions(ctx.input.muralId);
 
     let votingSessions = result.value.map(vs => ({

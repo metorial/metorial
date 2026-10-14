@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TwoChatClient } from '../lib/client';
 import { spec } from '../spec';
 
 let contactDetailSchema = z.object({
   type: z
-    .enum(['phone', 'email', 'address', 'url', 'note'])
-    .describe('Type of contact detail'),
+    .enum(['phone', 'email', 'address', 'url', 'note', 'whatsapp'])
+    .describe(
+      'Use phone, email, address or whatsapp. Legacy url and note values are unsupported by the Contacts API.'
+    ),
   value: z.string().describe('The value of the contact detail'),
   label: z.string().optional().describe('Label for the detail (e.g., "work", "home")')
 });
@@ -47,7 +49,13 @@ export let manageContacts = SlateTool.create(spec, {
         .array(contactDetailSchema)
         .optional()
         .describe('Contact details (required for "create")'),
-      query: z.string().optional().describe('Search query (for "search")')
+      query: z.string().optional().describe('Search query (for "search")'),
+      channelUuid: z
+        .string()
+        .optional()
+        .describe(
+          'Connected number UUID from List WhatsApp Numbers. When creating, also saves the contact on that WhatsApp account.'
+        )
     })
   )
   .output(
@@ -60,9 +68,26 @@ export let manageContacts = SlateTool.create(spec, {
     let client = new TwoChatClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.firstName?.trim() || !ctx.input.details?.length)
+        throw createApiServiceError(
+          'Creating a contact requires firstName and at least one detail.',
+          { reason: 'missing_contact_fields' }
+        );
+      if (
+        ctx.input.details.some(
+          detail =>
+            !['phone', 'whatsapp', 'email', 'address'].includes(detail.type) ||
+            !detail.value.trim()
+        )
+      )
+        throw createApiServiceError(
+          'Each detail needs a nonempty value and type phone, whatsapp, email or address; url and note are not supported by 2Chat.',
+          { reason: 'invalid_contact_detail' }
+        );
       let result = await client.createContact({
         firstName: ctx.input.firstName!,
         lastName: ctx.input.lastName,
+        channelUuid: ctx.input.channelUuid,
         details: ctx.input.details || []
       });
 
@@ -72,32 +97,48 @@ export let manageContacts = SlateTool.create(spec, {
         output: {
           contact: {
             contactUuid: contact.uuid || contact.contact_uuid,
-            firstName: contact.first_name || ctx.input.firstName,
-            lastName: contact.last_name || ctx.input.lastName,
+            firstName: contact.first_name ?? ctx.input.firstName,
+            lastName: contact.last_name ?? ctx.input.lastName,
             details: (contact.details || []).map((d: any) => ({
-              type: d.type,
+              type:
+                (
+                  { PH: 'phone', WAPH: 'whatsapp', E: 'email', A: 'address' } as Record<
+                    string,
+                    string
+                  >
+                )[d.type] ?? d.type,
               value: d.value,
-              label: d.label
+              label: d.label ?? undefined
             })),
-            createdAt: contact.created_at
+            createdAt: contact.created_at ?? undefined
           }
         },
         message: `Created contact **${ctx.input.firstName} ${ctx.input.lastName || ''}**.`
       };
     }
 
-    // Search
+    if (!ctx.input.query?.trim())
+      throw createApiServiceError(
+        'Provide query to search contacts, or use List Contacts to browse the directory.',
+        { reason: 'missing_contact_query' }
+      );
     let result = await client.searchContacts(ctx.input.query || '');
     let contacts = (result.contacts || result.data || []).map((c: any) => ({
       contactUuid: c.uuid || c.contact_uuid,
-      firstName: c.first_name,
-      lastName: c.last_name,
+      firstName: c.first_name ?? undefined,
+      lastName: c.last_name ?? undefined,
       details: (c.details || []).map((d: any) => ({
-        type: d.type,
+        type:
+          (
+            { PH: 'phone', WAPH: 'whatsapp', E: 'email', A: 'address' } as Record<
+              string,
+              string
+            >
+          )[d.type] ?? d.type,
         value: d.value,
-        label: d.label
+        label: d.label ?? undefined
       })),
-      createdAt: c.created_at
+      createdAt: c.created_at ?? undefined
     }));
 
     return {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,7 +20,9 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
       mailName: z
         .string()
         .optional()
-        .describe('Name of a pre-built transactional email template'),
+        .describe(
+          'Name of a transactional email template. Call list_transactional_templates to discover names.'
+        ),
       subject: z.string().optional().describe('Email subject line'),
       html: z.string().optional().describe('Custom HTML content for the email body'),
       from: z
@@ -58,6 +60,10 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
       token: ctx.auth.token,
       domain: ctx.config.domain
     });
+
+    if (!ctx.input.mailName && !ctx.input.html) {
+      throw createApiServiceError('Provide mailName or html to send a transactional email.');
+    }
 
     await client.sendTransactionalEmail({
       mail_name: ctx.input.mailName,

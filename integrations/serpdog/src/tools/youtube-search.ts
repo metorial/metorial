@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let youtubeSearch = SlateTool.create(spec, {
   name: 'YouTube Search',
   key: 'youtube_search',
-  description: `Extract YouTube search results in real-time. Returns video titles, URLs, channels, view counts, and other metadata. Configurable by country and language.`,
+  description: `Retrieve YouTube search results as downloadable HTML. Configurable by country and language, with YouTube filters and pagination.`,
   tags: {
     readOnly: true
   }
@@ -37,12 +37,24 @@ export let youtubeSearch = SlateTool.create(spec, {
       q: ctx.input.query,
       gl: ctx.input.country,
       hl: ctx.input.language,
-      sp: ctx.input.filterParam
+      sp: ctx.input.filterParam,
+      html: true
+    });
+
+    if (typeof data !== 'string') {
+      throw createApiServiceError(
+        'Serpdog returned an unexpected YouTube response. Try the search again.'
+      );
+    }
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(data, { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+      filename: 'youtube-search.html'
     });
 
     return {
       output: { results: data },
-      message: `Searched YouTube for **"${ctx.input.query}"**.`
+      message: `Searched YouTube for **"${ctx.input.query}"** and prepared the HTML results for download.`
     };
   })
   .build();

@@ -52,15 +52,17 @@ export let evaluateContent = SlateTool.create(spec, {
       containerClass: ctx.input.containerClass
     });
 
+    let score = result.content_score ?? result.score;
+
     let message =
-      result.score !== undefined
-        ? `Content score: **${result.score}**`
+      score !== undefined
+        ? `Content score: **${score}**`
         : `Evaluation status: **${result.status}**${result.error ? ` - ${result.error}` : ''}`;
 
     return {
       output: {
         status: result.status,
-        score: result.score,
+        score,
         error: result.error
       },
       message

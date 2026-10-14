@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getLeadHistory = SlateTool.create(spec, {
   name: 'Get Lead History',
   key: 'get_lead_history',
-  description: `Retrieve the full action history of a lead, including events like creation, status changes, step changes, user assignments, comments, emails sent, and amounts set. Filterable by date range, action type, and user.`,
+  description: `Retrieve a page of action history for a lead, including creation, status changes, step changes, user assignments, comments, emails sent, and amounts set. Filter by date range, action type, and user. Use limit and offset to retrieve later pages.`,
   tags: {
     readOnly: true
   }
@@ -20,7 +20,26 @@ export let getLeadHistory = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter by action type (e.g. status_changed, step_changed, comment_added)'),
-      userId: z.number().optional().describe('Filter by user ID who performed the action')
+      userId: z.number().optional().describe('Filter by user ID who performed the action'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Page size, from 1 to 100. Defaults to 100.'),
+      offset: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe(
+          'Number of history entries to skip. Increase by the page size to retrieve later entries.'
+        ),
+      direction: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe('Sort by history entry ID. Defaults to asc.')
     })
   )
   .output(
@@ -43,7 +62,10 @@ export let getLeadHistory = SlateTool.create(spec, {
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate,
       actionType: ctx.input.actionType,
-      userId: ctx.input.userId
+      userId: ctx.input.userId,
+      limit: ctx.input.limit,
+      offset: ctx.input.offset,
+      direction: ctx.input.direction
     });
 
     let actions = history.map((entry: any) => ({

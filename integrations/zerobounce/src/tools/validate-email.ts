@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type BatchValidationResult, Client, type ValidationResult } from '../lib/client';
 import { spec } from '../spec';
 
 let emailResultSchema = z.object({
@@ -12,6 +12,16 @@ let emailResultSchema = z.object({
     ),
   subStatus: z.string().describe('Detailed sub-status code providing additional context'),
   freeEmail: z.boolean().describe('Whether the email is from a free email provider'),
+  catchallDomain: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe('Whether the domain accepts mail for any address, when available'),
+  activeFirstSeen: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('First date when activity was detected, when available'),
   didYouMean: z
     .string()
     .nullable()
@@ -51,13 +61,13 @@ export let validateEmail = SlateTool.create(spec, {
   key: 'validate_email',
   description: `Validates one or more email addresses in real time to determine deliverability status.
 Returns detailed information including status (valid, invalid, catch-all, unknown, spamtrap, abuse, do_not_mail), enrichment data (name, gender, location), domain details (age, MX records, SMTP provider), and optionally activity data.
-For a single email, pass it directly. For multiple emails (up to 200), pass an array to use batch validation.`,
+For a single email, pass it directly. For multiple emails (up to 200), pass an array to use batch validation in groups of up to 100.`,
   instructions: [
     'Provide a single email or a list of up to 200 emails for batch validation.',
     'Optionally enable activity data or Verify+ mode for enhanced results.'
   ],
   constraints: [
-    'Batch validation supports a maximum of 200 emails per request.',
+    'Accepts up to 200 emails per invocation, processed sequentially in batches of up to 100.',
     'The timeout parameter ranges from 3-60 seconds for single validation, 10-120 seconds for batch.'
   ],
   tags: {
@@ -79,6 +89,8 @@ For a single email, pass it directly. For multiple emails (up to 200), pass an a
                   .describe('IP address the email signed up from')
               })
             )
+            .min(1)
+            .max(200)
             .describe('Array of emails (up to 200) for batch validation')
         ])
         .describe('Email address(es) to validate'),
@@ -122,32 +134,64 @@ For a single email, pass it directly. For multiple emails (up to 200), pass an a
       region: ctx.config.region
     });
 
-    let isBatch = Array.isArray(ctx.input.emails);
-
-    if (isBatch) {
-      let emails = ctx.input.emails as Array<{ emailAddress: string; ipAddress?: string }>;
+    let emails = ctx.input.emails;
+    let isBatch = Array.isArray(emails);
+    let minimumTimeout = isBatch ? 10 : 3;
+    let maximumTimeout = isBatch ? 120 : 60;
+    if (
+      ctx.input.timeout !== undefined &&
+      (!Number.isInteger(ctx.input.timeout) ||
+        ctx.input.timeout < minimumTimeout ||
+        ctx.input.timeout > maximumTimeout)
+    ) {
+      throw createApiServiceError(
+        `timeout must be an integer from ${minimumTimeout} to ${maximumTimeout} seconds for ${isBatch ? 'batch' : 'single'} validation.`
+      );
+    }
+    if (Array.isArray(emails)) {
+      if (ctx.input.ipAddress !== undefined) {
+        throw createApiServiceError(
+          'For batch validation, provide ipAddress inside each emails item.'
+        );
+      }
+      if (emails.some(email => !email.emailAddress.trim())) {
+        throw createApiServiceError(
+          'Every emails item must contain a non-empty emailAddress.'
+        );
+      }
       ctx.info(`Validating batch of ${emails.length} emails`);
 
-      let result = await client.validateBatch({
-        emails,
-        timeout: ctx.input.timeout,
-        activityData: ctx.input.activityData,
-        verifyPlus: ctx.input.verifyPlus
-      });
-
-      let mapped = (result.email_batch || []).map((r: Record<string, unknown>) =>
-        mapValidationResult(r)
+      let responses: BatchValidationResult[] = [];
+      for (let offset = 0; offset < emails.length; offset += 100) {
+        responses.push(
+          await client.validateBatch({
+            emails: emails.slice(offset, offset + 100),
+            timeout: ctx.input.timeout,
+            activityData: ctx.input.activityData,
+            verifyPlus: ctx.input.verifyPlus
+          })
+        );
+      }
+      let mapped = responses.flatMap(result => result.email_batch.map(mapValidationResult));
+      let errors = responses.flatMap(result =>
+        (result.errors || []).map(error => ({
+          emailAddress: error.email_address,
+          error: error.error
+        }))
       );
 
       return {
         output: {
           results: mapped,
-          errors: result.errors || []
+          errors
         },
-        message: `Validated **${emails.length}** emails in batch. ${mapped.filter((r: { status: string }) => r.status === 'valid').length} valid, ${mapped.filter((r: { status: string }) => r.status === 'invalid').length} invalid.`
+        message: `Received **${mapped.length}** results for **${emails.length}** submitted emails (${errors.length} errors). ${mapped.filter((r: { status: string }) => r.status === 'valid').length} valid, ${mapped.filter((r: { status: string }) => r.status === 'invalid').length} invalid.`
       };
     } else {
-      let email = ctx.input.emails as string;
+      let email = emails;
+      if (!email.trim()) {
+        throw createApiServiceError('Provide a non-empty email address to validate.');
+      }
       ctx.info(`Validating email: ${email}`);
 
       let result = await client.validateEmail({
@@ -170,25 +214,27 @@ For a single email, pass it directly. For multiple emails (up to 200), pass an a
   })
   .build();
 
-let mapValidationResult = (r: Record<string, unknown>) => ({
+let mapValidationResult = (r: ValidationResult) => ({
   address: String(r.address || ''),
   status: String(r.status || ''),
   subStatus: String(r.sub_status || ''),
-  freeEmail: Boolean(r.free_email),
-  didYouMean: r.did_you_mean as string | null,
-  account: r.account as string | null,
-  domain: r.domain as string | null,
-  domainAgeDays: r.domain_age_days as string | null,
-  activeInDays: r.active_in_days as string | null | undefined,
-  smtpProvider: r.smtp_provider as string | null,
-  mxRecord: r.mx_record as string | null,
-  mxFound: String(r.mx_found || ''),
-  firstName: r.firstname as string | null,
-  lastName: r.lastname as string | null,
-  gender: r.gender as string | null,
-  country: r.country as string | null,
-  region: r.region as string | null,
-  city: r.city as string | null,
-  zipcode: r.zipcode as string | null,
+  freeEmail: r.free_email === true,
+  catchallDomain: r.catchall_domain ?? null,
+  activeFirstSeen: r.active_first_seen ?? null,
+  didYouMean: r.did_you_mean ?? null,
+  account: r.account ?? null,
+  domain: r.domain ?? null,
+  domainAgeDays: r.domain_age_days ?? null,
+  activeInDays: r.active_in_days ?? null,
+  smtpProvider: r.smtp_provider ?? null,
+  mxRecord: r.mx_record ?? null,
+  mxFound: String(r.mx_found ?? ''),
+  firstName: r.firstname ?? null,
+  lastName: r.lastname ?? null,
+  gender: r.gender ?? null,
+  country: r.country ?? null,
+  region: r.region ?? null,
+  city: r.city ?? null,
+  zipcode: r.zipcode ?? null,
   processedAt: String(r.processed_at || '')
 });

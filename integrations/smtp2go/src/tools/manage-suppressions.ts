@@ -13,12 +13,21 @@ export let viewSuppressions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      subaccountId: z.string().optional().describe('Subaccount ID')
+      subaccountId: z.string().optional().describe('Subaccount ID'),
+      continueToken: z.string().optional().describe('Token for the next page of suppressions'),
+      emailAddress: z
+        .string()
+        .optional()
+        .describe('Check a specific suppressed email address or domain')
     })
   )
   .output(
     z.object({
-      suppressions: z.array(z.any()).describe('List of suppressed email addresses and domains')
+      suppressions: z
+        .array(z.any())
+        .describe('List of suppressed email addresses and domains'),
+      continueToken: z.string().optional().describe('Token for the next page'),
+      totalResults: z.number().optional().describe('Total number of matching suppressions')
     })
   )
   .handleInvocation(async ctx => {
@@ -27,14 +36,14 @@ export let viewSuppressions = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.viewSuppressions({
-      subaccountId: ctx.input.subaccountId
-    });
+    let result = await client.viewSuppressions(ctx.input);
     let data = result.data || result;
 
     return {
       output: {
-        suppressions: data.suppressions || data
+        suppressions: data.results ?? data.suppressions ?? [],
+        continueToken: data.continue_token ?? undefined,
+        totalResults: data.total_results
       },
       message: `Retrieved suppression list.`
     };
@@ -52,7 +61,10 @@ export let addSuppressions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      suppressions: z.array(z.string()).describe('Email addresses or domains to suppress'),
+      suppressions: z
+        .array(z.string())
+        .min(1)
+        .describe('Email addresses or domains to suppress'),
       subaccountId: z.string().optional().describe('Subaccount ID')
     })
   )
@@ -72,9 +84,9 @@ export let addSuppressions = SlateTool.create(spec, {
 
     return {
       output: {
-        suppressions: data.suppressions || ctx.input.suppressions
+        suppressions: data.suppressions ?? []
       },
-      message: `Added **${ctx.input.suppressions.length}** suppression(s).`
+      message: `Added **${data.suppressions?.length ?? 0}** suppression(s).`
     };
   })
   .build();
@@ -82,7 +94,7 @@ export let addSuppressions = SlateTool.create(spec, {
 export let removeSuppressions = SlateTool.create(spec, {
   name: 'Remove Suppressions',
   key: 'remove_suppressions',
-  description: `Remove email addresses or domains from the suppression list, allowing them to receive emails again.`,
+  description: `Remove selected suppression reasons for email addresses or domains. Reasons the provider refuses to remove can continue to prevent delivery; inspect the per-reason results.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -90,13 +102,31 @@ export let removeSuppressions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      suppressions: z.array(z.string()).describe('Email addresses or domains to unsuppress'),
-      subaccountId: z.string().optional().describe('Subaccount ID')
+      suppressions: z
+        .array(z.string())
+        .min(1)
+        .describe('Email addresses or domains to unsuppress'),
+      subaccountId: z.string().optional().describe('Subaccount ID'),
+      reasons: z
+        .array(z.string())
+        .min(1)
+        .optional()
+        .describe(
+          'Suppression reason types to remove; defaults to manual, spam, unsubscribe, bounce, and compliance'
+        )
     })
   )
   .output(
     z.object({
-      suppressions: z.array(z.string()).describe('Removed suppression entries')
+      suppressions: z
+        .array(z.string())
+        .describe('Addresses with at least one confirmed suppression removed'),
+      results: z
+        .array(
+          z.object({ emailAddress: z.string(), reason: z.string(), removed: z.boolean() })
+        )
+        .optional()
+        .describe('Provider confirmation for each requested suppression reason')
     })
   )
   .handleInvocation(async ctx => {
@@ -110,9 +140,10 @@ export let removeSuppressions = SlateTool.create(spec, {
 
     return {
       output: {
-        suppressions: data.suppressions || ctx.input.suppressions
+        suppressions: data.suppressions ?? [],
+        results: data.results
       },
-      message: `Removed **${ctx.input.suppressions.length}** suppression(s).`
+      message: `Removed suppressions for **${data.suppressions?.length ?? 0}** address(es) or domain(s).`
     };
   })
   .build();

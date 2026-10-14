@@ -1,7 +1,10 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let http = createAxios({
-  baseURL: 'https://api.timelyapp.com/1.1'
+let http = createAuthenticatedAxios({
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'Timely', reason: 'timely_api_error' }),
+  baseURL: 'https://api.timelyapp.com/1.1',
+  timeout: 30000
 });
 
 export class TimelyClient {
@@ -9,6 +12,11 @@ export class TimelyClient {
   private token: string;
 
   constructor(config: { accountId: string; token: string }) {
+    if (config.accountId && !/^[1-9]\d*$/.test(config.accountId)) {
+      throw createApiServiceError(
+        'Account ID must be a positive integer. Call list_accounts to discover available workspace IDs.'
+      );
+    }
     this.accountId = config.accountId;
     this.token = config.token;
   }
@@ -55,21 +63,18 @@ export class TimelyClient {
     if (params?.sort) queryParams.sort = params.sort;
     if (params?.order) queryParams.order = params.order;
 
-    let basePath: string;
-    if (params?.userId) {
-      basePath = this.url(`/users/${params.userId}/events`);
-    } else if (params?.projectId) {
-      basePath = this.url(`/projects/${params.projectId}/events`);
-    } else {
-      basePath = this.url('/events');
-    }
+    if (params?.userId) queryParams.user_id = params.userId;
+    if (params?.projectId) queryParams.project_id = params.projectId;
 
-    let res = await http.get(basePath, { headers: this.headers, params: queryParams });
+    let res = await http.get(this.url('/hours'), {
+      headers: this.headers,
+      params: queryParams
+    });
     return res.data;
   }
 
   async getEvent(eventId: string): Promise<any> {
-    let res = await http.get(this.url(`/events/${eventId}`), { headers: this.headers });
+    let res = await http.get(this.url(`/hours/${eventId}`), { headers: this.headers });
     return res.data;
   }
 
@@ -88,6 +93,12 @@ export class TimelyClient {
     externalId?: string;
     userId?: string;
   }): Promise<any> {
+    if (!event.projectId) {
+      throw createApiServiceError(
+        'projectId is required to create a time entry. Call list_projects to choose a project.'
+      );
+    }
+    validateTimeEntryDuration(event);
     let body: Record<string, any> = {
       day: event.day
     };
@@ -103,7 +114,8 @@ export class TimelyClient {
     if (event.estimatedMinutes !== undefined) body.estimated_minutes = event.estimatedMinutes;
     if (event.externalId) body.external_id = event.externalId;
 
-    let path = event.userId ? this.url(`/users/${event.userId}/events`) : this.url('/events');
+    if (event.userId) body.user_id = Number(event.userId);
+    let path = this.url('/hours');
 
     let res = await http.post(path, { event: body }, { headers: this.headers });
     return res.data;
@@ -128,6 +140,7 @@ export class TimelyClient {
       billable?: boolean;
     }
   ): Promise<any> {
+    validateTimeEntryDuration(event);
     let body: Record<string, any> = {};
     if (event.hours !== undefined) body.hours = event.hours;
     if (event.minutes !== undefined) body.minutes = event.minutes;
@@ -145,7 +158,7 @@ export class TimelyClient {
     if (event.billable !== undefined) body.billable = event.billable;
 
     let res = await http.put(
-      this.url(`/events/${eventId}`),
+      this.url(`/hours/${eventId}`),
       { event: body },
       { headers: this.headers }
     );
@@ -153,12 +166,12 @@ export class TimelyClient {
   }
 
   async deleteEvent(eventId: string): Promise<void> {
-    await http.delete(this.url(`/events/${eventId}`), { headers: this.headers });
+    await http.delete(this.url(`/hours/${eventId}`), { headers: this.headers });
   }
 
   async startTimer(eventId: string): Promise<any> {
-    let res = await http.post(
-      this.url(`/events/${eventId}/start_timer`),
+    let res = await http.put(
+      this.url(`/hours/${eventId}/start`),
       {},
       { headers: this.headers }
     );
@@ -166,8 +179,8 @@ export class TimelyClient {
   }
 
   async stopTimer(eventId: string): Promise<any> {
-    let res = await http.post(
-      this.url(`/events/${eventId}/stop_timer`),
+    let res = await http.put(
+      this.url(`/hours/${eventId}/stop`),
       {},
       { headers: this.headers }
     );
@@ -218,13 +231,16 @@ export class TimelyClient {
     labelIds?: number[];
     users?: Array<{ userId: number; hourRate?: number }>;
   }): Promise<any> {
-    let body: Record<string, any> = { name: project.name };
+    let body: Record<string, any> = {
+      name: project.name,
+      rate_type: project.rateType ?? 'project'
+    };
     if (project.description !== undefined) body.description = project.description;
     if (project.clientId) body.client_id = Number(project.clientId);
     if (project.color) body.color = project.color;
     if (project.billable !== undefined) body.billable = project.billable;
     if (project.budget !== undefined) body.budget = project.budget;
-    if (project.budgetType) body.budget_type = project.budgetType;
+    if (project.budgetType) body.budget_type = normalizeBudgetType(project.budgetType);
     if (project.hourRate !== undefined) body.hour_rate = project.hourRate;
     if (project.rateType) body.rate_type = project.rateType;
     if (project.requiredNotes !== undefined) body.required_notes = project.requiredNotes;
@@ -277,7 +293,7 @@ export class TimelyClient {
     if (project.color) body.color = project.color;
     if (project.billable !== undefined) body.billable = project.billable;
     if (project.budget !== undefined) body.budget = project.budget;
-    if (project.budgetType) body.budget_type = project.budgetType;
+    if (project.budgetType) body.budget_type = normalizeBudgetType(project.budgetType);
     if (project.hourRate !== undefined) body.hour_rate = project.hourRate;
     if (project.rateType) body.rate_type = project.rateType;
     if (project.requiredNotes !== undefined) body.required_notes = project.requiredNotes;
@@ -456,7 +472,7 @@ export class TimelyClient {
   async createTeam(team: { name: string; color?: string; userIds?: number[] }): Promise<any> {
     let body: Record<string, any> = { name: team.name };
     if (team.color) body.color = team.color;
-    if (team.userIds) body.user_ids = team.userIds;
+    if (team.userIds) body.users = team.userIds.map(userId => ({ user_id: userId }));
 
     let res = await http.post(this.url('/teams'), { team: body }, { headers: this.headers });
     return res.data;
@@ -473,7 +489,7 @@ export class TimelyClient {
     let body: Record<string, any> = {};
     if (team.name !== undefined) body.name = team.name;
     if (team.color) body.color = team.color;
-    if (team.userIds) body.user_ids = team.userIds;
+    if (team.userIds) body.users = team.userIds.map(userId => ({ user_id: userId }));
 
     let res = await http.put(
       this.url(`/teams/${teamId}`),
@@ -499,13 +515,16 @@ export class TimelyClient {
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
     if (params?.order) queryParams.order = params.order;
-    if (params?.show) queryParams.show = params.show;
 
     let res = await http.get(this.url('/users'), {
       headers: this.headers,
       params: queryParams
     });
-    return res.data;
+    return params?.show && params.show !== 'all'
+      ? res.data.filter((user: { active?: boolean }) =>
+          params.show === 'active' ? user.active !== false : user.active === false
+        )
+      : res.data;
   }
 
   async getUser(userId: string): Promise<any> {
@@ -527,24 +546,53 @@ export class TimelyClient {
     userId?: string;
     limit?: number;
     offset?: number;
+    page?: number;
+    perPage?: number;
   }): Promise<any[]> {
     let queryParams: Record<string, string> = {};
     if (params?.since) queryParams.since = params.since;
     if (params?.upto) queryParams.upto = params.upto;
-    if (params?.projectId) queryParams.project_id = params.projectId;
-    if (params?.userId) queryParams.user_id = params.userId;
-    if (params?.limit) queryParams.limit = String(params.limit);
-    if (params?.offset) queryParams.offset = String(params.offset);
+    if (params?.projectId) queryParams.project_ids = params.projectId;
+    if (params?.userId) queryParams.user_ids = params.userId;
+    if (
+      (params?.page !== undefined || params?.perPage !== undefined) &&
+      (params?.limit !== undefined || params?.offset !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Use either page/perPage or limit/offset for forecasts, not both.'
+      );
+    }
+    let legacyOffset = params?.offset ?? 0;
+    let perPage = params?.perPage ?? (params?.limit ?? 100) + legacyOffset;
+    if (
+      !Number.isInteger(perPage) ||
+      perPage < 1 ||
+      perPage > 5000 ||
+      !Number.isInteger(legacyOffset) ||
+      legacyOffset < 0
+    ) {
+      throw createApiServiceError(
+        'Forecast pagination must use a positive page size up to 5000 and a nonnegative offset. Use page and perPage for larger offsets.'
+      );
+    }
+    queryParams.per_page = String(perPage);
+    queryParams.page = String(params?.page ?? 1);
 
     let res = await http.get(this.url('/forecasts'), {
       headers: this.headers,
       params: queryParams
     });
-    return res.data;
+    return params?.page !== undefined || params?.perPage !== undefined
+      ? res.data
+      : res.data.slice(
+          legacyOffset,
+          params?.limit === undefined ? undefined : legacyOffset + params.limit
+        );
   }
 
   async createForecast(forecast: {
     projectId: string;
+    title?: string;
     userId?: string;
     hours?: number;
     minutes?: number;
@@ -556,18 +604,29 @@ export class TimelyClient {
     note?: string;
     labelIds?: number[];
   }): Promise<any> {
+    if (
+      !forecast.title?.trim() ||
+      !(forecast.from ?? forecast.day) ||
+      !(forecast.to ?? forecast.day)
+    ) {
+      throw createApiServiceError(
+        'Creating a forecast requires title and from/to dates, or day for a single-day task.'
+      );
+    }
     let body: Record<string, any> = {
       project_id: Number(forecast.projectId)
     };
     if (forecast.userId) body.user_id = Number(forecast.userId);
     if (forecast.hours !== undefined) body.hours = forecast.hours;
     if (forecast.minutes !== undefined) body.minutes = forecast.minutes;
-    if (forecast.estimatedHours !== undefined) body.estimated_hours = forecast.estimatedHours;
-    if (forecast.estimatedMinutes !== undefined)
-      body.estimated_minutes = forecast.estimatedMinutes;
+    if (forecast.estimatedHours !== undefined || forecast.estimatedMinutes !== undefined) {
+      body.estimated_minutes =
+        (forecast.estimatedHours ?? 0) * 60 + (forecast.estimatedMinutes ?? 0);
+    }
     if (forecast.day) body.day = forecast.day;
-    if (forecast.from) body.from = forecast.from;
-    if (forecast.to) body.to = forecast.to;
+    if (forecast.from ?? forecast.day) body.from = forecast.from ?? forecast.day;
+    if (forecast.to ?? forecast.day) body.to = forecast.to ?? forecast.day;
+    if (forecast.title !== undefined) body.title = forecast.title;
     if (forecast.note !== undefined) body.note = forecast.note;
     if (forecast.labelIds) body.label_ids = forecast.labelIds;
 
@@ -583,6 +642,7 @@ export class TimelyClient {
     forecastId: string,
     forecast: {
       projectId?: string;
+      title?: string;
       userId?: string;
       hours?: number;
       minutes?: number;
@@ -600,16 +660,18 @@ export class TimelyClient {
     if (forecast.userId) body.user_id = Number(forecast.userId);
     if (forecast.hours !== undefined) body.hours = forecast.hours;
     if (forecast.minutes !== undefined) body.minutes = forecast.minutes;
-    if (forecast.estimatedHours !== undefined) body.estimated_hours = forecast.estimatedHours;
-    if (forecast.estimatedMinutes !== undefined)
-      body.estimated_minutes = forecast.estimatedMinutes;
+    if (forecast.estimatedHours !== undefined || forecast.estimatedMinutes !== undefined) {
+      body.estimated_minutes =
+        (forecast.estimatedHours ?? 0) * 60 + (forecast.estimatedMinutes ?? 0);
+    }
     if (forecast.day) body.day = forecast.day;
-    if (forecast.from) body.from = forecast.from;
-    if (forecast.to) body.to = forecast.to;
+    if (forecast.from ?? forecast.day) body.from = forecast.from ?? forecast.day;
+    if (forecast.to ?? forecast.day) body.to = forecast.to ?? forecast.day;
+    if (forecast.title !== undefined) body.title = forecast.title;
     if (forecast.note !== undefined) body.note = forecast.note;
     if (forecast.labelIds) body.label_ids = forecast.labelIds;
 
-    let res = await http.put(
+    let res = await http.patch(
       this.url(`/forecasts/${forecastId}`),
       { forecast: body },
       { headers: this.headers }
@@ -634,7 +696,7 @@ export class TimelyClient {
   }): Promise<any> {
     let queryParams: Record<string, string> = {
       since: params.since,
-      upto: params.upto
+      until: params.upto
     };
     if (params.userIds?.length) queryParams.user_ids = params.userIds.join(',');
     if (params.projectIds?.length) queryParams.project_ids = params.projectIds.join(',');
@@ -655,9 +717,7 @@ export class TimelyClient {
     let res = await http.post(
       this.url('/day_properties'),
       {
-        user_ids: userIds,
-        dates,
-        locked: true
+        day_property: { user_ids: userIds, dates, locked: true }
       },
       { headers: this.headers }
     );
@@ -668,9 +728,7 @@ export class TimelyClient {
     let res = await http.put(
       this.url('/day_properties'),
       {
-        user_ids: userIds,
-        dates,
-        locked: false
+        day_property: { user_ids: userIds, dates, locked: false }
       },
       { headers: this.headers }
     );
@@ -702,3 +760,66 @@ export class TimelyClient {
     await http.delete(this.url(`/webhooks/${webhookId}`), { headers: this.headers });
   }
 }
+
+export let createTimelyClient = async (ctx: {
+  input: { accountId?: string };
+  auth: { token: string };
+  config: unknown;
+}) => {
+  let legacyAccountId =
+    typeof ctx.config === 'object' &&
+    ctx.config !== null &&
+    'accountId' in ctx.config &&
+    typeof ctx.config.accountId === 'string'
+      ? ctx.config.accountId
+      : undefined;
+  let accountId = ctx.input.accountId ?? legacyAccountId;
+  if (!accountId) {
+    let accounts = await new TimelyClient({
+      accountId: '',
+      token: ctx.auth.token
+    }).getAccounts();
+    if (accounts.length !== 1 || !accounts[0]?.id) {
+      throw createApiServiceError(
+        'Provide accountId from list_accounts to select your Timely workspace.'
+      );
+    }
+    accountId = String(accounts[0].id);
+  }
+  return new TimelyClient({ accountId, token: ctx.auth.token });
+};
+
+let validateTimeEntryDuration = (event: {
+  hours?: number;
+  minutes?: number;
+  from?: string;
+  to?: string;
+}) => {
+  if (
+    (event.from !== undefined || event.to !== undefined) &&
+    (event.hours !== undefined || event.minutes !== undefined)
+  ) {
+    throw createApiServiceError(
+      'Provide either hours/minutes or from/to for the time entry, not both.'
+    );
+  }
+  if ((event.from === undefined) !== (event.to === undefined)) {
+    throw createApiServiceError('Provide both from and to for a time range.');
+  }
+  if (
+    (event.hours !== undefined && (!Number.isInteger(event.hours) || event.hours < 0)) ||
+    (event.minutes !== undefined &&
+      (!Number.isInteger(event.minutes) || event.minutes < 0 || event.minutes > 59))
+  ) {
+    throw createApiServiceError(
+      'hours must be a nonnegative integer and minutes must be an integer from 0 to 59.'
+    );
+  }
+};
+
+let normalizeBudgetType = (budgetType: string) => {
+  if (budgetType === 'hours') return 'H';
+  if (budgetType === 'money') return 'M';
+  if (budgetType === 'H' || budgetType === 'M') return budgetType;
+  throw createApiServiceError('budgetType must be hours, money, H, or M.');
+};

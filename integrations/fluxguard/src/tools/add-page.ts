@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FluxguardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let addPage = SlateTool.create(spec, {
   name: 'Add Page',
   key: 'add_page',
-  description: `Add a web page for change monitoring. Provide a URL to start tracking changes on that page. Optionally assign it to an existing site and session, or let Fluxguard create new ones automatically. You can also categorize the page and give the site a nickname.`,
+  description: `Add a web page for change monitoring. Supply an existing site and session, or let Fluxguard create new ones. Category and nickname options apply only when creating a new site. Save the returned identifiers for page lookup, crawls, and deletion.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -48,6 +48,19 @@ export let addPage = SlateTool.create(spec, {
       categoryName: ctx.input.categoryName,
       siteNickname: ctx.input.siteNickname
     });
+
+    if (
+      typeof result?.siteId !== 'string' ||
+      !result.siteId.trim() ||
+      typeof result?.sessionId !== 'string' ||
+      !result.sessionId.trim() ||
+      typeof result?.pageId !== 'string' ||
+      !result.pageId.trim()
+    ) {
+      throw createApiServiceError(
+        'Fluxguard did not return the site, session, and page identifiers for the added page. Check your monitored pages before retrying.'
+      );
+    }
 
     return {
       output: {

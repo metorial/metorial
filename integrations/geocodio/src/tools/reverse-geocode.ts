@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -15,13 +15,18 @@ Use **skipGeocoding** to only retrieve enrichment field data for coordinates wit
 })
   .input(
     z.object({
-      latitude: z.number().describe('Latitude coordinate'),
-      longitude: z.number().describe('Longitude coordinate'),
+      latitude: z.number().min(-90).max(90).describe('Latitude coordinate'),
+      longitude: z.number().min(-180).max(180).describe('Longitude coordinate'),
       fields: z
         .array(z.string())
         .optional()
         .describe('Data enrichment fields to append, e.g. ["timezone", "census", "cd"]'),
-      limit: z.number().optional().describe('Maximum number of results to return'),
+      limit: z
+        .number()
+        .min(0)
+        .refine(Number.isSafeInteger, 'Use a whole number')
+        .optional()
+        .describe('Maximum number of results to return; 0 means no limit'),
       skipGeocoding: z
         .boolean()
         .optional()
@@ -33,14 +38,25 @@ Use **skipGeocoding** to only retrieve enrichment field data for coordinates wit
       results: z
         .array(
           z.object({
-            formattedAddress: z.string().describe('Standardized full address'),
+            formattedAddress: z
+              .string()
+              .optional()
+              .describe('Standardized full address; omitted when skipGeocoding is true'),
             location: z.object({
               lat: z.number().describe('Latitude'),
               lng: z.number().describe('Longitude')
             }),
-            accuracy: z.number().describe('Accuracy score from 0 to 1'),
+            accuracy: z
+              .number()
+              .optional()
+              .describe('Accuracy score from 0 to 1; omitted when skipGeocoding is true'),
             accuracyType: z.string().describe('Type of accuracy match'),
-            source: z.string().describe('Data source used for this result'),
+            source: z
+              .string()
+              .optional()
+              .describe(
+                'Data source used for this result; omitted when skipGeocoding is true'
+              ),
             stableAddressKey: z
               .string()
               .optional()
@@ -59,6 +75,11 @@ Use **skipGeocoding** to only retrieve enrichment field data for coordinates wit
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.skipGeocoding && !ctx.input.fields?.some(field => field.trim())) {
+      throw createApiServiceError(
+        'Provide at least one enrichment field when skipGeocoding is true.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let response = await client.geocodeReverse({
@@ -84,9 +105,11 @@ Use **skipGeocoding** to only retrieve enrichment field data for coordinates wit
 
     return {
       output: { results },
-      message: topResult
-        ? `Reverse geocoded **${ctx.input.latitude}, ${ctx.input.longitude}** to **${topResult.formattedAddress}** (${topResult.accuracyType}). ${results.length} result(s) returned.`
-        : `No results found for coordinates **${ctx.input.latitude}, ${ctx.input.longitude}**.`
+      message: ctx.input.skipGeocoding
+        ? `Retrieved enrichment data for **${ctx.input.latitude}, ${ctx.input.longitude}**.`
+        : topResult
+          ? `Reverse geocoded **${ctx.input.latitude}, ${ctx.input.longitude}** to **${topResult.formattedAddress}** (${topResult.accuracyType}). ${results.length} result(s) returned.`
+          : `No results found for coordinates **${ctx.input.latitude}, ${ctx.input.longitude}**.`
     };
   })
   .build();

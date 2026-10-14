@@ -22,7 +22,9 @@ export let recordPayment = SlateTool.create(spec, {
       paymentDate: z
         .string()
         .optional()
-        .describe('Payment date (YYYY-MM-DD). Defaults to today.')
+        .describe(
+          'Payment date (YYYY-MM-DD) or date/time (YYYY-MM-DD HH:MM:SS) in the account timezone. A date alone records midnight.'
+        )
     })
   )
   .output(
@@ -31,20 +33,24 @@ export let recordPayment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = {
       job_uuid: ctx.input.jobUuid,
       amount: ctx.input.amount
     };
-    if (ctx.input.paymentMethod) data.payment_method = ctx.input.paymentMethod;
-    if (ctx.input.paymentDate) data.payment_date = ctx.input.paymentDate;
+    if (ctx.input.paymentMethod) data.method = ctx.input.paymentMethod;
+    if (ctx.input.paymentDate)
+      data.timestamp =
+        ctx.input.paymentDate.length === 10
+          ? `${ctx.input.paymentDate} 00:00:00`
+          : ctx.input.paymentDate;
 
     let paymentUuid = await client.createJobPayment(data);
 
     return {
       output: { paymentUuid },
-      message: `Recorded payment of **$${ctx.input.amount}** on job **${ctx.input.jobUuid}**${ctx.input.paymentMethod ? ` via ${ctx.input.paymentMethod}` : ''}.`
+      message: `Recorded payment of **${ctx.input.amount}** in the account currency on job **${ctx.input.jobUuid}**${ctx.input.paymentMethod ? ` via ${ctx.input.paymentMethod}` : ''}.`
     };
   })
   .build();

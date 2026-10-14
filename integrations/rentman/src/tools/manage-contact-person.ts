@@ -36,11 +36,11 @@ export let createContactPerson = SlateTool.create(spec, {
       firstname: ctx.input.firstName
     };
 
-    if (ctx.input.surName) body.surname = ctx.input.surName;
-    if (ctx.input.email) body.email = ctx.input.email;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
-    if (ctx.input.function) body.function = ctx.input.function;
-    if (ctx.input.memo) body.memo = ctx.input.memo;
+    if (ctx.input.surName !== undefined) body.lastname = ctx.input.surName;
+    if (ctx.input.email !== undefined) body.email = ctx.input.email;
+    if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
+    if (ctx.input.function !== undefined) body.function = ctx.input.function;
+    if (ctx.input.memo !== undefined) body.memo = ctx.input.memo;
 
     let result = await client.createNested(
       'contacts',
@@ -54,9 +54,9 @@ export let createContactPerson = SlateTool.create(spec, {
       output: {
         contactPersonId: cp.id,
         firstName: cp.firstname,
-        surName: cp.surname,
+        surName: cp.lastname ?? cp.surname,
         email: cp.email,
-        createdAt: cp.created
+        createdAt: cp.created ?? undefined
       },
       message: `Created contact person **${cp.firstname}${cp.surname ? ` ${cp.surname}` : ''}** (ID: ${cp.id}) under contact **${ctx.input.contactId}**.`
     };
@@ -93,7 +93,7 @@ export let updateContactPerson = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
     if (ctx.input.firstName !== undefined) body.firstname = ctx.input.firstName;
-    if (ctx.input.surName !== undefined) body.surname = ctx.input.surName;
+    if (ctx.input.surName !== undefined) body.lastname = ctx.input.surName;
     if (ctx.input.email !== undefined) body.email = ctx.input.email;
     if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
     if (ctx.input.function !== undefined) body.function = ctx.input.function;
@@ -106,8 +106,8 @@ export let updateContactPerson = SlateTool.create(spec, {
       output: {
         contactPersonId: cp.id,
         firstName: cp.firstname,
-        surName: cp.surname,
-        updatedAt: cp.modified
+        surName: cp.lastname ?? cp.surname,
+        updatedAt: cp.modified ?? undefined
       },
       message: `Updated contact person **${cp.firstname}${cp.surname ? ` ${cp.surname}` : ''}** (ID: ${cp.id}).`
     };

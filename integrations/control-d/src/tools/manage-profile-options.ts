@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -46,9 +46,9 @@ export let manageProfileOptions = SlateTool.create(spec, {
     let { operation, profileId, optionName, enabled, value } = ctx.input;
 
     if (operation === 'update') {
-      if (!profileId) throw new Error('profileId is required for update');
-      if (!optionName) throw new Error('optionName is required for update');
-      if (enabled === undefined) throw new Error('enabled is required for update');
+      if (!profileId) throw createApiServiceError('profileId is required for update');
+      if (!optionName) throw createApiServiceError('optionName is required for update');
+      if (enabled === undefined) throw createApiServiceError('enabled is required for update');
 
       await client.modifyProfileOption(profileId, optionName, {
         status: enabled ? 1 : 0,

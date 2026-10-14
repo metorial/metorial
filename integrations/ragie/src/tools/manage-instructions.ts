@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let manageInstructions = SlateTool.create(spec, {
 Once created, an instruction is applied to all new and updated documents.`,
   instructions: [
     'Use action "list" to see all existing instructions.',
-    'Use action "create" with a prompt describing what to extract. Optionally include an entitySchema (JSON Schema) for structured output.',
+    'Use action "create" with a unique name, a prompt describing what to extract, and an entitySchema (JSON Schema) for structured output.',
     'Use action "update" to modify an existing instruction.',
     'Use action "delete" to remove an instruction.'
   ],
@@ -26,7 +26,10 @@ Once created, an instruction is applied to all new and updated documents.`,
         .string()
         .optional()
         .describe('Instruction ID (required for update and delete)'),
-      name: z.string().optional().describe('Name for the instruction (for create/update)'),
+      name: z
+        .string()
+        .optional()
+        .describe('Unique instruction name (required for create, optional for update)'),
       prompt: z
         .string()
         .optional()
@@ -34,7 +37,21 @@ Once created, an instruction is applied to all new and updated documents.`,
       entitySchema: z
         .record(z.string(), z.any())
         .optional()
-        .describe('JSON Schema defining the structure of extracted entities'),
+        .describe('JSON Schema defining extracted entities (required for create)'),
+      active: z
+        .boolean()
+        .optional()
+        .describe('Whether to run this instruction on new and updated documents'),
+      contextTemplate: z
+        .string()
+        .optional()
+        .describe('Mustache template to prepend document context during extraction'),
+      partition: z
+        .string()
+        .optional()
+        .describe(
+          'Partition to scope a newly created instruction to; overrides the default partition'
+        ),
       scope: z
         .enum(['chunk', 'document'])
         .optional()
@@ -108,14 +125,22 @@ Once created, an instruction is applied to all new and updated documents.`,
 
       case 'create': {
         if (!ctx.input.prompt) {
-          throw new Error('Prompt is required for creating an instruction.');
+          throw createApiServiceError('Prompt is required for creating an instruction.');
+        }
+        if (!ctx.input.name || ctx.input.entitySchema === undefined) {
+          throw createApiServiceError(
+            'Creating an instruction requires a unique name and entitySchema.'
+          );
         }
         let created = await client.createInstruction({
           name: ctx.input.name,
           prompt: ctx.input.prompt,
           entitySchema: ctx.input.entitySchema,
           scope: ctx.input.scope,
-          filter: ctx.input.filter
+          filter: ctx.input.filter,
+          active: ctx.input.active,
+          contextTemplate: ctx.input.contextTemplate,
+          partition: ctx.input.partition
         });
         return {
           output: {
@@ -127,14 +152,31 @@ Once created, an instruction is applied to all new and updated documents.`,
 
       case 'update': {
         if (!ctx.input.instructionId) {
-          throw new Error('instructionId is required for updating an instruction.');
+          throw createApiServiceError(
+            'instructionId is required for updating an instruction.'
+          );
+        }
+        if (
+          [
+            ctx.input.name,
+            ctx.input.prompt,
+            ctx.input.entitySchema,
+            ctx.input.scope,
+            ctx.input.filter,
+            ctx.input.active,
+            ctx.input.contextTemplate
+          ].every(value => value === undefined)
+        ) {
+          throw createApiServiceError('Provide at least one instruction field to update.');
         }
         let updated = await client.updateInstruction(ctx.input.instructionId, {
           name: ctx.input.name,
           prompt: ctx.input.prompt,
           entitySchema: ctx.input.entitySchema,
           scope: ctx.input.scope,
-          filter: ctx.input.filter
+          filter: ctx.input.filter,
+          active: ctx.input.active,
+          contextTemplate: ctx.input.contextTemplate
         });
         return {
           output: {
@@ -146,7 +188,9 @@ Once created, an instruction is applied to all new and updated documents.`,
 
       case 'delete': {
         if (!ctx.input.instructionId) {
-          throw new Error('instructionId is required for deleting an instruction.');
+          throw createApiServiceError(
+            'instructionId is required for deleting an instruction.'
+          );
         }
         await client.deleteInstruction(ctx.input.instructionId);
         return {

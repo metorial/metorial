@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   confirmPoeTool,
   createJobTool,
+  downloadJobResultsTool,
   getAccountInfoTool,
   getJobResultsTool,
   getJobStatusTool,
@@ -17,6 +18,7 @@ export let provider = Slate.create({
     createJobTool,
     getJobStatusTool,
     getJobResultsTool,
+    downloadJobResultsTool,
     searchJobsTool,
     manageJobTool,
     getAccountInfoTool,

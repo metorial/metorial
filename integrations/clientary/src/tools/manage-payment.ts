@@ -38,7 +38,7 @@ export let createPayment = SlateTool.create(spec, {
         .number()
         .optional()
         .describe(
-          'Payment profile ID to charge. Overrides amount/note and bills the full balance.'
+          'Payment profile ID to charge. Use list_payment_profiles to find profiles. Overrides amount/note and bills the full balance.'
         )
     })
   )
@@ -98,8 +98,8 @@ export let listPayments = SlateTool.create(spec, {
     return {
       output: {
         payments,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${payments.length} payment(s).`
     };
@@ -138,12 +138,12 @@ export let deletePayment = SlateTool.create(spec, {
   .build();
 
 let mapPayment = (p: any) => ({
-  paymentId: p.id,
-  invoiceId: p.invoice_id,
+  paymentId: p.id ?? undefined,
+  invoiceId: p.invoice_id ?? undefined,
   amount: p.amount,
-  note: p.note,
-  receivedOn: p.received_on,
-  transactionId: p.transaction_id,
-  transactionFee: p.transaction_fee,
-  createdAt: p.created_at
+  note: p.note ?? undefined,
+  receivedOn: p.received_on ?? undefined,
+  transactionId: p.transaction_id ?? undefined,
+  transactionFee: p.transaction_fee ?? p.transaction_fee_amount ?? undefined,
+  createdAt: p.created_at ?? undefined
 });

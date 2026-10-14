@@ -1,18 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BusinessClient } from '../lib/client';
+import { botIdSchema, pageSchema, sizeSchema, workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTrainingData = SlateTool.create(spec, {
   name: 'List Training Data',
   key: 'list_training_data',
   description: `Retrieve all training data files and entries associated with a bot. Use this to view the bot's knowledge base, check processing status of uploads, and find data entries for deletion.`,
+  instructions: [
+    'For account API key connections, call list_bots and provide botId. A Bot API Token connection targets the bot owning that token.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       searchQuery: z
         .string()
         .optional()
@@ -22,8 +28,8 @@ export let listTrainingData = SlateTool.create(spec, {
         .optional()
         .describe('Field to sort by (e.g. updated_at, created_at, status)'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
-      page: z.number().optional().describe('Page number (starts at 1)'),
-      size: z.number().optional().describe('Number of results per page (1-100, default 50)')
+      page: pageSchema,
+      size: sizeSchema
     })
   )
   .output(
@@ -49,13 +55,18 @@ export let listTrainingData = SlateTool.create(spec, {
           })
         )
         .describe('List of training data entries'),
-      total: z.number().describe('Total number of entries'),
-      page: z.number().describe('Current page number'),
-      pages: z.number().describe('Total number of pages')
+      total: z.number().optional().describe('Total number of entries'),
+      page: z.number().optional().describe('Current page number'),
+      pages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     let result = await client.listBotData({
       searchQuery: ctx.input.searchQuery,
@@ -82,11 +93,11 @@ export let listTrainingData = SlateTool.create(spec, {
     return {
       output: {
         trainingData,
-        total: result.total,
-        page: result.page,
-        pages: result.pages
+        total: result.total ?? undefined,
+        page: result.page ?? undefined,
+        pages: result.pages ?? undefined
       },
-      message: `Found **${result.total}** training data entries (page ${result.page}/${result.pages}).`
+      message: `Returned **${trainingData.length}** training data entries${result.total == null ? '' : ` of ${result.total} total`}.`
     };
   })
   .build();

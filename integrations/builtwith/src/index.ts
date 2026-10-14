@@ -9,11 +9,13 @@ import {
   getKeywords,
   getRecommendations,
   getRedirects,
+  getTechnologyChanges,
   getTechnologyTrends,
   listTechnologySites,
   liveDomainDetection,
   lookupDomain,
   resolveCompanyUrl,
+  searchKeywordSites,
   searchProducts
 } from './tools';
 export let provider = Slate.create({
@@ -32,7 +34,9 @@ export let provider = Slate.create({
     searchProducts,
     getDomainTags,
     freeLookup,
-    getFinancialData
+    getFinancialData,
+    getTechnologyChanges,
+    searchKeywordSites
   ] as any,
   triggers: []
 });

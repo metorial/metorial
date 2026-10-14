@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -84,7 +84,7 @@ export let manageRules = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.ruleId) {
-        throw new Error('ruleId is required for the get action.');
+        throw createApiServiceError('ruleId is required for the get action.');
       }
       let rule = await client.getRule(ctx.input.ruleId);
       return {
@@ -95,7 +95,7 @@ export let manageRules = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required for the create action.');
+        throw createApiServiceError('name is required for the create action.');
       }
       let rule = await client.createRule({
         name: ctx.input.name,
@@ -112,7 +112,7 @@ export let manageRules = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.ruleId) {
-        throw new Error('ruleId is required for the update action.');
+        throw createApiServiceError('ruleId is required for the update action.');
       }
       let input: Record<string, any> = {};
       if (ctx.input.name !== undefined) input.name = ctx.input.name;
@@ -130,7 +130,7 @@ export let manageRules = SlateTool.create(spec, {
 
     // delete
     if (!ctx.input.ruleId) {
-      throw new Error('ruleId is required for the delete action.');
+      throw createApiServiceError('ruleId is required for the delete action.');
     }
     await client.deleteRule(ctx.input.ruleId);
     return {

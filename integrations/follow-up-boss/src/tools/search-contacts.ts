@@ -8,7 +8,7 @@ export let searchContacts = SlateTool.create(spec, {
   key: 'search_contacts',
   description: `Search and list contacts in Follow Up Boss. Supports filtering by various criteria, checking for duplicates, and retrieving unclaimed leads.`,
   instructions: [
-    'Use "query" for general text search across contact fields.',
+    'Use "query" to search contact names.',
     'Set "unclaimed" to true to retrieve only unclaimed leads.',
     'Use "emails" or "phones" for duplicate checking.'
   ],
@@ -18,7 +18,7 @@ export let searchContacts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      query: z.string().optional().describe('Search query string'),
+      query: z.string().optional().describe('Contact name search string'),
       tag: z.string().optional().describe('Filter by tag name'),
       stage: z.string().optional().describe('Filter by stage name'),
       source: z.string().optional().describe('Filter by lead source'),
@@ -97,7 +97,7 @@ export let searchContacts = SlateTool.create(spec, {
             emails: p.emails,
             phones: p.phones,
             tags: p.tags,
-            assignedTo: p.assignedTo,
+            assignedTo: p.assignedUserId,
             created: p.created,
             updated: p.updated
           })),
@@ -129,7 +129,7 @@ export let searchContacts = SlateTool.create(spec, {
             emails: p.emails,
             phones: p.phones,
             tags: p.tags,
-            assignedTo: p.assignedTo,
+            assignedTo: p.assignedUserId,
             created: p.created,
             updated: p.updated
           })),
@@ -140,8 +140,8 @@ export let searchContacts = SlateTool.create(spec, {
     }
 
     let params: Record<string, any> = {};
-    if (ctx.input.query) params.query = ctx.input.query;
-    if (ctx.input.tag) params.tag = ctx.input.tag;
+    if (ctx.input.query) params.name = ctx.input.query;
+    if (ctx.input.tag) params.tags = ctx.input.tag;
     if (ctx.input.stage) params.stage = ctx.input.stage;
     if (ctx.input.source) params.source = ctx.input.source;
     if (ctx.input.assignedUserId) params.assignedUserId = ctx.input.assignedUserId;
@@ -166,7 +166,7 @@ export let searchContacts = SlateTool.create(spec, {
           emails: p.emails,
           phones: p.phones,
           tags: p.tags,
-          assignedTo: p.assignedTo,
+          assignedTo: p.assignedUserId,
           created: p.created,
           updated: p.updated
         })),

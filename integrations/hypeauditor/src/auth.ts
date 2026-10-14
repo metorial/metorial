@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,10 +17,13 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Your HypeAuditor API Token (X-Auth-Token header)')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.clientId.trim() || !ctx.input.token.trim()) {
+        throw createApiServiceError('Enter a HypeAuditor Client ID and API token.');
+      }
       return {
         output: {
-          token: ctx.input.token,
-          clientId: ctx.input.clientId
+          token: ctx.input.token.trim(),
+          clientId: ctx.input.clientId.trim()
         }
       };
     }

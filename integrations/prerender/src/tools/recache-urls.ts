@@ -45,7 +45,7 @@ export let recacheUrls = SlateTool.create(spec, {
     return {
       output: {
         urlCount: urls.length,
-        response: response as Record<string, unknown>
+        response
       },
       message: `Submitted ${urls.length} URL(s) for recaching${ctx.input.adaptiveType ? ` (${ctx.input.adaptiveType})` : ''}.`
     };

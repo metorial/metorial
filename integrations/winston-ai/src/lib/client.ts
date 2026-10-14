@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined,
+  requestAxiosData
+} from 'slates';
 
 export interface DetectTextParams {
   text?: string;
@@ -26,7 +32,8 @@ export interface DetectTextResponse {
 }
 
 export interface DetectImageParams {
-  url: string;
+  url?: string;
+  image?: string;
   version?: string;
 }
 
@@ -43,6 +50,22 @@ export interface DetectImageResponse {
   ai_watermark_issuers: Record<string, unknown> | null;
   credits_used: number;
   credits_remaining: number;
+}
+
+export interface AdvancedImageResponse {
+  status: number;
+  cost: number;
+  language: string;
+  title: string;
+  tags: string[];
+  tool_used: string[];
+  label: string;
+  confidence: string;
+  authenticity: string;
+  conclusion: string;
+  analysis: string;
+  tools_used_analysis: Array<{ id: string; analysis: string; result: unknown }>;
+  balance: number;
 }
 
 export interface DetectPlagiarismParams {
@@ -144,7 +167,8 @@ export interface TextCompareTextResult {
   items: Array<{
     type: string;
     word_count: number;
-    start_index: number;
+    index_start: number;
+    start_index?: number;
     length: number;
   }>;
 }
@@ -159,72 +183,123 @@ export interface TextCompareResponse {
 }
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    let token = config.token.trim();
+    if (!token) {
+      throw createApiServiceError(
+        'A Winston AI API token is required. Reconnect with your token.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.gowinston.ai',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${token}` }
     });
   }
 
-  async detectText(params: DetectTextParams): Promise<DetectTextResponse> {
-    let body: Record<string, unknown> = {};
-    if (params.text !== undefined) body.text = params.text;
-    if (params.file !== undefined) body.file = params.file;
-    if (params.website !== undefined) body.website = params.website;
-    if (params.version !== undefined) body.version = params.version;
-    if (params.sentences !== undefined) body.sentences = params.sentences;
-    if (params.language !== undefined) body.language = params.language;
+  private request<T>(operation: string, path: string, body: Record<string, unknown>) {
+    return requestAxiosData<T>(
+      operation,
+      () => this.axios.post<T>(path, body),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Winston AI',
+          operation,
+          reason: 'winston_ai_api_error',
+          detailKeys: ['description', 'error', 'message', 'code']
+        })
+    );
+  }
 
-    let response = await this.axios.post('/v2/ai-content-detection', body);
-    return response.data as DetectTextResponse;
+  private validateUrl(value: string, label: string) {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw createApiServiceError(`${label} must be a valid public HTTP or HTTPS URL.`);
+    }
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      !url.hostname ||
+      url.username ||
+      url.password
+    ) {
+      throw createApiServiceError(
+        `${label} must be a public HTTP or HTTPS URL without credentials.`
+      );
+    }
+  }
+
+  private validateScanInput(params: FactCheckParams, minimum: number, maximum: number) {
+    if (params.website !== undefined) {
+      this.validateUrl(params.website, 'websiteUrl');
+    } else if (params.file !== undefined) {
+      this.validateUrl(params.file, 'fileUrl');
+    } else if (params.text === undefined) {
+      throw createApiServiceError('Provide text, fileUrl, or websiteUrl to scan.');
+    } else if (params.text.length < minimum || params.text.length > maximum) {
+      throw createApiServiceError(
+        `Text must contain between ${minimum} and ${maximum} characters.`
+      );
+    }
+  }
+
+  async detectText(params: DetectTextParams): Promise<DetectTextResponse> {
+    this.validateScanInput(params, 300, 150000);
+    return this.request('detect AI text', '/v2/ai-content-detection', pickDefined(params));
   }
 
   async detectImage(params: DetectImageParams): Promise<DetectImageResponse> {
-    let body: Record<string, unknown> = {
-      url: params.url
-    };
-    if (params.version !== undefined) body.version = params.version;
+    if ((params.url !== undefined) === (params.image !== undefined)) {
+      throw createApiServiceError('Provide exactly one of imageUrl or image.');
+    }
+    if (params.url !== undefined) this.validateUrl(params.url, 'imageUrl');
+    if (params.image !== undefined && !params.image.trim()) {
+      throw createApiServiceError(
+        'image must contain a base64-encoded image or image data URL.'
+      );
+    }
+    return this.request('detect AI image', '/v2/image-detection', pickDefined(params));
+  }
 
-    let response = await this.axios.post('/v2/image-detection', body);
-    return response.data as DetectImageResponse;
+  async detectAdvancedImage(imageUrl: string): Promise<AdvancedImageResponse> {
+    this.validateUrl(imageUrl, 'imageUrl');
+    return this.request('analyze image forensics', '/v2/advanced-image-detection', {
+      image_url: imageUrl
+    });
   }
 
   async detectPlagiarism(params: DetectPlagiarismParams): Promise<DetectPlagiarismResponse> {
-    let body: Record<string, unknown> = {};
-    if (params.text !== undefined) body.text = params.text;
-    if (params.file !== undefined) body.file = params.file;
-    if (params.website !== undefined) body.website = params.website;
-    if (params.excludedSources !== undefined) body.excluded_sources = params.excludedSources;
-    if (params.language !== undefined) body.language = params.language;
-    if (params.country !== undefined) body.country = params.country;
-
-    let response = await this.axios.post('/v2/plagiarism', body);
-    return response.data as DetectPlagiarismResponse;
+    this.validateScanInput(params, 100, 120000);
+    return this.request(
+      'detect plagiarism',
+      '/v2/plagiarism',
+      pickDefined({
+        text: params.text,
+        file: params.file,
+        website: params.website,
+        excluded_sources: params.excludedSources,
+        language: params.language,
+        country: params.country
+      })
+    );
   }
 
   async factCheck(params: FactCheckParams): Promise<FactCheckResponse> {
-    let body: Record<string, unknown> = {};
-    if (params.text !== undefined) body.text = params.text;
-    if (params.file !== undefined) body.file = params.file;
-    if (params.website !== undefined) body.website = params.website;
-    if (params.language !== undefined) body.language = params.language;
-
-    let response = await this.axios.post('/v2/fact-checker', body);
-    return response.data as FactCheckResponse;
+    this.validateScanInput(params, 300, 10000);
+    return this.request('fact check', '/v2/fact-checker', pickDefined(params));
   }
 
   async compareTexts(params: TextCompareParams): Promise<TextCompareResponse> {
+    if (params.firstText.length > 120000 || params.secondText.length > 120000) {
+      throw createApiServiceError('Each text must contain no more than 120000 characters.');
+    }
     let body = {
       first_text: params.firstText,
       second_text: params.secondText
     };
 
-    let response = await this.axios.post('/v2/text-compare', body);
-    return response.data as TextCompareResponse;
+    return this.request('compare texts', '/v2/text-compare', body);
   }
 }

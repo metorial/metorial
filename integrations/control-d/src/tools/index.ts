@@ -1,6 +1,7 @@
 export { getAccountInfo } from './get-account-info';
 export { getAnalyticsConfig } from './get-analytics-config';
 export { listDevices } from './list-devices';
+export { listProfileRestrictions } from './list-profile-restrictions';
 export { listProfiles } from './list-profiles';
 export { listProxies } from './list-proxies';
 export { manageCustomRules } from './manage-custom-rules';
@@ -11,5 +12,6 @@ export { manageIpAccess } from './manage-ip-access';
 export { manageOrganization } from './manage-organization';
 export { manageProfile } from './manage-profile';
 export { manageProfileOptions } from './manage-profile-options';
+export { manageProfileRestrictions } from './manage-profile-restrictions';
 export { manageRuleFolders } from './manage-rule-folders';
 export { manageServices } from './manage-services';

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -29,7 +29,7 @@ export let manageTasks = SlateTool.create(spec, {
       limit: z.number().optional(),
       text: z.string().optional().describe('Task description text (for create/edit)'),
       commentary: z.string().optional().describe('Task commentary (for create/edit)'),
-      datetime: z.string().optional().describe('Due date and time (YYYY-MM-DD HH:MM:SS)'),
+      datetime: z.string().optional().describe('Due date and time (YYYY-MM-DD HH:MM)'),
       performerId: z.number().optional().describe('Performer user ID (for create/edit)'),
       complete: z.boolean().optional().describe('Task completion status (for edit)'),
       customerId: z.number().optional().describe('Link task to customer by ID (for create)'),
@@ -104,7 +104,7 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.taskId) throw new Error('taskId is required for get action.');
+      if (!ctx.input.taskId) throw createApiServiceError('taskId is required for get action.');
       let t = await client.getTask(ctx.input.taskId);
       return {
         output: {
@@ -123,6 +123,11 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
+      if (ctx.input.customerId && ctx.input.orderId) {
+        throw createApiServiceError(
+          'Specify customerId or orderId. An order automatically links its customer.'
+        );
+      }
       let taskData: Record<string, any> = {};
       if (ctx.input.text) taskData.text = ctx.input.text;
       if (ctx.input.commentary) taskData.commentary = ctx.input.commentary;
@@ -141,7 +146,8 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'edit') {
-      if (!ctx.input.taskId) throw new Error('taskId is required for edit action.');
+      if (!ctx.input.taskId)
+        throw createApiServiceError('taskId is required for edit action.');
       let taskData: Record<string, any> = {};
       if (ctx.input.text !== undefined) taskData.text = ctx.input.text;
       if (ctx.input.commentary !== undefined) taskData.commentary = ctx.input.commentary;
@@ -158,6 +164,6 @@ export let manageTasks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

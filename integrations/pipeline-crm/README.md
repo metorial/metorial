@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Pipeline Crm
 
-Manage sales deals, contacts, companies, and activities in Pipeline CRM. Create, update, and search deals with associated values, stages, and currencies. Add and manage person and company records with duplicate detection and automatic company linking. Create and update calendar events and tasks, complete or reopen tasks, discover event categories, and associate entries with deals, people, or companies. Add categorized notes to CRM records. Read and write custom fields for companies, deals, and people. Retrieve the authenticated user, list account users, and assign owners to records.
+Manage sales deals, contacts, companies, and activities in Pipeline CRM. Create, update, and search deals with associated values, stages, and currencies. Add and manage person and company records with duplicate detection and automatic company linking. Create, update, and delete calendar events and tasks, complete or reopen tasks, discover event categories, and associate entries with deals, people, or companies. Add categorized notes to CRM records, retrieve and edit existing notes, or delete them. Discover lead sources for deals and people. Connect with an API token or existing API and app keys. Read and write custom fields for companies, deals, and people. Retrieve the authenticated user, list account users, and assign owners to records.
 
 ## License
 

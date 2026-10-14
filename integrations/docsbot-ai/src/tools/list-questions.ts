@@ -1,21 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listQuestions = SlateTool.create(spec, {
   name: 'List Questions',
   key: 'list_questions',
-  description: `Retrieve question and answer history for a bot. Supports filtering by rating, escalation status, answer capability, date range, and IP hash. Returns paginated results with question text, answer, sources, and metadata.`,
+  description: `Retrieve question and answer history for a bot. Supports filtering by rating, escalation status, answer capability, date range, and IP hash. Returns paginated results with question text, answer, sources, and metadata. Call list_teams to discover accessible team IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID to list questions for'),
       page: z.number().optional().describe('Page number (zero-indexed, default: 0)'),
       perPage: z.number().optional().describe('Questions per page (default: 50)'),
+      ip: z.string().optional().describe('Filter by the SHA-256 hash of the caller IP'),
       ascending: z
         .boolean()
         .optional()
@@ -41,6 +44,7 @@ export let listQuestions = SlateTool.create(spec, {
           answer: z.string().describe('Bot answer in Markdown'),
           rating: z.number().describe('Rating: -1 (negative), 0 (neutral), 1 (positive)'),
           escalation: z.boolean().describe('Whether support was escalated'),
+          deleted: z.boolean().optional().describe('Whether the question content was deleted'),
           couldAnswer: z.boolean().optional().describe('Whether the bot could answer'),
           metadata: z.record(z.string(), z.string()).optional().describe('User metadata')
         })
@@ -57,27 +61,40 @@ export let listQuestions = SlateTool.create(spec, {
     else if (ctx.input.rating === 'negative') ratingValue = -1;
     else if (ctx.input.rating === 'neutral') ratingValue = 0;
 
-    let result = await client.listQuestions(ctx.config.teamId, ctx.input.botId, {
-      page: ctx.input.page,
-      perPage: ctx.input.perPage,
-      ascending: ctx.input.ascending,
-      rating: ratingValue,
-      escalated: ctx.input.escalated,
-      couldAnswer: ctx.input.couldAnswer,
-      startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate
-    });
+    let result = await client.listQuestions(
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
+      ctx.input.botId,
+      {
+        page: ctx.input.page,
+        perPage: ctx.input.perPage,
+        ip: ctx.input.ip,
+        ascending: ctx.input.ascending,
+        rating: ratingValue,
+        escalated: ctx.input.escalated,
+        couldAnswer: ctx.input.couldAnswer,
+        startDate: ctx.input.startDate,
+        endDate: ctx.input.endDate
+      }
+    );
 
     let questions = result.questions.map(q => ({
       questionId: q.id,
       createdAt: q.createdAt,
       alias: q.alias,
-      question: q.question,
-      answer: q.answer,
+      question: q.question ?? '',
+      answer: q.answer ?? '',
       rating: q.rating,
-      escalation: q.escalation,
+      escalation: q.escalation ?? false,
+      deleted: q.deleted,
       couldAnswer: q.couldAnswer ?? undefined,
       metadata: q.metadata
+        ? Object.fromEntries(
+            Object.entries(q.metadata).map(([key, value]) => [
+              key,
+              typeof value === 'string' ? value : (JSON.stringify(value) ?? String(value))
+            ])
+          )
+        : undefined
     }));
 
     return {

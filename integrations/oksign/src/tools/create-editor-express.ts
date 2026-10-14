@@ -19,11 +19,14 @@ export let createEditorExpress = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Show anonymous signer options in the editor'),
-      showMeSigner: z.boolean().optional().describe('Show "me" signer option in the editor'),
+      showMeSigner: z
+        .boolean()
+        .optional()
+        .describe('Legacy counter-signature option; showTeamMembers is its replacement'),
       showSigningOptions: z
         .boolean()
         .optional()
-        .describe('Show signing options panel in the editor'),
+        .describe('Show all signing methods when true; disable each method when false'),
       showTeamMembers: z.boolean().optional().describe('Show team members list in the editor')
     })
   )

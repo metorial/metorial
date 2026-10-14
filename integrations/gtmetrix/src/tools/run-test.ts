@@ -10,11 +10,11 @@ export let runTest = SlateTool.create(spec, {
   description: `Runs a GTmetrix page speed test on a given URL and optionally waits for the test to complete. Returns the test status and, if completed, the full report with performance metrics. Supports configuring test location, browser, report type, connection throttling, ad blocking, and more.`,
   instructions: [
     'Set **waitForCompletion** to `true` to poll until the test finishes and receive the full report in one call. Otherwise, only the test ID and initial status are returned.',
-    'Use the **List Locations & Browsers** tool to discover valid location and browser IDs.',
+    'Use the **List Locations & Browsers** tool to discover valid location and browser IDs. Use **List Simulated Devices** to discover simulateDevice IDs.',
     'Throttle format is `"down/up/latency"` in Kbps/Kbps/ms. Common presets: Broadband `"5000/1000/30"`, LTE `"15000/10000/100"`, 3G `"1600/768/200"`.'
   ],
   constraints: [
-    'Each test consumes API credits (0.6–1.1 base, plus optional extras for video, retention, PDF).',
+    'Each test consumes API credits. Costs depend on report type, video, retention, and other options.',
     'Basic accounts are limited to 2 concurrent tests; PRO accounts to 8.',
     'Some options (simulateDevice, customDns, userAgent, viewport) require a PRO account.'
   ],
@@ -26,8 +26,11 @@ export let runTest = SlateTool.create(spec, {
   .input(
     z.object({
       url: z.string().describe('URL of the page to test'),
-      location: z.string().optional().describe('Test server location ID'),
-      browser: z.string().optional().describe('Browser ID to use for the test'),
+      location: z
+        .string()
+        .optional()
+        .describe('Test server location ID from list_locations_browsers'),
+      browser: z.string().optional().describe('Browser ID from list_locations_browsers'),
       reportType: z
         .enum(['lighthouse', 'legacy', 'lighthouse,legacy', 'none'])
         .optional()
@@ -40,6 +43,10 @@ export let runTest = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Connection throttle as "down/up/latency" in Kbps/Kbps/ms'),
+      customDns: z
+        .array(z.string())
+        .optional()
+        .describe('Custom DNS mappings as host:ip_address (PRO only)'),
       cookies: z
         .array(z.string())
         .optional()
@@ -54,7 +61,10 @@ export let runTest = SlateTool.create(spec, {
         .describe('HTTP authentication password for password-protected pages'),
       allowUrl: z.array(z.string()).optional().describe('Resource URL whitelist patterns'),
       blockUrl: z.array(z.string()).optional().describe('Resource URL blacklist patterns'),
-      simulateDevice: z.string().optional().describe('Simulated device ID (PRO only)'),
+      simulateDevice: z
+        .string()
+        .optional()
+        .describe('Simulated device ID from list_simulated_devices (PRO only)'),
       userAgent: z.string().optional().describe('Custom user agent string (PRO only)'),
       browserWidth: z
         .number()
@@ -100,6 +110,7 @@ export let runTest = SlateTool.create(spec, {
       stopOnload: ctx.input.stopOnload,
       throttle: ctx.input.throttle,
       cookies: ctx.input.cookies,
+      customDns: ctx.input.customDns,
       httpAuthUsername: ctx.input.httpAuthUsername,
       httpAuthPassword: ctx.input.httpAuthPassword,
       allowUrl: ctx.input.allowUrl,
@@ -117,7 +128,7 @@ export let runTest = SlateTool.create(spec, {
     if (!ctx.input.waitForCompletion) {
       return {
         output: { test },
-        message: `Test **${test.testId}** has been queued for **${ctx.input.url}**. Credits used: ${test.creditsUsed ?? 'N/A'}, credits remaining: ${test.creditsLeft ?? 'N/A'}. Use the **Get Report** tool with the test ID to check status and retrieve results.`
+        message: `Test **${test.testId}** has been queued for **${ctx.input.url}**. Credits used: ${test.creditsUsed ?? 'N/A'}, credits remaining: ${test.creditsLeft ?? 'N/A'}. Use **Get Test** with the test ID to check status or **Get Report** to wait for results.`
       };
     }
 

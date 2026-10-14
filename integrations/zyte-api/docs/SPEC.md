@@ -1,4 +1,4 @@
-# Slates Specification for Zyte Api
+# Zyte API Specification
 
 ## Overview
 
@@ -36,7 +36,21 @@ Automatic extraction uses AI-powered extraction for the following structured dat
 
 - AI-powered extraction also supports LLM-based extraction of custom attributes. Custom attributes allow you to use natural language to describe what data you want extracted from a page.
 - Extraction can use either a browser request or an HTTP request as the source, configurable via `extractFrom` options.
-- The AI models are retrained regularly, usually a few times per year. While new model versions aim to improve overall accuracy, they may become less accurate for specific fields of specific websites. For certain data types, an option to pin a specific model version is provided.
+- Model pinning is documented for product extraction only. Legacy `modelVersion` fields remain available on other tools for compatibility, but requests using them receive a validation error.
+- Use `browserHtml` or `httpResponseBody`; the retained legacy `browserHtmlOnly` source is unsupported by the current API.
+- Custom-attribute schemas use a direct attribute-name map, and the result preserves the provider's `values` and `metadata` envelope.
+
+### Search Results
+
+`extract_serp` extracts organic search results, query information, and page number from a search engine results URL. It sends only `url`, `serp`, and optional `serpOptions`, as required by the API. SERP requests cannot combine other extraction types or screenshots.
+
+### Downloadable Content
+
+Raw response bodies, rendered HTML, and JPEG screenshots are available for download. Existing base64 and HTML response fields retain the provider content for compatibility. Browser action timeouts and typing delays use milliseconds, converted to the provider's seconds. `ignore` error handling maps to the provider's `continue`. Network-capture results map provider response headers and request methods to the existing output fields.
+
+The legacy `scroll` action maps to `scrollTo` when a selector is supplied, or `scrollBottom` otherwise. `setInputFiles` and regex network matching are unsupported and return clear validation errors. Select actions require `values`; request/response waits require `url`.
+
+Official sources: https://docs.zyte.com/zyte-api/usage/reference.html and https://docs.zyte.com/zyte-api/usage/extract/custom-attributes.html.
 
 ### Geolocation
 

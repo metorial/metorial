@@ -39,10 +39,10 @@ export let listMailboxes = SlateTool.create(spec, {
 
     let mapped = (Array.isArray(mailboxes) ? mailboxes : []).map((mb: any) => ({
       mailboxId: mb._id || mb.id,
-      name: mb.name,
-      email: mb.email,
-      processAttachments: mb.process_attachments,
-      collectEmails: mb.collect_emails
+      name: mb.name ?? undefined,
+      email: mb.email ?? undefined,
+      processAttachments: mb.process_attachments ?? undefined,
+      collectEmails: mb.collect_emails ?? undefined
     }));
 
     return {

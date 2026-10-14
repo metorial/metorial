@@ -6,15 +6,22 @@ import { spec } from '../spec';
 export let getEmailStatistics = SlateTool.create(spec, {
   name: 'Get Email Statistics',
   key: 'get_email_statistics',
-  description: `Retrieve a combined email statistics summary including bounce rates, spam complaints, unsubscribes, and delivery cycle data. Optionally filter by date range.`,
+  description: `Retrieve a combined email statistics summary including bounce rates, spam complaints, unsubscribes, and delivery cycle data. Reports the current billing cycle and last 30 days; date filters are unavailable.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      startDate: z.string().optional().describe('Start date in ISO-8601 format'),
-      endDate: z.string().optional().describe('End date in ISO-8601 format')
+      startDate: z
+        .string()
+        .optional()
+        .describe('Omit; this report does not support date filtering'),
+      endDate: z
+        .string()
+        .optional()
+        .describe('Omit; this report does not support date filtering'),
+      username: z.string().optional().describe('Filter statistics by SMTP username or API key')
     })
   )
   .output(
@@ -34,7 +41,8 @@ export let getEmailStatistics = SlateTool.create(spec, {
 
     let result = await client.getEmailSummary({
       startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate
+      endDate: ctx.input.endDate,
+      username: ctx.input.username
     });
     let data = result.data || result;
 
@@ -50,15 +58,22 @@ export let getEmailStatistics = SlateTool.create(spec, {
 export let getEmailBounces = SlateTool.create(spec, {
   name: 'Get Bounce Report',
   key: 'get_email_bounces',
-  description: `Retrieve email bounce statistics. Returns hard and soft bounce data, optionally filtered by date range.`,
+  description: `Retrieve email bounce statistics. Returns hard and soft bounce data, for the last 30 days; date filters are unavailable.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      startDate: z.string().optional().describe('Start date in ISO-8601 format'),
-      endDate: z.string().optional().describe('End date in ISO-8601 format')
+      startDate: z
+        .string()
+        .optional()
+        .describe('Omit; this report does not support date filtering'),
+      endDate: z
+        .string()
+        .optional()
+        .describe('Omit; this report does not support date filtering'),
+      username: z.string().optional().describe('Filter statistics by SMTP username or API key')
     })
   )
   .output(
@@ -74,7 +89,8 @@ export let getEmailBounces = SlateTool.create(spec, {
 
     let result = await client.getEmailBounces({
       startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate
+      endDate: ctx.input.endDate,
+      username: ctx.input.username
     });
     let data = result.data || result;
 

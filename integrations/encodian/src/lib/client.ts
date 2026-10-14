@@ -1,8 +1,14 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord,
+  requestAxios,
+  type SlateAddAttachmentInput
+} from 'slates';
 
-let axiosInstance = createAxios({
-  baseURL: 'https://api.apps-encodian.com/api/v1'
-});
+let apiUrl = 'https://api.apps-encodian.com/api/v1';
 
 export interface EncodianBaseResponse {
   HttpStatusCode: number;
@@ -26,13 +32,153 @@ export interface EncodianStringResponse extends EncodianBaseResponse {
 }
 
 export class Client {
-  constructor(private token: string) {}
+  private axiosInstance;
+  private operationId = '';
+  operationStatus = '';
+  statusUrl: string | undefined;
 
-  private get headers() {
-    return {
-      'X-ApiKey': this.token,
-      'Content-Type': 'application/json'
+  constructor(
+    token: string,
+    private addAttachment: (input: SlateAddAttachmentInput) => Promise<void>
+  ) {
+    if (!token.trim()) throw createApiServiceError('An Encodian API key is required.');
+    this.axiosInstance = createAuthenticatedAxios({
+      baseURL: apiUrl,
+      authHeader: { name: 'X-ApiKey', value: token },
+      timeout: 120_000
+    });
+  }
+
+  message(completedMessage: string) {
+    if (['queued', 'in progress'].includes(this.operationStatus.toLowerCase())) {
+      return `Encodian operation **${this.operationId}** is **${this.operationStatus}**. Call get_operation_status with the returned statusUrl to retrieve its result.`;
+    }
+    return completedMessage;
+  }
+
+  private async receive<T>(
+    path: string,
+    response: {
+      data: T;
+      status: number;
+      headers: unknown;
+    },
+    filename?: string
+  ): Promise<T> {
+    let data: unknown = response.data;
+    if (!isApiErrorRecord(data)) {
+      throw createApiServiceError('Encodian returned an invalid operation response.');
+    }
+
+    let upstreamStatus = data.HttpStatusCode ?? data.httpStatusCode;
+    let operationStatus = data.OperationStatus ?? data.operationStatus;
+    let operationId = data.OperationId ?? data.operationId;
+    let errors = [data.Errors, data.errors].flatMap(value =>
+      Array.isArray(value)
+        ? value.filter((error): error is string => typeof error === 'string' && !!error)
+        : []
+    );
+    if (
+      (typeof upstreamStatus === 'number' && upstreamStatus >= 400) ||
+      (typeof operationStatus === 'string' && /^(error|failed)$/i.test(operationStatus)) ||
+      errors.length
+    ) {
+      throw buildApiServiceError(
+        {
+          response: {
+            status: upstreamStatus ?? response.status,
+            data: {
+              HttpStatusMessage: data.HttpStatusMessage ?? data.httpStatusMessage,
+              Errors: errors
+            }
+          }
+        },
+        {
+          providerLabel: 'Encodian',
+          reason: 'encodian_operation_failed',
+          operation: path,
+          detailKeys: ['HttpStatusMessage'],
+          nestedKeys: ['Errors']
+        }
+      );
+    }
+
+    this.operationId = typeof operationId === 'string' ? operationId : '';
+    this.operationStatus =
+      typeof operationStatus === 'string' && operationStatus
+        ? operationStatus
+        : response.status === 202
+          ? 'Queued'
+          : 'Complete';
+    this.statusUrl = getResponseHeaderValue(response.headers, 'location');
+    data.OperationId = this.operationId;
+    data.OperationStatus = this.operationStatus;
+    if ('Filename' in data && (data.Filename === null || data.Filename === undefined))
+      data.Filename = '';
+
+    let deliverFile = async (
+      file: Record<string, unknown>,
+      contentKey: string,
+      nameKey: string
+    ) => {
+      let content = file[contentKey];
+      if (content === undefined || content === null) {
+        file[contentKey] = '';
+        return;
+      }
+      if (typeof content !== 'string') {
+        throw createApiServiceError('Encodian returned invalid file content.');
+      }
+      if (!content) return;
+      let compactContent = content.replace(/\s/g, '');
+      let bytes = Buffer.from(compactContent, 'base64');
+      if (
+        !/^[A-Za-z0-9+/]+={0,2}$/.test(compactContent) ||
+        bytes.toString('base64').replace(/=+$/, '') !== compactContent.replace(/=+$/, '')
+      ) {
+        throw createApiServiceError('Encodian returned invalid base64 file content.');
+      }
+      let fileName =
+        typeof file[nameKey] === 'string' && file[nameKey] ? file[nameKey] : filename;
+      let mimeTypes: Record<string, string> = {
+        pdf: 'application/pdf',
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        zip: 'application/zip',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        txt: 'text/plain',
+        html: 'text/html',
+        csv: 'text/csv',
+        tiff: 'image/tiff',
+        tif: 'image/tiff'
+      };
+      await this.addAttachment({
+        type: 'content',
+        content: new Response(new Uint8Array(bytes)),
+        filename: fileName,
+        mimeType:
+          mimeTypes[fileName?.split('.').pop()?.toLowerCase() ?? ''] ??
+          'application/octet-stream'
+      });
     };
+
+    if ('FileContent' in data) {
+      await deliverFile(data, 'FileContent', 'Filename');
+    }
+    for (let collection of [data.documents, data.Images]) {
+      if (!Array.isArray(collection)) continue;
+      for (let document of collection) {
+        if (isApiErrorRecord(document)) {
+          if (document.fileName === null || document.fileName === undefined)
+            document.fileName = '';
+          await deliverFile(document, 'fileContent', 'fileName');
+        }
+      }
+    }
+    return response.data;
   }
 
   async post<T = any>(
@@ -40,31 +186,35 @@ export class Client {
     body: Record<string, any>,
     queryParams?: Record<string, string>
   ): Promise<T> {
-    let url = path;
-    if (queryParams) {
-      let params = new URLSearchParams(queryParams);
-      url = `${path}?${params.toString()}`;
-    }
-
-    let response = await axiosInstance.post(url, body, {
-      headers: this.headers
-    });
-
-    return response.data as T;
+    let response = await requestAxios<T>(
+      path,
+      () => this.axiosInstance.post(path, body, { params: queryParams }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Encodian',
+          reason: 'encodian_request_failed',
+          operation,
+          detailKeys: ['HttpStatusMessage', 'httpStatusMessage', 'message'],
+          nestedKeys: ['Errors', 'errors']
+        })
+    );
+    return this.receive(path, response, body.outputFilename ?? body.fileName ?? body.FileName);
   }
 
   async get<T = any>(path: string, queryParams?: Record<string, string>): Promise<T> {
-    let url = path;
-    if (queryParams) {
-      let params = new URLSearchParams(queryParams);
-      url = `${path}?${params.toString()}`;
-    }
-
-    let response = await axiosInstance.get(url, {
-      headers: this.headers
-    });
-
-    return response.data as T;
+    let response = await requestAxios<T>(
+      path,
+      () => this.axiosInstance.get(path, { params: queryParams }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Encodian',
+          reason: 'encodian_request_failed',
+          operation,
+          detailKeys: ['HttpStatusMessage', 'httpStatusMessage', 'message'],
+          nestedKeys: ['Errors', 'errors']
+        })
+    );
+    return this.receive(path, response);
   }
 
   // PDF Operations

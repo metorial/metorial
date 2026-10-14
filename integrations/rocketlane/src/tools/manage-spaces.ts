@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createSpace = SlateTool.create(spec, {
@@ -52,17 +53,22 @@ export let listSpaces = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().optional().describe('Filter spaces by project ID'),
+      projectId: z
+        .number()
+        .optional()
+        .describe('Required project ID. Call list_projects to discover projects.'),
       spaceId: z
         .number()
         .optional()
         .describe('If provided, also fetches documents within this specific space'),
+      pageToken: pageTokenSchema,
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Maximum number of spaces to return')
     })
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       spaces: z
         .array(
           z.object({
@@ -80,6 +86,7 @@ export let listSpaces = SlateTool.create(spec, {
 
     let result = await client.listSpaces({
       projectId: ctx.input.projectId,
+      pageToken: ctx.input.pageToken,
       offset: ctx.input.offset,
       limit: ctx.input.limit
     });
@@ -88,14 +95,14 @@ export let listSpaces = SlateTool.create(spec, {
 
     let documents: any[] | undefined;
     if (ctx.input.spaceId) {
-      let docResult = await client.listSpaceDocuments(ctx.input.spaceId);
+      let docResult = await client.listSpaceDocuments(ctx.input.spaceId, ctx.input.projectId);
       documents = Array.isArray(docResult)
         ? docResult
         : (docResult.documents ?? docResult.data ?? []);
     }
 
     return {
-      output: { spaces, documents },
+      output: { spaces, documents, pagination: result.pagination },
       message: `Found **${spaces.length}** space(s).${documents ? ` Found **${documents.length}** document(s) in space ${ctx.input.spaceId}.` : ''}`
     };
   })

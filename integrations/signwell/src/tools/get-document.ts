@@ -31,6 +31,19 @@ export let getDocument = SlateTool.create(spec, {
         .describe('Whether signing order is enforced'),
       embeddedSigning: z.boolean().optional().describe('Whether embedded signing is enabled'),
       expiresIn: z.number().optional().describe('Days until expiration'),
+      fields: z
+        .array(
+          z.array(
+            z.object({
+              apiId: z.string().optional().describe('Field identifier'),
+              type: z.string().optional().describe('Field type'),
+              page: z.number().optional().describe('Page within the file, starting at 1'),
+              recipientId: z.string().optional().describe('Recipient assigned to the field')
+            })
+          )
+        )
+        .optional()
+        .describe('Document fields grouped by file'),
       recipients: z
         .array(
           z.object({
@@ -57,26 +70,36 @@ export let getDocument = SlateTool.create(spec, {
 
     let output = {
       documentId: result.id,
-      name: result.name,
-      status: result.status,
-      subject: result.subject,
-      message: result.message,
-      isDraft: result.is_draft,
-      requiresSigningOrder: result.apply_signing_order,
-      embeddedSigning: result.embedded_signing,
-      expiresIn: result.expires_in,
-      recipients: result.recipients?.map((r: any) => ({
-        recipientId: r.id,
-        name: r.name,
-        email: r.email,
-        status: r.status,
-        signedAt: r.signed_at,
-        embeddedSigningUrl: r.embedded_signing_url
+      name: result.name ?? undefined,
+      status: result.status ?? undefined,
+      subject: result.subject ?? undefined,
+      message: result.message ?? undefined,
+      isDraft:
+        result.is_draft ??
+        (result.status ? result.status.toLowerCase() === 'draft' : undefined),
+      requiresSigningOrder: result.apply_signing_order ?? undefined,
+      embeddedSigning: result.embedded_signing ?? undefined,
+      expiresIn: result.expires_in ?? undefined,
+      fields: result.fields?.map(group =>
+        group.map(field => ({
+          apiId: field.api_id ?? undefined,
+          type: field.type ?? undefined,
+          page: field.page ?? undefined,
+          recipientId: field.recipient_id ?? undefined
+        }))
+      ),
+      recipients: result.recipients?.map(r => ({
+        recipientId: r.id ?? undefined,
+        name: r.name ?? undefined,
+        email: r.email ?? undefined,
+        status: r.status ?? undefined,
+        signedAt: r.signed_at ?? undefined,
+        embeddedSigningUrl: r.embedded_signing_url ?? undefined
       })),
-      metadata: result.metadata,
-      createdAt: result.created_at,
-      updatedAt: result.updated_at,
-      completedAt: result.completed_at
+      metadata: result.metadata ?? undefined,
+      createdAt: result.created_at ?? undefined,
+      updatedAt: result.updated_at ?? undefined,
+      completedAt: result.completed_at ?? undefined
     };
 
     return {

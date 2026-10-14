@@ -60,9 +60,9 @@ export let geocodeAddress = SlateTool.create(spec, {
   description: `Convert a free-form address or structured address components into geographic coordinates (latitude/longitude). Supports worldwide address geocoding with relevance scoring.
 Use a free-form query string like "240 Washington St, Boston" or structured fields like city, street, postalCode separately.`,
   instructions: [
-    'Provide either a free-form query OR structured query fields (city, street, etc.) — not both.',
+    'Provide query, qualifiedQuery, or both for a hybrid address query.',
     'Use the "at" parameter to bias results toward a specific location.',
-    'Use "inArea" to restrict results to a country (e.g. "countryCode:USA") or bounding box.'
+    'Use "inArea" to restrict results to a country (e.g. "countryCode:USA").'
   ],
   tags: {
     readOnly: true
@@ -87,9 +87,7 @@ Use a free-form query string like "240 Washington St, Boston" or structured fiel
       inArea: z
         .string()
         .optional()
-        .describe(
-          'Geographic filter (e.g. "countryCode:USA", "bbox:west,south,east,north", "circle:lat,lng;r=radius")'
-        ),
+        .describe('Country filter (e.g. "countryCode:USA" or "countryCode:CAN,MEX,USA")'),
       limit: z
         .number()
         .optional()

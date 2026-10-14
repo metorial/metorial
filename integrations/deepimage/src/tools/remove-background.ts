@@ -85,7 +85,12 @@ Ideal for product photography, e-commerce listings, and creative workflows. Supp
     let client = new Client({ token: ctx.auth.token });
 
     let generate =
-      ctx.input.generateDescription || ctx.input.generateModelType
+      ctx.input.generateDescription !== undefined ||
+      ctx.input.generateModelType !== undefined ||
+      ctx.input.generateSampleNum !== undefined ||
+      ctx.input.itemAreaPercentage !== undefined ||
+      ctx.input.generateBackgroundUrl !== undefined ||
+      ctx.input.generateBackgroundColor !== undefined
         ? {
             description: ctx.input.generateDescription,
             modelType: ctx.input.generateModelType,
@@ -113,6 +118,10 @@ Ideal for product photography, e-commerce listings, and creative workflows. Supp
       padding: ctx.input.padding,
       outputFormat: ctx.input.outputFormat
     });
+
+    if (result.status === 'complete' && result.resultUrl) {
+      await ctx.addAttachment({ type: 'url', url: result.resultUrl });
+    }
 
     let message =
       result.status === 'complete'

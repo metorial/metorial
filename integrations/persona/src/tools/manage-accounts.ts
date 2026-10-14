@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PersonaClient } from '../lib/client';
 import { normalizeResource } from '../lib/helpers';
@@ -45,7 +45,7 @@ export let createAccount = SlateTool.create(spec, {
     return {
       output: {
         accountId: result.data?.id,
-        referenceId: normalized['reference-id'] || normalized.reference_id,
+        referenceId: normalized['reference-id'] ?? normalized.reference_id ?? undefined,
         attributes: normalized
       },
       message: `Created account **${result.data?.id}**.`
@@ -85,13 +85,17 @@ export let getAccount = SlateTool.create(spec, {
     return {
       output: {
         accountId: result.data?.id,
-        referenceId: n['reference-id'] || n.reference_id,
-        nameFirst: n['name-first'] || n.name_first,
-        nameLast: n['name-last'] || n.name_last,
-        emailAddress: n['email-address'] || n.email_address,
-        phoneNumber: n['phone-number'] || n.phone_number,
-        tags: n.tags,
-        createdAt: n['created-at'] || n.created_at,
+        referenceId: n['reference-id'] ?? n.reference_id ?? undefined,
+        nameFirst:
+          n['name-first'] ?? n.name_first ?? n.fields?.name?.value?.first?.value ?? undefined,
+        nameLast:
+          n['name-last'] ?? n.name_last ?? n.fields?.name?.value?.last?.value ?? undefined,
+        emailAddress:
+          n['email-address'] ?? n.email_address ?? n.fields?.email_address?.value ?? undefined,
+        phoneNumber:
+          n['phone-number'] ?? n.phone_number ?? n.fields?.phone_number?.value ?? undefined,
+        tags: n.tags ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined,
         attributes: n
       },
       message: `Retrieved account **${result.data?.id}**.`
@@ -138,8 +142,8 @@ export let listAccounts = SlateTool.create(spec, {
       let n = normalizeResource(item);
       return {
         accountId: item.id,
-        referenceId: n['reference-id'] || n.reference_id,
-        createdAt: n['created-at'] || n.created_at
+        referenceId: n['reference-id'] ?? n.reference_id ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined
       };
     });
 
@@ -281,7 +285,7 @@ export let tagAccount = SlateTool.create(spec, {
     } else if (ctx.input.action === 'set' && ctx.input.allTags) {
       result = await client.setAccountTags(ctx.input.accountId, ctx.input.allTags);
     } else {
-      throw new Error('Invalid tag action or missing required parameters');
+      throw createApiServiceError('Provide tag for add/remove, or allTags for set.');
     }
 
     let normalized = normalizeResource(result.data);

@@ -110,7 +110,7 @@ export let listTickets = SlateTool.create(spec, {
       sortBy: z
         .string()
         .optional()
-        .describe('Field to sort by, e.g. "createdAt", "updatedAt", "priority"'),
+        .describe('Field to sort by, "createdAt", "updatedAt", or "lastMessageAt"'),
       sortOrder: z
         .enum(['asc', 'desc'])
         .optional()

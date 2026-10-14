@@ -1,12 +1,14 @@
 import { SauceLabsClient } from './client';
 
 export let createClient = (ctx: {
-  auth: { username: string; token: string };
-  config: { dataCenter: string };
+  auth: { username: string; token: string; dataCenter?: string };
+  config: { dataCenter?: unknown };
 }) => {
   return new SauceLabsClient({
     username: ctx.auth.username,
     token: ctx.auth.token,
-    dataCenter: ctx.config.dataCenter
+    dataCenter:
+      ctx.auth.dataCenter ??
+      (typeof ctx.config.dataCenter === 'string' ? ctx.config.dataCenter : 'us-west-1')
   });
 };

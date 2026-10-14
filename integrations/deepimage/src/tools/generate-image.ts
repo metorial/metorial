@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -70,6 +70,15 @@ Supports multiple AI models and adapter types for different generation modes: te
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.adapterType &&
+      ['control', 'control2', 'upscale'].includes(ctx.input.adapterType) &&
+      !ctx.input.sourceImageUrl?.trim()
+    ) {
+      throw createApiServiceError(
+        `sourceImageUrl is required for the ${ctx.input.adapterType} adapter.`
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.processImageSync({
@@ -88,6 +97,10 @@ Supports multiple AI models and adapter types for different generation modes: te
         }
       }
     });
+
+    if (result.status === 'complete' && result.resultUrl) {
+      await ctx.addAttachment({ type: 'url', url: result.resultUrl });
+    }
 
     let message =
       result.status === 'complete'

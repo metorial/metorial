@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -71,7 +71,8 @@ export let manageTemplate = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.templateUuid) throw new Error('templateUuid is required for get');
+      if (!ctx.input.templateUuid)
+        throw createApiServiceError('templateUuid is required for get');
       let result = await client.getTemplate(ctx.input.templateUuid);
       return {
         output: { template: mapTemplate(result), templates: null, totalCount: null },
@@ -80,7 +81,8 @@ export let manageTemplate = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.templateUuid) throw new Error('templateUuid is required for delete');
+      if (!ctx.input.templateUuid)
+        throw createApiServiceError('templateUuid is required for delete');
       await client.deleteTemplate(ctx.input.templateUuid);
       return {
         output: { template: null, templates: null, totalCount: null },
@@ -89,7 +91,7 @@ export let manageTemplate = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create');
       let result = await client.createTemplate({
         name: ctx.input.name,
         html: ctx.input.html,
@@ -102,8 +104,9 @@ export let manageTemplate = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.templateUuid) throw new Error('templateUuid is required for update');
-    if (!ctx.input.name) throw new Error('name is required for update');
+    if (!ctx.input.templateUuid)
+      throw createApiServiceError('templateUuid is required for update');
+    if (!ctx.input.name) throw createApiServiceError('name is required for update');
 
     let result = await client.updateTemplate(ctx.input.templateUuid, {
       name: ctx.input.name,

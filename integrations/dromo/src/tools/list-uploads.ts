@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DromoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,14 +6,32 @@ import { spec } from '../spec';
 export let listUploads = SlateTool.create(spec, {
   name: 'List Uploads',
   key: 'list_uploads',
-  description: `Lists all completed imports (uploads) in your Dromo account. Returns an overview of each upload including status, row counts, and field information.`,
+  description: `Lists a range of completed imports (uploads) in your Dromo account. Returns status, row counts, field information, and the total upload count.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      start: z
+        .number()
+        .refine(Number.isInteger)
+        .min(0)
+        .optional()
+        .describe('Starting upload index; defaults to 0'),
+      end: z
+        .number()
+        .refine(Number.isInteger)
+        .min(1)
+        .optional()
+        .describe('Ending upload index; defaults to 10000')
+    })
+  )
   .output(
     z.object({
+      start: z.number().describe('Start index returned by Dromo'),
+      end: z.number().describe('End index returned by Dromo'),
+      totalUploads: z.number().describe('Total number of uploads available'),
       uploads: z.array(
         z.object({
           uploadId: z.string().describe('Unique identifier of the upload'),
@@ -26,10 +44,13 @@ export let listUploads = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.end ?? 10000) <= (ctx.input.start ?? 0)) {
+      throw createApiServiceError('end must be greater than start.');
+    }
     let client = new DromoClient({ token: ctx.auth.token });
-    let uploads = await client.listUploads();
+    let page = await client.listUploads(ctx.input);
 
-    let mapped = uploads.map(u => ({
+    let mapped = page.data.map(u => ({
       uploadId: u.id,
       status: u.upload_status,
       totalRows: u.total_num_rows,
@@ -38,7 +59,12 @@ export let listUploads = SlateTool.create(spec, {
     }));
 
     return {
-      output: { uploads: mapped },
+      output: {
+        uploads: mapped,
+        start: page.start,
+        end: page.end,
+        totalUploads: page.total_num_uploads
+      },
       message: `Found **${mapped.length}** upload(s).`
     };
   })

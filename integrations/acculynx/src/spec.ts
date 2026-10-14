@@ -4,7 +4,7 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'acculynx',
-  name: 'Acculynx',
+  name: 'AccuLynx',
   description:
     'All-in-one business management and CRM platform for roofing contractors, covering sales, production, finance, and operations.',
   metadata: {},

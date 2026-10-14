@@ -40,7 +40,7 @@ export let addCommunicationWay = SlateTool.create(spec, {
       contact: { id: ctx.input.contactId, objectName: 'Contact' },
       type: ctx.input.type,
       value: ctx.input.value,
-      key: ctx.input.key ? Number.parseInt(ctx.input.key, 10) : 2
+      key: { id: ctx.input.key ?? '2', objectName: 'CommunicationWayKey' }
     });
 
     return {

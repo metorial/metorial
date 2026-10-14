@@ -1,12 +1,16 @@
 # <img src="https://provider-logos.metorial-cdn.com/hiver.png" height="20"> Hiver
 
-Manage shared email inboxes and customer support conversations within Gmail and Outlook. List and browse shared inboxes, retrieve and update conversations (status, assignee, tags), search users and tags per inbox, and track email activity.
+Manage shared email inboxes and customer support conversations within Gmail and Outlook. List and browse shared inboxes, retrieve and update conversations (status, assignee, tags), search users and tags per inbox, and create categorization tags.
 
 ## Tools
 
+### Create Inbox Tag
+
+Create a tag in a shared inbox with an optional color and description, then apply it to conversations.
+
 ### Get Conversation
 
-Retrieve detailed information about a specific conversation in a shared inbox. Returns full conversation data including subject, status, assignee, tags, and timestamps.
+Retrieve detailed information about a specific conversation in a shared inbox. Returns available conversation details including status, assignee, tag identifiers, and conversation links. Accepts Hiver conversation IDs or Gmail thread IDs; supply the inbox member’s email for a thread ID from their own mailbox.
 
 ### Get Inbox
 
@@ -30,7 +34,7 @@ Search for users within a specific shared inbox. Can list all users or search by
 
 ### Update Conversation
 
-Update properties of a conversation in a shared inbox. Supports modifying the conversation's status, assignee, and tags. Provide only the fields you want to change.
+Update properties of a conversation in a shared inbox. Supports modifying status, assignee, and tags. Assign by discovered user ID or member email. Tags replace the existing set. Provide only the fields you want to change.
 
 ## License
 

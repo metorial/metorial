@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { deviceSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let channelSchema = z.object({
@@ -9,7 +10,8 @@ let channelSchema = z.object({
     .describe('Channel type'),
   value: z
     .string()
-    .describe('Channel identifier (email address, phone number, push token, etc.)')
+    .describe('Channel identifier (email address, phone number, push token, etc.)'),
+  device: deviceSchema.optional().describe('Device details for the mobilepush channel')
 });
 
 let addressSchema = z
@@ -26,7 +28,7 @@ let addressSchema = z
   .optional();
 
 let customFieldSchema = z.object({
-  id: z.number().describe('Custom field ID'),
+  id: z.number().describe('Custom field ID. Call get_additional_fields to discover IDs.'),
   value: z.string().describe('Custom field value')
 });
 
@@ -71,13 +73,13 @@ Supports setting channels (email, SMS, Viber, etc.), personal info, address, cus
       channels: ctx.input.channels
     };
 
-    if (ctx.input.firstName) payload.firstName = ctx.input.firstName;
-    if (ctx.input.lastName) payload.lastName = ctx.input.lastName;
+    if (ctx.input.firstName !== undefined) payload.firstName = ctx.input.firstName;
+    if (ctx.input.lastName !== undefined) payload.lastName = ctx.input.lastName;
     if (ctx.input.address) payload.address = ctx.input.address;
     if (ctx.input.fields) payload.fields = ctx.input.fields;
     if (ctx.input.externalCustomerId)
       payload.externalCustomerId = ctx.input.externalCustomerId;
-    if (ctx.input.groups) payload.groups = ctx.input.groups;
+    if (ctx.input.groups) payload.groups = ctx.input.groups.map(name => ({ name }));
     if (ctx.input.languageCode) payload.languageCode = ctx.input.languageCode;
     if (ctx.input.timeZone) payload.timeZone = ctx.input.timeZone;
 

@@ -11,11 +11,11 @@ This is an asynchronous operation — returns a run ID. Use the **Get FindAll Re
   instructions: [
     'Provide a clear objective describing what entities to find.',
     'Specify matchConditions to define criteria each entity must satisfy.',
-    'Use the ingest endpoint first (via ingestObjective) to auto-generate entity type and conditions from a natural language query.',
+    'Use Ingest FindAll Query first to generate entity type and conditions from a natural language objective.',
     'Higher generator tiers (core, pro) provide more comprehensive searches for specific queries.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -37,7 +37,9 @@ This is an asynchronous operation — returns a run ID. Use the **Get FindAll Re
         .describe(
           'Search tier: preview (cheapest), base (cost-effective), core (balanced), pro (most comprehensive)'
         ),
-      matchLimit: z.number().describe('Maximum number of matched entities to return'),
+      matchLimit: z
+        .number()
+        .describe('Maximum matched entities to return: a whole number from 5 to 1000'),
       metadata: z
         .record(z.string(), z.string())
         .optional()

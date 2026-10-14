@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let agenticScrape = SlateTool.create(spec, {
   name: 'Agentic Scrape',
   key: 'agentic_scrape',
-  description: `Automates browser interactions using a sequence of natural language steps before extracting data. Can click buttons, fill forms, type text, scroll, navigate, and log in to websites.
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Automates browser interactions using a sequence of natural language steps before extracting data. Can click buttons, fill forms, type text, scroll, navigate, and log in to websites.
 Supports session persistence for multi-step workflows and optional AI extraction with schema support. Without AI extraction, returns raw markdown.`,
   instructions: [
     'Describe each browser action as a plain language step (e.g., "Click the login button", "Type email@example.com in the email field").',

@@ -13,7 +13,7 @@ export let sendEmail = SlateTool.create(spec, {
   key: 'send_email',
   description: `Send transactional emails using a pre-created template. Supports HTML templates with variable mapping, multiple recipients with CC/BCC, attachments, and reply-to addresses.`,
   instructions: [
-    'Template ID must be created in the MSG91 email dashboard before use.',
+    'Call list_email_templates to discover existing templates before sending.',
     'The sender domain must be verified in MSG91.',
     'Variables in the template (Handlebars syntax) are populated from the variables object in each recipient group.'
   ],
@@ -24,7 +24,11 @@ export let sendEmail = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      templateId: z.string().describe('Email template ID from the MSG91 dashboard'),
+      templateId: z
+        .string()
+        .describe(
+          'Email template ID. Call list_email_templates to discover available templates.'
+        ),
       from: z
         .object({
           name: z.string().describe('Sender name'),

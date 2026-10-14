@@ -1,16 +1,103 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  collectApiErrorDetails,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.hey-y.io/api/v2.0',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+  constructor(config: { token: string; version?: 'v2' | 'v3' }) {
+    this.axios = createAuthenticatedAxios({
+      baseURL: `https://api.heyy.io/${config.version ?? 'v2'}`,
+      authHeader: { value: `Bearer ${config.token}` },
+      errorMapping: {
+        mapAxiosError: (error, inferred) => {
+          let body = error.response?.data;
+          if (!isApiErrorRecord(body) || !isApiErrorRecord(body.error)) return;
+
+          let details: string[] = [];
+          collectApiErrorDetails(body.error, details, {
+            detailKeys: ['messageKey', 'message']
+          });
+          if (isApiErrorRecord(body.error.invalidParams)) {
+            for (let [field, detail] of Object.entries(body.error.invalidParams)) {
+              if (isApiErrorRecord(detail) && typeof detail.message === 'string') {
+                details.push(`${field}: ${detail.message}`);
+              }
+            }
+          }
+
+          return {
+            message: details.length ? details.join(' - ') : inferred.message,
+            upstream: {
+              ...inferred.upstream,
+              code:
+                typeof body.error.messageKey === 'string'
+                  ? body.error.messageKey
+                  : inferred.upstream?.code
+            }
+          };
+        }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Heyy',
+          reason: 'heyy_api_error',
+          extractStatus: (error, response) => {
+            if (!isApiErrorRecord(error) || !isApiErrorRecord(error.data)) {
+              return response?.status;
+            }
+            let upstream = error.data.upstream;
+            return isApiErrorRecord(upstream) && typeof upstream.status === 'number'
+              ? upstream.status
+              : response?.status;
+          },
+          extractUpstreamCode: error => {
+            if (!isApiErrorRecord(error) || !isApiErrorRecord(error.data)) return;
+            let upstream = error.data.upstream;
+            return isApiErrorRecord(upstream) && typeof upstream.code === 'string'
+              ? upstream.code
+              : undefined;
+          }
+        })
     });
+
+    this.axios.interceptors.response.use(response => {
+      let body = response.data;
+      if (isApiErrorRecord(body) && body.success === false) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'Heyy',
+            reason: 'heyy_api_error',
+            detailKeys: ['messageKey', 'message'],
+            nestedKeys: ['error']
+          }
+        );
+      }
+      if (!isApiErrorRecord(body) || !('data' in body) || body.data == null) {
+        throw createApiServiceError(
+          'Heyy returned an invalid API response. Please try again.',
+          {
+            reason: 'heyy_invalid_response'
+          }
+        );
+      }
+      return response;
+    });
+  }
+
+  async getWorkspace() {
+    let response = await this.axios.get('/workspace');
+    return response.data.data;
+  }
+
+  async getChatById(chatId: string) {
+    let response = await this.axios.get(`/chats/${encodeURIComponent(chatId)}`);
+    return response.data.data;
   }
 
   // === Business ===
@@ -35,7 +122,7 @@ export class Client {
   }
 
   async getContact(contactId: string) {
-    let response = await this.axios.get(`/contacts/${contactId}`);
+    let response = await this.axios.get(`/contacts/${encodeURIComponent(contactId)}`);
     return response.data?.data;
   }
 
@@ -59,22 +146,28 @@ export class Client {
       attributes?: Array<{ externalId: string; value: string }>;
     }
   ) {
-    let response = await this.axios.put(`/contacts/${contactId}`, data);
+    let response = await this.axios.put(`/contacts/${encodeURIComponent(contactId)}`, data);
     return response.data?.data;
   }
 
   async deleteContact(contactId: string) {
-    let response = await this.axios.delete(`/contacts/${contactId}`);
+    let response = await this.axios.delete(`/contacts/${encodeURIComponent(contactId)}`);
     return response.data?.data;
   }
 
   async addContactAttribute(contactId: string, data: { externalId: string; value: string }) {
-    let response = await this.axios.post(`/contacts/${contactId}/attributes`, data);
+    let response = await this.axios.post(
+      `/contacts/${encodeURIComponent(contactId)}/attributes`,
+      data
+    );
     return response.data?.data;
   }
 
   async removeContactAttribute(contactId: string, data: { externalId: string }) {
-    let response = await this.axios.delete(`/contacts/${contactId}/attributes`, { data });
+    let response = await this.axios.delete(
+      `/contacts/${encodeURIComponent(contactId)}/attributes`,
+      { data }
+    );
     return response.data?.data;
   }
 
@@ -86,7 +179,7 @@ export class Client {
   }
 
   async getChannel(channelId: string) {
-    let response = await this.axios.get(`/channels/${channelId}`);
+    let response = await this.axios.get(`/channels/${encodeURIComponent(channelId)}`);
     return response.data?.data;
   }
 
@@ -104,7 +197,10 @@ export class Client {
       scheduledAt?: string;
     }
   ) {
-    let response = await this.axios.post(`/${channelId}/whatsapp_messages/send`, data);
+    let response = await this.axios.post(
+      `/${encodeURIComponent(channelId)}/whatsapp_messages/send`,
+      data
+    );
     return response.data?.data;
   }
 
@@ -146,17 +242,19 @@ export class Client {
       variables?: Array<{ name: string; value: string }>;
     }
   ) {
-    let response = await this.axios.post(`/${channelId}/broadcasts`, data);
+    let response = await this.axios.post(`/${encodeURIComponent(channelId)}/broadcasts`, data);
     return response.data?.data;
   }
 
   async listBroadcasts(channelId: string) {
-    let response = await this.axios.get(`/${channelId}/broadcasts`);
+    let response = await this.axios.get(`/${encodeURIComponent(channelId)}/broadcasts`);
     return response.data?.data;
   }
 
   async getBroadcast(channelId: string, broadcastId: string) {
-    let response = await this.axios.get(`/${channelId}/broadcasts/${broadcastId}`);
+    let response = await this.axios.get(
+      `/${encodeURIComponent(channelId)}/broadcasts/${encodeURIComponent(broadcastId)}`
+    );
     return response.data?.data;
   }
 
@@ -174,25 +272,33 @@ export class Client {
       variables?: Array<{ name: string; value: string }>;
     }
   ) {
-    let response = await this.axios.put(`/${channelId}/broadcasts/${broadcastId}`, data);
+    let response = await this.axios.put(
+      `/${encodeURIComponent(channelId)}/broadcasts/${encodeURIComponent(broadcastId)}`,
+      data
+    );
     return response.data?.data;
   }
 
   async deleteBroadcast(channelId: string, broadcastId: string) {
-    let response = await this.axios.delete(`/${channelId}/broadcasts/${broadcastId}`);
+    let response = await this.axios.delete(
+      `/${encodeURIComponent(channelId)}/broadcasts/${encodeURIComponent(broadcastId)}`
+    );
     return response.data?.data;
   }
 
   async startBroadcast(channelId: string, broadcastId: string, mediaId: string) {
-    let response = await this.axios.post(`/${channelId}/broadcasts/${broadcastId}/start`, {
-      mediaId
-    });
+    let response = await this.axios.post(
+      `/${encodeURIComponent(channelId)}/broadcasts/${encodeURIComponent(broadcastId)}/start`,
+      {
+        mediaId
+      }
+    );
     return response.data?.data;
   }
 
   async addBroadcastRecipients(channelId: string, broadcastId: string, contactsIds: string[]) {
     let response = await this.axios.post(
-      `/${channelId}/broadcasts/${broadcastId}/recipients`,
+      `/${encodeURIComponent(channelId)}/broadcasts/${encodeURIComponent(broadcastId)}/recipients`,
       { contactsIds }
     );
     return response.data?.data;
@@ -204,7 +310,7 @@ export class Client {
     contactsIds: string[]
   ) {
     let response = await this.axios.delete(
-      `/${channelId}/broadcasts/${broadcastId}/recipients`,
+      `/${encodeURIComponent(channelId)}/broadcasts/${encodeURIComponent(broadcastId)}/recipients`,
       {
         data: { contactsIds }
       }
@@ -213,19 +319,23 @@ export class Client {
   }
 
   async getBroadcastRecipients(channelId: string, broadcastId: string) {
-    let response = await this.axios.get(`/${channelId}/broadcasts/${broadcastId}/recipients`);
+    let response = await this.axios.get(
+      `/${encodeURIComponent(channelId)}/broadcasts/${encodeURIComponent(broadcastId)}/recipients`
+    );
     return response.data?.data;
   }
 
   // === Chats ===
 
   async listChats(channelId: string) {
-    let response = await this.axios.get(`/${channelId}/chats`);
+    let response = await this.axios.get(`/${encodeURIComponent(channelId)}/chats`);
     return response.data?.data;
   }
 
   async getChat(channelId: string, chatId: string) {
-    let response = await this.axios.get(`/${channelId}/chats/${chatId}`);
+    let response = await this.axios.get(
+      `/${encodeURIComponent(channelId)}/chats/${encodeURIComponent(chatId)}`
+    );
     return response.data?.data;
   }
 
@@ -239,14 +349,17 @@ export class Client {
       assignedTeamId?: string | null;
     }
   ) {
-    let response = await this.axios.put(`/${channelId}/chats/${chatId}`, data);
+    let response = await this.axios.put(
+      `/${encodeURIComponent(channelId)}/chats/${encodeURIComponent(chatId)}`,
+      data
+    );
     return response.data?.data;
   }
 
   // === Workflows / Automations ===
 
   async listWorkflows(channelId: string) {
-    let response = await this.axios.get(`/${channelId}/workflows`);
+    let response = await this.axios.get(`/${encodeURIComponent(channelId)}/workflows`);
     return response.data?.data;
   }
 
@@ -259,7 +372,10 @@ export class Client {
       scheduledAt?: string;
     }
   ) {
-    let response = await this.axios.post(`/${channelId}/workflows/${workflowId}`, data);
+    let response = await this.axios.post(
+      `/${encodeURIComponent(channelId)}/workflows/${encodeURIComponent(workflowId)}`,
+      data
+    );
     return response.data?.data;
   }
 

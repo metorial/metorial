@@ -15,6 +15,7 @@ import {
   listEsignSessions,
   listPlaceholders,
   resendEsignInvitation,
+  sendTestEmail,
   updateAutomation
 } from './tools';
 export let provider = Slate.create({
@@ -34,7 +35,8 @@ export let provider = Slate.create({
     listEsignSessions,
     getEsignSession,
     cancelEsignSession,
-    resendEsignInvitation
+    resendEsignInvitation,
+    sendTestEmail
   ],
   triggers: []
 });

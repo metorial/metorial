@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getPageContent = SlateTool.create(spec, {
   name: 'Get Page Content',
   key: 'get_page_content',
-  description: `Download the full rendered HTML content of a web page. Uses headless browsers with proxy rotation and captcha bypass to retrieve the complete page source, including JavaScript-rendered content.`,
+  description: `Download the full rendered HTML content of a web page. Uses a headless browser to retrieve JavaScript-rendered page source and prepares a downloadable HTML file.`,
   tags: {
     readOnly: true
   }
@@ -41,6 +41,15 @@ export let getPageContent = SlateTool.create(spec, {
         waitUntil: ctx.input.waitUntil
       }
     });
+
+    if (typeof result === 'string') {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(result),
+        mimeType: 'text/html',
+        filename: 'page.html'
+      });
+    }
 
     return {
       output: {

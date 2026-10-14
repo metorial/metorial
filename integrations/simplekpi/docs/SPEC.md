@@ -1,71 +1,64 @@
-Now let me check for more details on Groups and Reports API resources:# Slates Specification for Simplekpi
+# SimpleKPI Classic API Specification
 
-## Overview
+This integration uses the supported SimpleKPI Classic Developer API. The newer
+SimpleKPI AI API uses a different host, Bearer API keys, and resource model; it
+is not interchangeable with existing Classic connections.
 
-SimpleKPI is a performance management tool that allows businesses to track and visualize their key performance indicators (KPIs) in a user-friendly dashboard. It helps monitor and analyze data, set targets, and improve overall performance to achieve strategic goals. The API provides programmatic access to manage KPIs, users, groups, data entries, and reports.
+## Authentication and setup
 
-## Authentication
+Configure the account subdomain from `https://{subdomain}.simplekpi.com` and use
+HTTP Basic authentication with the account email address and Developer API token.
+Enable API access under Settings > Developer API. The Classic Individual plan
+does not include API access. Requests use JSON over HTTPS at
+`https://{subdomain}.simplekpi.com/api`.
 
-SimpleKPI uses **HTTP Basic Authentication**.
+## Capabilities
 
-- The API is SSL-only and can only be accessed via `https://{subdomain}.simplekpi.com/api/`. The authorization is basic authentication with your username and account API token.
-- **Username**: Your SimpleKPI account email address.
-- **Password**: Your account API token. This token is available in your SimpleKPI account under the Settings | Developer API section.
-- **Subdomain**: Your account-specific subdomain (e.g., `mycompany` in `https://mycompany.simplekpi.com/api/`).
+- List, read, create, update, and delete KPIs and users.
+- List raw KPI entries, read an entry by ID, record or update an entry by user
+  ID or email, load up to 5,000 entries in a batch, and delete an entry.
+- List, assign, update, and remove user KPI assignments, including target overrides.
+- Manage categories, groups, group items, user group membership, and KPI units.
+- Discover available KPI units, frequencies, and icons.
+- Query processed report rows, including calculated KPI values, with date, KPI,
+  user, and group item filters.
 
-**Important considerations:**
+## Requests and results
 
-- API access is disabled by default and must be enabled before the API can be accessed.
-- The Individual price plan does not have access to the API and you will need to upgrade your plan to gain access.
+The tools expose camelCase fields and map them to the Classic API's documented
+wire fields. Numeric schemas retain the existing number type. Entry writes must
+identify an active user by exactly one of user ID or email and use an active,
+non-calculated KPI assigned to that user. Notes are limited to 500 characters.
 
-**Example:**
+Entry list queries use `userid`, `kpiid`, `dateFrom`, `dateTo`, `rows`, and `page`.
+Dates default to today when omitted. Request at most 500 rows per page and fetch
+the next page when a page is full. Reports use comma-separated ID lists and
+return at most 10,000 rows, without a documented pagination parameter.
 
-```
-curl -u {email_address}:{api_token} \
-  -H "Content-Type: application/json" \
-  https://{subdomain}.simplekpi.com/api/users
-```
+Update tools retain optional fields. They read the resource, merge only supplied
+changes with its current writable fields, and send the resulting PUT body. Null
+targets, zero values, and false booleans are preserved. This is not an atomic
+update; concurrent writes can overwrite one another. Calculated KPIs must be
+changed through the product interface.
 
-Alternatively, you can construct the Basic Auth header manually by Base64-encoding `{email_address}:{api_token}` and passing it as `Authorization: Basic {encoded_string}`.
+The Classic API documents rate limits using HTTP 403 and `Retry-After`, as well
+as server failures. Tool errors retain the upstream status and include guidance.
+Unexpected collection/object response shapes fail instead of producing empty
+success results.
 
-## Features
+## Official references
 
-### KPI Management
-
-Create, retrieve, update, and delete KPIs. Each KPI has properties like id, name, description, target_default, and aggregate_function. KPIs can be configured with a frequency (daily, weekly, etc.), a measurement unit, an icon, a value direction (up/down/neutral), and an aggregation method (SUM, AVG, etc.). KPIs can also be organized within categories.
-
-### KPI Data Entry
-
-Record actual and target values for KPIs over time. Entries include user, KPI, date, actual value, target value, and notes. Entries can be queried by user, KPI, and date range. You can also use email addresses instead of user IDs when posting entries. Supports options to set or increment actual values, and to selectively update actuals, targets, or notes.
-
-### KPI Categories
-
-Organize KPIs into categories. You can create, list, update, and delete categories, and manage which KPIs belong to each category.
-
-### User Management
-
-Manage user accounts with properties like id, user_type, user_status_id, first_name, last_name, email, and permissions. Users can be created, updated, retrieved, and deleted. Permissions include the ability to manage other users and administer settings.
-
-### User-KPI Assignments
-
-KPIs are assigned to users, which determines what KPIs the user can enter data against and what KPIs the user can analyze. It also sets the target for the User KPI if the user has a target that is different to the default KPI target.
-
-### Groups and Group Items
-
-Organize users and data into groups (e.g., departments, teams). Groups contain group items, and group items can be assigned to users. This allows filtering and segmenting KPI data by organizational structure.
-
-### KPI Configuration Resources
-
-Manage supporting configuration for KPIs:
-
-- **KPI Units**: Define display and entry formats for KPI values (e.g., percentages, currencies).
-- **KPI Frequencies**: Retrieve available tracking frequencies (daily, weekly, monthly, etc.).
-- **KPI Icons**: Retrieve available icons for visual representation of KPIs.
-
-### Reporting
-
-Query processed KPI data entries for reporting purposes, including calculated KPIs. Reports can be filtered by KPI IDs, date range, user IDs, and group item IDs. This is the main way to extract aggregated performance data for analysis.
-
-## Events
-
-The provider does not support events. SimpleKPI's API does not offer webhooks or any built-in event subscription mechanism.
+- [Overview and authentication](https://support.simplekpi.com/Developers)
+- [KPIs](https://support.simplekpi.com/Developers/KPIs)
+- [KPI entries](https://support.simplekpi.com/Developers/KPIEntries)
+- [Users](https://support.simplekpi.com/Developers/Users)
+- [User KPIs](https://support.simplekpi.com/Developers/UsersKPIs)
+- [User group items](https://support.simplekpi.com/Developers/UsersGroupItems)
+- [Groups](https://support.simplekpi.com/Developers/Groups)
+- [Group items](https://support.simplekpi.com/Developers/GroupsGroupItems)
+- [Categories](https://support.simplekpi.com/Developers/KPICategories)
+- [KPI units](https://support.simplekpi.com/Developers/KPIUnits)
+- [Frequencies](https://support.simplekpi.com/Developers/KPIFrequencies)
+- [Icons](https://support.simplekpi.com/Developers/KPIIcons)
+- [Reports](https://support.simplekpi.com/Developers/Reports)
+- [Classic and AI API differences](https://support.simplekpi.com/ai-core/api/migrating)

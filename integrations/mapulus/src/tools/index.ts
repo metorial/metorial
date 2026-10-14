@@ -2,6 +2,7 @@ export * from './add-travel-boundary';
 export * from './create-location';
 export * from './delete-location';
 export * from './find-locations';
+export * from './get-location';
 export * from './get-map';
 export * from './list-maps';
 export * from './lookup-territory';

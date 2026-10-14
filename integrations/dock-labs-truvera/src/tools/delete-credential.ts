@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteCredential = SlateTool.create(spec, {
   name: 'Delete Credential',
   key: 'delete_credential',
-  description: `Delete a credential from the Dock Certs platform by its ID. This removes the credential metadata and any persisted encrypted data.`,
+  description: `Delete a credential from the Truvera platform by its ID. This removes the credential metadata and any persisted encrypted data.`,
   tags: {
     destructive: true,
     readOnly: false

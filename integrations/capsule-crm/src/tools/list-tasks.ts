@@ -7,7 +7,7 @@ let taskSchema = z.object({
   taskId: z.number().describe('Unique identifier'),
   description: z.string().optional().describe('Task description'),
   detail: z.string().optional().describe('Additional details'),
-  status: z.string().optional().describe('Status: open, completed, pending'),
+  status: z.string().optional().describe('Status: OPEN, COMPLETED, PENDING'),
   dueOn: z.string().optional().describe('Due date (YYYY-MM-DD)'),
   dueTime: z.string().optional().describe('Due time (HH:MM:SS)'),
   category: z.any().optional().describe('Task category'),
@@ -34,8 +34,19 @@ export let listTasks = SlateTool.create(spec, {
         .enum(['open', 'completed', 'pending'])
         .optional()
         .describe('Filter by task status'),
-      page: z.number().optional().describe('Page number (default: 1)'),
-      perPage: z.number().optional().describe('Results per page, 1-100 (default: 50)'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .positive()
+        .optional()
+        .describe('Page number (default: 1)'),
+      perPage: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page, 1-100 (default: 50)'),
       embed: z
         .array(z.enum(['party', 'opportunity', 'kase', 'owner', 'nextTask']))
         .optional()
@@ -59,15 +70,15 @@ export let listTasks = SlateTool.create(spec, {
 
     let tasks = (result.tasks || []).map((t: any) => ({
       taskId: t.id,
-      description: t.description,
-      detail: t.detail,
-      status: t.status,
-      dueOn: t.dueOn,
-      dueTime: t.dueTime,
+      description: t.description ?? undefined,
+      detail: t.detail ?? undefined,
+      status: t.status ?? undefined,
+      dueOn: t.dueOn ?? undefined,
+      dueTime: t.dueTime ?? undefined,
       category: t.category,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-      completedAt: t.completedAt,
+      createdAt: t.createdAt ?? undefined,
+      updatedAt: t.updatedAt ?? undefined,
+      completedAt: t.completedAt ?? undefined,
       owner: t.owner,
       party: t.party,
       opportunity: t.opportunity,

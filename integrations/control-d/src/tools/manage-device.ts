@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -28,7 +28,9 @@ export let manageDevice = SlateTool.create(spec, {
       profileId2: z
         .string()
         .optional()
-        .describe('Secondary profile ID for scheduled swapping (-1 to remove)'),
+        .describe(
+          'Additional enforced profile ID. Call list_profiles to discover IDs; use -1 to remove on update. This profile is enforced continuously, not only during a schedule.'
+        ),
       stats: z.number().optional().describe('Analytics level: 0=off, 1=basic, 2=full'),
       learnIp: z.boolean().optional().describe('Enable/disable IP learning'),
       restricted: z.boolean().optional().describe('Restrict to authorized IPs only'),
@@ -75,9 +77,9 @@ export let manageDevice = SlateTool.create(spec, {
     } = ctx.input;
 
     if (operation === 'create') {
-      if (!name) throw new Error('name is required for create');
-      if (!profileId) throw new Error('profileId is required for create');
-      if (!icon) throw new Error('icon is required for create');
+      if (!name) throw createApiServiceError('name is required for create');
+      if (!profileId) throw createApiServiceError('profileId is required for create');
+      if (!icon) throw createApiServiceError('icon is required for create');
 
       let device = await client.createDevice({
         name,
@@ -107,7 +109,7 @@ export let manageDevice = SlateTool.create(spec, {
       };
     }
 
-    if (!deviceId) throw new Error('deviceId is required for update and delete');
+    if (!deviceId) throw createApiServiceError('deviceId is required for update and delete');
 
     if (operation === 'delete') {
       await client.deleteDevice(deviceId);

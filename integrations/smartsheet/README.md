@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/smartsheet.png" height="20"> Smartsheet
 
-Create, read, update, and delete sheets, rows, columns, and cells in a spreadsheet-like work management platform. Organize work into workspaces and folders with granular sharing permissions. Manage attachments, discussions, and comments on sheets and rows. Build and access dashboards and reports that aggregate data across sheets. Search across sheets, send sheets or rows via email, and create update requests for collaborators. Manage users, groups, contacts, and favorites. Set up webhooks for real-time change notifications on sheets and account-level events. Support cross-sheet references, automation rules, proofing workflows, templates, and event reporting for auditing actions.
+Create and manage sheets, rows, columns, workspaces, and folders. Read dashboards and reports, search sheet data, discuss work, send sheets or rows by email, and request collaborator updates. Share sheets and workspaces with users or groups, and retrieve the current user profile.
 
 ## Tools
 
@@ -23,6 +23,14 @@ Permanently delete a sheet. This action cannot be undone.
 ### Get Sheet
 
 Retrieve a sheet's full data including columns, rows, and cell values. Optionally filter by specific columns or rows. Use this to read sheet structure and data.
+
+### Get Row
+
+Retrieve one row with its cell values, formulas, position, lock state, and a direct link. Returns column definitions and structured multi-contact and multi-picklist values.
+
+### Get Current User
+
+Retrieve the profile of the authenticated user.
 
 ### List Dashboards
 
@@ -70,7 +78,7 @@ Send a sheet or specific rows via email to one or more recipients. Supports form
 
 ### Share Resource
 
-Share a sheet or workspace with users. Can list current shares, add new shares, update access levels, or remove shares. Access levels include VIEWER, EDITOR, EDITOR_SHARE, ADMIN, and OWNER.
+Share a sheet or workspace with users or groups. List a page of shares and follow `lastKey` for additional results. Add shares, update access levels, or remove shares. Updating shares does not support ownership transfer.
 
 ### Update Rows
 

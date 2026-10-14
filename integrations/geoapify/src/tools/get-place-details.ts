@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GeoapifyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -60,6 +60,18 @@ export let getPlaceDetails = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let hasCoordinates = ctx.input.lat !== undefined || ctx.input.lon !== undefined;
+    if (ctx.input.placeId?.trim() && hasCoordinates) {
+      throw createApiServiceError(
+        'Provide either a placeId or lat/lon coordinates, not both.'
+      );
+    }
+    if (
+      !ctx.input.placeId?.trim() &&
+      (ctx.input.lat === undefined || ctx.input.lon === undefined)
+    ) {
+      throw createApiServiceError('Provide a placeId or both lat and lon coordinates.');
+    }
     let client = new GeoapifyClient({ token: ctx.auth.token });
 
     let data = await client.getPlaceDetails({

@@ -1,4 +1,4 @@
-# Slates Specification for Graphhopper
+# GraphHopper API Specification
 
 ## Overview
 
@@ -39,6 +39,7 @@ The Route Optimization API can be used to solve traveling salesman or vehicle ro
 - Supports pickup and delivery problems, multiple vehicles, and multiple depots.
 - Can minimize completion time or transport time.
 - Supports modeling multiple delivery routes with a single vehicle.
+- `optimize_routes` submits one asynchronous job and polls for a solution. It returns the job ID when complete and includes it in timeout messages so `get_optimization_solution` can retrieve unfinished jobs later.
 
 ### Distance/Time Matrix
 

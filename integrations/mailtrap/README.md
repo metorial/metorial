@@ -1,6 +1,8 @@
 # Mailtrap
 
-Send transactional and bulk emails, manage email templates, and test emails in a sandbox environment. Create and organize contact lists, build dynamic segments, and manage suppressions. Track delivery statistics including open rates, click rates, bounces, and spam complaints. Manage sending domains, email logs, webhooks for real-time event notifications, and account access permissions.
+Send transactional and bulk emails with text, HTML, or hosted templates. Search and manage contacts and contact lists, discover sandbox projects and inboxes, inspect captured messages, manage sending domains and suppressions, and view email delivery logs and statistics.
+
+Connect with a Mailtrap API token. Current management endpoints select the account from the token, so no account ID is required during setup. Use `list_contacts` to search or paginate through contacts and `list_sandbox_inboxes` to discover inbox IDs for message inspection.
 
 ## License
 

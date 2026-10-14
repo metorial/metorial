@@ -37,7 +37,7 @@ export let listJobActivities = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let activities = await client.listJobActivities({ filter: ctx.input.filter });
 
     let mapped = activities.map((a: any) => ({

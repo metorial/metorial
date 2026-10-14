@@ -1,6 +1,6 @@
-# <img src="logo.svg" height="20"> Espocrm
+# <img src="logo.svg" height="20"> EspoCRM
 
-Manage contacts, accounts, leads, opportunities, and support cases in a self-hosted CRM. Create, read, update, and delete records across all entity types. Track sales pipelines and convert leads into contacts and opportunities. Manage meetings, calls, tasks, and calendar events linked to CRM records. Send emails, manage email templates, and run mass email campaigns. Upload file attachments, generate PDF documents from templates, and import data from CSV. Link related records together, post to activity streams, and manage custom entities and fields.
+Manage contacts, accounts, leads, opportunities, support cases, meetings, calls, and tasks in your EspoCRM instance. Read and manage built-in or custom entity records, convert leads, send emails, link related records, upload and download files, generate PDFs from templates, and read or post to activity streams.
 
 ## License
 

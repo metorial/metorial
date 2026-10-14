@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getResponseEntity, ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let issueReward = SlateTool.create(spec, {
@@ -44,7 +44,7 @@ export let issueReward = SlateTool.create(spec, {
       ctx.input.overrideIneligible
     );
 
-    let reward = (result.reward || {}) as Record<string, unknown>;
+    let reward = getResponseEntity(result, 'reward');
     let resultInfo = (result.resultInfo || {}) as Record<string, unknown>;
 
     return {
@@ -57,7 +57,7 @@ export let issueReward = SlateTool.create(spec, {
         resultStatus: resultInfo.Status as string | undefined,
         resultMessage: resultInfo.Message as string | undefined
       },
-      message: `Issued reward **${ctx.input.rewardId}** — ${resultInfo.Message || 'Success'}.`
+      message: `Reward **${ctx.input.rewardId}** issue result: ${resultInfo.Message || reward.status || 'Request processed'}.`
     };
   })
   .build();

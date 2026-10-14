@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhoisFreaksClient } from '../lib/client';
 import { spec } from '../spec';
@@ -20,10 +20,14 @@ export let domainAvailability = SlateTool.create(spec, {
     z.object({
       domain: z
         .string()
+        .trim()
+        .min(1)
         .optional()
         .describe('Single domain name to check availability for (e.g. "example.com")'),
       domainNames: z
-        .array(z.string())
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(100)
         .optional()
         .describe('Array of domain names for bulk availability check (max 100)'),
       suggest: z
@@ -32,6 +36,9 @@ export let domainAvailability = SlateTool.create(spec, {
         .describe('Whether to return alternative domain suggestions (single domain only)'),
       suggestionCount: z
         .number()
+        .refine(Number.isSafeInteger, 'Suggestion count must be a safe integer.')
+        .min(1)
+        .max(100)
         .optional()
         .describe('Number of suggestions to return (default 5, max 100)')
     })
@@ -42,9 +49,16 @@ export let domainAvailability = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.domain !== undefined && ctx.input.domainNames !== undefined) {
+      throw createApiServiceError('Provide either domain or domainNames, not both.');
+    }
+
     let client = new WhoisFreaksClient({ token: ctx.auth.token });
 
     if (ctx.input.domainNames && ctx.input.domainNames.length > 0) {
+      if (ctx.input.suggest !== undefined || ctx.input.suggestionCount !== undefined) {
+        throw createApiServiceError('Suggestions are supported only with a single domain.');
+      }
       let result = await client.bulkDomainAvailability(ctx.input.domainNames);
       return {
         output: { availability: result },
@@ -63,6 +77,6 @@ export let domainAvailability = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('Either domain or domainNames must be provided.');
+    throw createApiServiceError('Either domain or domainNames must be provided.');
   })
   .build();

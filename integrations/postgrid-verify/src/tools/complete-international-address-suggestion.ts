@@ -8,7 +8,10 @@ export let completeInternationalAddressSuggestion = SlateTool.create(spec, {
   key: 'complete_international_address_suggestion',
   description: `Resolve a full international address from an autocomplete suggestion. Takes a preview ID from the **Autocomplete International Address** tool and returns the complete, standardized address.`,
   instructions: ['Use a previewId obtained from the Autocomplete International Address tool.'],
-  constraints: ['Consumes one lookup per call.', 'Geographic data uses an additional lookup.'],
+  constraints: [
+    'Consumes one lookup per call.',
+    'Geographic data requires a separate verification lookup after resolving the suggestion.'
+  ],
   tags: {
     readOnly: true
   }
@@ -24,6 +27,16 @@ export let completeInternationalAddressSuggestion = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      status: z
+        .enum(['verified', 'corrected', 'failed'])
+        .optional()
+        .describe('Verification status'),
+      error: z.string().optional().describe('Failure reason for an address'),
+      countryName: z.string().optional().describe('Full country name'),
+      details: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Additional parsed address details'),
       formattedAddress: z.string().optional().describe('Full formatted address'),
       line1: z.string().optional().describe('Address line 1'),
       line2: z.string().optional().describe('Address line 2'),
@@ -32,10 +45,20 @@ export let completeInternationalAddressSuggestion = SlateTool.create(spec, {
       city: z.string().optional().describe('City'),
       provinceOrState: z.string().optional().describe('Province or state'),
       postalOrZip: z.string().optional().describe('Postal code'),
-      country: z.string().optional().describe('Country code'),
+      country: z.string().optional().describe('Country name from the resolved suggestion'),
       building: z.string().optional().describe('Building name or number'),
       department: z.string().optional().describe('Department'),
       company: z.string().optional().describe('Company name'),
+      countryCode: z.string().optional().describe('ISO 2-letter country code'),
+      provinceCode: z.string().optional().describe('Province or state code'),
+      geoData: z
+        .object({
+          latitude: z.number().optional(),
+          longitude: z.number().optional(),
+          accuracy: z.string().optional()
+        })
+        .optional()
+        .describe('Geographic coordinates when requested'),
       errors: z
         .record(z.string(), z.array(z.string()))
         .optional()

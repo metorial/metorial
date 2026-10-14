@@ -30,7 +30,7 @@ export let sendEmail = SlateTool.create(spec, {
 
     return {
       output: { sendResult },
-      message: `Email draft **${ctx.input.emailId}** has been sent.`
+      message: `Email draft **${ctx.input.emailId}** was accepted for asynchronous delivery.`
     };
   })
   .build();

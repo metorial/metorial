@@ -40,8 +40,18 @@ Results can be narrowed using postcode filters and dataset restrictions.`,
 })
   .input(
     z.object({
-      query: z.string().describe('Address search query (partial or full address text)'),
-      limit: z.number().optional().describe('Maximum number of suggestions to return'),
+      query: z
+        .string()
+        .min(1)
+        .max(150)
+        .describe('Address search query (partial or full address text)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isSafeInteger, 'Limit must be a whole number')
+        .optional()
+        .describe('Maximum number of suggestions to return (1–100)'),
       postcode: z
         .string()
         .optional()
@@ -53,7 +63,22 @@ Results can be narrowed using postcode filters and dataset restrictions.`,
       dataset: z
         .string()
         .optional()
-        .describe('Restrict search to a specific dataset within a country')
+        .describe('Restrict search to a specific dataset within a country'),
+      context: z
+        .string()
+        .optional()
+        .describe(
+          'ISO alpha-3 country code, such as USA or CAN; discover licensed countries with get_current_key_info'
+        ),
+      postalCode: z
+        .string()
+        .optional()
+        .describe('Short postal code filter, such as a five-digit US ZIP code'),
+      city: z.string().optional().describe('Restrict results to this city'),
+      stateCode: z
+        .string()
+        .optional()
+        .describe('Restrict results to this state or region code, such as CA')
     })
   )
   .output(
@@ -66,22 +91,26 @@ Results can be narrowed using postcode filters and dataset restrictions.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AddressZenClient({ token: ctx.auth.token });
+    let client = new AddressZenClient(ctx.auth);
 
     let result = await client.autocompleteAddresses({
       query: ctx.input.query,
       limit: ctx.input.limit,
       postcode: ctx.input.postcode,
       postcodeOutward: ctx.input.postcodeOutward,
-      dataset: ctx.input.dataset
+      dataset: ctx.input.dataset,
+      context: ctx.input.context,
+      postalCode: ctx.input.postalCode,
+      city: ctx.input.city,
+      stateCode: ctx.input.stateCode
     });
 
     let suggestions = (result.result?.hits || result.result || []).map((hit: any) => ({
       suggestion: hit.suggestion || '',
       addressId: hit.id || hit.udprn?.toString() || '',
-      udprn: hit.udprn,
-      umprn: hit.umprn,
-      urls: hit.urls
+      udprn: typeof hit.udprn === 'number' ? hit.udprn : undefined,
+      umprn: typeof hit.umprn === 'number' ? hit.umprn : undefined,
+      urls: hit.urls ?? undefined
     }));
 
     return {

@@ -53,11 +53,7 @@ export let batchCreateContacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let contactsData = ctx.input.contacts.map(c => {
       let contact: Record<string, any> = {
@@ -65,10 +61,10 @@ export let batchCreateContacts = SlateTool.create(spec, {
         firstName: c.firstName,
         lastName: c.lastName
       };
-      if (c.email) contact.email = c.email;
-      if (c.phone) contact.phone = c.phone;
-      if (c.birthday) contact.birthday = c.birthday;
-      if (c.address) contact.address = c.address;
+      if (c.email !== undefined) contact.email = c.email;
+      if (c.phone !== undefined) contact.phone = c.phone;
+      if (c.birthday !== undefined) contact.birthday = c.birthday;
+      if (c.address !== undefined) contact.address = c.address;
       return contact;
     });
 

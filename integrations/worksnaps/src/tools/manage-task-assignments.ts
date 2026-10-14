@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -19,7 +19,9 @@ export let manageTaskAssignments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project'),
+      projectId: z
+        .string()
+        .describe('The ID of the project. Call list_projects to discover available projects.'),
       action: z.enum(['list', 'create', 'remove']).describe('Action to perform'),
       taskAssignmentId: z.string().optional().describe('Assignment ID (required for remove)'),
       userId: z.number().optional().describe('User ID to assign (required for create)'),
@@ -56,7 +58,7 @@ export let manageTaskAssignments = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (userId === undefined || taskId === undefined) {
-        throw new Error('Both userId and taskId are required for create action');
+        throw createApiServiceError('Both userId and taskId are required for create action');
       }
       let assignment = await client.createTaskAssignment(projectId, { userId, taskId });
       return {
@@ -66,7 +68,8 @@ export let manageTaskAssignments = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!taskAssignmentId) throw new Error('taskAssignmentId is required for remove action');
+      if (!taskAssignmentId)
+        throw createApiServiceError('taskAssignmentId is required for remove action');
       await client.deleteTaskAssignment(projectId, taskAssignmentId);
       return {
         output: { removed: true },
@@ -74,6 +77,6 @@ export let manageTaskAssignments = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

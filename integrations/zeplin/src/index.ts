@@ -6,10 +6,12 @@ import {
   createScreenNote,
   deleteScreenNote,
   getComponent,
+  getCurrentUser,
   getDesignTokens,
   getFlowBoard,
   getProject,
   getScreen,
+  getScreenVersion,
   getStyleguide,
   inviteProjectMember,
   listColors,
@@ -25,11 +27,13 @@ import {
   listStyleguides,
   listTextStyles,
   removeProjectMember,
-  updateProject
+  updateProject,
+  updateScreenNote
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     listProjects,
     getProject,
     updateProject,
@@ -39,8 +43,10 @@ export let provider = Slate.create({
     listScreens,
     getScreen,
     listScreenVersions,
+    getScreenVersion,
     listScreenNotes,
     createScreenNote,
+    updateScreenNote,
     deleteScreenNote,
     addNoteComment,
     listComponents,

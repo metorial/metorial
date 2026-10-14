@@ -112,7 +112,7 @@ export let updateTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result?.status || 'queued'
+        status: result.status
       },
       message: `Template **${templateId}** updated successfully.`
     };

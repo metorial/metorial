@@ -1,17 +1,32 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 let BASE_URL = 'https://api.hubplanner.com/v1';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    let token = config.token?.trim();
+    if (!token || /[\r\n]/.test(token)) {
+      throw createApiServiceError(
+        'A valid Hub Planner API key is required. Reconnect with a generated API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30000,
+      authHeader: { value: token },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Hub Planner',
+          reason: 'hub_planner_api_error'
+        })
     });
   }
 
@@ -26,26 +41,32 @@ export class Client {
   }
 
   async getProject(projectId: string): Promise<any> {
-    let res = await this.axios.get(`/project/${projectId}`);
+    let res = await this.axios.get(`/project/${encodeURIComponent(projectId)}`);
     return res.data;
   }
 
   async createProject(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/project', data);
+    let res = await this.axios.post('/project', pickDefined(data));
     return res.data;
   }
 
   async updateProject(projectId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch('/project', [{ _id: projectId, ...data }]);
+    let res = await this.axios.patch('/project', [{ ...pickDefined(data), _id: projectId }]);
     return res.data;
   }
 
   async deleteProject(projectId: string): Promise<void> {
-    await this.axios.delete(`/project/${projectId}`);
+    await this.axios.delete(`/project/${encodeURIComponent(projectId)}`);
   }
 
-  async searchProjects(filters: Record<string, any>): Promise<any[]> {
-    let res = await this.axios.post('/project/search', filters);
+  async searchProjects(
+    filters: Record<string, any>,
+    page?: number,
+    limit?: number
+  ): Promise<any[]> {
+    let res = await this.axios.post('/project/search', pickDefined(filters), {
+      params: pickDefined({ page, limit })
+    });
     return res.data;
   }
 
@@ -60,26 +81,32 @@ export class Client {
   }
 
   async getResource(resourceId: string): Promise<any> {
-    let res = await this.axios.get(`/resource/${resourceId}`);
+    let res = await this.axios.get(`/resource/${encodeURIComponent(resourceId)}`);
     return res.data;
   }
 
   async createResource(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/resource', data);
+    let res = await this.axios.post('/resource', pickDefined(data));
     return res.data;
   }
 
   async updateResource(resourceId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch('/resource', [{ _id: resourceId, ...data }]);
+    let res = await this.axios.patch('/resource', [{ ...pickDefined(data), _id: resourceId }]);
     return res.data;
   }
 
   async deleteResource(resourceId: string): Promise<void> {
-    await this.axios.delete(`/resource/${resourceId}`);
+    await this.axios.delete(`/resource/${encodeURIComponent(resourceId)}`);
   }
 
-  async searchResources(filters: Record<string, any>): Promise<any[]> {
-    let res = await this.axios.post('/resource/search', filters);
+  async searchResources(
+    filters: Record<string, any>,
+    page?: number,
+    limit?: number
+  ): Promise<any[]> {
+    let res = await this.axios.post('/resource/search', pickDefined(filters), {
+      params: pickDefined({ page, limit })
+    });
     return res.data;
   }
 
@@ -94,30 +121,40 @@ export class Client {
   }
 
   async getBooking(bookingId: string): Promise<any> {
-    let res = await this.axios.get(`/booking/${bookingId}`);
+    let res = await this.axios.get(`/booking/${encodeURIComponent(bookingId)}`);
     return res.data;
   }
 
   async createBooking(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/booking', data);
+    let res = await this.axios.post('/booking', pickDefined(data));
     return res.data;
   }
 
   async updateBooking(bookingId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/booking/${bookingId}`, data);
+    let res = await this.axios.patch(
+      `/booking/${encodeURIComponent(bookingId)}`,
+      pickDefined(data)
+    );
     return res.data;
   }
 
   async deleteBooking(bookingId: string): Promise<void> {
-    await this.axios.delete(`/booking/${bookingId}`);
+    await this.axios.delete(`/booking/${encodeURIComponent(bookingId)}`);
   }
 
-  async deleteBookingsBulk(ids: string[]): Promise<void> {
-    await this.axios.delete('/booking', { params: { ids: ids.join(',') } });
+  async deleteBookingsBulk(ids: string[]): Promise<any> {
+    let res = await this.axios.delete('/booking', { data: ids });
+    return res.data;
   }
 
-  async searchBookings(filters: Record<string, any>): Promise<any[]> {
-    let res = await this.axios.post('/booking/search', filters);
+  async searchBookings(
+    filters: Record<string, any>,
+    page?: number,
+    limit?: number
+  ): Promise<any[]> {
+    let res = await this.axios.post('/booking/search', pickDefined(filters), {
+      params: pickDefined({ page, limit })
+    });
     return res.data;
   }
 
@@ -132,53 +169,62 @@ export class Client {
   }
 
   async getTimeEntry(timeEntryId: string): Promise<any> {
-    let res = await this.axios.get(`/timeentry/${timeEntryId}`);
+    let res = await this.axios.get(`/timeentry/${encodeURIComponent(timeEntryId)}`);
     return res.data;
   }
 
   async createTimeEntry(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/timeentry', data);
+    let res = await this.axios.post('/timeentry', pickDefined(data));
     return res.data;
   }
 
   async updateTimeEntry(timeEntryId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.put(`/timeentry/${timeEntryId}`, data);
+    let res = await this.axios.put(
+      `/timeentry/${encodeURIComponent(timeEntryId)}`,
+      pickDefined(data)
+    );
     return res.data;
   }
 
   async deleteTimeEntry(timeEntryId: string): Promise<void> {
-    await this.axios.delete(`/timeentry/${timeEntryId}`);
+    await this.axios.delete(`/timeentry/${encodeURIComponent(timeEntryId)}`);
   }
 
-  async searchTimeEntries(filters: Record<string, any>): Promise<any[]> {
-    let res = await this.axios.post('/timeentry/search', filters);
+  async searchTimeEntries(
+    filters: Record<string, any>,
+    page?: number,
+    limit?: number
+  ): Promise<any[]> {
+    let res = await this.axios.post('/timeentry/search', pickDefined(filters), {
+      params: pickDefined({ page, limit })
+    });
     return res.data;
   }
 
   // --- Events ---
 
-  async getEvents(): Promise<any[]> {
-    let res = await this.axios.get('/event');
+  async getEvents(page?: number, limit?: number): Promise<any[]> {
+    let res = await this.axios.get('/event', { params: pickDefined({ page, limit }) });
     return res.data;
   }
 
   async getEvent(eventId: string): Promise<any> {
-    let res = await this.axios.get(`/event/${eventId}`);
+    let res = await this.axios.get(`/event/${encodeURIComponent(eventId)}`);
     return res.data;
   }
 
   async createEvent(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/event', data);
+    let res = await this.axios.post('/event', pickDefined(data));
     return res.data;
   }
 
   async updateEvent(eventId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.put(`/event/${eventId}`, data);
+    let res = await this.axios.put(`/event/${encodeURIComponent(eventId)}`, pickDefined(data));
     return res.data;
   }
 
   async deleteEvent(eventId: string): Promise<void> {
-    await this.axios.delete(`/event/${eventId}`);
+    await this.axios.delete(`/event/${encodeURIComponent(eventId)}`);
   }
 
   async searchEvents(filters: Record<string, any>): Promise<any[]> {
@@ -189,22 +235,25 @@ export class Client {
   // --- Milestones ---
 
   async getMilestone(milestoneId: string): Promise<any> {
-    let res = await this.axios.get(`/milestone/${milestoneId}`);
+    let res = await this.axios.get(`/milestone/${encodeURIComponent(milestoneId)}`);
     return res.data;
   }
 
   async createMilestone(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/milestone', data);
+    let res = await this.axios.post('/milestone', pickDefined(data));
     return res.data;
   }
 
   async updateMilestone(milestoneId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.put(`/milestone/${milestoneId}`, data);
+    let res = await this.axios.put(
+      `/milestone/${encodeURIComponent(milestoneId)}`,
+      pickDefined(data)
+    );
     return res.data;
   }
 
   async deleteMilestone(milestoneId: string): Promise<void> {
-    await this.axios.delete(`/milestone/${milestoneId}`);
+    await this.axios.delete(`/milestone/${encodeURIComponent(milestoneId)}`);
   }
 
   async searchMilestones(filters: Record<string, any>): Promise<any[]> {
@@ -220,22 +269,25 @@ export class Client {
   }
 
   async getVacation(vacationId: string): Promise<any> {
-    let res = await this.axios.get(`/vacation/${vacationId}`);
+    let res = await this.axios.get(`/vacation/${encodeURIComponent(vacationId)}`);
     return res.data;
   }
 
   async createVacation(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/vacation', data);
+    let res = await this.axios.post('/vacation', pickDefined(data));
     return res.data;
   }
 
   async updateVacation(vacationId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.patch(`/vacation/${vacationId}`, data);
+    let res = await this.axios.patch(
+      `/vacation/${encodeURIComponent(vacationId)}`,
+      pickDefined(data)
+    );
     return res.data;
   }
 
   async deleteVacation(vacationId: string): Promise<void> {
-    await this.axios.delete(`/vacation/${vacationId}`);
+    await this.axios.delete(`/vacation/${encodeURIComponent(vacationId)}`);
   }
 
   async searchVacations(filters: Record<string, any>): Promise<any[]> {
@@ -245,28 +297,31 @@ export class Client {
 
   // --- Clients ---
 
-  async getClients(): Promise<any[]> {
-    let res = await this.axios.get('/client');
+  async getClients(page?: number, limit?: number): Promise<any[]> {
+    let res = await this.axios.get('/client', { params: pickDefined({ page, limit }) });
     return res.data;
   }
 
   async getClient(clientId: string): Promise<any> {
-    let res = await this.axios.get(`/client/${clientId}`);
+    let res = await this.axios.get(`/client/${encodeURIComponent(clientId)}`);
     return res.data;
   }
 
   async createClient(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/client', data);
+    let res = await this.axios.post('/client', pickDefined(data));
     return res.data;
   }
 
   async updateClient(clientId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.put(`/client/${clientId}`, data);
+    let res = await this.axios.put(
+      `/client/${encodeURIComponent(clientId)}`,
+      pickDefined(data)
+    );
     return res.data;
   }
 
   async deleteClient(clientId: string): Promise<void> {
-    await this.axios.delete(`/client/${clientId}`);
+    await this.axios.delete(`/client/${encodeURIComponent(clientId)}`);
   }
 
   async searchClients(filters: Record<string, any>): Promise<any[]> {
@@ -282,22 +337,25 @@ export class Client {
   }
 
   async getHoliday(holidayId: string): Promise<any> {
-    let res = await this.axios.get(`/holiday/${holidayId}`);
+    let res = await this.axios.get(`/holiday/${encodeURIComponent(holidayId)}`);
     return res.data;
   }
 
   async createHoliday(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/holiday', data);
+    let res = await this.axios.post('/holiday', pickDefined(data));
     return res.data;
   }
 
   async updateHoliday(holidayId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.put(`/holiday/${holidayId}`, data);
+    let res = await this.axios.put(
+      `/holiday/${encodeURIComponent(holidayId)}`,
+      pickDefined(data)
+    );
     return res.data;
   }
 
   async deleteHoliday(holidayId: string): Promise<void> {
-    await this.axios.delete(`/holiday/${holidayId}`);
+    await this.axios.delete(`/holiday/${encodeURIComponent(holidayId)}`);
   }
 
   async searchHolidays(filters: Record<string, any>): Promise<any[]> {
@@ -313,17 +371,20 @@ export class Client {
   }
 
   async getBookingCategory(categoryId: string): Promise<any> {
-    let res = await this.axios.get(`/categories/${categoryId}`);
+    let res = await this.axios.get(`/categories/${encodeURIComponent(categoryId)}`);
     return res.data;
   }
 
   async createBookingCategory(data: Record<string, any>): Promise<any> {
-    let res = await this.axios.post('/categories', data);
+    let res = await this.axios.post('/categories', pickDefined(data));
     return res.data;
   }
 
   async updateBookingCategory(categoryId: string, data: Record<string, any>): Promise<any> {
-    let res = await this.axios.put(`/categories/${categoryId}`, data);
+    let res = await this.axios.put(
+      `/categories/${encodeURIComponent(categoryId)}`,
+      pickDefined(data)
+    );
     return res.data;
   }
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -79,8 +79,26 @@ export let isochroneTool = SlateTool.create(spec, {
       username: ctx.config.username
     });
 
-    if (!ctx.input.contoursMinutes && !ctx.input.contoursMeters) {
-      throw new Error('Either contoursMinutes or contoursMeters is required');
+    if (Boolean(ctx.input.contoursMinutes) === Boolean(ctx.input.contoursMeters)) {
+      throw createApiServiceError('Provide exactly one of contoursMinutes or contoursMeters.');
+    }
+    let contours = (ctx.input.contoursMinutes || ctx.input.contoursMeters || '')
+      .split(',')
+      .map(value => Number(value.trim()));
+    let maximum = ctx.input.contoursMinutes ? 60 : 100000;
+    if (
+      contours.length > 4 ||
+      contours.some(
+        (value, index) =>
+          !Number.isSafeInteger(value) ||
+          value <= 0 ||
+          value > maximum ||
+          (index > 0 && value <= contours[index - 1]!)
+      )
+    ) {
+      throw createApiServiceError(
+        `Provide one to four increasing contour values greater than 0 and no greater than ${maximum}.`
+      );
     }
 
     let result = await client.getIsochrone(

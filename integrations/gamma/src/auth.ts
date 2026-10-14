@@ -14,6 +14,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
+        .trim()
+        .min(1)
         .describe(
           'Gamma API key (format: sk-gamma-xxxxxxxx). Generate from Settings > API key tab.'
         )
@@ -21,7 +23,7 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey.trim()
         }
       };
     }

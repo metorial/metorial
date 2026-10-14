@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/launch-darkly-logo.png" height="20"> LaunchDarkly
 
-Manage LaunchDarkly feature flags, targeting, projects, environments, and segments. Inspect connected credentials, contexts, members, metrics, experiments, and change history; invite account members; and receive signed change notifications.
+Manage LaunchDarkly feature flags, targeting, projects, environments, and segments. Inspect connected credentials, contexts, members, metrics, experiments, and change history, and invite account members.
 
 ## Tools
 
@@ -19,6 +19,14 @@ Retrieve detailed information about a specific feature flag, including its varia
 ### Get Current Identity
 
 Identify the API credential connected to LaunchDarkly, including its account, token kind, scopes, and member profile when available.
+
+### Get Experiment
+
+Inspect one experiment, its current iteration, and optional treatment, metric, analysis, or previous-iteration details. Discover experiment keys with List Experiments.
+
+### Get Metric
+
+Inspect one metric, its event definition, numeric settings, version, and optional experiment or guarded-rollout usage details. Discover metric keys with List Metrics.
 
 ### Get Segment
 

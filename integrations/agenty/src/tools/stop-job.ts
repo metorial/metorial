@@ -29,7 +29,7 @@ export let stopJob = SlateTool.create(spec, {
 
     return {
       output: {
-        jobId: result.job_id || ctx.input.jobId,
+        jobId: String(result.job_id ?? ctx.input.jobId),
         status: result.status || 'stopped'
       },
       message: `Stopped job **${ctx.input.jobId}**. Status: ${result.status || 'stopped'}.`

@@ -35,6 +35,10 @@ export let sendOtp = SlateTool.create(spec, {
         .optional()
         .describe('OTP validity in minutes (default: 1440 / 1 day)'),
       sender: z.string().optional().describe('Sender ID'),
+      variables: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('OTP template variables, such as {"Param1": "value1"}'),
       email: z
         .string()
         .optional()
@@ -57,7 +61,8 @@ export let sendOtp = SlateTool.create(spec, {
       otpLength: ctx.input.otpLength,
       otpExpiry: ctx.input.otpExpiry,
       sender: ctx.input.sender,
-      email: ctx.input.email
+      email: ctx.input.email,
+      variables: ctx.input.variables
     });
 
     return {

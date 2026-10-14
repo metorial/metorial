@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let recipientSchema = z
@@ -13,6 +13,7 @@ let recipientSchema = z
     city: z.string().optional().describe('City'),
     state: z.string().optional().describe('State or county'),
     zipcode: z.string().optional().describe('Postal/zip code'),
+    postcode: z.string().optional().describe('Postal code for UK/EU addresses'),
     country: z
       .string()
       .optional()
@@ -39,7 +40,7 @@ export let sendLetter = SlateTool.create(spec, {
       recipientId: z.number().optional().describe('Existing recipient ID to send to'),
       recipient: recipientSchema.optional(),
       templateId: z.number().optional().describe('Pre-configured letter template ID'),
-      file: z.string().optional().describe('PDF/DOC file as URL or base64 (max 10 pages)'),
+      file: z.string().optional().describe('PDF/DOC file as URL or base64 (maximum 25 pages)'),
       duplex: z.boolean().optional().describe('Print double-sided (defaults to true)'),
       tags: z.string().optional().describe('Comma-separated tags for tracking and reporting'),
       addons: z.string().optional().describe('Addon codes (e.g. FIRST_CLASS)'),
@@ -64,17 +65,27 @@ export let sendLetter = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
-    let recipientValue: number | Record<string, any>;
-    if (ctx.input.recipientId) {
+    if ((ctx.input.recipientId !== undefined) === (ctx.input.recipient !== undefined)) {
+      throw createApiServiceError(
+        'Provide either recipientId or inline recipient details, not both.'
+      );
+    }
+    let recipientValue: number | Record<string, unknown>;
+    if (ctx.input.recipientId !== undefined) {
       recipientValue = ctx.input.recipientId;
     } else if (ctx.input.recipient) {
       recipientValue = ctx.input.recipient;
     } else {
-      throw new Error('Either recipientId or recipient details must be provided');
+      throw createApiServiceError('Provide recipientId or inline recipient details.');
     }
 
+    if ((ctx.input.templateId !== undefined) === (ctx.input.file !== undefined)) {
+      throw createApiServiceError(
+        'Provide either templateId or file for the letter content, not both.'
+      );
+    }
     let result = await client.createLetter({
       template: ctx.input.templateId,
       file: ctx.input.file,
@@ -86,17 +97,24 @@ export let sendLetter = SlateTool.create(spec, {
       postUnverified: ctx.input.postUnverified
     });
 
+    if (typeof result.pdf === 'string' && result.pdf) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.pdf,
+        mimeType: 'application/pdf'
+      });
+    }
     return {
       output: {
         mailpieceId: String(result.id),
-        pdfUrl: result.pdf,
-        status: result.status,
-        cost: result.cost,
-        format: result.format,
-        created: result.created
+        pdfUrl: result.pdf ?? undefined,
+        status: result.status ?? undefined,
+        cost: result.cost != null ? String(result.cost) : undefined,
+        format: result.format ?? undefined,
+        created: result.created ?? undefined
       },
       message: ctx.input.test
-        ? `Test letter generated. PDF available at: ${result.pdf}`
+        ? `Test letter generated. The PDF is ready for download.`
         : `Letter created with ID **${result.id}**. Status: ${result.status}`
     };
   })

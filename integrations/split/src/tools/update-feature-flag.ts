@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client, type JsonPatchOp } from '../lib/client';
+import { validateBuckets, validateTrafficAllocation } from '../lib/validation';
 import { spec } from '../spec';
 
 let bucketInputSchema = z.object({
@@ -16,7 +17,7 @@ let treatmentInputSchema = z.object({
   segments: z.array(z.string()).optional()
 });
 
-let matcherInputSchema: z.ZodType<any> = z.object({
+let matcherInputSchema = z.object({
   negate: z.boolean().optional(),
   type: z
     .string()
@@ -28,6 +29,12 @@ let matcherInputSchema: z.ZodType<any> = z.object({
   number: z.number().optional(),
   date: z.number().optional(),
   between: z.object({ from: z.number(), to: z.number() }).optional(),
+  semverBetween: z
+    .object({ from: z.string(), to: z.string() })
+    .optional()
+    .describe(
+      'Semantic version bounds for a BETWEEN_SEMVER matcher. Keep between for numeric and date bounds.'
+    ),
   depends: z.object({ splitName: z.string(), treatment: z.string() }).optional()
 });
 
@@ -55,7 +62,9 @@ export let updateFeatureFlag = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Falls back to the configured default.'),
+        .describe(
+          'Workspace ID. Call list_workspaces to discover IDs. Falls back to the configured default.'
+        ),
       flagName: z.string().describe('Name of the feature flag to update.'),
       description: z
         .string()
@@ -64,7 +73,9 @@ export let updateFeatureFlag = SlateTool.create(spec, {
       rolloutStatusId: z
         .string()
         .optional()
-        .describe('New rollout status ID (metadata update).'),
+        .describe(
+          'New rollout status ID (metadata update). Call list_rollout_statuses to discover IDs.'
+        ),
       environmentId: z
         .string()
         .optional()
@@ -107,10 +118,67 @@ export let updateFeatureFlag = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
     if (!wsId) {
-      throw new Error('workspaceId is required. Set it in config or pass it as input.');
+      throw createApiServiceError(
+        'workspaceId is required. Call list_workspaces to discover IDs, then pass the ID or set the default workspace.'
+      );
     }
 
-    let client = new Client({ token: ctx.auth.token });
+    let envId = ctx.input.environmentId ?? ctx.config.environmentId;
+    let definitionRequested = [
+      ctx.input.killed,
+      ctx.input.treatments,
+      ctx.input.defaultTreatment,
+      ctx.input.defaultRule,
+      ctx.input.rules,
+      ctx.input.trafficAllocation,
+      ctx.input.impressionsDisabled
+    ].some(value => value !== undefined);
+    if (definitionRequested && !envId) {
+      throw createApiServiceError(
+        'environmentId is required for definition changes. Call list_environments to discover IDs, then pass the environment or set the default.'
+      );
+    }
+    if (
+      !definitionRequested &&
+      ctx.input.description === undefined &&
+      ctx.input.rolloutStatusId === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide at least one metadata or environment definition field to update.'
+      );
+    }
+    if (ctx.input.treatments) {
+      let names = new Set(ctx.input.treatments.map(treatment => treatment.treatmentName));
+      if (!ctx.input.treatments.length || names.size !== ctx.input.treatments.length) {
+        throw createApiServiceError(
+          'treatments must contain at least one treatment with unique names.'
+        );
+      }
+      if (
+        (ctx.input.defaultTreatment !== undefined && !names.has(ctx.input.defaultTreatment)) ||
+        ctx.input.defaultRule?.some(bucket => !names.has(bucket.treatment)) ||
+        ctx.input.rules?.some(rule =>
+          rule.buckets.some(bucket => !names.has(bucket.treatment))
+        )
+      ) {
+        throw createApiServiceError(
+          'defaultTreatment and all buckets must reference a supplied treatment when replacing treatments.'
+        );
+      }
+    }
+    validateTrafficAllocation(ctx.input.trafficAllocation);
+    validateBuckets(ctx.input.defaultRule, 'defaultRule');
+    for (let [index, rule] of (ctx.input.rules ?? []).entries()) {
+      validateBuckets(rule.buckets, `rules[${index}].buckets`);
+      for (let matcher of rule.condition.matchers) {
+        if (matcher.semverBetween && (matcher.type !== 'BETWEEN_SEMVER' || matcher.between)) {
+          throw createApiServiceError(
+            'semverBetween is only valid for BETWEEN_SEMVER and cannot be combined with between.'
+          );
+        }
+      }
+    }
+    let client = new Client(ctx.auth);
     let metadataUpdated = false;
     let definitionUpdated = false;
     let killedState: boolean | undefined;
@@ -133,16 +201,15 @@ export let updateFeatureFlag = SlateTool.create(spec, {
     }
 
     // Definition updates (environment-level)
-    let envId = ctx.input.environmentId ?? ctx.config.environmentId;
     if (envId) {
       // Handle kill/restore separately
       if (ctx.input.killed === true) {
-        let def = await client.killFlag(wsId, ctx.input.flagName, envId);
-        killedState = def.killed;
+        await client.killFlag(wsId, ctx.input.flagName, envId);
+        killedState = true;
         definitionUpdated = true;
       } else if (ctx.input.killed === false) {
-        let def = await client.restoreFlag(wsId, ctx.input.flagName, envId);
-        killedState = def.killed;
+        await client.restoreFlag(wsId, ctx.input.flagName, envId);
+        killedState = false;
         definitionUpdated = true;
       }
 
@@ -177,7 +244,20 @@ export let updateFeatureFlag = SlateTool.create(spec, {
         });
       }
       if (ctx.input.rules !== undefined) {
-        definitionOps.push({ op: 'replace', path: '/rules', value: ctx.input.rules });
+        definitionOps.push({
+          op: 'replace',
+          path: '/rules',
+          value: ctx.input.rules.map(rule => ({
+            ...rule,
+            condition: {
+              ...rule.condition,
+              matchers: rule.condition.matchers.map(({ semverBetween, ...matcher }) => ({
+                ...matcher,
+                between: semverBetween ?? matcher.between
+              }))
+            }
+          }))
+        });
       }
       if (ctx.input.trafficAllocation !== undefined) {
         definitionOps.push({

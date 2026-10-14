@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageSubscriberGroups = SlateTool.create(spec, {
   name: 'Manage Subscriber Groups',
   key: 'manage_subscriber_groups',
-  description: `Adds or removes subscribers from a group. Provide the group ID, an action (add or remove), and a list of subscriber email addresses. Returns a breakdown of successful and failed operations.`,
+  description: `Adds or removes subscribers from a group. Provide the group ID, an action (add or remove), and a list of subscriber email addresses. Returns individual results when available, or an overall confirmation when Sender omits the per-subscriber breakdown.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -28,6 +28,11 @@ export let manageSubscriberGroups = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      success: z.boolean().optional().describe('Whether the provider confirmed the request'),
+      confirmationMessage: z
+        .string()
+        .optional()
+        .describe('Provider confirmation when individual results are unavailable'),
       successful: z
         .array(z.string())
         .describe('Email addresses that were successfully processed'),
@@ -48,14 +53,18 @@ export let manageSubscriberGroups = SlateTool.create(spec, {
         ctx.input.triggerAutomation
       );
 
+      let successful =
+        result.message.subscribers_added_to_group ??
+        result.message.subscribers_add_tag_group ??
+        [];
       return {
         output: {
-          successful: result.message.subscribers_add_tag_group,
-          alreadyInState: result.message.subscribers_with_group_already,
-          nonExisting: result.message.non_existing_subscribers,
-          invalidEmails: result.message.invalid_emails
+          successful,
+          alreadyInState: result.message.subscribers_with_group_already ?? [],
+          nonExisting: result.message.non_existing_subscribers ?? [],
+          invalidEmails: result.message.invalid_emails ?? []
         },
-        message: `Added **${result.message.subscribers_add_tag_group.length}** subscriber(s) to group \`${ctx.input.groupId}\`.`
+        message: `Added **${successful.length}** subscriber(s) to group \`${ctx.input.groupId}\`.`
       };
     } else {
       let result = await client.removeSubscribersFromGroup(
@@ -63,14 +72,35 @@ export let manageSubscriberGroups = SlateTool.create(spec, {
         ctx.input.emails
       );
 
+      if (result.success === false) {
+        throw createApiServiceError('Sender did not confirm the group removal request.');
+      }
+      if (typeof result.message === 'string') {
+        return {
+          output: {
+            success: result.success,
+            confirmationMessage: result.message,
+            successful: [],
+            alreadyInState: [],
+            nonExisting: [],
+            invalidEmails: []
+          },
+          message: `Group removal request completed. ${result.message} Sender did not return individual subscriber results.`
+        };
+      }
+      let successful =
+        result.message.subscribers_removed_from_group ??
+        result.message.subscribers_remove_tag_group ??
+        [];
       return {
         output: {
-          successful: result.message.subscribers_remove_tag_group,
-          alreadyInState: result.message.subscribers_without_group_already,
-          nonExisting: result.message.non_existing_subscribers,
-          invalidEmails: result.message.invalid_emails
+          success: result.success,
+          successful,
+          alreadyInState: result.message.subscribers_without_group_already ?? [],
+          nonExisting: result.message.non_existing_subscribers ?? [],
+          invalidEmails: result.message.invalid_emails ?? []
         },
-        message: `Removed **${result.message.subscribers_remove_tag_group.length}** subscriber(s) from group \`${ctx.input.groupId}\`.`
+        message: `Removed **${successful.length}** subscriber(s) from group \`${ctx.input.groupId}\`.`
       };
     }
   })

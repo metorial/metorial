@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,22 +30,19 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.scrapfly.io'
-      });
-
-      let response = await http.get('/account', {
-        params: {
-          key: ctx.output.token
-        }
-      });
-
-      let account = response.data;
+      let account = await new Client(ctx.output.token).getAccount();
+      let accountId =
+        account?.account?.account_id ?? account?.account?.id ?? account?.project?.name;
+      if (accountId === undefined || accountId === null) {
+        throw createApiServiceError(
+          'Scrapfly did not return an account identifier. Check the API key and try again.'
+        );
+      }
 
       return {
         profile: {
-          id: account.account?.id ?? account.project?.name,
-          name: account.project?.name ?? 'Scrapfly Account'
+          id: String(accountId),
+          name: account?.project?.name ?? 'Scrapfly Account'
         }
       };
     }

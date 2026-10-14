@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { HelloLeadsClient } from '../lib/client';
+import { HelloLeadsClient, readHelloLeadsString } from '../lib/client';
 import { spec } from '../spec';
 
 let listSchema = z.object({
@@ -32,12 +32,19 @@ export let getLists = SlateTool.create(spec, {
 
     let result = await client.listLists();
 
-    let rawLists = Array.isArray(result) ? result : (result?.data ?? result?.lists ?? []);
+    let lists = result.map(list => {
+      let listKey = readHelloLeadsString(list.list_key ?? list.key ?? list.id);
+      if (!listKey?.trim()) {
+        throw createApiServiceError('HelloLeads returned a list without an identifier.', {
+          reason: 'helloleads_invalid_response'
+        });
+      }
 
-    let lists = (rawLists as any[]).map((list: any) => ({
-      listKey: String(list.list_key ?? list.key ?? list.id ?? ''),
-      name: String(list.name ?? '')
-    }));
+      return {
+        listKey,
+        name: readHelloLeadsString(list.name) ?? ''
+      };
+    });
 
     return {
       output: {

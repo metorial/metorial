@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listInvoices = SlateTool.create(spec, {
   name: 'List Invoices',
   key: 'list_invoices',
-  description: `Retrieve invoices with optional filtering by client, project, state, and date range. Returns invoice details including amounts, status, and dates.`,
+  description: `Retrieve invoices with optional filtering by client, project, state, and date range. Returns invoice details including amounts, status, and dates. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       clientId: z.number().optional().describe('Filter by client ID'),
       projectId: z.number().optional().describe('Filter by project ID'),
       state: z
@@ -50,7 +52,7 @@ export let listInvoices = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     let result = await client.listInvoices({

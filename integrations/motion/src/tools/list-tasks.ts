@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
@@ -16,7 +17,7 @@ export let listTasks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().optional().describe('Filter tasks to a specific workspace'),
+      workspaceId: workspaceIdSchema.optional(),
       projectId: z.string().optional().describe('Filter tasks to a specific project'),
       assigneeId: z.string().optional().describe('Filter tasks assigned to a specific user'),
       status: z
@@ -62,6 +63,10 @@ export let listTasks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.status !== undefined && ctx.input.includeAllStatuses !== undefined) {
+      throw createApiServiceError('Choose either status or includeAllStatuses, not both.');
+    }
+
     let client = new MotionClient({ token: ctx.auth.token });
 
     let result = await client.listTasks({

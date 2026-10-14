@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -34,24 +34,28 @@ export let manageContactList = SlateTool.create(spec, {
 
     switch (action) {
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required when creating a contact list');
-        let data: Record<string, any> = { Name: ctx.input.name };
-        if (ctx.input.description) data.Description = ctx.input.description;
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required when creating a contact list');
+        let data: Record<string, unknown> = { Name: ctx.input.name };
+        if (ctx.input.description !== undefined) data.Description = ctx.input.description;
         let result = await client.createContactList(data);
-        success = result?.Status === 1;
-        resultListId = String(result?.Data ?? '');
+        success = String(result?.Status) === '1';
+        resultListId = String(result?.Data?.ID ?? '');
+        if (!resultListId)
+          throw createApiServiceError('Benchmark Email did not return the created record ID.');
         message = success
           ? `Created contact list **"${ctx.input.name}"** with ID \`${resultListId}\`.`
           : `Failed to create contact list.`;
         break;
       }
       case 'update': {
-        if (!listId) throw new Error('listId is required when updating a contact list');
-        let data: Record<string, any> = {};
-        if (ctx.input.name) data.Name = ctx.input.name;
-        if (ctx.input.description) data.Description = ctx.input.description;
+        if (!listId)
+          throw createApiServiceError('listId is required when updating a contact list');
+        let data: Record<string, unknown> = {};
+        if (ctx.input.name !== undefined) data.Name = ctx.input.name;
+        if (ctx.input.description !== undefined) data.Description = ctx.input.description;
         let result = await client.updateContactList(listId, data);
-        success = result?.Status === 1;
+        success = String(result?.Status) === '1';
         resultListId = listId;
         message = success
           ? `Updated contact list \`${listId}\`.`
@@ -59,9 +63,10 @@ export let manageContactList = SlateTool.create(spec, {
         break;
       }
       case 'delete': {
-        if (!listId) throw new Error('listId is required when deleting a contact list');
+        if (!listId)
+          throw createApiServiceError('listId is required when deleting a contact list');
         let result = await client.deleteContactList(listId);
-        success = result?.Status === 1;
+        success = String(result?.Status) === '1';
         message = success
           ? `Deleted contact list \`${listId}\`.`
           : `Failed to delete contact list \`${listId}\`.`;

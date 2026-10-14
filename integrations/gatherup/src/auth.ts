@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,6 +18,10 @@ export let auth = SlateAuth.create()
       clientId: z.string().describe('Client ID found in Account Owner Details')
     }),
     getOutput: async ctx => {
+      await new Client({
+        token: ctx.input.bearerToken,
+        clientId: ctx.input.clientId
+      }).testConnection();
       return {
         output: {
           token: ctx.input.bearerToken,

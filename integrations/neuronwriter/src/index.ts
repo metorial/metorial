@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   createQuery,
   evaluateContent,
+  exportContent,
   getContent,
   getRecommendations,
   importContent,
@@ -18,6 +19,7 @@ export let provider = Slate.create({
     listQueries,
     getRecommendations,
     getContent,
+    exportContent,
     importContent,
     evaluateContent
   ],

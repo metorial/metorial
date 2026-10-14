@@ -7,6 +7,7 @@ import {
   countDocuments,
   createDocument,
   deleteDocument,
+  getCurrentUser,
   getDocument,
   getReport,
   listDocuments,
@@ -16,6 +17,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     getDocument,
     listDocuments,
     createDocument,

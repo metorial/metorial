@@ -63,7 +63,9 @@ export let createWebhook = SlateTool.create(spec, {
   .input(
     z.object({
       url: z.string().describe('URL of the webhook endpoint to receive events'),
-      websiteId: z.string().describe('ID of the website to associate the webhook with'),
+      websiteId: z
+        .string()
+        .describe('Website ID. Call list_websites to discover website IDs.'),
       version: z.string().optional().describe('API version (defaults to "v1.0")')
     })
   )
@@ -87,8 +89,11 @@ export let createWebhook = SlateTool.create(spec, {
 export let updateWebhook = SlateTool.create(spec, {
   name: 'Update Webhook',
   key: 'update_webhook',
-  description: `Update an existing webhook endpoint configuration. Modify the endpoint URL or enable/disable the webhook.`,
-  constraints: ['Requires Admin or Owner role to manage webhook settings.'],
+  description: `Update an existing webhook endpoint configuration. Supply url and websiteId to replace its destination. If either is omitted, webhooks:read access is needed to load the current settings.`,
+  constraints: [
+    'Requires Admin or Owner role to manage webhook settings.',
+    'Changing enabled requires provider support; the public update documentation does not specify this field.'
+  ],
   tags: {
     destructive: false
   }
@@ -97,7 +102,17 @@ export let updateWebhook = SlateTool.create(spec, {
     z.object({
       webhookId: z.string().describe('ID of the webhook to update'),
       url: z.string().optional().describe('New webhook endpoint URL'),
-      enabled: z.boolean().optional().describe('Enable or disable the webhook')
+      enabled: z.boolean().optional().describe('Enable or disable the webhook'),
+      websiteId: z
+        .string()
+        .optional()
+        .describe(
+          'Website ID. Call list_websites to discover IDs; defaults to the current website.'
+        ),
+      version: z
+        .string()
+        .optional()
+        .describe('Webhook API version (defaults to the current version or v1.0)')
     })
   )
   .output(webhookSchema)
@@ -105,7 +120,9 @@ export let updateWebhook = SlateTool.create(spec, {
     let client = new Client(ctx.auth.token);
     let result = await client.updateWebhook(ctx.input.webhookId, {
       url: ctx.input.url,
-      enabled: ctx.input.enabled
+      enabled: ctx.input.enabled,
+      websiteId: ctx.input.websiteId,
+      version: ctx.input.version
     });
 
     let webhook = mapWebhook(result);
@@ -143,9 +160,12 @@ export let deleteWebhook = SlateTool.create(spec, {
     return {
       output: {
         webhookId: result.webhook_id || ctx.input.webhookId,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Deleted webhook **${ctx.input.webhookId}**.`
+      message:
+        result.deleted === true
+          ? `Deleted webhook **${ctx.input.webhookId}**.`
+          : `LiveSession did not confirm deletion of webhook **${ctx.input.webhookId}**.`
     };
   })
   .build();

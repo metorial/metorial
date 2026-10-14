@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let markdownify = SlateTool.create(spec, {
   name: 'Convert to Markdown',
   key: 'markdownify',
-  description: `Converts a webpage into clean, well-formatted Markdown. Strips ads, navigation, and irrelevant elements while preserving content structure, images, and links.
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Converts a webpage into clean, well-formatted Markdown. Strips ads, navigation, and irrelevant elements while preserving content structure, images, and links.
 Useful for preparing web content for LLMs, documentation, or content migration.`,
   tags: {
     destructive: false,
@@ -34,7 +34,11 @@ Useful for preparing web content for LLMs, documentation, or content migration.`
     z.object({
       requestId: z.string().describe('Unique identifier for this request'),
       status: z.string().describe('Status of the request'),
-      result: z.string().describe('Clean Markdown content of the webpage'),
+      result: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Clean Markdown content when available'),
       error: z.string().nullable().optional().describe('Error message if the request failed')
     })
   )

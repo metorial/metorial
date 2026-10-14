@@ -15,7 +15,8 @@ import {
   manageTask,
   searchContacts,
   sendEvent,
-  sendTextMessage
+  sendTextMessage,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -34,7 +35,8 @@ export let provider = Slate.create({
     listDeals,
     listTasks,
     enrollActionPlan,
-    listPipelines
+    listPipelines,
+    whoAmI
   ],
   triggers: []
 });

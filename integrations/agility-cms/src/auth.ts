@@ -1,4 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 let mgmtBaseUrls = {
@@ -42,24 +48,26 @@ function createAgilityOauth(name: string, key: string, region: Region) {
     },
 
     handleCallback: async (ctx: any) => {
-      let httpClient = createAxios({ baseURL: baseUrl });
-      let response = await httpClient.post('/oauth/token', {
-        code: ctx.code,
-        redirect_uri: ctx.redirectUri
+      let httpClient = createAuthenticatedAxios({
+        baseURL: baseUrl,
+        contentType: false,
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Agility CMS',
+            reason: 'agility_authentication_error',
+            operation: 'authentication'
+          })
       });
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let form = new FormData();
+      form.set('code', ctx.code);
+      let response = await httpClient.post('/oauth/token', form);
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Agility CMS',
+        operation: 'authorization'
+      });
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          ...tokens,
           authMethod: 'oauth' as const,
           region
         }
@@ -67,24 +75,33 @@ function createAgilityOauth(name: string, key: string, region: Region) {
     },
 
     handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output.refreshToken) return { output: ctx.output };
-      let httpClient = createAxios({ baseURL: baseUrl });
-      let response = await httpClient.post('/oauth/refresh', {
-        refresh_token: ctx.output.refreshToken
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'The Agility CMS refresh token is missing. Reconnect with offline access enabled.'
+        );
+      }
+      let httpClient = createAuthenticatedAxios({
+        baseURL: baseUrl,
+        contentType: false,
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Agility CMS',
+            reason: 'agility_authentication_error',
+            operation: 'authentication'
+          })
       });
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let response = await httpClient.post('/oauth/refresh', null, {
+        params: { refresh_token: ctx.output.refreshToken }
+      });
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Agility CMS',
+        operation: 'token refresh',
+        previousRefreshToken: ctx.output.refreshToken,
+        refreshTokenFallbackMode: 'falsy'
+      });
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
+          ...tokens,
           authMethod: 'oauth' as const,
           region
         }

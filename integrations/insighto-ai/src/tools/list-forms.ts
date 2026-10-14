@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListResult, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let listForms = SlateTool.create(spec, {
@@ -49,20 +49,23 @@ export let listForms = SlateTool.create(spec, {
 
     if (ctx.input.formId) {
       let result = await client.getForm(ctx.input.formId);
-      let data = result.data || result;
+      let data = getObjectResult(result);
       let capturedResponses: any[] | undefined;
 
       if (ctx.input.listCapturedResponses) {
-        let capturedResult = await client.listCapturedForms(ctx.input.formId);
-        capturedResponses = capturedResult.data || capturedResult;
+        let capturedResult = await client.listCapturedForms(ctx.input.formId, {
+          page: ctx.input.page,
+          size: ctx.input.size
+        });
+        capturedResponses = getListResult(capturedResult).items;
       }
 
       return {
         output: {
           form: {
             formId: data.id,
-            name: data.name,
-            description: data.description
+            name: data.name ?? undefined,
+            description: data.description ?? undefined
           },
           capturedResponses
         },
@@ -71,16 +74,15 @@ export let listForms = SlateTool.create(spec, {
     }
 
     let result = await client.listForms({ page: ctx.input.page, size: ctx.input.size });
-    let items = result.data || result.items || result;
-    let list = Array.isArray(items) ? items : [];
+    let { items: list, total } = getListResult(result);
     return {
       output: {
         forms: list.map((f: any) => ({
           formId: f.id,
-          name: f.name,
-          description: f.description
+          name: f.name ?? undefined,
+          description: f.description ?? undefined
         })),
-        totalCount: result.total || list.length
+        totalCount: total
       },
       message: `Found **${list.length}** form(s).`
     };

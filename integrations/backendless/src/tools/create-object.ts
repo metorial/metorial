@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BackendlessClient } from '../lib/client';
 import { spec } from '../spec';
@@ -41,6 +41,17 @@ export let createObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.record === undefined) === (ctx.input.records === undefined) ||
+      ctx.input.records?.length === 0
+    ) {
+      throw createApiServiceError(
+        'Provide either record or a non-empty records array, but not both.'
+      );
+    }
+    if (ctx.input.records && ctx.input.records.length > 100) {
+      throw createApiServiceError('Create at most 100 records per request.');
+    }
     let client = new BackendlessClient({
       applicationId: ctx.auth.applicationId,
       token: ctx.auth.token,
@@ -70,10 +81,6 @@ export let createObject = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: { count: 0 },
-      message:
-        'No record or records provided. Please specify either `record` for single creation or `records` for bulk creation.'
-    };
+    throw createApiServiceError('Provide record or records to create an object.');
   })
   .build();

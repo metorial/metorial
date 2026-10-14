@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Teltel
 
-Initiate outbound voice calls (click-to-call/callback), send SMS messages, and manage auto dialer campaigns. Verify phone numbers via HLR lookup, retrieve detailed call data and recordings, and manage users and SIP devices. Supports bulk SMS for marketing campaigns, two-way SMS with inbound webhook forwarding, and real-time call event notifications via webhooks and WebSocket. Configure call forwarding logic for incoming calls.
+Initiate Click2Call voice calls, send single or bulk SMS messages, inspect message history, verify phone numbers, and manage auto dialer campaigns and contacts. Discover users and their caller ID groups, check account balance, and monitor live campaign statistics.
+
+SMS sending requires a sender ID. Campaign creation requires a name, campaign type, and caller ID phone numbers; additional provider settings can be supplied in `settings`. Legacy campaign fields `callflowId`, `callerIdGroupId`, and `status`, plus contact `name`, remain available, but their write behavior is not specified by the current public API documentation.
+
+API documentation: [TelTel OpenAPI](https://apidoc.teltel.io/).
 
 ## License
 

@@ -1,4 +1,4 @@
-# Slates Specification for Eversign
+# Eversign Integration Specification
 
 ## Overview
 
@@ -7,6 +7,12 @@ Eversign (now branded as Xodo Sign) is an electronic signature platform that all
 ## Authentication
 
 Eversign supports two authentication methods:
+
+Business-scoped tools accept `businessId`, discovered with `list_businesses`.
+Connection setup requires no business ID. An ID stored in an older connection
+remains a fallback when a tool omits `businessId`. API-key connections remain
+compatible; OAuth connections created before version 0.3.0 need to reconnect
+so that subsequent tool calls use Bearer authentication.
 
 ### 1. API Access Key
 
@@ -25,13 +31,26 @@ Using OAuth you can make requests to the API on behalf of other Eversign users. 
 1. Register an app in the Developer page, providing an app name, domain, OAuth callback URL, and optional webhook URL.
 2. Upon approval, you receive a **Client ID** and **Client Secret**.
 3. Redirect users to the authorization URL: `https://app.eversign.com/oauth/authorize?client_id=YOUR_CLIENT_ID&state=YOUR_STATE_VALUE`
-4. After user authorization, exchange the returned `code` for an access token via a POST request to `https://app.eversign.com/oauth/token` with `client_id`, `client_secret`, `code`, and `state` parameters.
+4. After user authorization, exchange the returned `code` for an access token via a multipart/form-data POST request to `https://app.eversign.com/oauth/token` with `client_id`, `client_secret`, `code`, and `state` parameters.
 5. The response includes a Bearer `access_token`. Tokens currently do not expire.
 6. Use the token as a `Bearer` HTTP Authorization header instead of the `access_key` parameter.
 
 **Important:** OAuth access is scoped to documents created through your OAuth app only. You cannot access documents created by the user independently.
 
 ## Features
+
+Registered tools are `send_document`, `get_document`, `list_documents`,
+`cancel_document`, `create_document_from_template`, `list_templates`,
+`download_document`, `manage_signer`, `list_businesses`, `create_bulk_job`,
+`get_bulk_job`, `get_bulk_csv_template`, `list_bulk_jobs`, and
+`get_document_audit_log`. The provider capabilities below also describe
+features beyond these registered tools.
+
+PDF and bulk CSV requests prepare downloadable files. `download_document`
+retains its string `downloadUrl` field as a provider endpoint without credentials;
+the prepared PDF includes authentication. `get_bulk_job` retains its optional
+`csvTemplate` field with the provider's original CSV response text, and also
+supplies the requested CSV as a downloadable file.
 
 ### Document Management
 

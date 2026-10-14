@@ -16,6 +16,7 @@ import {
   deleteSubtaskTool,
   deleteTagTool,
   deleteVersionTool,
+  getIssueSchemaTool,
   getIssueTool,
   listCommentsTool,
   listEpicsTool,
@@ -24,6 +25,7 @@ import {
   listProjectMembersTool,
   listProjectsTool,
   listSprintsTool,
+  listSubtasksTool,
   listTagsTool,
   listVersionsTool,
   manageVersionLifecycleTool,
@@ -34,6 +36,7 @@ import {
   updateIssueTool,
   updateSprintTool,
   updateSubtaskTool,
+  updateTagTool,
   updateVersionTool
 } from './tools';
 export let provider = Slate.create({
@@ -41,6 +44,7 @@ export let provider = Slate.create({
   tools: [
     listProjectsTool,
     getIssueTool,
+    getIssueSchemaTool,
     createIssueTool,
     updateIssueTool,
     deleteIssueTool,
@@ -49,6 +53,7 @@ export let provider = Slate.create({
     addSubtaskTool,
     updateSubtaskTool,
     deleteSubtaskTool,
+    listSubtasksTool,
     addIssueRelationTool,
     removeIssueRelationTool,
     listSprintsTool,
@@ -70,6 +75,7 @@ export let provider = Slate.create({
     deleteCommentTool,
     listTagsTool,
     createTagTool,
+    updateTagTool,
     deleteTagTool,
     listOrgMembersTool,
     listProjectMembersTool

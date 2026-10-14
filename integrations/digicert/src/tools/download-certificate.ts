@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let downloadCertificate = SlateTool.create(spec, {
   name: 'Download Certificate',
   key: 'download_certificate',
-  description: `Download an issued certificate from DigiCert CertCentral. Returns certificate details and the PEM-encoded certificate content.`,
+  description: `Download an issued certificate from DigiCert CertCentral in PEM or a certificate bundle format.`,
   tags: {
     readOnly: true
   }
@@ -15,7 +15,7 @@ export let downloadCertificate = SlateTool.create(spec, {
     z.object({
       certificateId: z.string().describe('ID of the certificate to download'),
       format: z
-        .enum(['pem_all', 'pem_noroot', 'pem', 'cer', 'p7b', 'der'])
+        .enum(['pem_all', 'pem_noroot', 'pem', 'cer', 'p7b', 'der', 'pem_nointermediate'])
         .optional()
         .describe(
           'Certificate download format. "pem_all" includes full chain (default), "pem_noroot" excludes root, "pem" is end-entity only.'
@@ -40,7 +40,19 @@ export let downloadCertificate = SlateTool.create(spec, {
     ctx.progress('Downloading certificate...');
     let content = await client.downloadCertificate(ctx.input.certificateId, format);
 
-    let contentStr = typeof content === 'string' ? content : String(content);
+    let isPem = format.startsWith('pem');
+    let bytes = Buffer.from(content);
+    let contentStr = bytes.toString(isPem ? 'utf8' : 'base64');
+    await ctx.addAttachment({
+      type: 'url',
+      url: client.getCertificateDownloadUrl(ctx.input.certificateId, format),
+      headers: { 'X-DC-DEVKEY': ctx.auth.token },
+      mimeType: isPem
+        ? 'application/x-pem-file'
+        : format === 'der'
+          ? 'application/octet-stream'
+          : 'application/x-pkcs7-certificates'
+    });
 
     return {
       output: {

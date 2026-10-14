@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let purchaseItemSchema = z.object({
@@ -29,12 +30,12 @@ let purchaseOutputSchema = z.object({
 
 let mapPurchase = (p: any) => ({
   purchaseId: p.id,
-  title: p.title,
-  identifier: p.identifier,
+  title: p.title ?? undefined,
+  identifier: p.identifier ?? undefined,
   status: p.status,
   date: p.date,
   currency: p.currency,
-  paymentMethod: p.payment_method,
+  paymentMethod: p.payment_method ?? undefined,
   netTotal: p.net_total,
   grossTotal: p.gross_total,
   tax: p.tax,
@@ -55,6 +56,7 @@ export let listPurchases = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       categoryId: z.number().optional().describe('Filter by purchase category ID'),
       companyId: z.number().optional().describe('Filter by supplier company ID'),
       status: z.string().optional().describe('Filter by status'),
@@ -73,6 +75,8 @@ export let listPurchases = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.categoryId) params.category_id = ctx.input.categoryId;
     if (ctx.input.companyId) params.company_id = ctx.input.companyId;
     if (ctx.input.status) params.status = ctx.input.status;

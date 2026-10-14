@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -64,6 +64,8 @@ export let googleScholar = SlateTool.create(spec, {
     if (ctx.input.authorId) {
       let data = await client.googleScholarAuthor({
         authorId: ctx.input.authorId,
+        num: ctx.input.numResults,
+        hl: ctx.input.language,
         sort: ctx.input.authorSort,
         viewOp: ctx.input.authorViewCoauthors
           ? 'list_colleagues'
@@ -79,7 +81,7 @@ export let googleScholar = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.query) throw new Error('Either query or authorId is required');
+    if (!ctx.input.query) throw createApiServiceError('Either query or authorId is required');
 
     let data = await client.googleScholar({
       q: ctx.input.query,

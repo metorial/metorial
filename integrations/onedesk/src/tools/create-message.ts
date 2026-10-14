@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getCreatedId } from '../lib/client';
 import { spec } from '../spec';
 
 export let createMessage = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let createMessage = SlateTool.create(spec, {
   key: 'create_message',
   description: `Creates a message or comment on a conversation in OneDesk.
 Use this to add comments to tickets, tasks, or other work items via their conversation ID.
-Supports both internal team comments and customer-facing messages.`,
+Message visibility follows the existing conversation.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -38,8 +38,7 @@ Supports both internal team comments and customer-facing messages.`,
       content: ctx.input.content
     });
 
-    let messageId =
-      typeof result === 'string' ? result : result?.id || result?.externalId || String(result);
+    let messageId = getCreatedId(result);
 
     return {
       output: {

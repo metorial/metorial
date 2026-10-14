@@ -18,6 +18,14 @@ Use operators like **$in**, **$nin**, **$like**, **$lt**, **$lte**, **$gte** for
 })
   .input(
     z.object({
+      page: z.number().int().min(0).optional().describe('Page number (0-based)'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Results per page, up to 1000'),
       name: z
         .any()
         .optional()
@@ -71,19 +79,19 @@ Use operators like **$in**, **$nin**, **$like**, **$lt**, **$lte**, **$gte** for
     if (ctx.input.end !== undefined) filters.end = ctx.input.end;
     if (ctx.input.metadata !== undefined) filters.metadata = ctx.input.metadata;
 
-    let projects = await client.searchProjects(filters);
+    let projects = await client.searchProjects(filters, ctx.input.page, ctx.input.limit);
     return {
       output: {
         projects: projects.map((p: any) => ({
           projectId: p._id,
-          name: p.name,
-          projectCode: p.projectCode,
-          status: p.status,
-          start: p.start,
-          end: p.end,
-          metadata: p.metadata,
-          createdDate: p.createdDate,
-          updatedDate: p.updatedDate
+          name: p.name ?? undefined,
+          projectCode: p.projectCode ?? undefined,
+          status: p.status ?? undefined,
+          start: p.start ?? undefined,
+          end: p.end ?? undefined,
+          metadata: p.metadata ?? undefined,
+          createdDate: p.createdDate ?? undefined,
+          updatedDate: p.updatedDate ?? undefined
         }))
       },
       message: `Found **${projects.length}** projects matching the search criteria.`

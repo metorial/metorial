@@ -1,7 +1,17 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
-let axios = createAxios({
-  baseURL: 'https://www.waboxapp.com/api'
+let axios = createAuthenticatedAxios({
+  baseURL: 'https://www.waboxapp.com/api',
+  contentType: 'application/x-www-form-urlencoded',
+  timeout: 30000,
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'Waboxapp', reason: 'waboxapp_api_error' })
 });
 
 export class Client {
@@ -10,28 +20,44 @@ export class Client {
       token: string;
       phoneNumber: string;
     }
-  ) {}
+  ) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Waboxapp API token is required.');
+    }
+    if (!/^\d+$/.test(config.phoneNumber)) {
+      throw createApiServiceError(
+        'The linked account phone number must include the country code and contain digits only, without a + prefix.'
+      );
+    }
+  }
 
-  private async request<T = any>(opts: {
+  private async request(opts: {
     method: 'GET' | 'POST';
     path: string;
     data?: Record<string, string | undefined>;
-  }): Promise<T> {
-    let params: Record<string, string> = {
-      token: this.config.token
-    };
-
-    let response = await axios({
+  }): Promise<Record<string, unknown>> {
+    let response = await axios<unknown>({
       method: opts.method,
       url: opts.path,
-      params,
-      data: opts.data,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
+      params: { token: this.config.token },
+      data: opts.data
+        ? new URLSearchParams(pickDefined(opts.data) as Record<string, string>)
+        : undefined
     });
 
-    return response.data as T;
+    if (!isApiErrorRecord(response.data) || response.data.success !== true) {
+      throw buildApiServiceError(
+        { response: { status: response.status, data: response.data } },
+        {
+          providerLabel: 'Waboxapp',
+          reason: 'waboxapp_api_error',
+          operation: opts.path,
+          fallbackMessage: 'The API did not confirm that the request was accepted.'
+        }
+      );
+    }
+
+    return response.data;
   }
 
   async sendChat(opts: { to: string; customUid: string; text: string }) {
@@ -117,7 +143,7 @@ export class Client {
   async getStatus() {
     return this.request({
       method: 'POST',
-      path: `/status/${this.config.phoneNumber}`
+      path: `/status/${encodeURIComponent(this.config.phoneNumber)}`
     });
   }
 }

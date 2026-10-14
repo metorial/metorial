@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { chatbotIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getChatbotSettings = SlateTool.create(spec, {
@@ -14,7 +15,7 @@ export let getChatbotSettings = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      chatbotId: z.string().describe('The ID of the chatbot to retrieve settings for.')
+      chatbotId: chatbotIdSchema
     })
   )
   .output(
@@ -33,6 +34,15 @@ export let getChatbotSettings = SlateTool.create(spec, {
       temperature: z.number().nullable().describe('Model temperature setting.'),
       topK: z.number().nullable().describe('Top-K parameter for model.'),
       enableSources: z.boolean().describe('Whether source URLs are shown in responses.'),
+      systemPrompt: z.string().nullable().optional().describe('AI system instructions.'),
+      goalsPrompt: z.string().nullable().optional().describe('Goals given to the chatbot.'),
+      defaultAnswer: z.string().nullable().optional().describe('Fallback answer text.'),
+      defaultLanguage: z.string().nullable().optional().describe('Default response language.'),
+      enableEscalations: z
+        .boolean()
+        .optional()
+        .describe('Whether escalation to human support is enabled.'),
+      escalationsEmail: z.string().nullable().optional().describe('Escalation contact email.'),
       createdAt: z.string().nullable().describe('Chatbot creation timestamp.'),
       updatedAt: z.string().nullable().describe('Chatbot last update timestamp.')
     })
@@ -58,6 +68,12 @@ export let getChatbotSettings = SlateTool.create(spec, {
         temperature: data.temperature ?? null,
         topK: data.topK ?? data.top_k ?? null,
         enableSources: Boolean(data.enable_sources),
+        systemPrompt: data.system_prompt ?? null,
+        goalsPrompt: data.goals_prompt ?? null,
+        defaultAnswer: data.default_answer ?? null,
+        defaultLanguage: data.default_language ?? null,
+        enableEscalations: Boolean(data.enable_escalations),
+        escalationsEmail: data.escalations_email ?? null,
         createdAt: data.created_at ?? null,
         updatedAt: data.updated_at ?? null
       },

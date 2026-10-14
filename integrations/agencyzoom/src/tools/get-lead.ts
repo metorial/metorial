@@ -42,6 +42,12 @@ export let getLead = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ISO 8601 timestamp when the lead was last updated'),
+      rawLead: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Original lead record returned by AgencyZoom, preserving provider-specific fields.'
+        ),
       opportunities: z
         .array(z.record(z.string(), z.any()))
         .describe('Opportunities associated with this lead'),
@@ -51,11 +57,7 @@ export let getLead = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let [lead, opportunitiesResult, quotesResult] = await Promise.all([
       client.getLead(ctx.input.leadId),
@@ -75,27 +77,61 @@ export let getLead = SlateTool.create(spec, {
         : [];
 
     let leadData = lead.data ?? lead;
+    let fields = Array.isArray(leadData.customFields)
+      ? Object.fromEntries(
+          leadData.customFields.map((field: Record<string, any>) => [
+            field.fieldName,
+            field.fieldValue
+          ])
+        )
+      : leadData.customFields;
+    let tags = await client.resolveTagNames(leadData.tags ?? leadData.tagNames);
+    let statuses: Record<number, string> = {
+      0: 'new',
+      1: 'quoted',
+      2: 'won',
+      3: 'lost',
+      4: 'contacted',
+      5: 'x-dated'
+    };
 
     return {
       output: {
-        leadId: leadData.leadId ?? leadData.id ?? ctx.input.leadId,
-        firstName: leadData.firstName,
-        lastName: leadData.lastName,
+        leadId: String(leadData.leadId ?? leadData.id ?? ctx.input.leadId),
+        firstName: leadData.firstName ?? leadData.firstname,
+        lastName: leadData.lastName ?? leadData.lastname,
         email: leadData.email,
         phone: leadData.phone,
-        status: leadData.status,
-        producer: leadData.producer,
-        leadSource: leadData.leadSource,
-        pipelineId: leadData.pipelineId,
-        stageId: leadData.stageId,
-        customFields: leadData.customFields,
-        tags: leadData.tags,
-        createdAt: leadData.createdAt,
-        updatedAt: leadData.updatedAt,
+        status:
+          typeof leadData.status === 'number'
+            ? (statuses[leadData.status] ?? String(leadData.status))
+            : leadData.status,
+        producer: leadData.producer ?? {
+          id: leadData.assignedTo,
+          firstName: leadData.assignToFirstname,
+          lastName: leadData.assignToLastname
+        },
+        leadSource: leadData.leadSource ?? {
+          id: leadData.leadSourceId,
+          name: leadData.leadSourceName
+        },
+        pipelineId:
+          leadData.pipelineId != null || leadData.workflowId != null
+            ? String(leadData.pipelineId ?? leadData.workflowId)
+            : undefined,
+        stageId:
+          leadData.stageId != null || leadData.workflowStageId != null
+            ? String(leadData.stageId ?? leadData.workflowStageId)
+            : undefined,
+        customFields: fields,
+        tags,
+        createdAt: leadData.createdAt ?? leadData.createDate,
+        updatedAt: leadData.updatedAt ?? leadData.modifyDate,
+        rawLead: leadData,
         opportunities,
         quotes
       },
-      message: `Retrieved lead **${leadData.firstName ?? ''} ${leadData.lastName ?? ''}** (${ctx.input.leadId}) with **${opportunities.length}** opportunity(ies) and **${quotes.length}** quote(s).`
+      message: `Retrieved lead **${leadData.firstName ?? leadData.firstname ?? ''} ${leadData.lastName ?? leadData.lastname ?? ''}** (${ctx.input.leadId}) with **${opportunities.length}** opportunity(ies) and **${quotes.length}** quote(s).`
     };
   })
   .build();

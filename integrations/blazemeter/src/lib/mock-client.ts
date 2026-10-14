@@ -1,20 +1,32 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class MockServiceClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(params: { token: string; apiKeyId?: string; apiKeySecret?: string }) {
+  constructor(params: {
+    token: string;
+    apiKeyId?: string;
+    apiKeySecret?: string;
+    runscopeToken?: string;
+  }) {
+    if (params.runscopeToken || !params.token) {
+      throw createApiServiceError(
+        'A BlazeMeter API key connection is required for this operation.'
+      );
+    }
     let authHeader =
       params.apiKeyId && params.apiKeySecret
         ? `Basic ${Buffer.from(`${params.apiKeyId}:${params.apiKeySecret}`).toString('base64')}`
         : `Basic ${params.token}`;
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://mock.blazemeter.com/api/v1',
-      headers: {
-        Authorization: authHeader,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: authHeader },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'BlazeMeter Service Virtualization',
+          reason: 'blazemeter_mock_api_error'
+        })
     });
   }
 

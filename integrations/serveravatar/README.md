@@ -1,6 +1,10 @@
-# Serveravatar
+# ServerAvatar
 
-Deploy, manage, and monitor web applications and cloud servers. Create and configure servers on cloud providers (DigitalOcean, Vultr, Linode, AWS Lightsail, Hetzner) with choice of web server (Nginx, Apache2, OpenLiteSpeed) and database type. Deploy applications via one-click installers (WordPress, Moodle, Joomla, etc.), Git repositories, or Node.js. Manage SSL certificates, domains, firewall rules, Fail2ban, backups, databases, database users, cron jobs, and system users. Configure Git deployment with auto-pull webhooks and deployment scripts. Manage Cloudflare DNS and SSL/TLS settings. Browse and manage server files, create and restore backups to cloud storage, clone and migrate sites, manage staging environments, and run Supervisor background processes. Monitor server resource usage, view logs, and control individual services. Organize resources under organizations with server tagging and white-label hosting panel support.
+Deploy and manage cloud servers and web applications in ServerAvatar. Discover organizations, connected cloud provider accounts, server sizes, and supported timezones. Provision servers, create applications, inspect resource usage and logs, control services, and manage domains, SSL certificates, databases, firewall rules, cron jobs, system users, and backup listings.
+
+Use `list_organizations` to discover an organization ID, then pass it to an organization-scoped tool or configure it as the default. `get_organization` retrieves a selected organization's details. `list_timezones` supplies valid identifiers for server general settings and application creation.
+
+Application creation accepts framework-specific options in `frameworkSettings`. Explicit application, domain, and system-user inputs take precedence. For a new system user, supply a username and password; for an existing one, supply its ID. Cron creation accepts a predefined schedule or a five-field `customScheduling` expression.
 
 ## License
 

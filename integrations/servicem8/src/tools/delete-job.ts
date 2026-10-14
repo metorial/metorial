@@ -22,7 +22,7 @@ export let deleteJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteJob(ctx.input.jobUuid);
 
     return {

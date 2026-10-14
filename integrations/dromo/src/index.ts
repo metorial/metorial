@@ -6,6 +6,9 @@ import {
   deleteHeadlessImport,
   deleteSchema,
   deleteUpload,
+  downloadHeadlessImport,
+  downloadUpload,
+  getFileUrl,
   getHeadlessImport,
   getSchema,
   getUpload,
@@ -28,7 +31,10 @@ export let provider = Slate.create({
     createHeadlessImport,
     getHeadlessImport,
     listHeadlessImports,
-    deleteHeadlessImport
+    deleteHeadlessImport,
+    downloadUpload,
+    downloadHeadlessImport,
+    getFileUrl
   ],
   triggers: []
 });

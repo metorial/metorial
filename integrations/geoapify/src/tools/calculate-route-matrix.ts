@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GeoapifyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -69,6 +69,12 @@ export let calculateRouteMatrix = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let totalPairs = ctx.input.sources.length * ctx.input.targets.length;
+    if (totalPairs === 0 || totalPairs > 1000) {
+      throw createApiServiceError(
+        'Provide at least one source and target, with at most 1000 source-target combinations.'
+      );
+    }
     let client = new GeoapifyClient({ token: ctx.auth.token });
 
     let data = await client.calculateRouteMatrix({
@@ -80,16 +86,24 @@ export let calculateRouteMatrix = SlateTool.create(spec, {
       units: ctx.input.units
     });
 
-    let matrix = (data.sources_to_targets || []).map((row: any[]) =>
-      row.map((cell: any) => ({
-        distance: cell.distance,
-        time: cell.time,
-        sourceIndex: cell.source_index,
-        targetIndex: cell.target_index
+    if (
+      !Array.isArray(data?.sources_to_targets) ||
+      data.sources_to_targets.length !== ctx.input.sources.length ||
+      data.sources_to_targets.some(
+        (row: unknown) => !Array.isArray(row) || row.length !== ctx.input.targets.length
+      )
+    ) {
+      throw createApiServiceError('Geoapify returned an invalid route matrix.');
+    }
+    let matrix = data.sources_to_targets.map((row: any[], sourceIndex: number) =>
+      row.map((cell: any, targetIndex: number) => ({
+        distance: cell?.distance ?? undefined,
+        time: cell?.time ?? undefined,
+        sourceIndex: cell?.source_index ?? sourceIndex,
+        targetIndex: cell?.target_index ?? targetIndex
       }))
     );
 
-    let totalPairs = ctx.input.sources.length * ctx.input.targets.length;
     return {
       output: { matrix },
       message: `Computed route matrix with **${totalPairs}** source-target pair(s) (${ctx.input.sources.length} sources × ${ctx.input.targets.length} targets) using ${ctx.input.mode} mode.`

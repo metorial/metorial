@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { labelSchema } from '../lib/types';
@@ -40,6 +40,21 @@ export let manageLabels = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let hasChanges =
+      (ctx.input.labelsToAdd?.length ?? 0) > 0 || (ctx.input.labelsToRemove?.length ?? 0) > 0;
+    if (hasChanges && ctx.input.ticketId === undefined) {
+      throw createApiServiceError('Provide ticketId when adding or removing labels.');
+    }
+    if (!hasChanges && !ctx.input.listAvailable) {
+      throw createApiServiceError(
+        'Provide labelsToAdd, labelsToRemove, or listAvailable=true.'
+      );
+    }
+    if (ctx.input.labelsToAdd?.some(label => ctx.input.labelsToRemove?.includes(label))) {
+      throw createApiServiceError(
+        'The same label cannot be added and removed in one invocation.'
+      );
+    }
     let client = new Client({
       token: ctx.auth.token,
       companySubdomain: ctx.config.companySubdomain
@@ -53,14 +68,14 @@ export let manageLabels = SlateTool.create(spec, {
       availableLabels = await client.listLabels();
     }
 
-    if (ctx.input.ticketId && ctx.input.labelsToAdd) {
+    if (ctx.input.ticketId !== undefined && ctx.input.labelsToAdd) {
       for (let label of ctx.input.labelsToAdd) {
         await client.addLabel(ctx.input.ticketId, label);
         added.push(label);
       }
     }
 
-    if (ctx.input.ticketId && ctx.input.labelsToRemove) {
+    if (ctx.input.ticketId !== undefined && ctx.input.labelsToRemove) {
       for (let label of ctx.input.labelsToRemove) {
         await client.removeLabel(ctx.input.ticketId, label);
         removed.push(label);

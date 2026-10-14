@@ -5,8 +5,11 @@ import {
   createBulkJob,
   createDocumentFromTemplate,
   downloadDocument,
+  getBulkCsvTemplate,
   getBulkJob,
   getDocument,
+  getDocumentAuditLog,
+  listBulkJobs,
   listBusinesses,
   listDocuments,
   listTemplates,
@@ -26,7 +29,10 @@ export let provider = Slate.create({
     manageSigner,
     listBusinesses,
     createBulkJob,
-    getBulkJob
+    getBulkJob,
+    getBulkCsvTemplate,
+    listBulkJobs,
+    getDocumentAuditLog
   ],
   triggers: []
 });

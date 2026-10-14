@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmpClient } from '../lib/cmp-client';
 import { spec } from '../spec';
@@ -29,7 +29,7 @@ Assets include images, videos, articles, raw files, and structured content. Use 
         .string()
         .optional()
         .describe(
-          'Filter by asset type: image, video, article, raw_file, structured_content (for list)'
+          'Asset type: image, video, article, raw_file, structured_content. Filters list; selects the type-specific endpoint for get/update/delete. Call list to discover asset types.'
         ),
       metadata: z
         .record(z.string(), z.any())
@@ -65,27 +65,31 @@ Assets include images, videos, articles, raw files, and structured content. Use 
         };
       }
       case 'get': {
-        if (!ctx.input.assetId) throw new Error('assetId is required');
-        let asset = await client.getAsset(ctx.input.assetId);
+        if (!ctx.input.assetId) throw createApiServiceError('assetId is required');
+        let asset = await client.getAsset(ctx.input.assetId, ctx.input.assetType);
         return {
           output: { asset },
-          message: `Retrieved CMP asset **${asset.name || ctx.input.assetId}**.`
+          message: `Retrieved CMP asset **${asset.title || asset.name || ctx.input.assetId}**.`
         };
       }
       case 'update': {
-        if (!ctx.input.assetId) throw new Error('assetId is required');
+        if (!ctx.input.assetId) throw createApiServiceError('assetId is required');
         let updateData: Record<string, any> = {};
         if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
         if (ctx.input.metadata !== undefined) updateData.metadata = ctx.input.metadata;
-        let asset = await client.updateAsset(ctx.input.assetId, updateData);
+        let asset = await client.updateAsset(
+          ctx.input.assetId,
+          updateData,
+          ctx.input.assetType
+        );
         return {
           output: { asset },
-          message: `Updated CMP asset **${asset.name || ctx.input.assetId}**.`
+          message: `Updated CMP asset **${asset.title || asset.name || ctx.input.assetId}**.`
         };
       }
       case 'delete': {
-        if (!ctx.input.assetId) throw new Error('assetId is required');
-        await client.deleteAsset(ctx.input.assetId);
+        if (!ctx.input.assetId) throw createApiServiceError('assetId is required');
+        await client.deleteAsset(ctx.input.assetId, ctx.input.assetType);
         return {
           output: {},
           message: `Deleted CMP asset ${ctx.input.assetId}.`
@@ -100,7 +104,7 @@ Assets include images, videos, articles, raw files, and structured content. Use 
         };
       }
       case 'get_folder': {
-        if (!ctx.input.folderId) throw new Error('folderId is required');
+        if (!ctx.input.folderId) throw createApiServiceError('folderId is required');
         let folder = await client.getFolder(ctx.input.folderId);
         return {
           output: { folder },

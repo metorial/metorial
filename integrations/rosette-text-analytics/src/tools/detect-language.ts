@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let detectLanguageTool = SlateTool.create(spec, {
   name: 'Detect Language',
   key: 'detect_language',
-  description: `Identifies the language of a given text. Supports detection across 55 languages. Can optionally use multilingual detection mode to identify language regions within the same document, useful when text contains multiple languages.`,
+  description: `Identifies the language of a given text across supported languages. Can optionally use multilingual detection mode to identify language regions within the same document, useful when text contains multiple languages. Use list_supported_languages to discover language availability.`,
   constraints: ['Maximum payload size is 600KB with a maximum of 50,000 characters.'],
   tags: {
     readOnly: true

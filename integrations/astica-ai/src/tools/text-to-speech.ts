@@ -1,17 +1,19 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AsticaVoiceClient } from '../lib/client';
+import { getSpeechAudio, mapSpeechResult, speechOutputSchema } from '../lib/speech';
 import { spec } from '../spec';
 
 export let textToSpeechTool = SlateTool.create(spec, {
   name: 'Text to Speech',
   key: 'text_to_speech',
   description: `Convert text to natural-sounding speech audio using Astica's voice AI. Choose from 500+ voices across multiple categories including expressive, programmable, neural, and cloned voices.
-Returns Base64-encoded WAV audio and optionally word-level timestamps for precise playback synchronization.`,
+Provides downloadable WAV audio and optionally word-level timestamps for precise playback synchronization. Low-priority requests return a task ID to retrieve with get_speech_task.`,
   instructions: [
     'Specify a voice identifier (e.g., "expressive_ava", "prog_avery", "neural_jennifer").',
     'For programmable voices, use the stylePrompt parameter to shape the voice personality with natural language.',
-    'Enable timestamps to get word-level timing data for synchronized playback.'
+    'Enable timestamps with expressive voices to get word-level timing data for synchronized playback.',
+    'Low-priority mode supports expressive voices and custom clones. Retrieve queued audio with get_speech_task.'
   ],
   tags: {
     readOnly: true
@@ -34,30 +36,22 @@ Returns Base64-encoded WAV audio and optionally word-level timestamps for precis
         .string()
         .optional()
         .describe('Natural-language persona instructions for programmable voices only'),
-      lowPriority: z.boolean().optional().describe('Use low-priority mode for lower cost')
-    })
-  )
-  .output(
-    z.object({
-      status: z.string().describe('Response status'),
-      engine: z.string().optional().describe('Voice engine used'),
-      voice: z.string().optional().describe('Voice identifier used'),
-      audioBase64: z.string().optional().describe('Base64-encoded WAV audio data'),
-      audioFormat: z.string().optional().describe('Audio format (e.g., "wav")'),
-      costUnits: z.number().optional().describe('API usage cost units'),
-      timestamps: z
-        .array(
-          z.object({
-            text: z.string(),
-            startSeconds: z.number(),
-            stopSeconds: z.number()
-          })
-        )
+      lowPriority: z
+        .boolean()
         .optional()
-        .describe('Word-level timestamps')
+        .describe(
+          'Queue an expressive voice or custom clone for lower cost; retrieve its task ID with get_speech_task'
+        )
     })
   )
+  .output(speechOutputSchema)
   .handleInvocation(async ctx => {
+    let voice = ctx.input.voice || 'expressive_ava';
+    if (ctx.input.lowPriority && /^(neural_|prog_)/.test(voice)) {
+      throw createApiServiceError(
+        'Low-priority speech supports expressive voices and custom clones. Select one of those voices or disable lowPriority.'
+      );
+    }
     let client = new AsticaVoiceClient(ctx.auth.token);
 
     ctx.info(`Converting text to speech with voice: ${ctx.input.voice || 'expressive_ava'}`);
@@ -70,23 +64,26 @@ Returns Base64-encoded WAV audio and optionally word-level timestamps for precis
       lowPriority: ctx.input.lowPriority
     });
 
-    let timestamps = result.meta?.timestamps?.map((t: any) => ({
-      text: t.text,
-      startSeconds: t.start_s,
-      stopSeconds: t.stop_s
-    }));
+    let output = mapSpeechResult(result);
+    let audio = getSpeechAudio(output);
+    if (audio) {
+      await ctx.addAttachment({ type: 'content', content: audio, filename: 'speech.wav' });
+    }
+
+    if (output.status === 'queued' && !output.taskId) {
+      throw createApiServiceError(
+        'Astica queued the speech request without returning a task ID.'
+      );
+    }
 
     return {
-      output: {
-        status: result.status || 'unknown',
-        engine: result.engine,
-        voice: result.voice,
-        audioBase64: result.audio_b64,
-        audioFormat: result.audio_format,
-        costUnits: result.cost_units,
-        timestamps
-      },
-      message: `Text-to-speech conversion completed using voice "${result.voice || ctx.input.voice || 'expressive_ava'}" (${result.engine || 'unknown'} engine). Audio format: ${result.audio_format || 'wav'}.`
+      output,
+      message:
+        output.taskId && !audio
+          ? `Speech queued. Use get_speech_task with task ID "${output.taskId}" to retrieve the audio.`
+          : audio
+            ? `Text-to-speech conversion completed using voice "${output.voice || voice}" (${output.engine || 'unknown'} engine). Audio format: ${output.audioFormat || 'wav'}.`
+            : `Speech request status: ${output.status}.`
     };
   })
   .build();

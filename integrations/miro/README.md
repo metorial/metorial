@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/miro.svg" height="20"> Miro
 
-Create, manage, and organize collaborative whiteboard boards. Add and update board items including sticky notes, shapes, cards, text, images, documents, embeds, and frames. Connect items with configurable connectors, group items together, and categorize with tags. Share boards and manage board members with role-based permissions. Create mind maps and flowcharts (experimental). Enterprise features include project management, organization and team administration, audit logs, data classification, eDiscovery, and SCIM user provisioning.
+Create, copy, update, and delete collaborative whiteboard boards. Add and manage sticky notes, cards, text, shapes, images from URLs, embeds, and frames. Connect items, manage tags, discover frame contents, share boards, and manage board members. Retrieve the connected user and authorized team.
 
 ## Tools
 
@@ -55,6 +55,30 @@ Updates an existing item on a Miro board. Supports updating sticky notes, cards,
 ### Update Board
 
 Updates a Miro board's name, description, or sharing/permissions policies.
+
+### Get Current User
+
+Retrieves the connected user and authorized team. Use the team ID when creating, copying, or filtering boards.
+
+### Get Frame Items
+
+Retrieves a page of child items inside a frame. Discover frames with Get Board Items and use the returned cursor for later pages.
+
+### Update Tag
+
+Updates an existing tag's title or color. Get Tags discovers tag IDs. Refresh the board to see tag changes made through the API.
+
+### Get Tags, Attach Tag, Detach Tag, and Delete Tag
+
+List board or item tags, attach or remove an existing tag from a card or sticky note, and delete board tags. Board tag lists include the next pagination offset when more results exist.
+
+### Get Connectors and Delete Connector
+
+Retrieve connectors, including their endpoint IDs and captions, or delete a connector from a board.
+
+### Get Board Members, Update Board Member, and Remove Board Member
+
+List board members with pagination, change a member's role, or remove board access. Share Board accepts 1 to 20 email addresses per invitation request.
 
 ## License
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -72,7 +72,7 @@ export let manageEmailList = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.emailListUuid)
-        throw new Error('emailListUuid is required for delete action');
+        throw createApiServiceError('emailListUuid is required for delete action');
       await client.deleteEmailList(ctx.input.emailListUuid);
       return {
         output: { emailList: null },
@@ -81,9 +81,9 @@ export let manageEmailList = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create action');
       if (!ctx.input.defaultFromEmail)
-        throw new Error('defaultFromEmail is required for create action');
+        throw createApiServiceError('defaultFromEmail is required for create action');
 
       let result = await client.createEmailList({
         name: ctx.input.name,
@@ -108,7 +108,7 @@ export let manageEmailList = SlateTool.create(spec, {
 
     // update
     if (!ctx.input.emailListUuid)
-      throw new Error('emailListUuid is required for update action');
+      throw createApiServiceError('emailListUuid is required for update action');
 
     let existing = await client.getEmailList(ctx.input.emailListUuid);
 

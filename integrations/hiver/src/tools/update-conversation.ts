@@ -8,7 +8,7 @@ export let updateConversation = SlateTool.create(spec, {
   key: 'update_conversation',
   description: `Update properties of a conversation in a shared inbox. Supports modifying the conversation's status, assignee, and tags. Provide only the fields you want to change.`,
   instructions: [
-    'Provide at least one field to update (status, assigneeId, or tags).',
+    'Provide at least one field to update (status, assigneeId, assigneeEmail, or tags).',
     'Tags will replace the existing tags on the conversation when provided.'
   ],
   tags: {
@@ -18,13 +18,32 @@ export let updateConversation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      inboxId: z.string().describe('ID of the inbox containing the conversation'),
+      inboxId: z.string().describe('Inbox ID from list_inboxes'),
       conversationId: z.string().describe('ID of the conversation to update'),
       status: z
         .string()
         .optional()
-        .describe('New status for the conversation (e.g., "open", "closed", "pending")'),
-      assigneeId: z.string().optional().describe('User ID to assign the conversation to'),
+        .describe(
+          'New status for the conversation ("open", "close" (or "closed"), or "pending")'
+        ),
+      assigneeId: z
+        .string()
+        .optional()
+        .describe('User ID from search_inbox_users. Use either assigneeId or assigneeEmail.'),
+      assigneeEmail: z
+        .string()
+        .email()
+        .optional()
+        .describe(
+          'Email of an inbox member to assign. Use either assigneeEmail or assigneeId.'
+        ),
+      userEmail: z
+        .string()
+        .email()
+        .optional()
+        .describe(
+          'Inbox user email when conversationId is a Gmail thread ID from that user’s mailbox'
+        ),
       tags: z
         .array(z.string())
         .optional()
@@ -53,13 +72,16 @@ export let updateConversation = SlateTool.create(spec, {
       {
         status: ctx.input.status,
         assigneeId: ctx.input.assigneeId,
-        tags: ctx.input.tags
-      }
+        tags: ctx.input.tags,
+        assigneeEmail: ctx.input.assigneeEmail
+      },
+      ctx.input.userEmail
     );
 
     let changes: string[] = [];
     if (ctx.input.status) changes.push(`status → ${ctx.input.status}`);
     if (ctx.input.assigneeId) changes.push(`assignee → ${ctx.input.assigneeId}`);
+    if (ctx.input.assigneeEmail) changes.push(`assignee → ${ctx.input.assigneeEmail}`);
     if (ctx.input.tags) changes.push(`tags → [${ctx.input.tags.join(', ')}]`);
 
     return {

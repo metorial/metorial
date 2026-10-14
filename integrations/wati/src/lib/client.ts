@@ -1,16 +1,44 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private axios;
 
   constructor(params: { token: string; apiEndpoint: string }) {
-    let baseURL = params.apiEndpoint.replace(/\/+$/, '');
-    this.axios = createAxios({
-      baseURL,
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json'
+    let endpoint: URL;
+    try {
+      endpoint = new URL(params.apiEndpoint);
+    } catch {
+      throw createApiServiceError('Enter a valid Wati API endpoint URL.');
+    }
+    if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password) {
+      throw createApiServiceError(
+        'The Wati API endpoint must be an HTTPS URL without embedded credentials.'
+      );
+    }
+    let token = params.token.trim().replace(/^Bearer\s+/i, '');
+    if (!token) {
+      throw createApiServiceError('A Wati API token is required.');
+    }
+    this.axios = createAuthenticatedAxios({
+      // V3 resolves the workspace from the token, without a tenant path segment.
+      baseURL: endpoint.origin,
+      timeout: 30_000,
+      maxRedirects: 0,
+      authHeader: { value: `Bearer ${token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Wati',
+          reason: 'wati_api_error',
+          operation: 'request'
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.result === false || response.data?.success === false) {
+        throw createApiServiceError(
+          response.data.error || response.data.message || 'Wati rejected the request.'
+        );
       }
+      return response;
     });
   }
 
@@ -62,13 +90,15 @@ export class Client {
   async assignContactToTeams(target: string, teamIds: string[]) {
     let response = await this.axios.put('/api/ext/v3/contacts/teams', {
       target,
-      team_ids: teamIds
+      teams: teamIds
     });
     return response.data;
   }
 
-  async getContactCount() {
-    let response = await this.axios.get('/api/ext/v3/contacts/count');
+  async getContactCount(options: { dateFrom?: string; dateTo?: string } = {}) {
+    let response = await this.axios.get('/api/ext/v3/contacts/count', {
+      params: { date_from: options.dateFrom, date_to: options.dateTo }
+    });
     return response.data;
   }
 
@@ -90,7 +120,7 @@ export class Client {
   async sendTextMessage(target: string, messageText: string) {
     let response = await this.axios.post('/api/ext/v3/conversations/messages/text', {
       target,
-      message_text: messageText
+      text: messageText
     });
     return response.data;
   }
@@ -98,7 +128,7 @@ export class Client {
   async sendFileViaUrl(target: string, fileUrl: string, caption?: string) {
     let response = await this.axios.post('/api/ext/v3/conversations/messages/fileViaUrl', {
       target,
-      fileUrl,
+      file_url: fileUrl,
       caption
     });
     return response.data;
@@ -123,7 +153,7 @@ export class Client {
     let response = await this.axios.put(
       `/api/ext/v3/conversations/${encodeURIComponent(target)}/operator`,
       {
-        email: operatorEmail
+        assignee_email: operatorEmail
       }
     );
     return response.data;
@@ -133,7 +163,7 @@ export class Client {
     let response = await this.axios.put(
       `/api/ext/v3/conversations/${encodeURIComponent(target)}/status`,
       {
-        status
+        new_status: status
       }
     );
     return response.data;
@@ -141,8 +171,14 @@ export class Client {
 
   // ─── Template Messages ───
 
-  async listTemplates() {
-    let response = await this.axios.get('/api/ext/v3/messageTemplates');
+  async listTemplates(options: { pageNumber: number; pageSize: number; channel?: string }) {
+    let response = await this.axios.get('/api/ext/v3/messageTemplates', {
+      params: {
+        page_number: options.pageNumber,
+        page_size: options.pageSize,
+        channel: options.channel
+      }
+    });
     return response.data;
   }
 
@@ -154,32 +190,34 @@ export class Client {
   }
 
   async sendTemplateMessage(data: {
-    templateId: string;
-    target: string;
+    templateName: string;
+    broadcastName: string;
+    phoneNumber: string;
     customParams?: Array<{ name: string; value: string }>;
     channel?: string;
   }) {
     let response = await this.axios.post('/api/ext/v3/messageTemplates/send', {
-      template_id: data.templateId,
-      target: data.target,
-      custom_params: data.customParams,
+      template_name: data.templateName,
+      broadcast_name: data.broadcastName,
+      recipients: [{ phone_number: data.phoneNumber, custom_params: data.customParams }],
       channel: data.channel
     });
     return response.data;
   }
 
   async scheduleTemplateMessage(data: {
-    templateId: string;
-    target: string;
+    templateName: string;
+    broadcastName: string;
+    phoneNumber: string;
     scheduledAt: string;
     customParams?: Array<{ name: string; value: string }>;
     channel?: string;
   }) {
     let response = await this.axios.post('/api/ext/v3/messageTemplates/schedule', {
-      template_id: data.templateId,
-      target: data.target,
+      template_name: data.templateName,
+      broadcast_name: data.broadcastName,
       scheduled_at: data.scheduledAt,
-      custom_params: data.customParams,
+      recipients: [{ phone_number: data.phoneNumber, custom_params: data.customParams }],
       channel: data.channel
     });
     return response.data;

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -46,7 +46,7 @@ export let manageEnvironmentTool = SlateTool.create(spec, {
     let { action, environmentId, workspaceId, name, values } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating an environment.');
+      if (!name) throw createApiServiceError('Name is required when creating an environment.');
       let result = await client.createEnvironment({ name, values }, workspaceId);
       return {
         output: { environmentId: result.id, name: result.name, uid: result.uid },
@@ -55,7 +55,7 @@ export let manageEnvironmentTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!environmentId) throw new Error('environmentId is required for update.');
+      if (!environmentId) throw createApiServiceError('environmentId is required for update.');
       let result = await client.updateEnvironment(environmentId, { name, values });
       return {
         output: { environmentId: result.id, name: result.name, uid: result.uid },
@@ -63,7 +63,7 @@ export let manageEnvironmentTool = SlateTool.create(spec, {
       };
     }
 
-    if (!environmentId) throw new Error('environmentId is required for delete.');
+    if (!environmentId) throw createApiServiceError('environmentId is required for delete.');
     let result = await client.deleteEnvironment(environmentId);
     return {
       output: { environmentId: result.id, name: undefined, uid: result.uid },

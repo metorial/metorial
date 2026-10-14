@@ -40,33 +40,36 @@ export let getUserProfile = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let user = await client.getCurrentUser();
 
     return {
       output: {
         userId: user.id ?? '',
-        username: user.username,
-        displayName: user.display_name,
-        email: user.email,
-        photoUrl: user.photo,
-        timezone: user.timezone,
-        lastProject: user.last_project,
-        lastPlugin: user.last_plugin,
-        lastPluginName: user.last_plugin_name,
-        plan: user.plan,
-        createdAt: user.created_at,
-        lastHeartbeatAt: user.last_heartbeat_at,
-        website: user.website,
-        humanReadableWebsite: user.human_readable_website,
-        city: user.city,
-        isHireable: user.is_hireable,
-        bio: user.bio,
-        publicEmail: user.public_email,
-        githubUsername: user.github_username,
-        twitterUsername: user.twitter_username,
-        linkedInUsername: user.linkedin_username
+        username: user.username ?? undefined,
+        displayName: user.display_name ?? undefined,
+        email: user.email ?? undefined,
+        photoUrl: user.photo ?? undefined,
+        timezone: user.timezone ?? undefined,
+        lastProject: user.last_project ?? undefined,
+        lastPlugin: user.last_plugin ?? undefined,
+        lastPluginName: user.last_plugin_name ?? undefined,
+        plan: user.plan ?? undefined,
+        createdAt: user.created_at ?? undefined,
+        lastHeartbeatAt: user.last_heartbeat_at ?? undefined,
+        website: user.website ?? undefined,
+        humanReadableWebsite: user.human_readable_website ?? undefined,
+        city:
+          typeof user.city === 'string'
+            ? user.city
+            : (user.city?.title ?? user.city?.name ?? undefined),
+        isHireable: user.is_hireable ?? undefined,
+        bio: user.bio ?? undefined,
+        publicEmail: user.public_email ?? undefined,
+        githubUsername: user.github_username ?? undefined,
+        twitterUsername: user.twitter_username ?? undefined,
+        linkedInUsername: user.linkedin_username ?? undefined
       },
       message: `Profile for **${user.display_name || user.username}** (${user.email || 'no email'}). Plan: **${user.plan || 'unknown'}**. Timezone: **${user.timezone || 'unknown'}**.`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,6 +30,12 @@ export let getAppointment = SlateTool.create(spec, {
     let result = await client.getAppointment(ctx.input.appointmentId);
 
     let appointment = Array.isArray(result) ? result[0] : result;
+    if (!appointment) {
+      throw createApiServiceError(
+        `No appointment was found for AppID ${ctx.input.appointmentId}.`,
+        { reason: 'appointment_not_found' }
+      );
+    }
 
     return {
       output: { appointment },

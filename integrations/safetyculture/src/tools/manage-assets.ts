@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { assetTypeIdSchema, siteIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageAssets = SlateTool.create(spec, {
@@ -10,7 +11,7 @@ export let manageAssets = SlateTool.create(spec, {
   instructions: [
     'To list assets, set operation to "list".',
     'To get a specific asset, set operation to "get" and provide assetId.',
-    'To create, set operation to "create" and provide typeId and optional fields.',
+    'To create, set operation to "create" and provide typeId and code. The code must be unique within the organization. Optionally provide fields and siteId.',
     'To archive, set operation to "archive" and provide assetId.'
   ]
 })
@@ -20,13 +21,20 @@ export let manageAssets = SlateTool.create(spec, {
         .enum(['list', 'get', 'create', 'archive'])
         .describe('The operation to perform'),
       assetId: z.string().optional().describe('Asset ID (for get or archive)'),
-      typeId: z.string().optional().describe('Asset type ID (for create)'),
-      code: z.string().optional().describe('Asset code identifier (for create)'),
+      typeId: assetTypeIdSchema.optional(),
+      code: z
+        .string()
+        .optional()
+        .describe(
+          'Required for create: a nonempty asset code unique within the organization.'
+        ),
       fields: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Custom field values for the asset (for create)'),
-      siteId: z.string().optional().describe('Site ID to associate with (for create)'),
+        .describe(
+          'Asset fields keyed by field ID. Values may be text or objects containing string_value, timestamp_value, or money_value. Call list_asset_types with includeFields to discover field IDs.'
+        ),
+      siteId: siteIdSchema.optional(),
       pageSize: z.number().optional().describe('Page size for list'),
       pageToken: z.string().optional().describe('Page token for pagination')
     })
@@ -59,7 +67,7 @@ export let manageAssets = SlateTool.create(spec, {
         };
       }
       case 'get': {
-        if (!ctx.input.assetId) throw new Error('assetId is required for get');
+        if (!ctx.input.assetId) throw createApiServiceError('assetId is required for get');
         let asset = await client.getAsset(ctx.input.assetId);
         return {
           output: { asset, assetId: ctx.input.assetId, success: true },
@@ -67,7 +75,11 @@ export let manageAssets = SlateTool.create(spec, {
         };
       }
       case 'create': {
-        if (!ctx.input.typeId) throw new Error('typeId is required for create');
+        if (!ctx.input.typeId) throw createApiServiceError('typeId is required for create');
+        if (!ctx.input.code?.trim())
+          throw createApiServiceError(
+            'code is required for create and must be unique within the organization.'
+          );
         let result = await client.createAsset({
           typeId: ctx.input.typeId,
           code: ctx.input.code,
@@ -81,7 +93,7 @@ export let manageAssets = SlateTool.create(spec, {
         };
       }
       case 'archive': {
-        if (!ctx.input.assetId) throw new Error('assetId is required for archive');
+        if (!ctx.input.assetId) throw createApiServiceError('assetId is required for archive');
         await client.archiveAsset(ctx.input.assetId);
         return {
           output: { assetId: ctx.input.assetId, success: true },

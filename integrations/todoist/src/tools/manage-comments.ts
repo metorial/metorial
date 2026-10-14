@@ -6,7 +6,9 @@ import { spec } from '../spec';
 let commentSchema = z.object({
   commentId: z.string().describe('Comment ID'),
   content: z.string().describe('Comment content (markdown)'),
-  postedAt: z.string().describe('Timestamp when comment was posted'),
+  postedAt: z
+    .string()
+    .describe('Timestamp when comment was posted, or an empty string when unavailable'),
   taskId: z.string().nullable().describe('Associated task ID'),
   projectId: z.string().nullable().describe('Associated project ID'),
   attachment: z

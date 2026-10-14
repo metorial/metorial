@@ -26,6 +26,23 @@ Can also retrieve a specific company by Chameleon ID or external UID.`,
         .array(z.record(z.string(), z.unknown()))
         .optional()
         .describe('Array of segmentation filter expressions for searching'),
+      filtersOp: z
+        .enum(['and', 'or'])
+        .optional()
+        .describe('Logical operator joining company filters'),
+      sortBy: z
+        .string()
+        .optional()
+        .describe(
+          'Company property to sort by, such as uid, created_at, profile_count, or a custom property'
+        ),
+      sortDir: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Pagination offset from cursor.offset for filtered or sorted searches'),
       expandCompany: z
         .enum(['all', 'min'])
         .optional()
@@ -53,7 +70,8 @@ Can also retrieve a specific company by Chameleon ID or external UID.`,
       cursor: z
         .object({
           limit: z.number().optional(),
-          before: z.string().optional()
+          before: z.string().optional(),
+          offset: z.number().optional()
         })
         .optional()
         .describe('Pagination cursor')
@@ -76,6 +94,10 @@ Can also retrieve a specific company by Chameleon ID or external UID.`,
     let expand = ctx.input.expandCompany ? { company: ctx.input.expandCompany } : undefined;
     let result = await client.listCompanies({
       filters: ctx.input.filters,
+      filtersOp: ctx.input.filtersOp,
+      sortBy: ctx.input.sortBy,
+      sortDir: ctx.input.sortDir,
+      offset: ctx.input.offset,
       expand,
       limit: ctx.input.limit,
       before: ctx.input.before,

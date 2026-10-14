@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTidyId } from '../lib/format';
 import { spec } from '../spec';
 
 let issueOutputSchema = z.object({
@@ -14,8 +15,8 @@ let issueOutputSchema = z.object({
 });
 
 let mapIssue = (data: any) => ({
-  issueId: data.id,
-  addressId: data.address_id,
+  issueId: formatTidyId(data.id),
+  addressId: formatTidyId(data.address_id),
   description: data.description,
   reporterType: data.reporter_type ?? null,
   status: data.status,

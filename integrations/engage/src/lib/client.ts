@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import type {
   CreateListParams,
   CreateUserParams,
@@ -17,15 +17,17 @@ export class Client {
   private http;
 
   constructor(credentials: { token: string; secret: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.engage.so/v1',
       auth: {
         username: credentials.token,
         password: credentials.secret
       },
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Engage',
+          reason: 'engage_api_error'
+        })
     });
   }
 
@@ -52,6 +54,9 @@ export class Client {
     previousCursor?: string;
     email?: string;
   }): Promise<PaginatedResponse<EngageUser>> {
+    if (options?.nextCursor && options.previousCursor) {
+      throw createApiServiceError('Use only one of nextCursor or previousCursor.');
+    }
     let queryParams: Record<string, string> = {};
     if (options?.limit) queryParams.limit = String(options.limit);
     if (options?.nextCursor) queryParams.next_cursor = options.nextCursor;
@@ -171,6 +176,9 @@ export class Client {
     nextCursor?: string;
     previousCursor?: string;
   }): Promise<PaginatedResponse<EngageList>> {
+    if (options?.nextCursor && options.previousCursor) {
+      throw createApiServiceError('Use only one of nextCursor or previousCursor.');
+    }
     let queryParams: Record<string, string> = {};
     if (options?.limit) queryParams.limit = String(options.limit);
     if (options?.nextCursor) queryParams.next_cursor = options.nextCursor;

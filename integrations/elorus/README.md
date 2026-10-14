@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Elorus
 
-Create, manage, and send invoices, credit notes, estimates, and recurring billing documents. Track expenses, record payments, and manage contacts representing clients and suppliers. Monitor project finances with time tracking and task management. Manage products and services inventory, apply tax configurations, and export documents as PDFs. Upload and manage attachments on records. Organize data with custom tracking categories for segmented reporting. Supports multi-currency invoicing, payment receipt generation, client portal discussions, and Greek tax compliance (myDATA/AADE) integration.
+Manage contacts, invoices, credit notes, estimates, expenses, payments received, products, projects, and time entries in Elorus. Discover document types, taxes, and organization users. Send invoice emails and set invoice void status. Supply the target organization ID on each tool or use the saved default.
+
+Time entries require an assignee user ID from `list_users`; invoice payments use transaction type `ip` and explicit invoice allocations. Product and project prices use the organization base currency.
 
 ## License
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -41,6 +41,22 @@ export let manageStaff = SlateTool.create(spec, {
         .describe('Block start datetime (for create_block)'),
       blockEndDate: z.string().optional().describe('Block end datetime (for create_block)'),
       blockReason: z.string().optional().describe('Reason for the block (for create_block)'),
+      blockDate: z
+        .string()
+        .optional()
+        .describe('Date of the block, YYYY-MM-DD (for create_block)'),
+      blockSlots: z
+        .array(
+          z.object({
+            startTime: z.string(),
+            endTime: z.string(),
+            startTimeUTC: z.string().optional(),
+            endTimeUTC: z.string().optional()
+          })
+        )
+        .optional()
+        .describe('Unavailable time slots on blockDate (for create_block)'),
+      timezone: z.string().optional().describe('Timezone of blockSlots (for create_block)'),
       page: z.number().optional().describe('Page number (for list)'),
       pageSize: z.number().optional().describe('Results per page (for list)')
     })
@@ -81,7 +97,7 @@ export let manageStaff = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.staffId) throw new Error('staffId is required for get');
+      if (!ctx.input.staffId) throw createApiServiceError('staffId is required for get');
       let result = await client.getStaff(ctx.input.staffId);
       return {
         output: { success: true, staff: result },
@@ -90,7 +106,8 @@ export let manageStaff = SlateTool.create(spec, {
     }
 
     if (action === 'get_availability') {
-      if (!ctx.input.staffId) throw new Error('staffId is required for get_availability');
+      if (!ctx.input.staffId)
+        throw createApiServiceError('staffId is required for get_availability');
       let result = await client.getStaffAvailabilityBlocks(ctx.input.staffId, {
         fromDate: ctx.input.fromDate,
         toDate: ctx.input.toDate
@@ -105,8 +122,13 @@ export let manageStaff = SlateTool.create(spec, {
     }
 
     if (action === 'create_block') {
-      if (!ctx.input.staffId) throw new Error('staffId is required for create_block');
-      let data: Record<string, any> = {};
+      if (!ctx.input.staffId)
+        throw createApiServiceError('staffId is required for create_block');
+      let data: Record<string, any> = {
+        date: ctx.input.blockDate,
+        slots: ctx.input.blockSlots,
+        timezone: ctx.input.timezone
+      };
       if (ctx.input.blockStartDate) data.startDate = ctx.input.blockStartDate;
       if (ctx.input.blockEndDate) data.endDate = ctx.input.blockEndDate;
       if (ctx.input.blockReason) data.reason = ctx.input.blockReason;
@@ -119,8 +141,10 @@ export let manageStaff = SlateTool.create(spec, {
     }
 
     if (action === 'delete_block') {
-      if (!ctx.input.staffId) throw new Error('staffId is required for delete_block');
-      if (!ctx.input.blockId) throw new Error('blockId is required for delete_block');
+      if (!ctx.input.staffId)
+        throw createApiServiceError('staffId is required for delete_block');
+      if (!ctx.input.blockId)
+        throw createApiServiceError('blockId is required for delete_block');
       await client.deleteStaffAvailabilityBlock(ctx.input.staffId, ctx.input.blockId);
       return {
         output: { success: true },
@@ -128,6 +152,6 @@ export let manageStaff = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

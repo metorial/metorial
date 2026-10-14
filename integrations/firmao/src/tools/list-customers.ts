@@ -75,17 +75,17 @@ export let listCustomers = SlateTool.create(spec, {
     let customers = result.data.map((c: any) => ({
       customerId: c.id,
       name: c.name,
-      label: c.label,
-      customerType: c.customerType,
-      nipNumber: c.nipNumber,
-      emails: c.emails,
-      phones: c.phones,
-      website: c.website,
-      description: c.description,
-      officeCity: c.officeAddress?.city,
-      officeCountry: c.officeAddress?.country,
-      creationDate: c.creationDate,
-      lastModificationDate: c.lastModificationDate
+      label: c.label ?? undefined,
+      customerType: c.customerType ?? undefined,
+      nipNumber: c.nipNumber ?? undefined,
+      emails: c.emails ?? undefined,
+      phones: c.phones ?? undefined,
+      website: c.website ?? undefined,
+      description: c.description ?? undefined,
+      officeCity: c.officeAddress?.city ?? undefined,
+      officeCountry: c.officeAddress?.country ?? undefined,
+      creationDate: c.creationDate ?? undefined,
+      lastModificationDate: c.lastModificationDate ?? c.lastUpdateDate ?? undefined
     }));
 
     return {

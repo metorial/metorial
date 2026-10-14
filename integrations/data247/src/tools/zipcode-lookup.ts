@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -53,7 +53,9 @@ export let zipcodeLookup = SlateTool.create(spec, {
 
     if (lookupType === 'append') {
       if (!ctx.input.address || !ctx.input.city || !ctx.input.state) {
-        throw new Error('Address, city, and state are required for zipcode append lookup.');
+        throw createApiServiceError(
+          'Address, city, and state are required for zipcode append lookup.'
+        );
       }
       raw = await client.zipcodeAppend({
         address: ctx.input.address,
@@ -62,7 +64,7 @@ export let zipcodeLookup = SlateTool.create(spec, {
       });
     } else {
       if (!ctx.input.zip) {
-        throw new Error('ZIP code is required for reverse zipcode lookup.');
+        throw createApiServiceError('ZIP code is required for reverse zipcode lookup.');
       }
       raw = await client.reverseZipcode(ctx.input.zip);
     }

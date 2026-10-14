@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PointagramClient } from '../lib/client';
+import { getPointagramList, PointagramClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listScoreHistory = SlateTool.create(spec, {
@@ -18,14 +18,32 @@ export let listScoreHistory = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      scoreseriesId: z.string().describe('ID of the score series to query history for'),
+      scoreseriesId: z
+        .string()
+        .describe('Score series ID. Call list_score_series to discover score series IDs.'),
       tagsFilter: z
         .string()
         .optional()
         .describe('JSON string filter for tags/point types, e.g. [{"id":"13","type":1}]'),
-      teamsFilter: z.string().optional().describe('Filter by team'),
-      playerFilter: z.string().optional().describe('Filter by player'),
-      timeFrom: z.string().optional().describe('UTC timestamp to fetch history from'),
+      tagsOrFilter: z
+        .string()
+        .optional()
+        .describe('JSON string for an OR tag/point-type filter, using the tagsFilter format'),
+      teamsFilter: z.string().optional().describe('JSON array of team IDs, e.g. ["20"]'),
+      playerFilter: z.string().optional().describe('JSON array of player IDs, e.g. ["19145"]'),
+      timeFrom: z
+        .string()
+        .optional()
+        .describe('UTC lower time bound in YYYY-MM-DD HH:mm:ss format'),
+      timeTo: z
+        .string()
+        .optional()
+        .describe('UTC upper time bound in YYYY-MM-DD HH:mm:ss format'),
+      showRevoked: z.boolean().optional().describe('Include revoked point transactions'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Page size, a whole number from 1 to 1000. Defaults to 50.'),
       offsetTimestamp: z
         .string()
         .optional()
@@ -47,14 +65,18 @@ export let listScoreHistory = SlateTool.create(spec, {
     let result = await client.listScoreSeriesHistory({
       scoreseriesId: ctx.input.scoreseriesId,
       tagsFilter: ctx.input.tagsFilter,
+      tagsOrFilter: ctx.input.tagsOrFilter,
       teamsFilter: ctx.input.teamsFilter,
       playerFilter: ctx.input.playerFilter,
       timeFrom: ctx.input.timeFrom,
+      timeTo: ctx.input.timeTo,
+      showRevoked: ctx.input.showRevoked,
+      limit: ctx.input.limit,
       offsetTimestamp: ctx.input.offsetTimestamp,
       offsetId: ctx.input.offsetId
     });
 
-    let history = Array.isArray(result) ? result : (result?.history ?? [result]);
+    let history = getPointagramList(result, 'history');
 
     return {
       output: { history },

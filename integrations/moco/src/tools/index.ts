@@ -3,6 +3,7 @@ export * from './manage-comments';
 export * from './manage-companies';
 export * from './manage-contacts';
 export * from './manage-deals';
+export * from './manage-invoice-payments';
 export * from './manage-invoices';
 export * from './manage-offers';
 export * from './manage-planning';

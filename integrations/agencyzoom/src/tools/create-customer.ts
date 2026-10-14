@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createCustomer = SlateTool.create(spec, {
   name: 'Create Customer',
   key: 'create_customer',
-  description: `Create a new personal or commercial customer record in AgencyZoom. Provide contact details, address, business information (for commercial customers), tags, and custom fields. Returns the newly created customer record.`,
+  description: `Create a new personal or commercial customer record in AgencyZoom. Provide contact details, address, business information (for commercial customers), tags, and custom fields. AgencyZoom requires email and agentId. Returns the provider confirmation including the customer ID.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -15,6 +15,12 @@ export let createCustomer = SlateTool.create(spec, {
   .input(
     z.object({
       firstName: z.string().describe('Customer first name'),
+      agentId: z
+        .string()
+        .optional()
+        .describe(
+          'Assigned producer ID. Required by AgencyZoom; discover it with list_reference_data using employees.'
+        ),
       lastName: z.string().describe('Customer last name'),
       email: z.string().optional().describe('Customer primary email address'),
       phone: z.string().optional().describe('Customer primary phone number'),
@@ -78,17 +84,14 @@ export let createCustomer = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = {
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName
     };
 
+    if (ctx.input.agentId !== undefined) data.agentId = ctx.input.agentId;
     if (ctx.input.email !== undefined) data.email = ctx.input.email;
     if (ctx.input.phone !== undefined) data.phone = ctx.input.phone;
     if (ctx.input.address !== undefined) data.address = ctx.input.address;

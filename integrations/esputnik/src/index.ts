@@ -7,7 +7,9 @@ import {
   deleteOrders,
   generateEvent,
   getAccountInfo,
+  getAdditionalFields,
   getContact,
+  getContactImportStatus,
   getMessageStatus,
   getSegmentContacts,
   listSegments,
@@ -38,6 +40,8 @@ export let provider = Slate.create({
     addOrders,
     deleteOrders,
     getAccountInfo,
+    getAdditionalFields,
+    getContactImportStatus,
     manageUnsubscribes
   ],
   triggers: []

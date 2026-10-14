@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listOrders = SlateTool.create(spec, {
   name: 'List Orders',
   key: 'list_orders',
-  description: `Lists all orders in your MailBluster brand. Returns an array of orders with customer info, items, pricing, and campaign attribution.`,
+  description: `Lists one page of orders in your MailBluster brand. Returns customer emails, pricing, campaign attribution, and pagination details.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,8 +14,18 @@ export let listOrders = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageNo: z.number().optional().describe('Page number for pagination'),
-      perPage: z.number().optional().describe('Number of orders per page')
+      pageNo: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .positive()
+        .optional()
+        .describe('Page number for pagination. Defaults to 1.'),
+      perPage: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .positive()
+        .optional()
+        .describe('Number of orders per page. Defaults to 10.')
     })
   )
   .output(
@@ -32,13 +42,23 @@ export let listOrders = SlateTool.create(spec, {
             updatedAt: z.string().describe('Last update timestamp')
           })
         )
-        .describe('List of orders')
+        .describe('List of orders'),
+      meta: z
+        .object({
+          total: z.number(),
+          prevPageNo: z.number().nullable(),
+          pageNo: z.number(),
+          nextPageNo: z.number().nullable(),
+          perPage: z.number(),
+          totalPage: z.number()
+        })
+        .describe('Pagination details; nextPageNo is null on the last page')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let orders = await client.listOrders(ctx.input.pageNo, ctx.input.perPage);
+    let { orders, meta } = await client.listOrders(ctx.input.pageNo, ctx.input.perPage);
 
     let mappedOrders = (Array.isArray(orders) ? orders : []).map(o => ({
       orderId: o.id,
@@ -52,7 +72,8 @@ export let listOrders = SlateTool.create(spec, {
 
     return {
       output: {
-        orders: mappedOrders
+        orders: mappedOrders,
+        meta
       },
       message: `Retrieved **${mappedOrders.length}** order(s).`
     };

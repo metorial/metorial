@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -50,6 +50,13 @@ Returns the Twitter profile data along with linked social profiles (LinkedIn, Fa
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.twitterUsername?.trim() &&
+      !ctx.input.linkedinUrl?.trim() &&
+      !ctx.input.email?.trim()
+    ) {
+      throw createApiServiceError('Provide twitterUsername, linkedinUrl, or email.');
+    }
     let client = new Client(ctx.auth.token);
 
     let result: any;
@@ -59,7 +66,7 @@ Returns the Twitter profile data along with linked social profiles (LinkedIn, Fa
     } else {
       result = await client.getTwitterByUsername({
         username: ctx.input.twitterUsername,
-        linkedin: ctx.input.linkedinUrl
+        linkedin: ctx.input.linkedinUrl?.replace(/^https?:\/\//i, '')
       });
     }
 

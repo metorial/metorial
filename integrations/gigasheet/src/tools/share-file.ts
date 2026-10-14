@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -50,7 +50,7 @@ export let shareFile = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'share_with_users':
         if (!ctx.input.emails || ctx.input.emails.length === 0) {
-          throw new Error('emails is required for share_with_users');
+          throw createApiServiceError('emails is required for share_with_users');
         }
         result = await client.shareFile(ctx.input.sheetHandle, {
           emails: ctx.input.emails,
@@ -69,7 +69,7 @@ export let shareFile = SlateTool.create(spec, {
 
       case 'delete_live_share':
         if (!ctx.input.liveShareId) {
-          throw new Error('liveShareId is required for delete_live_share');
+          throw createApiServiceError('liveShareId is required for delete_live_share');
         }
         await client.deleteLiveShare(ctx.input.liveShareId);
         result = { deleted: true };

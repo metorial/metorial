@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -41,7 +41,7 @@ export let manageEmailCampaign = SlateTool.create(spec, {
     let { action, campaignId, name } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('Campaign name is required for create action');
+      if (!name) throw createApiServiceError('Campaign name is required for create action');
       let campaign = await client.createEmailCampaign({ name });
       return {
         output: { campaign, success: true },
@@ -49,7 +49,7 @@ export let manageEmailCampaign = SlateTool.create(spec, {
       };
     }
 
-    if (!campaignId) throw new Error('Campaign ID is required for this action');
+    if (!campaignId) throw createApiServiceError('Campaign ID is required for this action');
 
     if (action === 'get') {
       let campaign = await client.getEmailCampaign(campaignId);
@@ -91,6 +91,6 @@ export let manageEmailCampaign = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

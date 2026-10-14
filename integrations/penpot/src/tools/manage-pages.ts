@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let managePagesTool = SlateTool.create(spec, {
@@ -22,9 +22,15 @@ export let managePagesTool = SlateTool.create(spec, {
         .enum(['add', 'rename', 'delete', 'move'])
         .describe('The page operation to perform'),
       fileId: z.string().describe('ID of the file'),
-      revn: z.number().describe('Current file revision number (get from Get File tool)'),
+      revn: z
+        .number()
+        .refine(Number.isSafeInteger, { message: 'Must be an integer' })
+        .nonnegative()
+        .describe('Current file revision number (get from Get File tool)'),
       vern: z
         .number()
+        .refine(Number.isSafeInteger, { message: 'Must be an integer' })
+        .nonnegative()
         .default(0)
         .describe('Current file version number (get from Get File tool)'),
       pageId: z
@@ -32,7 +38,11 @@ export let managePagesTool = SlateTool.create(spec, {
         .optional()
         .describe('ID of the page (required for "rename", "delete", "move")'),
       name: z.string().optional().describe('Page name (required for "add" and "rename")'),
-      index: z.number().optional().describe('Target position index (required for "move")')
+      index: z
+        .number()
+        .refine(Number.isSafeInteger, { message: 'Must be an integer' })
+        .optional()
+        .describe('Target position index (required for "move")')
     })
   )
   .output(
@@ -42,7 +52,7 @@ export let managePagesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let { action, fileId, revn, vern, pageId, name, index } = ctx.input;
 
     let sessionId = crypto.randomUUID();
@@ -60,7 +70,7 @@ export let managePagesTool = SlateTool.create(spec, {
       }
       case 'rename': {
         if (!pageId || !name)
-          throw new Error('pageId and name are required for rename action');
+          throw createApiServiceError('pageId and name are required for rename action');
         change = { type: 'mod-page', id: pageId, name };
         await client.updateFile(fileId, sessionId, revn, vern, [change]);
         return {
@@ -69,7 +79,7 @@ export let managePagesTool = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!pageId) throw new Error('pageId is required for delete action');
+        if (!pageId) throw createApiServiceError('pageId is required for delete action');
         change = { type: 'del-page', id: pageId };
         await client.updateFile(fileId, sessionId, revn, vern, [change]);
         return {
@@ -79,7 +89,7 @@ export let managePagesTool = SlateTool.create(spec, {
       }
       case 'move': {
         if (!pageId || index === undefined)
-          throw new Error('pageId and index are required for move action');
+          throw createApiServiceError('pageId and index are required for move action');
         change = { type: 'mov-page', id: pageId, index };
         await client.updateFile(fileId, sessionId, revn, vern, [change]);
         return {

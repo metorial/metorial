@@ -35,11 +35,11 @@ export let listUsers = SlateTool.create(spec, {
 
     let users = (result.users || []).map((u: any) => ({
       userId: u.id,
-      name: u.name,
-      username: u.username,
-      role: u.role,
-      status: u.status,
-      pictureURL: u.pictureURL
+      name: u.name ?? undefined,
+      username: u.username ?? undefined,
+      role: u.role ?? undefined,
+      status: u.status ?? undefined,
+      pictureURL: u.pictureURL ?? u.party?.pictureURL ?? undefined
     }));
 
     return {

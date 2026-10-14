@@ -26,7 +26,7 @@ export let getDeliveryStatus = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
 
     ctx.info(`Fetching delivery status for batch: ${ctx.input.batchId}`);
     let result = await client.getDeliveryReport({ batchId: ctx.input.batchId });
@@ -34,7 +34,7 @@ export let getDeliveryStatus = SlateTool.create(spec, {
     return {
       output: {
         status: result.status || 'unknown',
-        description: result.description || result
+        description: result.description ?? result
       },
       message: `Delivery status retrieved for batch **${ctx.input.batchId}**`
     };

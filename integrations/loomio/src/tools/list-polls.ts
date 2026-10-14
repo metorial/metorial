@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { groupIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPolls = SlateTool.create(spec, {
   name: 'List Polls',
   key: 'list_polls',
-  description: `List polls and proposals, optionally filtered by group or discussion. Returns a summary of each poll including type, title, status, and voter counts.`,
+  description: `List polls and proposals in a group. Call list_groups to discover group IDs. Supply groupId or a discussionId whose group can be resolved. Discussion filtering applies after group pagination; advance offset to check later pages. Returns a summary of each poll including type, title, status, and voter counts.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,8 +15,19 @@ export let listPolls = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      groupId: z.number().optional().describe('Filter polls by group ID'),
-      discussionId: z.number().optional().describe('Filter polls by discussion ID')
+      groupId: groupIdSchema.optional(),
+      discussionId: z
+        .number()
+        .optional()
+        .describe(
+          'Filter a group page to this discussion. When groupId is omitted, resolve it from the discussion.'
+        ),
+      status: z
+        .enum(['active', 'closed', 'all'])
+        .optional()
+        .describe('Filter by status. Default: active.'),
+      limit: z.number().int().min(1).optional().describe('Page size. Default: 50.'),
+      offset: z.number().int().min(0).optional().describe('Offset for pagination. Default: 0.')
     })
   )
   .output(
@@ -35,7 +47,11 @@ export let listPolls = SlateTool.create(spec, {
             votersCount: z.number().optional().describe('Number of voters')
           })
         )
-        .describe('List of polls')
+        .describe('List of polls'),
+      total: z
+        .number()
+        .optional()
+        .describe('Total records before pagination, when supplied by Loomio')
     })
   )
   .handleInvocation(async ctx => {
@@ -46,24 +62,27 @@ export let listPolls = SlateTool.create(spec, {
 
     let result = await client.listPolls({
       groupId: ctx.input.groupId,
-      discussionId: ctx.input.discussionId
+      discussionId: ctx.input.discussionId,
+      status: ctx.input.status,
+      limit: ctx.input.limit,
+      offset: ctx.input.offset
     });
 
-    let polls = (result.polls || []).map((p: any) => ({
+    let polls = result.polls.map(p => ({
       pollId: p.id,
       pollKey: p.key,
       title: p.title,
       pollType: p.poll_type,
-      groupId: p.group_id,
-      authorId: p.author_id,
-      closingAt: p.closing_at,
-      closedAt: p.closed_at,
-      createdAt: p.created_at,
-      votersCount: p.voters_count
+      groupId: p.group_id ?? undefined,
+      authorId: p.author_id ?? undefined,
+      closingAt: p.closing_at ?? undefined,
+      closedAt: p.closed_at ?? undefined,
+      createdAt: p.created_at ?? undefined,
+      votersCount: p.voters_count ?? undefined
     }));
 
     return {
-      output: { polls },
+      output: { polls, total: result.meta?.total },
       message: `Found **${polls.length}** poll(s).`
     };
   })

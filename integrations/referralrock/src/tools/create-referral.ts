@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getResponseEntity, ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createReferral = SlateTool.create(spec, {
@@ -55,7 +55,7 @@ export let createReferral = SlateTool.create(spec, {
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
     let result = await client.createReferral(ctx.input);
-    let referral = (result.referral || result) as Record<string, unknown>;
+    let referral = getResponseEntity(result, 'referral');
 
     return {
       output: {

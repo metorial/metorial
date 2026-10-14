@@ -30,8 +30,7 @@ export let listAccounts = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let result = await client.listAccounts();

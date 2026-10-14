@@ -1,8 +1,15 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  pickDefined
+} from 'slates';
 
-let restApi = createAxios({
-  baseURL: 'https://api.enigma.com'
-});
+export interface GraphqlResponse<T> {
+  data?: T | null;
+  errors?: { message: string; locations?: unknown; path?: unknown }[];
+}
 
 export interface MatchBusinessInput {
   name?: string;
@@ -87,20 +94,49 @@ export interface KybOptions {
 }
 
 export class Client {
-  private token: string;
+  private api: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
-
-  private headers() {
-    return {
-      'x-api-key': this.token,
-      'content-type': 'application/json'
-    };
+    this.api = createAuthenticatedAxios({
+      baseURL: 'https://api.enigma.com',
+      timeout: 60000,
+      authHeader: { name: 'x-api-key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Enigma',
+          reason: 'enigma_api_error',
+          formatMessage: ({ status, statusLabel, message }) => {
+            let remediation =
+              status === 401
+                ? ' Check the API key in your connection.'
+                : status === 403
+                  ? ' Check that your account has access to the requested data or add-on.'
+                  : status === 404
+                    ? ' For a business lookup, match the business again to obtain its current ID.'
+                    : status === 429
+                      ? ' Wait before retrying and check your account rate limits.'
+                      : '';
+            return `Enigma API request failed: ${statusLabel}${message}${remediation}`;
+          }
+        })
+    });
   }
 
   async matchBusiness(input: MatchBusinessInput, options: MatchBusinessOptions = {}) {
+    let name = !!input.name?.trim();
+    let address = !!input.address && Object.values(input.address).some(value => value?.trim());
+    let person = !!input.person && Object.values(input.person).some(value => value?.trim());
+    let website = !!input.website?.trim();
+    if (website && options.entityType === 'business_location') {
+      throw createApiServiceError(
+        'Website matching is only available for business entities. Remove website or choose entityType "business".'
+      );
+    }
+    if (!website && [name, address, person].filter(Boolean).length < 2) {
+      throw createApiServiceError(
+        'Provide a website, or at least two of business name, address, and associated person.'
+      );
+    }
     let body: Record<string, unknown> = {};
 
     if (input.name) body.name = input.name;
@@ -129,8 +165,7 @@ export class Client {
     if (options.showNonMatches) params.show_non_matches = '1';
     if (options.prioritization) params.prioritization = options.prioritization;
 
-    let response = await restApi.post('/businesses/match', body, {
-      headers: this.headers(),
+    let response = await this.api.post('/businesses/match', body, {
       params
     });
 
@@ -146,8 +181,7 @@ export class Client {
       params.lookback_months = String(options.lookbackMonths);
     }
 
-    let response = await restApi.get(`/businesses/${enigmaId}`, {
-      headers: this.headers(),
+    let response = await this.api.get(`/businesses/${encodeURIComponent(enigmaId)}`, {
       params
     });
 
@@ -155,6 +189,30 @@ export class Client {
   }
 
   async verifyBusiness(input: KybInput, options: KybOptions = {}) {
+    let name = !!input.name?.trim();
+    let address = !!input.address && Object.values(input.address).some(value => value?.trim());
+    let person =
+      !!input.person &&
+      [input.person.firstName, input.person.lastName].some(value => value?.trim());
+    if ([name, address, person].filter(Boolean).length < 2) {
+      throw createApiServiceError(
+        'KYB verification requires at least two of business name, address, and associated person.'
+      );
+    }
+    if (
+      input.address &&
+      ![input.address.city, input.address.state, input.address.postalCode].some(value =>
+        value?.trim()
+      )
+    ) {
+      throw createApiServiceError('A KYB address must include city, state, or postalCode.');
+    }
+    if (input.tin !== undefined && !/^\d{9}$/.test(input.tin)) {
+      throw createApiServiceError('Provide tin as exactly 9 digits without dashes.');
+    }
+    if (input.person?.ssn !== undefined && !/^\d{9}$/.test(input.person.ssn)) {
+      throw createApiServiceError('Provide person.ssn as exactly 9 digits without dashes.');
+    }
     let body: Record<string, unknown> = {};
 
     if (input.name) body.name = input.name;
@@ -180,7 +238,7 @@ export class Client {
       body.persons_to_screen = input.personsToScreen.map(p => ({
         ...(p.firstName && { first_name: p.firstName }),
         ...(p.lastName && { last_name: p.lastName }),
-        ...(p.dob && { dob: p.dob })
+        ...(p.dob && { date_of_birth: p.dob })
       }));
     }
 
@@ -191,8 +249,7 @@ export class Client {
       params.match_threshold = String(options.matchThreshold);
     if (options.topN !== undefined) params.top_n = String(options.topN);
 
-    let response = await restApi.post('/v1/kyb/', body, {
-      headers: this.headers(),
+    let response = await this.api.post('/v1/kyb/', body, {
       params
     });
 
@@ -231,7 +288,7 @@ export class Client {
       data.persons_to_screen = input.personsToScreen.map(p => ({
         ...(p.firstName && { first_name: p.firstName }),
         ...(p.lastName && { last_name: p.lastName }),
-        ...(p.dob && { dob: p.dob })
+        ...(p.dob && { date_of_birth: p.dob })
       }));
     }
 
@@ -242,22 +299,38 @@ export class Client {
       params.match_threshold = String(options.matchThreshold);
     if (options.topN !== undefined) params.top_n = String(options.topN);
 
-    let response = await restApi.post('/v1/kyb/', body, {
-      headers: this.headers(),
+    let response = await this.api.post('/v1/kyb/', body, {
       params
     });
 
     return response.data;
   }
 
-  async graphqlQuery(query: string, variables?: Record<string, unknown>) {
-    let body: Record<string, unknown> = { query };
-    if (variables) body.variables = variables;
-
-    let response = await restApi.post('/graphql', body, {
-      headers: this.headers()
-    });
+  async graphqlQuery<T = Record<string, unknown>>(
+    query: string,
+    variables?: Record<string, unknown>
+  ) {
+    let response = await this.api.post<GraphqlResponse<T>>(
+      '/graphql',
+      pickDefined({ query, variables })
+    );
 
     return response.data;
+  }
+
+  async graphqlData<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+    let result = await this.graphqlQuery<T>(query, variables);
+    if (result.errors?.length) {
+      throw createApiServiceError(
+        `Enigma GraphQL request failed: ${extractApiErrorMessage({ response: { data: result } })}`,
+        { reason: 'enigma_graphql_error' }
+      );
+    }
+    if (result.data === undefined || result.data === null) {
+      throw createApiServiceError(
+        'Enigma returned no GraphQL data. Check the query and API access.'
+      );
+    }
+    return result.data;
   }
 }

@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { asOptionalString, createClient, isEnabled } from '../lib/helpers';
+import { businessIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getBulkJob = SlateTool.create(spec, {
   name: 'Get Bulk Job',
   key: 'get_bulk_job',
-  description: `Get the status and details of a bulk sending job, including document completion counts and the resulting documents. Optionally retrieve the blank CSV template for a given template.`,
+  description: `Get the status and details of a bulk sending job, including document completion counts and the resulting documents. Optionally retrieve the blank CSV template for a given template. Call list_businesses to discover the businessId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,6 +15,7 @@ export let getBulkJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      businessId: businessIdSchema,
       bulkJobId: z.string().optional().describe('ID of the bulk job to retrieve status for'),
       templateHash: z
         .string()
@@ -25,9 +27,17 @@ export let getBulkJob = SlateTool.create(spec, {
         .describe('Include resulting documents in the response'),
       documentLimit: z
         .number()
+        .refine(Number.isSafeInteger, { message: 'Must be a whole number' })
+        .min(0)
+        .max(1000)
         .optional()
         .describe('Max number of documents to include (default 100)'),
-      documentOffset: z.number().optional().describe('Offset for document pagination')
+      documentOffset: z
+        .number()
+        .refine(Number.isSafeInteger, { message: 'Must be a whole number' })
+        .min(0)
+        .optional()
+        .describe('Offset for document pagination')
     })
   )
   .output(
@@ -42,7 +52,7 @@ export let getBulkJob = SlateTool.create(spec, {
       csvTemplate: z
         .string()
         .optional()
-        .describe('Blank CSV template headers for the specified template'),
+        .describe('CSV text when available; templateHash requests prepare a downloadable CSV'),
       documents: z
         .array(
           z.object({
@@ -56,23 +66,33 @@ export let getBulkJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input.businessId);
+    if (!ctx.input.templateHash && !ctx.input.bulkJobId) {
+      throw createApiServiceError(
+        'Provide bulkJobId to retrieve a job, templateHash to download its CSV structure, or both.'
+      );
+    }
     let output: Record<string, any> = {};
 
     if (ctx.input.templateHash) {
-      let csv = await client.getBulkCsvTemplate(ctx.input.templateHash);
-      output.csvTemplate = csv;
+      output.csvTemplate = await client.getBulkCsvTemplate(ctx.input.templateHash);
+      await ctx.addAttachment({
+        type: 'url',
+        ...client.getBulkCsvDownloadDetails(ctx.input.templateHash),
+        mimeType: 'text/csv'
+      });
     }
 
     if (ctx.input.bulkJobId) {
       let status = await client.getBulkJobStatus(ctx.input.bulkJobId);
+      let job = await client.getBulkJob(ctx.input.bulkJobId);
       output.bulkJobId = ctx.input.bulkJobId;
-      output.status = status.status || undefined;
+      output.status = job.status || undefined;
       output.documentCount = status.document_count ?? undefined;
       output.completedDocuments = status.completed_documents ?? undefined;
       output.cancelledDocuments = status.cancelled_documents ?? undefined;
       output.inProgressDocuments = status.in_progress_documents ?? undefined;
-      output.createdAt = status.bulk_job_created_at ?? undefined;
+      output.createdAt = asOptionalString(status.bulk_job_created_at ?? job.created_at);
 
       if (ctx.input.includeDocuments) {
         let docsResult = await client.getBulkJobDocuments(
@@ -83,15 +103,15 @@ export let getBulkJob = SlateTool.create(spec, {
         let docs = docsResult.data || docsResult || [];
         output.documents = (Array.isArray(docs) ? docs : []).map((d: any) => ({
           documentHash: d.document_hash,
-          title: d.title || undefined,
-          isCompleted: d.is_completed === 1 || d.is_completed === true
+          title: d.document_title || d.title || undefined,
+          isCompleted: isEnabled(d.is_completed)
         }));
       }
     }
 
     let message = ctx.input.bulkJobId
       ? `Bulk job "${ctx.input.bulkJobId}" — ${output.completedDocuments ?? 0}/${output.documentCount ?? 0} completed.`
-      : `Retrieved CSV template for template "${ctx.input.templateHash}".`;
+      : `Prepared the CSV structure for template "${ctx.input.templateHash}" for download.`;
 
     return { output: output as any, message };
   })

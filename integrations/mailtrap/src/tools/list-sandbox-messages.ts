@@ -15,7 +15,13 @@ export let listSandboxMessages = SlateTool.create(spec, {
     z.object({
       inboxId: z.string().describe('Sandbox inbox ID'),
       search: z.string().optional().describe('Search term to filter messages'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z.number().optional().describe('Page number for pagination'),
+      lastId: z
+        .string()
+        .optional()
+        .describe(
+          'Message ID of the last item on the previous page. Takes precedence over page.'
+        )
     })
   )
   .output(
@@ -38,13 +44,13 @@ export let listSandboxMessages = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let result = await client.listSandboxMessages(ctx.input.inboxId, {
       search: ctx.input.search,
-      page: ctx.input.page
+      page: ctx.input.page,
+      lastId: ctx.input.lastId
     });
 
     let messages = (Array.isArray(result) ? result : []).map((m: any) => ({

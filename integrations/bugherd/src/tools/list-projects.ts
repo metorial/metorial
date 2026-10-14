@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
+import type { BugherdProject } from '../lib/types';
 import { spec } from '../spec';
 
 let projectSchema = z.object({
@@ -24,10 +26,18 @@ export let listProjects = SlateTool.create(spec, {
   .input(
     z.object({
       activeOnly: z.boolean().default(false).describe('If true, only return active projects'),
-      userId: z
-        .number()
+      userId: positiveIntegerSchema
         .optional()
-        .describe('If provided, list only projects accessible to this user')
+        .describe(
+          'If provided, list only projects accessible to this user; call list_users for user IDs'
+        ),
+      page: positiveIntegerSchema
+        .optional()
+        .describe('Page number starting at 1 (up to 100 projects per page)'),
+      createdSince: z
+        .string()
+        .optional()
+        .describe('Return projects created after this timestamp; requires userId')
     })
   )
   .output(
@@ -36,20 +46,25 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.createdSince !== undefined && ctx.input.userId === undefined) {
+      throw createApiServiceError('Provide userId when filtering projects by createdSince.');
+    }
     let client = new BugherdClient(ctx.auth.token);
 
-    let rawProjects: any;
+    let rawProjects: BugherdProject[];
     if (ctx.input.userId) {
       rawProjects = await client.getUserProjects(ctx.input.userId, {
-        isActive: ctx.input.activeOnly ? true : undefined
+        isActive: ctx.input.activeOnly ? true : undefined,
+        page: ctx.input.page,
+        createdSince: ctx.input.createdSince
       });
     } else if (ctx.input.activeOnly) {
-      rawProjects = await client.listActiveProjects();
+      rawProjects = await client.listActiveProjects(ctx.input.page);
     } else {
-      rawProjects = await client.listProjects();
+      rawProjects = await client.listProjects(ctx.input.page);
     }
 
-    let projects = rawProjects.map((p: any) => ({
+    let projects = rawProjects.map(p => ({
       projectId: p.id,
       name: p.name,
       devurl: p.devurl,

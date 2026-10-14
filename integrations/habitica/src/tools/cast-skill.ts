@@ -55,7 +55,9 @@ Some skills require a target (task ID or user ID), while others are self-cast or
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     let result = await client.castSkill(ctx.input.spellId, ctx.input.targetId);

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCustomFields = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listCustomFields = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('ID of the workspace to list custom fields from')
+      workspaceId: workspaceIdSchema
     })
   )
   .output(
@@ -63,7 +64,7 @@ export let createCustomField = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('ID of the workspace to create the custom field in'),
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Name for the custom field'),
       type: z
         .enum([
@@ -125,7 +126,7 @@ export let deleteCustomField = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('ID of the workspace the custom field belongs to'),
+      workspaceId: workspaceIdSchema,
       customFieldId: z.string().describe('ID of the custom field to delete')
     })
   )
@@ -208,6 +209,15 @@ export let setCustomFieldValue = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new MotionClient({ token: ctx.auth.token });
 
+    if (
+      ctx.input.removeValueId !== undefined &&
+      (ctx.input.customFieldInstanceId !== undefined ||
+        ctx.input.fieldType !== undefined ||
+        ctx.input.fieldValue !== undefined)
+    ) {
+      throw createApiServiceError('Provide removal fields or setting fields, not both.');
+    }
+
     if (ctx.input.removeValueId) {
       if (ctx.input.targetType === 'task') {
         await client.removeCustomFieldFromTask(ctx.input.targetId, ctx.input.removeValueId);
@@ -227,7 +237,7 @@ export let setCustomFieldValue = SlateTool.create(spec, {
       !ctx.input.fieldType ||
       ctx.input.fieldValue === undefined
     ) {
-      throw new Error(
+      throw createApiServiceError(
         'customFieldInstanceId, fieldType, and fieldValue are required when setting a value'
       );
     }

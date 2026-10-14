@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StartonClient } from '../lib/client';
 import { spec } from '../spec';
@@ -65,6 +65,11 @@ Use **template deployment** for standard token contracts or **bytecode deploymen
     z.object({
       contractAddress: z.string().describe('Deployed contract address'),
       transactionHash: z.string().describe('Deployment transaction hash'),
+      transactionId: z
+        .string()
+        .optional()
+        .describe('Starton transaction ID for tracking with get_transactions'),
+      state: z.string().optional().describe('Deployment transaction state'),
       network: z.string().describe('Network the contract was deployed to'),
       contractName: z.string().describe('Name of the deployed contract')
     })
@@ -75,7 +80,7 @@ Use **template deployment** for standard token contracts or **bytecode deploymen
 
     if (ctx.input.source === 'template') {
       if (!ctx.input.templateId) {
-        throw new Error('templateId is required for template deployment');
+        throw createApiServiceError('templateId is required for template deployment');
       }
       result = await client.deployFromTemplate({
         templateId: ctx.input.templateId,
@@ -88,7 +93,7 @@ Use **template deployment** for standard token contracts or **bytecode deploymen
       });
     } else {
       if (!ctx.input.abi || !ctx.input.bytecode) {
-        throw new Error('abi and bytecode are required for bytecode deployment');
+        throw createApiServiceError('abi and bytecode are required for bytecode deployment');
       }
       result = await client.deployFromBytecode({
         abi: ctx.input.abi,
@@ -106,10 +111,12 @@ Use **template deployment** for standard token contracts or **bytecode deploymen
       output: {
         contractAddress: result.smartContract?.address || result.address || '',
         transactionHash: result.transaction?.transactionHash || result.transactionHash || '',
+        transactionId: result.transaction?.id ?? undefined,
+        state: result.transaction?.state ?? result.smartContract?.state ?? undefined,
         network: ctx.input.network,
         contractName: ctx.input.name
       },
-      message: `Smart contract **${ctx.input.name}** deployed on **${ctx.input.network}** at \`${result.smartContract?.address || result.address || 'pending'}\`.`
+      message: `Submitted deployment of **${ctx.input.name}** on **${ctx.input.network}**. Contract address: \`${result.smartContract?.address || result.address || 'pending'}\`.${result.transaction?.id ? ` Track transaction \`${result.transaction.id}\` with get_transactions.` : ''}`
     };
   })
   .build();

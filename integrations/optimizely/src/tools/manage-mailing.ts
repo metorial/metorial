@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CampaignClient } from '../lib/campaign-client';
 import { spec } from '../spec';
@@ -22,6 +22,28 @@ Mailings are email messages that can be designed, configured, and sent to recipi
       action: z
         .enum(['create', 'update', 'get', 'list', 'send', 'copy'])
         .describe('Action to perform'),
+      clientId: z
+        .string()
+        .optional()
+        .describe(
+          'Campaign client ID from Administration > API Overview; overrides campaignClientId in config'
+        ),
+      campaignId: z
+        .number()
+        .optional()
+        .describe(
+          'Smart Campaign ID. Selects the documented Smart Campaign message routes for list/get/create/update/send.'
+        ),
+      contentText: z
+        .string()
+        .optional()
+        .describe(
+          'Plain text mailing content for Smart Campaign create/update. Use with campaignId instead of content.'
+        ),
+      mediaType: z
+        .enum(['email', 'sms', 'push'])
+        .optional()
+        .describe('Media type for Smart Campaign message creation; defaults to email'),
       mailingId: z
         .number()
         .optional()
@@ -49,9 +71,10 @@ Mailings are email messages that can be designed, configured, and sent to recipi
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.config.campaignClientId)
-      throw new Error('campaignClientId must be set in config for Campaign API');
-    let client = new CampaignClient(ctx.auth.token, ctx.config.campaignClientId);
+    let clientId = ctx.input.clientId ?? ctx.config.campaignClientId;
+    if (!clientId)
+      throw createApiServiceError('campaignClientId must be set in config for Campaign API');
+    let client = new CampaignClient(ctx.auth.token, clientId, ctx.input.campaignId);
 
     switch (ctx.input.action) {
       case 'list': {
@@ -65,7 +88,7 @@ Mailings are email messages that can be designed, configured, and sent to recipi
         };
       }
       case 'get': {
-        if (!ctx.input.mailingId) throw new Error('mailingId is required');
+        if (!ctx.input.mailingId) throw createApiServiceError('mailingId is required');
         let mailing = await client.getMailing(ctx.input.mailingId);
         return {
           output: { mailing },
@@ -73,14 +96,16 @@ Mailings are email messages that can be designed, configured, and sent to recipi
         };
       }
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required');
+        if (!ctx.input.name) throw createApiServiceError('name is required');
         let mailing = await client.createMailing({
           name: ctx.input.name,
           subject: ctx.input.subject,
           senderAddress: ctx.input.senderAddress,
           senderName: ctx.input.senderName,
           recipientListId: ctx.input.recipientListId,
-          content: ctx.input.content
+          content: ctx.input.content,
+          contentText: ctx.input.contentText,
+          mediaType: ctx.input.mediaType
         });
         return {
           output: { mailing },
@@ -88,7 +113,7 @@ Mailings are email messages that can be designed, configured, and sent to recipi
         };
       }
       case 'update': {
-        if (!ctx.input.mailingId) throw new Error('mailingId is required');
+        if (!ctx.input.mailingId) throw createApiServiceError('mailingId is required');
         let updateData: Record<string, any> = {};
         if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
         if (ctx.input.subject !== undefined) updateData.subject = ctx.input.subject;
@@ -98,6 +123,8 @@ Mailings are email messages that can be designed, configured, and sent to recipi
         if (ctx.input.recipientListId !== undefined)
           updateData.recipientListId = ctx.input.recipientListId;
         if (ctx.input.content !== undefined) updateData.content = ctx.input.content;
+        if (ctx.input.contentText !== undefined)
+          updateData.contentText = ctx.input.contentText;
         let mailing = await client.updateMailing(ctx.input.mailingId, updateData);
         return {
           output: { mailing },
@@ -105,15 +132,15 @@ Mailings are email messages that can be designed, configured, and sent to recipi
         };
       }
       case 'send': {
-        if (!ctx.input.mailingId) throw new Error('mailingId is required');
+        if (!ctx.input.mailingId) throw createApiServiceError('mailingId is required');
         let result = await client.sendMailing(ctx.input.mailingId);
         return {
           output: { mailing: result },
-          message: `Sent mailing ${ctx.input.mailingId}.`
+          message: `Started mailing ${ctx.input.mailingId}.`
         };
       }
       case 'copy': {
-        if (!ctx.input.mailingId) throw new Error('mailingId is required');
+        if (!ctx.input.mailingId) throw createApiServiceError('mailingId is required');
         let mailing = await client.copyMailing(ctx.input.mailingId);
         return {
           output: { mailing },

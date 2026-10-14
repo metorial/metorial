@@ -1,4 +1,4 @@
-# Slates Specification for GTmetrix
+# GTmetrix API Capabilities
 
 ## Overview
 

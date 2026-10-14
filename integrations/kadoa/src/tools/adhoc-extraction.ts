@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KadoaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -33,7 +33,9 @@ Useful for one-off data needs or testing extraction configurations.`,
       locationIsoCode: z
         .string()
         .optional()
-        .describe('ISO country code for manual location (e.g., "US", "DE")')
+        .describe(
+          'ISO country code for manual location. Call list_locations for available codes (e.g., "US", "DE")'
+        )
     })
   )
   .output(
@@ -54,6 +56,17 @@ Useful for one-off data needs or testing extraction configurations.`,
   .handleInvocation(async ctx => {
     let client = new KadoaClient({ token: ctx.auth.token });
 
+    if (ctx.input.locationType === 'manual' && !ctx.input.locationIsoCode) {
+      throw createApiServiceError(
+        'locationIsoCode is required when locationType is manual. Call list_locations for available country codes.'
+      );
+    }
+    if (ctx.input.locationIsoCode && ctx.input.locationType !== 'manual') {
+      throw createApiServiceError(
+        'Set locationType to manual when providing locationIsoCode.'
+      );
+    }
+
     let location = ctx.input.locationType
       ? {
           type: ctx.input.locationType,
@@ -69,11 +82,11 @@ Useful for one-off data needs or testing extraction configurations.`,
     return {
       output: {
         status: result.status,
-        url: result.link,
-        extractedData: result.data,
-        screenshotUrl: result.screenshotUrl,
-        requestTimeMs: result.requestTimeMs,
-        message: result.message
+        url: result.link ?? undefined,
+        extractedData: result.data ?? undefined,
+        screenshotUrl: result.screenshotUrl ?? undefined,
+        requestTimeMs: result.requestTimeMs ?? undefined,
+        message: result.message ?? undefined
       },
       message: `Ad-hoc extraction from **${ctx.input.url}** — status: **${result.status}**${result.requestTimeMs ? ` (${result.requestTimeMs}ms)` : ''}.`
     };

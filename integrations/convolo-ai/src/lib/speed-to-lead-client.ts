@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface TriggerCallParams {
   leadPhone: string;
@@ -39,15 +39,30 @@ export class SpeedToLeadClient {
   private apiKey: string;
 
   constructor(config: { widgetKey: string; apiKey: string }) {
+    if (!config.widgetKey || !config.apiKey) {
+      throw createApiServiceError(
+        'A widget key and Speed To Lead API key are required. Configure them in your authentication settings.'
+      );
+    }
     this.widgetKey = config.widgetKey;
     this.apiKey = config.apiKey;
 
-    this.callAxios = createAxios({
-      baseURL: 'https://app.convolo.ai/rest/v1/ext'
+    this.callAxios = createAuthenticatedAxios({
+      baseURL: 'https://app.brightcall.ai/rest/v1/ext',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Brightcall Speed To Lead',
+          reason: 'convolo_ai_speed_to_lead_api_error'
+        })
     });
 
-    this.reportAxios = createAxios({
-      baseURL: 'https://api.leads.convolo.ai/api/v2'
+    this.reportAxios = createAuthenticatedAxios({
+      baseURL: 'https://api.leads.convolo.ai/api/v2',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Brightcall Speed To Lead',
+          reason: 'convolo_ai_speed_to_lead_api_error'
+        })
     });
   }
 
@@ -93,10 +108,30 @@ export class SpeedToLeadClient {
       headers: { 'Content-Type': 'application/json' }
     });
 
+    if (response.data?.success === false) {
+      throw buildApiServiceError(
+        { response },
+        {
+          providerLabel: 'Brightcall Speed To Lead',
+          reason: 'convolo_ai_speed_to_lead_api_error',
+          operation: 'trigger a call'
+        }
+      );
+    }
+
     return response.data;
   }
 
   async getCallReports(filters: CallReportFilters = {}): Promise<any> {
+    if (
+      filters.maxCalls !== undefined &&
+      (!Number.isInteger(filters.maxCalls) || filters.maxCalls < 1 || filters.maxCalls > 500)
+    ) {
+      throw createApiServiceError('maxCalls must be a whole number between 1 and 500.');
+    }
+    if (filters.page !== undefined && (!Number.isInteger(filters.page) || filters.page < 1)) {
+      throw createApiServiceError('page must be a positive whole number.');
+    }
     let params: Record<string, string | number> = {
       'api-key': this.apiKey
     };
@@ -122,6 +157,20 @@ export class SpeedToLeadClient {
       params.filter_talk_time_to = filters.filterTalkTimeTo;
 
     let response = await this.reportAxios.get('/calls/payload-data-list', { params });
+
+    if (
+      response.data?.success === false ||
+      !Array.isArray(response.data?.endCallPayloadList)
+    ) {
+      throw buildApiServiceError(
+        { response },
+        {
+          providerLabel: 'Brightcall Speed To Lead',
+          reason: 'convolo_ai_speed_to_lead_api_error',
+          operation: 'retrieve call reports'
+        }
+      );
+    }
 
     return response.data;
   }

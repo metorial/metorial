@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let searchInspections = SlateTool.create(spec, {
   name: 'Search Inspections',
   key: 'search_inspections',
-  description: `Search and list inspections in your SafetyCulture organization. Filter by modification date, template, archived status, or completion status. Returns inspection IDs, titles, templates, and modification timestamps.`,
+  description: `Search and list inspections in your SafetyCulture organization. Filter by modification date, template, archived status, or completion status. Returns inspection IDs, template IDs, and modification timestamps.`,
   tags: {
     readOnly: true
   }

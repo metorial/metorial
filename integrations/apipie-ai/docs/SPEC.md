@@ -1,93 +1,41 @@
-Now I have enough information. Let me compile the specification.
+# APIpie AI specification
 
-# Slates Specification for APIpie AI
+## Authentication and configuration
 
-## Overview
+APIpie accepts an API key through `Authorization: Bearer <API_KEY>` or `x-api-key`. This integration uses the Bearer header. API requests use `https://apipie.ai/v1`; the existing document upload/collection routes use `https://apipie.ai/ragtune`. Connection configuration optionally specifies a default provider and `price`, `perf`, or `perf_avg` routing. No OAuth or duplicate auth/config resource identifier exists.
 
-APIpie AI is an AI super aggregator that provides a unified, OpenAI-compatible API to access hundreds of AI models from multiple providers (OpenAI, Anthropic, Google, Meta, etc.) across language, image, voice, vision, embedding, and moderation categories. It offers intelligent routing, load balancing, and value-added features like search grounding, RAG, and model pooling on a pay-as-you-go basis.
+## Tool requests and responses
 
-## Authentication
+| Tool | Request | Response |
+| --- | --- | --- |
+| `chat_completion` | `POST /v1/chat/completions`; existing generation, search, RAG, integrity, and memory fields, plus optional `user` and `tools_model`. Specific function names in `toolChoice` are encoded as a named-function choice. | First choice text/function calls, completion identity, provider, tokens, cost, and latency. Documented numeric-string costs are normalized to numbers. |
+| `analyze_images` | `POST /v1/chat/completions` with text and `image_url` content parts; image URLs or data URLs, optional detail and output token limit. | Visual text, identity, finish reason, provider, tokens, cost, and latency. |
+| `generate_image` | `POST /v1/images/generations`; model, prompt, provider, count, dimensions, quality/style, response format, optional source image. | Existing URL/base64/revised-prompt values, model and usage metadata, plus downloadable generated images. |
+| `text_to_speech` | `POST /v1/audio/speech`; model, voice, text, format/speed, and optional nested ElevenLabs voice settings. | Existing audio URL and usage fields plus downloadable speech. JSON URL responses and binary audio responses are accepted without text corruption. |
+| `create_embeddings` | `POST /v1/embeddings`; model, text/string list, existing `float`/`np` encoding enum, optional dimensions. | Numeric embedding vectors with indexes, model, and token counts. |
+| `discover_models` | `GET /v1/models`; existing type/subtype/provider/model/enabled/voices filters. | Existing model fields, with additive voice identifiers/names when listing voices. |
+| `web_search` | `POST /v1/search`; query, search provider, locale and count. `POST /v1/scrape`; URL and format. Combined action scrapes top results and preserves per-page failure outcomes. | Search result URL/title/description and scraped title/text/excerpt. |
+| `manage_rag` | Existing `POST /ragtune`, `/ragtune/listCollections`, `/ragtune/deleteCollection` requests and fields. | Existing collection names, upload/delete flags, and unmodified raw responses. |
+| `get_usage` | `GET /v1/queries/`; optional limit/offset. | Existing per-request ID, timestamp, provider/route, tokens/characters, string cost, latency, IP, and pagination fields. |
+| `get_state` | `GET /v1/state`; optional `user` and `app_name` query fields. | Scope, key/application name, saved settings, feature flags, and complete provider response. |
+| `update_state` | `POST /v1/state`; partial `settings`, `delete` setting keys, `enable_inline_cli`, `enable_user_states`, and `gui_only`. | Resulting state and complete provider response. Scope switches clear existing settings; dashboard-only mode restricts later API writes. |
 
-APIpie API requires API keys to authenticate users. You can obtain or create new API keys from your API Keys page at `https://apipie.ai/dashboard/profile/api-keys`.
+Existing tool keys, field types, optionality, meanings, enum values, and file/raw/base64 outputs are preserved. Whole-number checks run during invocation without narrowing existing numeric schemas. HTTP, timeout, upstream, invalid-response, and user validation failures use structured service errors.
 
-Authentication is done using either an `Authorization` header with a Bearer token or an `x-api-key` header:
+## Official sources and documentation limits
 
-- `Authorization: Bearer <YOUR_API_KEY>`
-- `x-api-key: <YOUR_API_KEY>`
+- [Chat completions](https://apipie.ai/docs/features/completions)
+- [Tools and function calls](https://apipie.ai/docs/features/tools)
+- [Search and scraping](https://apipie.ai/docs/features/internetsearch)
+- [Image generation](https://apipie.ai/docs/features/images)
+- [Speech synthesis](https://apipie.ai/docs/features/voices)
+- [Model and voice catalog](https://apipie.ai/docs/features/models)
+- [Usage history](https://apipie.ai/docs/features/usage)
+- [State management](https://apipie.ai/docs/features/state)
+- [Multimodal vision](https://apipie.ai/docs/features/multimodal_vision)
+- [Official RAG upload example](https://apipie.ai/blog/understanding-rag-retrieval-augmented-generation-guide)
+- [API reference](https://apipie.ai/docs/api)
 
-The base URL for all API requests is `https://apipie.ai/v1/`. The API follows OpenAI's API structure, so existing OpenAI-compatible clients can be pointed at APIpie by changing the base URL and API key.
+The linked RAG reference at `https://apipie.ai/docs/features/ragtune` returned 404 during this audit. Its existing list/delete endpoints and response shapes could not be reverified and are preserved. The API reference returned no readable schema content, so the existing embedding endpoint and `np` encoding behavior could not be fully reverified. Numeric embedding output is checked before success. No suitable current-user/profile endpoint was documented, so model discovery remains the existing connection profile probe with a generic connection label.
 
-No OAuth, scopes, or additional credentials are required. Authentication is solely via the API key.
-
-## Features
-
-### Chat Completions
-
-Send conversational prompts to hundreds of language models from providers like OpenAI, Anthropic, Google, Meta, Mistral, xAI, DeepSeek, and more through a single OpenAI-compatible endpoint. You can specify a model and optionally a provider. Supports streaming responses, function calling/tools, and structured output.
-
-- Key parameters: `model`, `provider`, `messages`, `max_tokens`, `stream`.
-- Tools/function calling can be configured to use OpenAI or Anthropic models to handle tool calls inline with requests to any model.
-
-### Image Generation
-
-Create and manipulate images using AI models from various providers through a unified interface. Supports generating original images, editing existing ones, and creating variations.
-
-### Voice Synthesis
-
-Convert text into natural-sounding speech using text-to-speech models from leading providers. Access thousands of voice options across multiple voice model providers.
-
-### Multimodal Vision
-
-Process and analyze images alongside text using vision-capable models. Supports sending images (via URL or base64) within chat completion requests for tasks like visual analysis, chart interpretation, and document processing.
-
-### Embeddings
-
-Generate vector embeddings from text using embedding models from multiple providers, useful for semantic search, clustering, and similarity tasks.
-
-### Search Grounding
-
-Augment any model's responses with real-time web search results. The system performs live searches, scrapes and cleans top results, and injects them into the prompt context automatically. Configurable via `web_search_options` or advanced parameters like number of searches, results to pull, scrape length, language, and geolocation. Also available as standalone search (`/v1/search`) and scrape (`/v1/scrape`) endpoints.
-
-### RAG Tuning
-
-Upload documents to collections and reference them when querying any model. The platform handles vectorization and retrieval, augmenting model responses with your own data without needing to fine-tune or train models.
-
-### Pinecone Integration
-
-For users needing more control over the vectorization process, the platform offers full Pinecone vector database integration, allowing custom embeddings and vector storage/retrieval for AI workflows.
-
-### Integrity (Hallucination Reduction)
-
-Queries models multiple times and uses an election process to select the most accurate response, reducing hallucinations. Useful for applications requiring high accuracy.
-
-### Model Pooling
-
-Aggregate similar models into pools for redundancy, failover, and higher effective throughput. Pools can contain multiple renditions of the same model or several models with similar capabilities.
-
-### Preferred Routing
-
-Choose between performance-optimized or cost-optimized routing for requests. The platform routes queries across multiple providers based on your preference.
-
-### State Management
-
-Manage configuration, memory, model selection, and routing preferences at the application or per-user level. State can be set via the dashboard GUI, the `/v1/state` API endpoint, or inline CLI commands within prompts. Supports features like persistent memory, model pinning, and search configuration.
-
-### Integrated Model Memory (IMM)
-
-Enable persistent conversational memory across requests. The platform can store and recall conversation context, allowing stateful interactions without client-side conversation management.
-
-### Inline CLI
-
-Control model behavior and features directly within prompts using special commands (e.g., `:setmodel:`, `:search`, `:deepsearch`). Allows dynamic configuration without changing API parameters.
-
-### Models Discovery
-
-Retrieve and filter available AI models based on type, provider, capabilities, pricing, and performance metrics. Provides detailed information including availability, latency, cost, and context window sizes to help select the right model.
-
-### Usage Tracking
-
-Track and analyze API usage with detailed insights including token counts, response times, costs, and source IPs. Historic usage data is accessible via API for auditing and optimization.
-
-## Events
-
-The provider does not support events. APIpie AI does not offer webhooks or event subscription mechanisms.
+Generated URL examples do not document expiry timestamps or URL-renewal endpoints. Download URLs are used as returned, and file download/expiration behavior requires provider verification. No live provider calls, E2E suites, or evals were run for this refresh.

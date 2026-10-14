@@ -34,7 +34,9 @@ let resultSchema = z.object({
   distanceKm: z
     .string()
     .optional()
-    .describe('Distance in kilometers from the queried coordinates to the returned place')
+    .describe(
+      'Provider distance string in kilometers from the queried coordinates to the returned place; may include a km suffix'
+    )
 });
 
 export let reverseGeocode = SlateTool.create(spec, {
@@ -62,7 +64,7 @@ export let reverseGeocode = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      status: z.string().describe('Response status (e.g., "ok", "ZERO_RESULTS")'),
+      status: z.string().describe('Response status (e.g., "ok", "OK", "ZERO_RESULTS")'),
       results: z.array(resultSchema).describe('Array of matching reverse-geocoded locations')
     })
   )
@@ -74,19 +76,15 @@ export let reverseGeocode = SlateTool.create(spec, {
       lng: ctx.input.longitude
     });
 
-    if (response.status !== 'ok') {
-      ctx.warn(`Geokeo returned status: ${response.status}`);
-    }
-
-    let results = (response.results || []).map(r => ({
+    let results = response.results.map(r => ({
       placeClass: r.class,
       placeType: r.type,
-      name: r.address_components.name,
-      street: r.address_components.street,
-      city: r.address_components.city,
-      state: r.address_components.state,
-      postcode: r.address_components.postcode,
-      country: r.address_components.country,
+      name: r.address_components?.name ?? '',
+      street: r.address_components?.street ?? '',
+      city: r.address_components?.city ?? '',
+      state: r.address_components?.state ?? '',
+      postcode: r.address_components?.postcode ?? '',
+      country: r.address_components?.country ?? '',
       formattedAddress: r.formatted_address,
       latitude: r.geometry.location.lat,
       longitude: r.geometry.location.lng,
@@ -101,7 +99,7 @@ export let reverseGeocode = SlateTool.create(spec, {
     let resultCount = results.length;
     let message =
       resultCount > 0
-        ? `Found **${resultCount}** result${resultCount > 1 ? 's' : ''} for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}). Nearest address: **${results[0]!.formattedAddress}**${results[0]!.distanceKm ? ` (${results[0]!.distanceKm} km away)` : ''}.`
+        ? `Found **${resultCount}** result${resultCount > 1 ? 's' : ''} for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}). Nearest address: **${results[0]!.formattedAddress}**${results[0]!.distanceKm ? ` (${results[0]!.distanceKm} away)` : ''}.`
         : `No results found for coordinates (${ctx.input.latitude}, ${ctx.input.longitude}).`;
 
     return {

@@ -23,6 +23,9 @@ export let addFeed = SlateTool.create(spec, {
   name: 'Add RSS Feed',
   key: 'add_feed',
   description: `Subscribe to an RSS feed to automatically post new items to social networks. New feed items are detected and published to the specified platforms.`,
+  constraints: [
+    'X/Twitter is no longer supported for RSS auto-posting; a twitter-only feed returns an error.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -47,7 +50,7 @@ export let addFeed = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -85,7 +88,7 @@ export let getFeeds = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -122,7 +125,7 @@ export let deleteFeed = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 

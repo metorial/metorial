@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getFirstResult, getResponseEntity, ReferralRockClient } from '../lib/client';
+import { memberQuery } from '../lib/queries';
 import { spec } from '../spec';
 
 export let updateMember = SlateTool.create(spec, {
@@ -60,28 +61,7 @@ export let updateMember = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
-    let query: Record<string, unknown> = {};
-
-    if (ctx.input.memberId || ctx.input.referralCode) {
-      query = {
-        primaryInfo: {
-          ...(ctx.input.memberId && { memberId: ctx.input.memberId }),
-          ...(ctx.input.referralCode && { referralCode: ctx.input.referralCode })
-        }
-      };
-    } else {
-      query = {
-        secondaryInfo: {
-          ...(ctx.input.email && { email: ctx.input.email }),
-          ...(ctx.input.externalIdentifier && {
-            externalIdentifier: ctx.input.externalIdentifier
-          })
-        },
-        tertiaryInfo: {
-          ...(ctx.input.programId && { programId: ctx.input.programId })
-        }
-      };
-    }
+    let query = memberQuery(ctx.input);
 
     let memberUpdate: Record<string, unknown> = {};
     if (ctx.input.firstName !== undefined) memberUpdate.firstName = ctx.input.firstName;
@@ -104,11 +84,10 @@ export let updateMember = SlateTool.create(spec, {
     if (ctx.input.customOverrideURL !== undefined)
       memberUpdate.customOverrideURL = ctx.input.customOverrideURL;
 
-    let result = await client.updateMembers([{ query, ...memberUpdate }]);
+    let result = await client.updateMembers([{ query, member: memberUpdate }]);
 
-    let results = result as unknown as Record<string, unknown>[];
-    let first = Array.isArray(results) ? results[0] : result;
-    let member = (first?.member || {}) as Record<string, unknown>;
+    let first = getFirstResult(result);
+    let member = getResponseEntity(first, 'member');
     let resultInfo = (first?.resultInfo || {}) as Record<string, unknown>;
 
     return {
@@ -120,7 +99,7 @@ export let updateMember = SlateTool.create(spec, {
         status: resultInfo.Status as string | undefined,
         statusMessage: resultInfo.Message as string | undefined
       },
-      message: `Updated member **${member.displayName || ctx.input.memberId || 'unknown'}** — ${resultInfo.Message || 'Success'}.`
+      message: `Member update result for **${member.displayName || ctx.input.memberId || 'requested member'}**: ${resultInfo.Message || resultInfo.Status || 'Request processed'}.`
     };
   })
   .build();

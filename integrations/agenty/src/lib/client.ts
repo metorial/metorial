@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://api.agenty.com/v2';
 let BROWSER_BASE_URL = 'https://browser.agenty.com/api';
@@ -6,25 +11,67 @@ let BROWSER_BASE_URL = 'https://browser.agenty.com/api';
 export class Client {
   private http;
   private browserHttp;
-  private token: string;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'An Agenty API key is required. Reconnect with a valid key.'
+      );
+    }
 
-    this.http = createAxios({
+    let errorAdapter = (error: unknown) =>
+      buildApiServiceError(error, {
+        providerLabel: 'Agenty',
+        reason: 'agenty_api_error'
+      });
+    this.http = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Agenty-ApiKey': config.token
-      }
+      timeout: 65000,
+      authHeader: { name: 'X-Agenty-ApiKey', value: config.token },
+      errorAdapter
     });
-
-    this.browserHttp = createAxios({
+    this.browserHttp = createAuthenticatedAxios({
       baseURL: BROWSER_BASE_URL,
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      timeout: 65000,
+      authHeader: { name: 'X-Agenty-ApiKey', value: config.token },
+      errorAdapter
     });
+    for (let http of [this.http, this.browserHttp]) {
+      http.interceptors.response.use(response => {
+        let data = response.data;
+        if (isApiErrorRecord(data)) {
+          let status = data.status_code;
+          if (
+            (typeof status === 'number' && status >= 400) ||
+            (typeof status === 'string' && /^(error|failed)$/i.test(status))
+          ) {
+            throw createApiServiceError(
+              typeof data.message === 'string'
+                ? `Agenty API failed: ${data.message}`
+                : 'Agenty rejected the request.',
+              { upstreamStatus: typeof status === 'number' ? status : response.status }
+            );
+          }
+        }
+        return response;
+      });
+    }
+  }
+
+  private async browserFile(path: string, params: unknown) {
+    let response = await this.browserHttp.post(path, params, { responseType: 'arraybuffer' });
+    let content = Buffer.from(response.data);
+    let legacyData: unknown = content.toString('utf8');
+    // Match the previous JSON/text response value while retaining the original file bytes.
+    try {
+      legacyData = JSON.parse(content.toString('utf8'));
+    } catch {}
+    if (isApiErrorRecord(legacyData)) {
+      throw createApiServiceError(
+        'Agenty returned a JSON response instead of the requested file. Check the URL and browser options.'
+      );
+    }
+    return { content, legacyData };
   }
 
   // ─── Agents ───
@@ -41,17 +88,17 @@ export class Client {
   }
 
   async getAgent(agentId: string) {
-    let response = await this.http.get(`/agents/${agentId}`);
+    let response = await this.http.get(`/agents/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
   async cloneAgent(agentId: string) {
-    let response = await this.http.get(`/agents/${agentId}/clone`);
+    let response = await this.http.get(`/agents/${encodeURIComponent(agentId)}/clone`);
     return response.data;
   }
 
   async deleteAgent(agentId: string) {
-    let response = await this.http.delete(`/agents/${agentId}`);
+    let response = await this.http.delete(`/agents/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
@@ -63,12 +110,12 @@ export class Client {
   }
 
   async stopJob(jobId: string) {
-    let response = await this.http.get(`/jobs/${jobId}/stop`);
+    let response = await this.http.get(`/jobs/${encodeURIComponent(jobId)}/stop`);
     return response.data;
   }
 
   async getJob(jobId: string) {
-    let response = await this.http.get(`/jobs/${jobId}`);
+    let response = await this.http.get(`/jobs/${encodeURIComponent(jobId)}`);
     return response.data;
   }
 
@@ -81,7 +128,9 @@ export class Client {
       modified?: number;
     }
   ) {
-    let response = await this.http.get(`/jobs/${jobId}/result`, { params });
+    let response = await this.http.get(`/jobs/${encodeURIComponent(jobId)}/result`, {
+      params
+    });
     return response.data;
   }
 
@@ -92,7 +141,7 @@ export class Client {
       limit?: number;
     }
   ) {
-    let response = await this.http.get(`/jobs/${jobId}/logs`, { params });
+    let response = await this.http.get(`/jobs/${encodeURIComponent(jobId)}/logs`, { params });
     return response.data;
   }
 
@@ -105,8 +154,24 @@ export class Client {
       filename?: string;
     }
   ) {
-    let response = await this.http.get(`/jobs/${jobId}/export`, { params });
+    let response = await this.http.get(`/jobs/${encodeURIComponent(jobId)}/export`, {
+      params
+    });
     return response.data;
+  }
+
+  async getExportDownload(
+    jobId: string,
+    params: { type?: string; collection?: number; modified?: number; filename?: string }
+  ) {
+    let result = await this.exportJobResult(jobId, params);
+    let url = result.download_link || result.downloadlink || result.url;
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+      throw createApiServiceError(
+        'Agenty did not return an export download URL. Request the export again after the job completes.'
+      );
+    }
+    return { result, url };
   }
 
   async listJobs(params?: { agent_id?: string; offset?: number; limit?: number }) {
@@ -124,24 +189,24 @@ export class Client {
       is_enabled: boolean;
     }
   ) {
-    let response = await this.http.post(`/scheduler/${agentId}`, schedule);
+    let response = await this.http.post(`/scheduler/${encodeURIComponent(agentId)}`, schedule);
     return response.data;
   }
 
   async getSchedule(agentId: string) {
-    let response = await this.http.get(`/scheduler/${agentId}`);
+    let response = await this.http.get(`/scheduler/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
   async deleteSchedule(agentId: string) {
-    let response = await this.http.delete(`/scheduler/${agentId}`);
+    let response = await this.http.delete(`/scheduler/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
   // ─── Inputs ───
 
   async getInput(agentId: string) {
-    let response = await this.http.get(`/inputs/${agentId}`);
+    let response = await this.http.get(`/inputs/${encodeURIComponent(agentId)}`);
     return response.data;
   }
 
@@ -155,7 +220,7 @@ export class Client {
       field?: string;
     }
   ) {
-    let response = await this.http.put(`/inputs/${agentId}`, input);
+    let response = await this.http.put(`/inputs/${encodeURIComponent(agentId)}`, input);
     return response.data;
   }
 
@@ -176,7 +241,7 @@ export class Client {
   }
 
   async getList(listId: string) {
-    let response = await this.http.get(`/lists/${listId}`);
+    let response = await this.http.get(`/lists/${encodeURIComponent(listId)}`);
     return response.data;
   }
 
@@ -187,17 +252,49 @@ export class Client {
       description?: string;
     }
   ) {
-    let response = await this.http.put(`/lists/${listId}`, data);
+    let response = await this.http.put(`/lists/${encodeURIComponent(listId)}`, data);
     return response.data;
   }
 
   async deleteList(listId: string) {
-    let response = await this.http.delete(`/lists/${listId}`);
+    let response = await this.http.delete(`/lists/${encodeURIComponent(listId)}`);
     return response.data;
   }
 
   async addListRows(listId: string, rows: Record<string, string>[]) {
-    let response = await this.http.post(`/lists/${listId}/rows`, rows);
+    let response = await this.http.post(`/lists/${encodeURIComponent(listId)}/rows`, rows);
+    return response.data;
+  }
+
+  async listListRows(
+    listId: string,
+    params: { offset?: number; limit?: number; sort?: string; order?: string }
+  ) {
+    let response = await this.http.get(`/lists/${encodeURIComponent(listId)}/rows`, {
+      params
+    });
+    return response.data;
+  }
+
+  async getListRow(listId: string, rowId: string) {
+    let response = await this.http.get(
+      `/lists/${encodeURIComponent(listId)}/rows/${encodeURIComponent(rowId)}`
+    );
+    return response.data;
+  }
+
+  async updateListRow(listId: string, rowId: string, row: Record<string, string>) {
+    let response = await this.http.put(
+      `/lists/${encodeURIComponent(listId)}/rows/${encodeURIComponent(rowId)}`,
+      { ...row, _id: rowId }
+    );
+    return response.data;
+  }
+
+  async deleteListRow(listId: string, rowId: string) {
+    let response = await this.http.delete(
+      `/lists/${encodeURIComponent(listId)}/rows/${encodeURIComponent(rowId)}`
+    );
     return response.data;
   }
 
@@ -214,8 +311,7 @@ export class Client {
       omitBackground?: boolean;
     };
   }) {
-    let response = await this.browserHttp.post(`/screenshot?apiKey=${this.token}`, params);
-    return response.data;
+    return this.browserFile('/screenshot', params);
   }
 
   async generatePdf(params: {
@@ -224,22 +320,19 @@ export class Client {
     gotoOptions?: { timeout?: number; waitUntil?: string };
     options?: { format?: string };
   }) {
-    let response = await this.browserHttp.post(`/pdf?apiKey=${this.token}`, params);
-    return response.data;
+    return this.browserFile('/pdf', params);
   }
 
   async getContent(params: {
     url: string;
     gotoOptions?: { timeout?: number; waitUntil?: string };
   }) {
-    let response = await this.browserHttp.post(`/content?apiKey=${this.token}`, params);
+    let response = await this.browserHttp.post('/content', params);
     return response.data;
   }
 
   async extractStructuredData(url: string) {
-    let response = await this.browserHttp.get(
-      `/extract?apiKey=${this.token}&url=${encodeURIComponent(url)}`
-    );
+    let response = await this.browserHttp.get('/extract', { params: { url } });
     return response.data;
   }
 }

@@ -1,7 +1,10 @@
 export interface PaginatedResponse<T> {
   count: number;
   data: T[];
+  has_more: boolean;
 }
+
+export type ResourceReference = string | { id: string; [key: string]: unknown };
 
 export interface Booking {
   object: string;
@@ -13,20 +16,24 @@ export interface Booking {
   starting_time: string;
   customer_timezone: string;
   last_updated_time: string;
-  owner: string;
+  owner: ResourceReference;
   duration_minutes: number;
   virtual_conferencing: {
     join_url: string;
   } | null;
   location_description: string | null;
   rescheduled_booking_id: string | null;
-  cancel_reschedule_information: CancelRescheduleInfo[] | null;
+  cancel_reschedule_information: CancelRescheduleInfo | CancelRescheduleInfo[] | null;
   attendees: string[];
   form_submission: FormSubmission | null;
-  booking_page: string | null;
-  master_page: string | null;
-  event_type: string | null;
-  booking_calendar: string | null;
+  booking_page?: ResourceReference | null;
+  master_page?: ResourceReference | null;
+  event_type?: ResourceReference | null;
+  booking_calendar?: ResourceReference | null;
+  contact?: ResourceReference | null;
+  conversation?: ResourceReference | null;
+  cancel_url?: string | null;
+  reschedule_url?: string | null;
 }
 
 export interface CancelRescheduleInfo {
@@ -36,19 +43,19 @@ export interface CancelRescheduleInfo {
 }
 
 export interface FormSubmission {
-  name: string | null;
-  email: string | null;
-  phone: string | null;
-  mobile_phone: string | null;
-  note: string | null;
-  company: string | null;
-  guests: string[];
-  custom_fields: CustomField[];
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  mobile_phone?: string | null;
+  note?: string | null;
+  company?: string | null;
+  guests?: string[];
+  custom_fields?: CustomField[];
 }
 
 export interface CustomField {
   name: string;
-  value: string;
+  value: unknown;
 }
 
 export interface BookingCalendar {
@@ -67,7 +74,10 @@ export interface BookingPage {
   id: string;
   name: string;
   url: string;
-  published: boolean;
+  active: boolean;
+  published?: boolean;
+  label?: string;
+  timezone?: string;
 }
 
 export interface MasterPage {
@@ -81,14 +91,25 @@ export interface EventType {
   id: string;
   name: string;
   description: string | null;
-  duration_minutes: number | null;
+  duration_minutes?: number | null;
 }
 
 export interface User {
   object: string;
   id: string;
-  name: string;
+  name?: string;
+  first_name: string;
+  last_name: string;
   email: string;
+}
+
+export interface AvailableTimeSlot {
+  start_time: string;
+  locations: {
+    type: string;
+    value: string | null;
+    id: string | null;
+  }[];
 }
 
 export interface Team {

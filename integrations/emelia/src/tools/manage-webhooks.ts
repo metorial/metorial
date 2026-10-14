@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,9 +48,9 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!campaignId) throw new Error('Campaign ID is required');
-      if (!url) throw new Error('Webhook URL is required');
-      if (!event) throw new Error('Event type is required');
+      if (!campaignId) throw createApiServiceError('Campaign ID is required');
+      if (!url) throw createApiServiceError('Webhook URL is required');
+      if (!event) throw createApiServiceError('Event type is required');
       let webhook = await client.createWebhook({ campaignId, url, event });
       return {
         output: { webhook, success: true },
@@ -59,7 +59,7 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!webhookId) throw new Error('Webhook ID is required');
+      if (!webhookId) throw createApiServiceError('Webhook ID is required');
       await client.deleteWebhook(webhookId);
       return {
         output: { success: true },
@@ -68,7 +68,7 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'test') {
-      if (!webhookId) throw new Error('Webhook ID is required');
+      if (!webhookId) throw createApiServiceError('Webhook ID is required');
       await client.testWebhook(webhookId);
       return {
         output: { success: true },
@@ -76,6 +76,6 @@ export let manageWebhooks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

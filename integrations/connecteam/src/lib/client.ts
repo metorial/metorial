@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationParams {
   limit?: number;
@@ -8,19 +8,34 @@ export interface PaginationParams {
 export interface PaginatedResponse<T> {
   requestId: string;
   data: T;
-  paging?: { offset?: number };
+  paging?: { offset?: number; total?: number };
 }
 
 export class ConnecteamClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(config: { baseUrl: string; token: string }) {
-    this.http = createAxios({
-      baseURL: config.baseUrl,
-      headers: {
-        'X-API-KEY': config.token,
-        Authorization: `Bearer ${config.token}`
-      }
+  constructor(config: {
+    baseUrl?: string;
+    token: string;
+    authType?: 'api_key' | 'oauth';
+  }) {
+    if (!config.token) throw createApiServiceError('A Connecteam credential is required.');
+    this.http = createAuthenticatedAxios({
+      baseURL: config.baseUrl ?? 'https://api.connecteam.com',
+      timeout: 30000,
+      paramsSerializer: { indexes: null },
+      authHeader:
+        config.authType === 'oauth'
+          ? { value: `Bearer ${config.token}` }
+          : { name: 'X-API-KEY', value: config.token },
+      // Older connections did not persist their auth method. Preserve their headers
+      // until reauthentication records an explicit authType.
+      headers: config.authType ? undefined : { Authorization: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Connecteam',
+          reason: 'connecteam_api_error'
+        })
     });
   }
 
@@ -28,7 +43,11 @@ export class ConnecteamClient {
 
   async getAccount(): Promise<{ companyName: string; companyId: string }> {
     let response = await this.http.get('/me');
-    return response.data.data;
+    let data = response.data?.data;
+    if (typeof data?.companyName !== 'string' || typeof data?.companyId !== 'string') {
+      throw createApiServiceError('Connecteam did not return valid account information.');
+    }
+    return { companyName: data.companyName, companyId: data.companyId };
   }
 
   // ─── Users ─────────────────────────────────────────────
@@ -63,7 +82,10 @@ export class ConnecteamClient {
   }
 
   async archiveUsers(userIds: number[]): Promise<any> {
-    let response = await this.http.delete('/users/v1/users', { data: userIds });
+    let response = await this.http.delete('/users/v1/users', {
+      data: userIds,
+      params: { deletionType: 'archive' }
+    });
     return response.data;
   }
 
@@ -74,7 +96,7 @@ export class ConnecteamClient {
     return response.data;
   }
 
-  async promoteToAdmin(body: { userId: number; email: string; title?: string }): Promise<any> {
+  async promoteToAdmin(body: { userId: number; email: string; title: string }): Promise<any> {
     let response = await this.http.post('/users/v1/admins', body);
     return response.data;
   }
@@ -115,8 +137,9 @@ export class ConnecteamClient {
   async getTimeActivities(
     timeClockId: string,
     params?: PaginationParams & {
-      startDate?: string;
-      endDate?: string;
+      startDate: string;
+      endDate: string;
+      userIds?: number[];
     }
   ): Promise<any> {
     let response = await this.http.get(
@@ -161,8 +184,8 @@ export class ConnecteamClient {
   async getTimesheetTotals(
     timeClockId: string,
     params?: PaginationParams & {
-      startDate?: string;
-      endDate?: string;
+      startDate: string;
+      endDate: string;
       userIds?: number[];
     }
   ): Promise<any> {
@@ -190,6 +213,18 @@ export class ConnecteamClient {
     let response = await this.http.get(`/time-off/v1/policy-types/${policyTypeId}/balances`, {
       params
     });
+    return response.data;
+  }
+
+  async getTimeOffRequests(
+    params: PaginationParams & {
+      startDate: string;
+      endDate: string;
+      userIds?: number[];
+      statuses?: ('approved' | 'pending' | 'denied')[];
+    }
+  ): Promise<PaginatedResponse<{ requests: any[] }>> {
+    let response = await this.http.get('/time-off/v1/requests', { params });
     return response.data;
   }
 
@@ -527,9 +562,9 @@ export class ConnecteamClient {
   async sendMessageToConversation(
     conversationId: string,
     body: {
-      message: string;
-      senderId?: number;
-      attachments?: { fileId: string }[];
+      text: string;
+      senderId: number;
+      attachments?: { fileId: string; type: 'image' | 'file' }[];
     }
   ): Promise<any> {
     let response = await this.http.post(
@@ -542,9 +577,9 @@ export class ConnecteamClient {
   async sendPrivateMessage(
     userId: string,
     body: {
-      message: string;
-      senderId?: number;
-      attachments?: { fileId: string }[];
+      text: string;
+      senderId: number;
+      attachments?: { fileId: string; type: 'image' | 'file' }[];
     }
   ): Promise<any> {
     let response = await this.http.post(
@@ -554,8 +589,8 @@ export class ConnecteamClient {
     return response.data;
   }
 
-  async getPublishers(): Promise<any> {
-    let response = await this.http.get('/publishers/v1/publishers');
+  async getPublishers(params?: PaginationParams): Promise<any> {
+    let response = await this.http.get('/publishers/v1/publishers', { params });
     return response.data;
   }
 

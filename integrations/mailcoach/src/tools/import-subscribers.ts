@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let importSubscribers = SlateTool.create(spec, {
   name: 'Import Subscribers',
   key: 'import_subscribers',
-  description: `Bulk import subscribers into an email list using CSV data. The import is created and then started automatically. Returns the import status and counts.`,
+  description: `Bulk import subscribers into an email list using CSV data. The import is created and then started automatically. Returns the current import status and counts; call get_subscriber_import later to monitor completion.`,
   instructions: [
     'The CSV data should include at minimum an "email" column. Other supported columns include "first_name", "last_name", and "tags".'
   ],
@@ -21,11 +21,17 @@ export let importSubscribers = SlateTool.create(spec, {
       subscribeUnsubscribed: z
         .boolean()
         .optional()
-        .describe('Whether to re-subscribe previously unsubscribed addresses'),
+        .describe(
+          'Whether to re-subscribe previously unsubscribed addresses (defaults to false)'
+        ),
       unsubscribeOthers: z
         .boolean()
         .optional()
-        .describe('Whether to unsubscribe addresses not in the import')
+        .describe('Whether to unsubscribe addresses not in the import (defaults to false)'),
+      replaceTags: z
+        .boolean()
+        .optional()
+        .describe('Whether to replace existing subscriber tags (defaults to false)')
     })
   )
   .output(
@@ -48,8 +54,9 @@ export let importSubscribers = SlateTool.create(spec, {
     let importResult = await client.createSubscriberImport({
       email_list_uuid: ctx.input.emailListUuid,
       subscribers_csv: ctx.input.subscribersCsv,
-      subscribe_unsubscribed: ctx.input.subscribeUnsubscribed,
-      unsubscribe_others: ctx.input.unsubscribeOthers
+      subscribe_unsubscribed: ctx.input.subscribeUnsubscribed ?? false,
+      unsubscribe_others: ctx.input.unsubscribeOthers ?? false,
+      replace_tags: ctx.input.replaceTags ?? false
     });
 
     let started = await client.startSubscriberImport(importResult.uuid);

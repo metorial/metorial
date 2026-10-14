@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let userSchema = z.object({
@@ -19,11 +20,12 @@ let userSchema = z.object({
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `Retrieve users from the Timely workspace. Includes roles, capacity, and rate information. Filter by status (active, archived, all).`,
+  description: `Call list_accounts to choose a workspace when needed. Retrieve users from the Timely workspace. Includes roles, capacity, and rate information. Filter the returned page by status (active, archived, all).`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       show: z.enum(['active', 'all', 'archived']).optional().describe('Filter by user status'),
       limit: z.number().optional().describe('Max users to return'),
       offset: z.number().optional().describe('Offset for pagination'),
@@ -37,10 +39,7 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let users = await client.listUsers({
       show: ctx.input.show,

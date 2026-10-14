@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageService = SlateTool.create(spec, {
@@ -19,6 +20,7 @@ export let manageService = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       action: z
         .enum(['create', 'get', 'update', 'delete', 'pause', 'resume'])
         .describe('Operation to perform'),
@@ -39,6 +41,16 @@ export let manageService = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('External container image path (for create from external registry)'),
+      internalBuild: z
+        .object({
+          id: z
+            .string()
+            .describe('Build service ID. Call list_services to discover build services.'),
+          branch: z.string().optional().describe('Git branch to deploy'),
+          buildSHA: z.string().optional().describe('Commit SHA or latest build to deploy')
+        })
+        .optional()
+        .describe('Internal build source for create; provide this or imagePath'),
       registryCredentials: z
         .string()
         .optional()
@@ -70,7 +82,9 @@ export let manageService = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId:
+        ctx.input.teamId ??
+        (typeof ctx.config.teamId === 'string' ? ctx.config.teamId : undefined)
     });
 
     let {
@@ -83,17 +97,22 @@ export let manageService = SlateTool.create(spec, {
       deploymentPlan,
       instances,
       imagePath,
+      internalBuild,
       registryCredentials,
       ports
     } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for creating a service');
+      if (!name) throw createApiServiceError('name is required for creating a service');
       if (!deploymentPlan)
-        throw new Error('deploymentPlan is required for creating a service');
+        throw createApiServiceError('deploymentPlan is required for creating a service');
+      if (!!imagePath === !!internalBuild)
+        throw createApiServiceError(
+          'Provide exactly one deployment source: imagePath or internalBuild.'
+        );
 
       let deploymentConfig: any = {
-        instances: instances || 1
+        instances: instances ?? 1
       };
 
       if (imagePath) {
@@ -102,6 +121,7 @@ export let manageService = SlateTool.create(spec, {
           credentials: registryCredentials
         };
       }
+      if (internalBuild) deploymentConfig.internal = internalBuild;
 
       let result = await client.createDeploymentService(projectId, {
         name,
@@ -123,7 +143,7 @@ export let manageService = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!serviceId) throw new Error('serviceId is required');
+      if (!serviceId) throw createApiServiceError('serviceId is required');
       let result = await client.getService(projectId, serviceId);
       let depStatus = result?.status?.deployment?.status || 'unknown';
       return {
@@ -138,10 +158,13 @@ export let manageService = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!serviceId) throw new Error('serviceId is required for update');
+      if (!serviceId) throw createApiServiceError('serviceId is required for update');
+      if (name !== undefined)
+        throw createApiServiceError(
+          'Service names cannot be changed. Update description or tags instead.'
+        );
       let updateData: any = {};
-      if (name) updateData.name = name;
-      if (description) updateData.description = description;
+      if (description !== undefined) updateData.description = description;
       if (tags) updateData.tags = tags;
       let result = await client.updateService(projectId, serviceId, updateData);
       return {
@@ -155,7 +178,7 @@ export let manageService = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!serviceId) throw new Error('serviceId is required for delete');
+      if (!serviceId) throw createApiServiceError('serviceId is required for delete');
       await client.deleteService(projectId, serviceId);
       return {
         output: {
@@ -167,7 +190,7 @@ export let manageService = SlateTool.create(spec, {
     }
 
     if (action === 'pause') {
-      if (!serviceId) throw new Error('serviceId is required for pause');
+      if (!serviceId) throw createApiServiceError('serviceId is required for pause');
       await client.pauseService(projectId, serviceId);
       return {
         output: {
@@ -179,7 +202,7 @@ export let manageService = SlateTool.create(spec, {
     }
 
     if (action === 'resume') {
-      if (!serviceId) throw new Error('serviceId is required for resume');
+      if (!serviceId) throw createApiServiceError('serviceId is required for resume');
       await client.resumeService(projectId, serviceId);
       return {
         output: {
@@ -190,6 +213,6 @@ export let manageService = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

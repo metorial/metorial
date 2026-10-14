@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { NeuronWriterClient } from '../lib/client';
+import { type CreateQueryParams, NeuronWriterClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createQuery = SlateTool.create(spec, {
@@ -42,7 +42,7 @@ export let createQuery = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NeuronWriterClient(ctx.auth.token);
 
-    let params: Record<string, any> = {
+    let params: CreateQueryParams = {
       project: ctx.input.projectId,
       keyword: ctx.input.keyword,
       engine: ctx.input.engine,
@@ -56,7 +56,7 @@ export let createQuery = SlateTool.create(spec, {
       params.competitors_mode = ctx.input.competitorsMode;
     }
 
-    let result = await client.createQuery(params as any);
+    let result = await client.createQuery(params);
 
     return {
       output: {

@@ -42,11 +42,8 @@ export let listOrders = SlateTool.create(spec, {
             .optional()
             .describe('Filter by payment type codes'),
           managers: z.array(z.number()).optional().describe('Filter by manager IDs'),
-          createdAtFrom: z
-            .string()
-            .optional()
-            .describe('Created from date (YYYY-MM-DD HH:MM:SS)'),
-          createdAtTo: z.string().optional().describe('Created to date (YYYY-MM-DD HH:MM:SS)'),
+          createdAtFrom: z.string().optional().describe('Created from date (YYYY-MM-DD)'),
+          createdAtTo: z.string().optional().describe('Created to date (YYYY-MM-DD)'),
           minSumm: z.number().optional().describe('Minimum order amount'),
           maxSumm: z.number().optional().describe('Maximum order amount'),
           shipped: z.boolean().optional().describe('Filter by shipped status'),

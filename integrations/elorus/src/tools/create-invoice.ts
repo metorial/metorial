@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getInvoiceDueDays } from '../lib/documents';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let lineItemSchema = z.object({
@@ -18,7 +20,7 @@ let lineItemSchema = z.object({
     .string()
     .optional()
     .describe('Unit price excluding tax. Used when calculatorMode is "initial".'),
-  unit: z.string().optional().describe('Unit of measurement (e.g. "hrs", "pcs").'),
+  unit: z.string().optional().describe('Unit of measurement (e.g. "hour", "item").'),
   productId: z
     .string()
     .optional()
@@ -43,6 +45,7 @@ export let createInvoice = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       clientId: z.string().describe('Contact ID of the client being invoiced.'),
       documentTypeId: z
         .string()
@@ -50,7 +53,7 @@ export let createInvoice = SlateTool.create(spec, {
       date: z
         .string()
         .optional()
-        .describe('Invoice date in YYYY-MM-DD format. Defaults to today.'),
+        .describe('Invoice date in YYYY-MM-DD format. Defaults to today in UTC.'),
       dueDate: z.string().optional().describe('Payment due date in YYYY-MM-DD format.'),
       draft: z
         .boolean()
@@ -80,7 +83,10 @@ export let createInvoice = SlateTool.create(spec, {
         .describe(
           'Payment method code: "1"=domestic bank, "2"=foreign bank, "3"=cash, "4"=cheque, "6"=web banking, "7"=POS.'
         ),
-      reference: z.string().optional().describe('Reference or PO number.'),
+      reference: z
+        .string()
+        .optional()
+        .describe('Legacy unsupported field. Use customId for an external reference.'),
       customId: z.string().optional().describe('Custom external identifier (API-only).')
     })
   )
@@ -92,10 +98,19 @@ export let createInvoice = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.input.organizationId ?? ctx.config.organizationId
     });
 
+    if (ctx.input.reference !== undefined) {
+      throw createApiServiceError(
+        'Elorus has no general invoice reference field. Use customId for an external reference.',
+        { reason: 'unsupported_invoice_reference' }
+      );
+    }
+
     let body: any = {
+      date: ctx.input.date ?? new Date().toISOString().slice(0, 10),
+      draft: ctx.input.draft ?? true,
       client: ctx.input.clientId,
       documenttype: ctx.input.documentTypeId,
       calculator_mode: ctx.input.calculatorMode || 'total',
@@ -105,21 +120,20 @@ export let createInvoice = SlateTool.create(spec, {
         if (item.quantity) lineItem.quantity = item.quantity;
         if (item.unitTotal) lineItem.unit_total = item.unitTotal;
         if (item.unitValue) lineItem.unit_value = item.unitValue;
-        if (item.unit) lineItem.unit = item.unit;
+        if (item.unit) lineItem.unit_measure = item.unit;
         if (item.productId) lineItem.product = item.productId;
-        if (item.taxes) lineItem.taxes = item.taxes;
+        if (item.taxes) lineItem.taxes = item.taxes.map(tax => ({ tax }));
         return lineItem;
       })
     };
 
     if (ctx.input.date) body.date = ctx.input.date;
-    if (ctx.input.dueDate) body.due_date = ctx.input.dueDate;
+    if (ctx.input.dueDate) body.due_days = getInvoiceDueDays(body.date, ctx.input.dueDate);
     if (ctx.input.draft !== undefined) body.draft = ctx.input.draft;
     if (ctx.input.currencyCode) body.currency_code = ctx.input.currencyCode;
     if (ctx.input.exchangeRate) body.exchange_rate = ctx.input.exchangeRate;
     if (ctx.input.paidOnReceipt) body.paid_on_receipt = ctx.input.paidOnReceipt;
     if (ctx.input.paymentMethod) body.payment_method = ctx.input.paymentMethod;
-    if (ctx.input.reference) body.reference = ctx.input.reference;
     if (ctx.input.customId) body.custom_id = ctx.input.customId;
 
     let invoice = await client.createInvoice(body);

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,6 +40,12 @@ export let createCertificate = SlateTool.create(spec, {
       token: ctx.auth.token,
       authMethod: ctx.auth.authMethod
     });
+
+    if ((ctx.input.productId === undefined) === (ctx.input.couponId === undefined)) {
+      throw createApiServiceError(
+        'Provide exactly one of productId or couponId to create a certificate.'
+      );
+    }
 
     let c = await client.createCertificate({
       productID: ctx.input.productId,

@@ -35,7 +35,7 @@ Use without a subgraph name to get the full composed schema. Specify a subgraph 
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     let schema = await client.getSchema(

@@ -1,6 +1,8 @@
-# <img src="logo.jpeg" height="20"> Acculynx
+# <img src="logo.jpeg" height="20"> AccuLynx
 
-Manage roofing contractor business operations including jobs, contacts, estimates, invoices, and payments. Create and search jobs with milestone tracking, assign representatives, and monitor job lifecycle events. Create and retrieve contacts with communication logging. Access estimates, supplements, and financial worksheets. Create and manage invoices, payments, and expenses. Schedule and update appointments via calendars. Upload documents, photos, and videos to jobs. Retrieve company settings such as insurance companies, lead sources, milestones, and trade types. Access reports and manage webhook subscriptions for real-time event notifications on job, contact, and financial changes.
+Manage roofing contractor jobs, contacts, estimates, invoices, payments, and appointments with the AccuLynx API. Identify the connected company, search jobs by text or location, list a contact's jobs, read job custom fields, assign representatives, and access insurance details. Retrieve financial worksheets and supplements, record payments and expenses, upload job files, and create or reply to job messages.
+
+Connect with an API key from the [AccuLynx API page](https://my.acculynx.com/apikeys). Each company location needs its own API key. See the [official API reference](https://apidocs.acculynx.com/reference/getjobs) and [integration specification](docs/SPEC.md) for supported workflows.
 
 ## License
 

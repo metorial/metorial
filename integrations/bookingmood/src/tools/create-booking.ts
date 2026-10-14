@@ -14,12 +14,22 @@ export let createBooking = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      productId: z.string().describe('UUID of the product (rental unit) to book'),
+      productId: z
+        .string()
+        .describe(
+          'UUID of the product (rental unit) to book. Call list_products to discover product IDs.'
+        ),
       startDate: z.string().describe('Start date of the booking in YYYY-MM-DD format'),
       endDate: z.string().describe('End date of the booking in YYYY-MM-DD format'),
       occupancy: z
         .record(z.string(), z.number())
-        .describe('Maps capacity group IDs to guest counts'),
+        .describe('Maps capacity group IDs from list_capacity_groups to guest counts'),
+      showPendingAs: z
+        .enum(['CANCELLED', 'TENTATIVE', 'CONFIRMED'])
+        .optional()
+        .describe(
+          'How to interpret pending events when checking availability; defaults to TENTATIVE'
+        ),
       couponCodes: z.array(z.string()).optional().describe('Discount coupon codes to apply'),
       currency: z.string().optional().describe('Override the product default currency'),
       formValues: z
@@ -54,7 +64,8 @@ export let createBooking = SlateTool.create(spec, {
       currency: ctx.input.currency,
       formValues: ctx.input.formValues,
       language: ctx.input.language,
-      redirectUrl: ctx.input.redirectUrl
+      redirectUrl: ctx.input.redirectUrl,
+      showPendingAs: ctx.input.showPendingAs
     });
 
     return {

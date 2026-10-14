@@ -6,6 +6,6 @@ export let config = SlateConfig.create(
     region: z
       .enum(['us', 'eu'])
       .default('us')
-      .describe('API region. "us" uses api.boldsign.com, "eu" uses eu-api.boldsign.com')
+      .describe('API region. "us" uses api.boldsign.com, "eu" uses api-eu.boldsign.com')
   })
 );

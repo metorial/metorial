@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FindymailClient } from '../lib/client';
 import { spec } from '../spec';
@@ -28,12 +28,15 @@ export let enrichCompany = SlateTool.create(spec, {
       domain: z.string().optional().describe('Company website domain.'),
       companySize: z.string().optional().describe('Company size range, e.g. "1001-5000".'),
       industry: z.string().optional().describe('Company industry.'),
-      linkedinUrl: z.string().optional().describe('LinkedIn company page URL.')
+      linkedinUrl: z.string().optional().describe('LinkedIn company page URL.'),
+      description: z.string().optional().describe('Company description.')
     })
   )
   .handleInvocation(async ctx => {
     if (!ctx.input.domain && !ctx.input.linkedinUrl && !ctx.input.companyName) {
-      throw new Error('Provide at least one of: domain, linkedinUrl, or companyName.');
+      throw createApiServiceError(
+        'Provide at least one of: domain, linkedinUrl, or companyName.'
+      );
     }
 
     let client = new FindymailClient({ token: ctx.auth.token });
@@ -50,7 +53,8 @@ export let enrichCompany = SlateTool.create(spec, {
         domain: result?.domain ?? undefined,
         companySize: result?.company_size ?? result?.companySize ?? undefined,
         industry: result?.industry ?? undefined,
-        linkedinUrl: result?.linkedin_url ?? result?.linkedinUrl ?? undefined
+        linkedinUrl: result?.linkedin_url ?? result?.linkedinUrl ?? undefined,
+        description: result?.description ?? undefined
       },
       message: result?.name
         ? `Found company **${result.name}**${result?.industry ? ` in ${result.industry}` : ''}${result?.company_size ? ` (${result.company_size} employees)` : ''}.`

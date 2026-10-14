@@ -66,21 +66,21 @@ export let listContacts = SlateTool.create(spec, {
     });
 
     let contacts = (result?.contact_list || []).map((c: any) => ({
-      contactId: c.id,
-      waId: c.wa_id,
-      name: c.name,
-      phone: c.phone,
-      photo: c.photo,
-      created: c.created,
-      lastUpdated: c.last_updated,
-      contactStatus: c.contact_status,
-      source: c.source,
-      optedIn: c.opted_in,
-      allowBroadcast: c.allow_broadcast,
-      teams: c.teams,
-      segments: c.segments,
-      customParams: c.custom_params,
-      channelType: c.channel_type
+      contactId: c.id ?? undefined,
+      waId: c.wa_id ?? undefined,
+      name: c.name ?? undefined,
+      phone: c.phone ?? undefined,
+      photo: c.photo ?? undefined,
+      created: c.created ?? undefined,
+      lastUpdated: c.last_updated ?? undefined,
+      contactStatus: c.contact_status ?? undefined,
+      source: c.source ?? undefined,
+      optedIn: c.opted_in ?? undefined,
+      allowBroadcast: c.allow_broadcast ?? undefined,
+      teams: c.teams ?? undefined,
+      segments: c.segments ?? undefined,
+      customParams: c.custom_params ?? undefined,
+      channelType: c.channel_type ?? undefined
     }));
 
     return {

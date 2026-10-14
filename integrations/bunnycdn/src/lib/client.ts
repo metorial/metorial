@@ -1,4 +1,77 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+// Bunny uses PascalCase resource fields and GUIDs that differ from the public IDs.
+let mapBunnyObject = (value: Record<string, any>, idKey?: string) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw createApiServiceError('Bunny returned an invalid resource response.', {
+      reason: 'invalid_bunny_response'
+    });
+  }
+  if (idKey) {
+    let usesGuid = idKey === 'videoId' || idKey === 'collectionId';
+    let id = usesGuid ? value.guid : value.Id;
+    if (
+      usesGuid
+        ? typeof id !== 'string' || !id.trim()
+        : typeof id !== 'number' || !Number.isInteger(id) || id <= 0
+    ) {
+      throw createApiServiceError(`Bunny returned a resource without a valid ${idKey}.`, {
+        reason: 'invalid_bunny_response'
+      });
+    }
+    let requiredField =
+      idKey === 'dnsZoneId'
+        ? 'Domain'
+        : ['pullZoneId', 'storageZoneId', 'videoLibraryId'].includes(idKey)
+          ? 'Name'
+          : undefined;
+    if (requiredField && typeof value[requiredField] !== 'string') {
+      throw createApiServiceError(
+        `Bunny returned a resource without its required ${requiredField.toLowerCase()}.`,
+        { reason: 'invalid_bunny_response' }
+      );
+    }
+  }
+  let result: Record<string, any> = { ...value };
+  for (let [key, field] of Object.entries(value)) {
+    let publicKey = key.charAt(0).toLowerCase() + key.slice(1);
+    if (field !== null && field !== undefined) result[publicKey] = field;
+    else if (publicKey === key) delete result[publicKey];
+  }
+  if (idKey) result[idKey] = value.Id ?? value.guid;
+  if (Array.isArray(value.Hostnames))
+    result.hostnames = value.Hostnames.map((host: Record<string, any>) => {
+      if (!host || typeof host.Value !== 'string') {
+        throw createApiServiceError('Bunny returned a hostname without its required value.', {
+          reason: 'invalid_bunny_response'
+        });
+      }
+      return mapBunnyObject(host);
+    });
+  if (Array.isArray(value.Records))
+    result.records = value.Records.map((record: Record<string, any>) =>
+      mapBunnyObject(record, 'recordId')
+    );
+  if (Array.isArray(value.captions))
+    result.captions = value.captions.map((caption: Record<string, any>) =>
+      mapBunnyObject(caption)
+    );
+  if (Array.isArray(value.BillingRecords))
+    result.billingRecords = value.BillingRecords.map((record: Record<string, any>) =>
+      mapBunnyObject(record)
+    );
+  if (value.EnableMP4Fallback != null) result.enableMp4Fallback = value.EnableMP4Fallback;
+  if (value.EnableDRM != null) result.enableDrm = value.EnableDRM;
+  return result;
+};
+
+let mapBunnyList = (value: any, idKey: string) => {
+  let items = Array.isArray(value) ? value : (value.Items ?? []);
+  return {
+    ...(Array.isArray(value) ? { TotalItems: items.length, CurrentPage: 0 } : value),
+    Items: items.map((item: Record<string, any>) => mapBunnyObject(item, idKey))
+  };
+};
 
 let STORAGE_REGION_HOSTS: Record<string, string> = {
   default: 'storage.bunnycdn.com',
@@ -16,8 +89,11 @@ export class CoreClient {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.bunny.net',
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Bunny', reason: 'bunny_api_error' }),
       headers: {
         AccessKey: config.token,
         Accept: 'application/json',
@@ -29,22 +105,31 @@ export class CoreClient {
   // Pull Zones
   async listPullZones(params?: { page?: number; perPage?: number; search?: string }) {
     let response = await this.axios.get('/pullzone', { params });
-    return response.data;
+    return mapBunnyList(response.data, 'pullZoneId');
   }
 
   async getPullZone(pullZoneId: number) {
     let response = await this.axios.get(`/pullzone/${pullZoneId}`);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'pullZoneId'), {
+      pullZoneId: response.data.Id,
+      name: response.data.Name
+    });
   }
 
   async createPullZone(data: Record<string, any>) {
     let response = await this.axios.post('/pullzone', data);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'pullZoneId'), {
+      pullZoneId: response.data.Id,
+      name: response.data.Name
+    });
   }
 
   async updatePullZone(pullZoneId: number, data: Record<string, any>) {
     let response = await this.axios.post(`/pullzone/${pullZoneId}`, data);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'pullZoneId'), {
+      pullZoneId: response.data.Id,
+      name: response.data.Name
+    });
   }
 
   async deletePullZone(pullZoneId: number) {
@@ -99,27 +184,33 @@ export class CoreClient {
     includeDeleted?: boolean;
   }) {
     let response = await this.axios.get('/storagezone', { params });
-    return response.data;
+    return mapBunnyList(response.data, 'storageZoneId');
   }
 
   async getStorageZone(storageZoneId: number) {
     let response = await this.axios.get(`/storagezone/${storageZoneId}`);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'storageZoneId'), {
+      storageZoneId: response.data.Id,
+      name: response.data.Name
+    });
   }
 
   async createStorageZone(data: {
     Name: string;
-    Region?: string;
+    Region: string;
     ReplicationRegions?: string[];
     ZoneTier?: number;
   }) {
     let response = await this.axios.post('/storagezone', data);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'storageZoneId'), {
+      storageZoneId: response.data.Id,
+      name: response.data.Name
+    });
   }
 
   async updateStorageZone(storageZoneId: number, data: Record<string, any>) {
-    let response = await this.axios.post(`/storagezone/${storageZoneId}`, data);
-    return response.data;
+    await this.axios.post(`/storagezone/${storageZoneId}`, data);
+    return this.getStorageZone(storageZoneId);
   }
 
   async deleteStorageZone(storageZoneId: number) {
@@ -130,22 +221,31 @@ export class CoreClient {
   // DNS Zones
   async listDnsZones(params?: { page?: number; perPage?: number; search?: string }) {
     let response = await this.axios.get('/dnszone', { params });
-    return response.data;
+    return mapBunnyList(response.data, 'dnsZoneId');
   }
 
   async getDnsZone(dnsZoneId: number) {
     let response = await this.axios.get(`/dnszone/${dnsZoneId}`);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'dnsZoneId'), {
+      dnsZoneId: response.data.Id,
+      domain: response.data.Domain
+    });
   }
 
   async createDnsZone(domain: string) {
     let response = await this.axios.post('/dnszone', { Domain: domain });
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'dnsZoneId'), {
+      dnsZoneId: response.data.Id,
+      domain: response.data.Domain
+    });
   }
 
   async updateDnsZone(dnsZoneId: number, data: Record<string, any>) {
     let response = await this.axios.post(`/dnszone/${dnsZoneId}`, data);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'dnsZoneId'), {
+      dnsZoneId: response.data.Id,
+      domain: response.data.Domain
+    });
   }
 
   async deleteDnsZone(dnsZoneId: number) {
@@ -176,28 +276,55 @@ export class CoreClient {
     includeAccessKey?: boolean;
   }) {
     let response = await this.axios.get('/videolibrary', { params });
-    return response.data;
+    return mapBunnyList(response.data, 'videoLibraryId');
   }
 
   async getVideoLibrary(libraryId: number, includeAccessKey?: boolean) {
     let response = await this.axios.get(`/videolibrary/${libraryId}`, {
       params: includeAccessKey ? { includeAccessKey: true } : undefined
     });
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'videoLibraryId'), {
+      videoLibraryId: response.data.Id,
+      name: response.data.Name
+    });
   }
 
   async createVideoLibrary(data: { Name: string; ReplicationRegions?: string[] }) {
     let response = await this.axios.post('/videolibrary', data);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'videoLibraryId'), {
+      videoLibraryId: response.data.Id,
+      name: response.data.Name
+    });
   }
 
   async updateVideoLibrary(libraryId: number, data: Record<string, any>) {
     let response = await this.axios.post(`/videolibrary/${libraryId}`, data);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'videoLibraryId'), {
+      videoLibraryId: response.data.Id,
+      name: response.data.Name
+    });
   }
 
   async deleteVideoLibrary(libraryId: number) {
     let response = await this.axios.delete(`/videolibrary/${libraryId}`);
+    return response.data;
+  }
+
+  async listDnsRecords(
+    dnsZoneId: number,
+    params: { page?: number; perPage?: number; type?: number; search?: string }
+  ) {
+    let response = await this.axios.get(`/dnszone/${dnsZoneId}/records`, { params });
+    return mapBunnyList(response.data, 'recordId');
+  }
+
+  async getStorageStatistics(
+    storageZoneId: number,
+    params: { dateFrom?: string; dateTo?: string }
+  ) {
+    let response = await this.axios.get(`/storagezone/${storageZoneId}/statistics`, {
+      params
+    });
     return response.data;
   }
 
@@ -210,54 +337,62 @@ export class CoreClient {
   // Billing
   async getBillingSummary() {
     let response = await this.axios.get('/billing');
-    return response.data;
+    return mapBunnyObject(response.data);
   }
 }
 
 export class StorageClient {
   private axios;
+  private host: string;
 
   constructor(config: { storageToken: string; region: string }) {
-    let host = STORAGE_REGION_HOSTS[config.region] || STORAGE_REGION_HOSTS.default;
-    this.axios = createAxios({
+    let host = STORAGE_REGION_HOSTS[config.region] || 'storage.bunnycdn.com';
+    this.host = host;
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://${host}`,
+      timeout: 30000,
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Bunny Storage',
+          reason: 'bunny_api_error'
+        }),
       headers: {
         AccessKey: config.storageToken
       }
     });
   }
 
-  async listFiles(storageZoneName: string, path: string = '/') {
-    let normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    let fullPath = `/${storageZoneName}${normalizedPath}`;
-    if (!fullPath.endsWith('/')) {
-      fullPath += '/';
+  getFileUrl(storageZoneName: string, filePath: string) {
+    let segments = filePath.replace(/^\/+/, '').split('/');
+    if (segments.some(segment => segment === '.' || segment === '..')) {
+      throw createApiServiceError('File paths cannot contain . or .. segments.');
     }
-    let response = await this.axios.get(fullPath);
-    return response.data;
+    return `https://${this.host}/${encodeURIComponent(storageZoneName)}/${segments.map(encodeURIComponent).join('/')}`;
   }
 
-  async uploadFile(storageZoneName: string, filePath: string, content: string) {
-    let normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
-    let response = await this.axios.put(`/${storageZoneName}${normalizedPath}`, content, {
-      headers: {
-        'Content-Type': 'application/octet-stream'
-      }
+  async listFiles(storageZoneName: string, path: string = '/') {
+    let url = this.getFileUrl(storageZoneName, path);
+    let response = await this.axios.get(url.endsWith('/') ? url : `${url}/`);
+    return response.data.map((file: Record<string, any>) => mapBunnyObject(file));
+  }
+
+  async uploadFile(storageZoneName: string, filePath: string, content: string | Buffer) {
+    let response = await this.axios.put(this.getFileUrl(storageZoneName, filePath), content, {
+      headers: { 'Content-Type': 'application/octet-stream' }
     });
     return response.data;
   }
 
   async downloadFile(storageZoneName: string, filePath: string) {
-    let normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
-    let response = await this.axios.get(`/${storageZoneName}${normalizedPath}`, {
+    let response = await this.axios.get(this.getFileUrl(storageZoneName, filePath), {
       responseType: 'text'
     });
     return response.data;
   }
 
   async deleteFile(storageZoneName: string, filePath: string) {
-    let normalizedPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
-    let response = await this.axios.delete(`/${storageZoneName}${normalizedPath}`);
+    let response = await this.axios.delete(this.getFileUrl(storageZoneName, filePath));
     return response.data;
   }
 }
@@ -266,13 +401,28 @@ export class StreamClient {
   private axios;
 
   constructor(config: { streamToken: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://video.bunnycdn.com',
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Bunny Stream',
+          reason: 'bunny_api_error'
+        }),
       headers: {
         AccessKey: config.streamToken,
         Accept: 'application/json',
         'Content-Type': 'application/json'
       }
+    });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.success === false) {
+        throw createApiServiceError(
+          response.data.message || 'Bunny Stream rejected the operation.',
+          { upstreamStatus: response.data.statusCode }
+        );
+      }
+      return response;
     });
   }
 
@@ -288,12 +438,19 @@ export class StreamClient {
     }
   ) {
     let response = await this.axios.get(`/library/${libraryId}/videos`, { params });
-    return response.data;
+    return {
+      ...response.data,
+      items: (response.data.items ?? []).map((video: Record<string, any>) =>
+        mapBunnyObject(video, 'videoId')
+      )
+    };
   }
 
   async getVideo(libraryId: number, videoId: string) {
     let response = await this.axios.get(`/library/${libraryId}/videos/${videoId}`);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'videoId'), {
+      videoId: response.data.guid
+    });
   }
 
   async createVideo(
@@ -301,7 +458,9 @@ export class StreamClient {
     data: { title: string; collectionId?: string; thumbnailTime?: number }
   ) {
     let response = await this.axios.post(`/library/${libraryId}/videos`, data);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'videoId'), {
+      videoId: response.data.guid
+    });
   }
 
   async updateVideo(libraryId: number, videoId: string, data: Record<string, any>) {
@@ -316,9 +475,12 @@ export class StreamClient {
 
   async fetchVideo(
     libraryId: number,
-    data: { url: string; headers?: Record<string, string> }
+    data: { url: string; headers?: Record<string, string>; title?: string },
+    params?: { collectionId?: string; thumbnailTime?: number }
   ) {
-    let response = await this.axios.post(`/library/${libraryId}/videos/fetch`, data);
+    let response = await this.axios.post(`/library/${libraryId}/videos/fetch`, data, {
+      params
+    });
     return response.data;
   }
 
@@ -364,24 +526,33 @@ export class StreamClient {
     params?: { page?: number; itemsPerPage?: number; search?: string; orderBy?: string }
   ) {
     let response = await this.axios.get(`/library/${libraryId}/collections`, { params });
-    return response.data;
+    return {
+      ...response.data,
+      items: (response.data.items ?? []).map((collection: Record<string, any>) =>
+        mapBunnyObject(collection, 'collectionId')
+      )
+    };
   }
 
   async getCollection(libraryId: number, collectionId: string) {
     let response = await this.axios.get(`/library/${libraryId}/collections/${collectionId}`);
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'collectionId'), {
+      collectionId: response.data.guid
+    });
   }
 
   async createCollection(libraryId: number, name: string) {
     let response = await this.axios.post(`/library/${libraryId}/collections`, { name });
-    return response.data;
+    return Object.assign(mapBunnyObject(response.data, 'collectionId'), {
+      collectionId: response.data.guid
+    });
   }
 
   async updateCollection(libraryId: number, collectionId: string, name: string) {
-    let response = await this.axios.post(`/library/${libraryId}/collections/${collectionId}`, {
+    await this.axios.post(`/library/${libraryId}/collections/${collectionId}`, {
       name
     });
-    return response.data;
+    return this.getCollection(libraryId, collectionId);
   }
 
   async deleteCollection(libraryId: number, collectionId: string) {

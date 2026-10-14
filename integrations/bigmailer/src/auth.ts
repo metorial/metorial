@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -26,12 +27,9 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({ baseURL: 'https://api.bigmailer.io/v1' });
-      let response = await http.get('/me', {
-        headers: { 'X-API-Key': ctx.output.token }
-      });
+      let profile = await new Client(ctx.output.token).getIdentity();
       return {
-        profile: response.data
+        profile
       };
     }
   });

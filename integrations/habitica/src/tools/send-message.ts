@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HabiticaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
   key: 'send_message',
-  description: `Send a chat message in Habitica. Send a message to a group (party or guild) or a private message to another user.`,
+  description: `Send a chat message in Habitica. Send a message to a party or an available private group or a private message to another user.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -18,7 +18,10 @@ export let sendMessage = SlateTool.create(spec, {
         .enum(['group', 'private'])
         .describe('Whether to send a group chat message or a private message'),
       message: z.string().describe('Message text to send'),
-      groupId: z.string().optional().describe('Group ID or "party" for group messages'),
+      groupId: z
+        .string()
+        .optional()
+        .describe('Group ID from manage_group or "party" for group messages'),
       targetUserId: z.string().optional().describe('Target user ID for private messages')
     })
   )
@@ -32,23 +35,26 @@ export let sendMessage = SlateTool.create(spec, {
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     if (ctx.input.messageType === 'group') {
-      if (!ctx.input.groupId) throw new Error('groupId is required for group messages');
+      if (!ctx.input.groupId)
+        throw createApiServiceError('groupId is required for group messages');
       let result = await client.postGroupChatMessage(ctx.input.groupId, ctx.input.message);
       return {
         output: {
           sent: true,
-          messageId: result.id || result._id
+          messageId: result.message?.id || result.message?._id
         },
         message: `Sent message to group **${ctx.input.groupId}**`
       };
     }
 
     if (!ctx.input.targetUserId)
-      throw new Error('targetUserId is required for private messages');
+      throw createApiServiceError('targetUserId is required for private messages');
     await client.sendPrivateMessage(ctx.input.targetUserId, ctx.input.message);
     return {
       output: {

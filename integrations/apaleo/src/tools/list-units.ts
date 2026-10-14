@@ -14,7 +14,7 @@ export let listUnits = SlateTool.create(spec, {
       propertyId: z
         .string()
         .optional()
-        .describe('Property ID (uses default from config if not set)'),
+        .describe('Property ID from list_properties; uses the configured default if omitted.'),
       unitGroupId: z.string().optional().describe('Filter by room type ID'),
       isOccupied: z.boolean().optional().describe('Filter by occupancy status'),
       condition: z
@@ -80,35 +80,39 @@ export let listUnits = SlateTool.create(spec, {
     });
 
     let units = (result.units || []).map((u: any) => ({
-      unitId: u.id,
-      name: u.name,
-      description: u.description,
-      property: u.property ? { propertyId: u.property.id, name: u.property.name } : undefined,
-      unitGroup: u.unitGroup
-        ? { unitGroupId: u.unitGroup.id, name: u.unitGroup.name }
+      unitId: u.id ?? undefined,
+      name: u.name ?? undefined,
+      description: u.description ?? undefined,
+      property: u.property
+        ? { propertyId: u.property.id ?? undefined, name: u.property.name ?? undefined }
         : undefined,
-      status: u.status
-        ? {
-            isOccupied: u.status.isOccupied,
-            condition: u.status.condition,
-            maintenance: u.status.maintenance
-              ? {
-                  maintenanceId: u.status.maintenance.id,
-                  type: u.status.maintenance.type
-                }
-              : undefined
-          }
-        : undefined,
-      maxPersons: u.maxPersons,
-      created: u.created
+      unitGroup:
+        (u.unitGroup ?? undefined)
+          ? { unitGroupId: u.unitGroup.id ?? undefined, name: u.unitGroup.name ?? undefined }
+          : undefined,
+      status:
+        (u.status ?? undefined)
+          ? {
+              isOccupied: u.status.isOccupied ?? undefined,
+              condition: u.status.condition ?? undefined,
+              maintenance: u.status.maintenance
+                ? {
+                    maintenanceId: u.status.maintenance.id ?? undefined,
+                    type: u.status.maintenance.type ?? undefined
+                  }
+                : undefined
+            }
+          : undefined,
+      maxPersons: u.maxPersons ?? undefined,
+      created: u.created ?? undefined
     }));
 
     return {
       output: {
         units,
-        count: result.count || units.length
+        count: result.count ?? units.length
       },
-      message: `Found **${result.count || units.length}** rooms.`
+      message: `Found **${result.count ?? units.length}** rooms.`
     };
   })
   .build();

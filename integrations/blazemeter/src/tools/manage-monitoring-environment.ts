@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RunscopeClient } from '../lib/runscope-client';
 import { spec } from '../spec';
@@ -48,8 +48,14 @@ export let manageMonitoringEnvironment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.runscopeToken && !ctx.auth.token) {
-      throw new Error('Runscope OAuth token is required for API Monitoring operations');
+    if (
+      ctx.auth.apiKeyId ||
+      ctx.auth.apiKeySecret ||
+      (!ctx.auth.runscopeToken && !ctx.auth.token)
+    ) {
+      throw createApiServiceError(
+        'Runscope OAuth token is required for API Monitoring operations'
+      );
     }
     let client = new RunscopeClient({ token: ctx.auth.runscopeToken || ctx.auth.token });
 
@@ -67,7 +73,8 @@ export let manageMonitoringEnvironment = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating an environment');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for creating an environment');
       let env = await client.createEnvironment(ctx.input.bucketKey, ctx.input.testId, {
         name: ctx.input.name,
         initialVariables: ctx.input.initialVariables,
@@ -81,7 +88,8 @@ export let manageMonitoringEnvironment = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.environmentId) throw new Error('environmentId is required for updating');
+      if (!ctx.input.environmentId)
+        throw createApiServiceError('environmentId is required for updating');
       let env = await client.updateEnvironment(
         ctx.input.bucketKey,
         ctx.input.testId,
@@ -99,6 +107,6 @@ export let manageMonitoringEnvironment = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

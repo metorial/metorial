@@ -43,12 +43,14 @@ Returns a whisper hash that can be used to check status and retrieve results. Fo
         .describe('String used to separate pages in output. Defaults to "<<<".'),
       medianFilterSize: z
         .number()
+        .refine(Number.isInteger, 'Median filter size must be a whole number.')
         .optional()
         .describe(
           'Median filter size for noise removal on scanned images (low_cost mode only).'
         ),
       gaussianBlurRadius: z
         .number()
+        .refine(Number.isInteger, 'Gaussian blur radius must be a whole number.')
         .optional()
         .describe(
           'Gaussian blur radius for noise removal on scanned images (low_cost mode only).'

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -86,6 +86,15 @@ Configure voting mode, visibility, and participant requirements.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.pollType === 'TEXT' && ctx.input.dateOptions?.length) ||
+      (ctx.input.pollType === 'DATE' && ctx.input.textOptions?.length)
+    ) {
+      throw createApiServiceError(
+        'Provide textOptions for TEXT polls or dateOptions for DATE polls, not both.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     let options =

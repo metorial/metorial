@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -28,6 +28,11 @@ export let manageTimeEntry = SlateTool.create(spec, {
         .optional()
         .describe('Person ID logging the time (required for create)'),
       date: z.string().optional().describe('Date of the time entry (YYYYMMDD)'),
+      time: z
+        .string()
+        .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+        .optional()
+        .describe('Start time (HH:MM); defaults to 00:00 for create'),
       hours: z.number().optional().describe('Number of hours'),
       minutes: z.number().optional().describe('Number of minutes'),
       description: z.string().optional().describe('Description of work done'),
@@ -48,13 +53,16 @@ export let manageTimeEntry = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.personId) throw new Error('personId is required to create a time entry');
-      if (!ctx.input.date) throw new Error('date is required to create a time entry');
+      if (!ctx.input.personId)
+        throw createApiServiceError('personId is required to create a time entry');
+      if (!ctx.input.date)
+        throw createApiServiceError('date is required to create a time entry');
       let result = await client.createTimeEntry({
         projectId: ctx.input.projectId,
         taskId: ctx.input.taskId,
         personId: ctx.input.personId,
         date: ctx.input.date,
+        time: ctx.input.time,
         hours: ctx.input.hours ?? 0,
         minutes: ctx.input.minutes ?? 0,
         description: ctx.input.description,
@@ -70,10 +78,11 @@ export let manageTimeEntry = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.timeEntryId)
-        throw new Error('timeEntryId is required to update a time entry');
+        throw createApiServiceError('timeEntryId is required to update a time entry');
       await client.updateTimeEntry(ctx.input.timeEntryId, {
         description: ctx.input.description,
         date: ctx.input.date,
+        time: ctx.input.time,
         hours: ctx.input.hours,
         minutes: ctx.input.minutes,
         isBillable: ctx.input.isBillable,
@@ -87,7 +96,7 @@ export let manageTimeEntry = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.timeEntryId)
-        throw new Error('timeEntryId is required to delete a time entry');
+        throw createApiServiceError('timeEntryId is required to delete a time entry');
       await client.deleteTimeEntry(ctx.input.timeEntryId);
       return {
         output: { timeEntryId: ctx.input.timeEntryId, deleted: true },
@@ -95,6 +104,6 @@ export let manageTimeEntry = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

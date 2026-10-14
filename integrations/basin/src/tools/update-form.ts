@@ -54,12 +54,20 @@ export let updateForm = SlateTool.create(spec, {
     if (ctx.input.notificationEmails !== undefined)
       updateData.notification_emails = ctx.input.notificationEmails;
     if (ctx.input.notifyEmailSubject !== undefined)
-      updateData.notify_email_subject = ctx.input.notifyEmailSubject;
+      updateData.notification_subject = ctx.input.notifyEmailSubject;
     if (ctx.input.honeypotField !== undefined)
       updateData.honeypot_field = ctx.input.honeypotField;
-    if (ctx.input.captchaProvider !== undefined)
-      updateData.captcha_provider = ctx.input.captchaProvider;
-    if (ctx.input.ajax !== undefined) updateData.ajax = ctx.input.ajax;
+    if (ctx.input.captchaProvider !== undefined) {
+      let captcha = ctx.input.captchaProvider.toLowerCase();
+      if (['hcaptcha', 'recaptcha', 'turnstile', 'none'].includes(captcha)) {
+        updateData.force_hcaptcha = captcha === 'hcaptcha';
+        updateData.force_recaptcha = captcha === 'recaptcha';
+        updateData.force_turnstile = captcha === 'turnstile';
+      } else {
+        updateData.captcha_provider = ctx.input.captchaProvider;
+      }
+    }
+    if (ctx.input.ajax !== undefined) updateData.use_ajax = ctx.input.ajax;
     if (ctx.input.projectId !== undefined) updateData.project_id = ctx.input.projectId;
     if (ctx.input.timezone !== undefined) updateData.timezone = ctx.input.timezone;
 

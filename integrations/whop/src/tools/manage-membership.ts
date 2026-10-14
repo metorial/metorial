@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -81,7 +81,7 @@ Use **action** to specify: \`get\`, \`update_metadata\`, \`cancel\`, \`uncancel\
       m = await client.getMembership(membershipId);
     } else if (action === 'update_metadata') {
       if (!ctx.input.metadata)
-        throw new Error('metadata is required for update_metadata action');
+        throw createApiServiceError('metadata is required for update_metadata action');
       m = await client.updateMembership(membershipId, ctx.input.metadata);
     } else if (action === 'cancel') {
       m = await client.cancelMembership(membershipId, ctx.input.cancellationMode);
@@ -92,7 +92,7 @@ Use **action** to specify: \`get\`, \`update_metadata\`, \`cancel\`, \`uncancel\
     } else if (action === 'resume') {
       m = await client.resumeMembership(membershipId);
     } else {
-      throw new Error(`Unknown action: ${action}`);
+      throw createApiServiceError(`Unknown action: ${action}`);
     }
 
     let actionLabels: Record<string, string> = {

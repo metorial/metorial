@@ -1,8 +1,10 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cloneDefinitionVersion,
   deleteApi,
   deleteDomain,
+  downloadDefinition,
   getApiDefinition,
   getCollaboration,
   getComments,
@@ -30,7 +32,9 @@ export let provider = Slate.create({
     manageIntegrations,
     manageProjects,
     runStandardization,
-    getCollaboration
+    getCollaboration,
+    cloneDefinitionVersion,
+    downloadDefinition
   ],
   triggers: []
 });

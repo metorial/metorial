@@ -1,15 +1,16 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) throw createApiServiceError('A Missive API token is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://public.missiveapp.com/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token.trim()}` },
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'Missive', reason: 'missive_api_error' })
     });
   }
 
@@ -115,12 +116,14 @@ export class Client {
   }
 
   async createContacts(contacts: Record<string, any>) {
-    let res = await this.axios.post('/contacts', { contacts });
+    let res = await this.axios.post('/contacts', { contacts: [contacts] });
     return res.data;
   }
 
   async updateContacts(contactIds: string[], data: Record<string, any>) {
-    let res = await this.axios.patch(`/contacts/${contactIds.join(',')}`, { contacts: data });
+    let res = await this.axios.patch(`/contacts/${contactIds.join(',')}`, {
+      contacts: contactIds.map(id => ({ ...data, id }))
+    });
     return res.data;
   }
 
@@ -146,13 +149,13 @@ export class Client {
   }
 
   async createSharedLabels(labels: Record<string, any>) {
-    let res = await this.axios.post('/shared_labels', { shared_labels: labels });
+    let res = await this.axios.post('/shared_labels', { shared_labels: [labels] });
     return res.data;
   }
 
   async updateSharedLabels(labelIds: string[], data: Record<string, any>) {
     let res = await this.axios.patch(`/shared_labels/${labelIds.join(',')}`, {
-      shared_labels: data
+      shared_labels: labelIds.map(id => ({ ...data, id }))
     });
     return res.data;
   }
@@ -165,12 +168,14 @@ export class Client {
   }
 
   async createTeams(teams: Record<string, any>) {
-    let res = await this.axios.post('/teams', { teams });
+    let res = await this.axios.post('/teams', { teams: [teams] });
     return res.data;
   }
 
   async updateTeams(teamIds: string[], data: Record<string, any>) {
-    let res = await this.axios.patch(`/teams/${teamIds.join(',')}`, { teams: data });
+    let res = await this.axios.patch(`/teams/${teamIds.join(',')}`, {
+      teams: teamIds.map(id => ({ ...data, id }))
+    });
     return res.data;
   }
 
@@ -209,13 +214,13 @@ export class Client {
   }
 
   async createResponses(responses: Record<string, any>) {
-    let res = await this.axios.post('/responses', { responses });
+    let res = await this.axios.post('/responses', { responses: [responses] });
     return res.data;
   }
 
   async updateResponses(responseIds: string[], data: Record<string, any>) {
     let res = await this.axios.patch(`/responses/${responseIds.join(',')}`, {
-      responses: data
+      responses: responseIds.map(id => ({ ...data, id }))
     });
     return res.data;
   }
@@ -228,7 +233,7 @@ export class Client {
   // ─── Analytics ───
 
   async createAnalyticsReport(report: Record<string, any>) {
-    let res = await this.axios.post('/analytics/reports', report);
+    let res = await this.axios.post('/analytics/reports', { reports: report });
     return res.data;
   }
 

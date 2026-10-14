@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTidyDateTime, formatTidyId } from '../lib/format';
 import { spec } from '../spec';
 
 let jobOutputSchema = z.object({
@@ -10,7 +11,10 @@ let jobOutputSchema = z.object({
   status: z
     .string()
     .describe('Current status of the job (e.g. scheduled, in_progress, completed, cancelled)'),
-  price: z.number().nullable().describe('Price of the job'),
+  price: z
+    .number()
+    .nullable()
+    .describe('Price of the job in the smallest currency unit (for example, cents for USD)'),
   isPartiallyCompleted: z
     .boolean()
     .nullable()
@@ -26,19 +30,19 @@ let jobOutputSchema = z.object({
 });
 
 let mapJob = (data: any) => ({
-  jobId: data.id,
-  addressId: data.address_id,
-  toDoListId: data.to_do_list_id ?? null,
+  jobId: formatTidyId(data.id),
+  addressId: formatTidyId(data.address_id),
+  toDoListId: data.to_do_list_id == null ? null : formatTidyId(data.to_do_list_id),
   status: data.status,
   price: data.price ?? null,
   isPartiallyCompleted: data.is_partially_completed ?? null,
   cancelledBy: data.cancelled_by ?? null,
   serviceTypeKey: data.service_type_key,
   url: data.url ?? null,
-  currentStartDatetime: data.current_start_datetime ?? null,
-  preferredStartDatetime: data.preferred_start_datetime ?? null,
-  startNoEarlierThan: data.start_no_earlier_than,
-  endNoLaterThan: data.end_no_later_than,
+  currentStartDatetime: formatTidyDateTime(data.current_start_datetime),
+  preferredStartDatetime: formatTidyDateTime(data.preferred_start_datetime),
+  startNoEarlierThan: formatTidyDateTime(data.start_no_earlier_than) ?? '',
+  endNoLaterThan: formatTidyDateTime(data.end_no_later_than) ?? '',
   createdAt: data.created_at ?? null
 });
 
@@ -109,7 +113,7 @@ export let createJob = SlateTool.create(spec, {
   description: `Schedule a new cleaning or maintenance job at a property. Specify the address, service type, and a preferred time window. Optionally attach a to-do list defining what tasks should be completed.`,
   instructions: [
     'Use the "Check Booking Availability" tool first to find available time slots before creating a job.',
-    'Common service type keys include: `regular_cleaning.one_hour`, `regular_cleaning.two_hours`, `regular_cleaning.three_hours`, `regular_cleaning.four_hours`.'
+    'Common service type keys include: `regular_cleaning.one_hour`, `regular_cleaning.two_and_a_half_hours`, `regular_cleaning.four_hours`.'
   ]
 })
   .input(
@@ -120,13 +124,21 @@ export let createJob = SlateTool.create(spec, {
         .describe('Service type key (e.g. "regular_cleaning.one_hour")'),
       startNoEarlierThan: z
         .string()
-        .describe('Earliest allowed start time (ISO 8601 datetime)'),
-      endNoLaterThan: z.string().describe('Latest allowed end time (ISO 8601 datetime)'),
+        .describe(
+          'Earliest allowed start time (ISO 8601 datetime using local date and time at the property, on a 30-minute interval)'
+        ),
+      endNoLaterThan: z
+        .string()
+        .describe(
+          'Latest allowed end time (ISO 8601 datetime using local date and time at the property, on a 30-minute interval)'
+        ),
       toDoListId: z.string().optional().describe('ID of a to-do list to assign to the job'),
       preferredStartDatetime: z
         .string()
         .optional()
-        .describe('Preferred start time within the window (ISO 8601 datetime)')
+        .describe(
+          'Preferred start time within the window (ISO 8601 datetime using local date and time at the property, on a 30-minute interval)'
+        )
     })
   )
   .output(jobOutputSchema)
@@ -157,11 +169,15 @@ export let updateJob = SlateTool.create(spec, {
       startNoEarlierThan: z
         .string()
         .optional()
-        .describe('Updated earliest allowed start time (ISO 8601 datetime)'),
+        .describe(
+          'Updated earliest allowed start time (ISO 8601 datetime using local date and time at the property, on a 30-minute interval)'
+        ),
       endNoLaterThan: z
         .string()
         .optional()
-        .describe('Updated latest allowed end time (ISO 8601 datetime)')
+        .describe(
+          'Updated latest allowed end time (ISO 8601 datetime using local date and time at the property, on a 30-minute interval)'
+        )
     })
   )
   .output(jobOutputSchema)
@@ -215,12 +231,20 @@ export let rescheduleJob = SlateTool.create(spec, {
       serviceTypeKey: z.string().describe('Service type key for the rescheduled job'),
       startNoEarlierThan: z
         .string()
-        .describe('New earliest allowed start time (ISO 8601 datetime)'),
-      endNoLaterThan: z.string().describe('New latest allowed end time (ISO 8601 datetime)'),
+        .describe(
+          'New earliest allowed start time (ISO 8601 datetime using local date and time at the property, on a 30-minute interval)'
+        ),
+      endNoLaterThan: z
+        .string()
+        .describe(
+          'New latest allowed end time (ISO 8601 datetime using local date and time at the property, on a 30-minute interval)'
+        ),
       preferredStartDatetime: z
         .string()
         .optional()
-        .describe('Preferred start time within the new window (ISO 8601 datetime)'),
+        .describe(
+          'Preferred start time within the new window (ISO 8601 datetime using local date and time at the property, on a 30-minute interval)'
+        ),
       toDoListId: z.string().optional().describe('To-do list ID for the rescheduled job')
     })
   )

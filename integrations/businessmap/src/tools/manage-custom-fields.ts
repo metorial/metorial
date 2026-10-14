@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageCustomFieldsTool = SlateTool.create(spec, {
   name: 'Manage Custom Fields',
   key: 'manage_custom_fields',
-  description: `List or update custom field values on a card. Use action "list" to see all custom fields and their current values, or "update" to set a new value for a specific field.`
+  description: `List or update custom field values on a card. Use action "list" to see all custom fields and their current values, or "update" to set the value of a text, number, date, or link field.`
 })
   .input(
     z.object({
@@ -18,7 +18,9 @@ export let manageCustomFieldsTool = SlateTool.create(spec, {
       value: z
         .any()
         .optional()
-        .describe('New value for the custom field (required for update)')
+        .describe(
+          'A string, number, or null for a text, number, date, or link field; required for update'
+        )
     })
   )
   .output(
@@ -45,10 +47,7 @@ export let manageCustomFieldsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.action === 'list') {
       let fields = await client.listCustomFields(ctx.input.cardId);
@@ -67,7 +66,12 @@ export let manageCustomFieldsTool = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.fieldId) throw new Error('fieldId is required to update a custom field.');
+    if (!ctx.input.fieldId)
+      throw createApiServiceError('fieldId is required to update a custom field.');
+    if (ctx.input.value === undefined)
+      throw createApiServiceError(
+        'value is required to update a custom field; use null to clear it.'
+      );
     let result = await client.updateCustomField(
       ctx.input.cardId,
       ctx.input.fieldId,

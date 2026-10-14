@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EmeliaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageAdvancedCampaign = SlateTool.create(spec, {
   name: 'Manage Advanced Campaign',
   key: 'manage_advanced_campaign',
-  description: `Create or list multi-channel advanced campaigns that combine email and LinkedIn outreach. Also supports retrieving manual tasks.
+  description: `Create or list multi-channel advanced campaigns that combine email and LinkedIn outreach. Retrieve, start, pause, finish, reactivate, archive or delete campaigns, and manage manual tasks. Use update_advanced_campaign to configure the sequence, sender identities and recipient lists before starting.
 - **list**: List all advanced campaigns.
 - **create**: Create a new advanced campaign.
 - **get_manual_tasks**: Retrieve pending manual tasks for a campaign.
@@ -15,21 +15,37 @@ export let manageAdvancedCampaign = SlateTool.create(spec, {
   .input(
     z.object({
       action: z
-        .enum(['list', 'create', 'get_manual_tasks', 'update_manual_task'])
+        .enum([
+          'list',
+          'create',
+          'get_manual_tasks',
+          'update_manual_task',
+          'get',
+          'start',
+          'pause',
+          'finish',
+          'reactivate',
+          'archive',
+          'delete'
+        ])
         .describe('Operation to perform'),
       campaignId: z
         .string()
         .optional()
-        .describe('Campaign ID (required for get_manual_tasks)'),
+        .describe('Campaign ID (required except for list and create)'),
       name: z.string().optional().describe('Campaign name (required for create)'),
       taskId: z
         .string()
         .optional()
         .describe('Manual task ID (required for update_manual_task)'),
+      contactId: z
+        .string()
+        .optional()
+        .describe('Contact ID returned with a manual task; required for update_manual_task'),
       taskStatus: z
         .string()
         .optional()
-        .describe('New task status (required for update_manual_task)')
+        .describe('Manual task status: ok or ko (required for update_manual_task)')
     })
   )
   .output(
@@ -57,7 +73,7 @@ export let manageAdvancedCampaign = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('Campaign name is required');
+      if (!name) throw createApiServiceError('Campaign name is required');
       let campaign = await client.createAdvancedCampaign({ name });
       return {
         output: { campaign, success: true },
@@ -65,8 +81,32 @@ export let manageAdvancedCampaign = SlateTool.create(spec, {
       };
     }
 
+    if (action === 'get') {
+      if (!campaignId) throw createApiServiceError('Campaign ID is required');
+      let campaign = await client.getAdvancedCampaign(campaignId);
+      return {
+        output: { campaign, success: true },
+        message: `Retrieved multichannel campaign **${campaignId}**.`
+      };
+    }
+    if (
+      action === 'start' ||
+      action === 'pause' ||
+      action === 'finish' ||
+      action === 'reactivate' ||
+      action === 'archive' ||
+      action === 'delete'
+    ) {
+      if (!campaignId) throw createApiServiceError('Campaign ID is required');
+      await client.changeAdvancedCampaignState(campaignId, action);
+      return {
+        output: { success: true },
+        message: `Completed campaign operation **${action}** for **${campaignId}**.`
+      };
+    }
+
     if (action === 'get_manual_tasks') {
-      if (!campaignId) throw new Error('Campaign ID is required');
+      if (!campaignId) throw createApiServiceError('Campaign ID is required');
       let tasks = await client.getAdvancedCampaignManualTasks(campaignId);
       let taskList = Array.isArray(tasks) ? tasks : [];
       return {
@@ -76,15 +116,23 @@ export let manageAdvancedCampaign = SlateTool.create(spec, {
     }
 
     if (action === 'update_manual_task') {
-      if (!taskId) throw new Error('Task ID is required');
-      if (!taskStatus) throw new Error('Task status is required');
-      await client.updateAdvancedCampaignManualTask(taskId, { status: taskStatus });
+      if (!taskId) throw createApiServiceError('Task ID is required');
+      if (!taskStatus) throw createApiServiceError('Task status is required');
+      if (!campaignId || !ctx.input.contactId)
+        throw createApiServiceError(
+          'Campaign ID and contact ID are required to update a manual task.'
+        );
+      await client.updateAdvancedCampaignManualTask(taskId, {
+        status: taskStatus,
+        campaignId,
+        contactId: ctx.input.contactId
+      });
       return {
         output: { success: true },
         message: `Updated manual task **${taskId}** to status **${taskStatus}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

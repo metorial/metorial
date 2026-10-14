@@ -29,7 +29,11 @@ export let listCampaigns = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      campaigns: z.array(z.any()).describe('List of campaign objects')
+      campaigns: z.array(z.any()).describe('List of campaign objects'),
+      totalCount: z
+        .union([z.number(), z.string()])
+        .optional()
+        .describe('Total matching records reported by HeyReach')
     })
   )
   .handleInvocation(async ctx => {
@@ -43,12 +47,11 @@ export let listCampaigns = SlateTool.create(spec, {
       offset: ctx.input.offset
     });
 
-    let campaigns = Array.isArray(result)
-      ? result
-      : (result?.data ?? result?.items ?? [result]);
+    let page = result?.data ?? result;
+    let campaigns = Array.isArray(page) ? page : (page?.items ?? []);
 
     return {
-      output: { campaigns },
+      output: { campaigns, totalCount: page?.totalCount },
       message: `Retrieved ${campaigns.length} campaign(s).`
     };
   })

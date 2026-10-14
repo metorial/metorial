@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, readOptionalNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getFacebookRecommendations = SlateTool.create(spec, {
@@ -50,12 +50,6 @@ export let getFacebookRecommendations = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to get Facebook recommendations: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
-
     let recommendations = (data.recommendations ?? []).map((r: any) => ({
       recommendationId: r.id,
       businessId: r.businessId,
@@ -71,8 +65,8 @@ export let getFacebookRecommendations = SlateTool.create(spec, {
     return {
       output: {
         recommendations,
-        page: data.page ?? 1,
-        pages: data.pages ?? 1,
+        page: readOptionalNumber(data.page) ?? 1,
+        pages: readOptionalNumber(data.pages) ?? 1,
         totalCount: count
       } as any,
       message: `Found **${count}** Facebook recommendation(s) (page ${data.page ?? 1} of ${data.pages ?? 1}).`

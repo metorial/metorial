@@ -6,11 +6,12 @@ import { spec } from '../spec';
 export let manageCollectionTool = SlateTool.create(spec, {
   name: 'Manage Collection',
   key: 'manage_collection',
-  description: `Add or remove items from a collection (many-to-many relation) field on an entity. Use this to manage linked entities, file attachments, and other collection-type relations.`,
+  description: `Add, remove, replace, or clear items in a collection relation field on an entity. Use this to manage linked entities, file attachments, and multi-select values.`,
   instructions: [
     'Use "get_schema" to find collection field names.',
     'Use "query_entities" to find entity IDs for linking.',
-    'The "add" action appends items; the "remove" action detaches items without deleting them.'
+    'The "add" action appends items; the "remove" action detaches items without deleting them.',
+    'The "set" action replaces all collection items with itemIds; "reset" clears the collection. Pass an empty itemIds array for reset.'
   ],
   tags: {
     destructive: false
@@ -28,19 +29,19 @@ export let manageCollectionTool = SlateTool.create(spec, {
           'Fully qualified collection field name (e.g., "Project/Tags" or "Project/Files")'
         ),
       action: z
-        .enum(['add', 'remove'])
-        .describe('Whether to add or remove items from the collection'),
+        .enum(['add', 'remove', 'set', 'reset'])
+        .describe('Add, remove, replace (set), or clear (reset) collection items'),
       itemIds: z
         .array(z.string())
-        .describe('Array of fibery/id values for items to add or remove')
+        .describe('Array of fibery/id values to add, remove, or set. Pass [] for reset.')
     })
   )
   .output(
     z.object({
       entityId: z.string().describe('The entity whose collection was modified'),
       field: z.string().describe('The collection field that was modified'),
-      action: z.string().describe('The action performed (add or remove)'),
-      itemCount: z.number().describe('Number of items added or removed')
+      action: z.string().describe('The action performed (add, remove, set, or reset)'),
+      itemCount: z.number().describe('Number of submitted item IDs; zero for reset')
     })
   )
   .handleInvocation(async ctx => {
@@ -56,12 +57,25 @@ export let manageCollectionTool = SlateTool.create(spec, {
         entityId: ctx.input.entityId,
         itemIds: ctx.input.itemIds
       });
-    } else {
+    } else if (ctx.input.action === 'remove') {
       await client.removeCollectionItems({
         typeName: ctx.input.typeName,
         field: ctx.input.field,
         entityId: ctx.input.entityId,
         itemIds: ctx.input.itemIds
+      });
+    } else if (ctx.input.action === 'set') {
+      await client.setCollectionItems({
+        typeName: ctx.input.typeName,
+        field: ctx.input.field,
+        entityId: ctx.input.entityId,
+        itemIds: ctx.input.itemIds
+      });
+    } else {
+      await client.resetCollectionItems({
+        typeName: ctx.input.typeName,
+        field: ctx.input.field,
+        entityId: ctx.input.entityId
       });
     }
 
@@ -70,9 +84,9 @@ export let manageCollectionTool = SlateTool.create(spec, {
         entityId: ctx.input.entityId,
         field: ctx.input.field,
         action: ctx.input.action,
-        itemCount: ctx.input.itemIds.length
+        itemCount: ctx.input.action === 'reset' ? 0 : ctx.input.itemIds.length
       },
-      message: `${ctx.input.action === 'add' ? 'Added' : 'Removed'} **${ctx.input.itemIds.length}** items ${ctx.input.action === 'add' ? 'to' : 'from'} \`${ctx.input.field}\` on entity \`${ctx.input.entityId}\`.`
+      message: `Completed collection action **${ctx.input.action}** on \`${ctx.input.field}\` for entity \`${ctx.input.entityId}\`.`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SimpleroClient } from '../lib/client';
 import { spec } from '../spec';
@@ -87,7 +87,8 @@ export let manageAdministrator = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.administratorId) throw new Error('administratorId is required.');
+      if (!ctx.input.administratorId)
+        throw createApiServiceError('administratorId is required.');
       let administrator = await client.getAdministrator(ctx.input.administratorId);
       return {
         output: { administrator },
@@ -96,7 +97,7 @@ export let manageAdministrator = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'find') {
-      if (!ctx.input.email) throw new Error('email is required.');
+      if (!ctx.input.email) throw createApiServiceError('email is required.');
       let administrator = await client.findAdministrator(ctx.input.email);
       return {
         output: { administrator },
@@ -105,8 +106,8 @@ export let manageAdministrator = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create_or_update') {
-      if (!ctx.input.email) throw new Error('email is required.');
-      if (!ctx.input.adminRoleId) throw new Error('adminRoleId is required.');
+      if (!ctx.input.email) throw createApiServiceError('email is required.');
+      if (!ctx.input.adminRoleId) throw createApiServiceError('adminRoleId is required.');
       let administrator = await client.createOrUpdateAdministrator({
         email: ctx.input.email,
         adminRoleId: ctx.input.adminRoleId,
@@ -124,7 +125,8 @@ export let manageAdministrator = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'remove') {
-      if (!ctx.input.administratorId) throw new Error('administratorId is required.');
+      if (!ctx.input.administratorId)
+        throw createApiServiceError('administratorId is required.');
       await client.removeAdministrator(ctx.input.administratorId);
       return {
         output: { success: true },
@@ -132,6 +134,6 @@ export let manageAdministrator = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

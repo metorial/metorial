@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageWorkflow = SlateTool.create(spec, {
@@ -11,12 +12,13 @@ export let manageWorkflow = SlateTool.create(spec, {
     'Use action "publish" to immediately publish a variant, or provide scheduledTo for scheduled publishing.',
     'Use action "unpublish" to unpublish and archive, or provide scheduledTo for scheduled unpublishing.',
     'Use action "create_new_version" to create a new draft from a published variant.',
-    'Use action "change_step" with workflowStepId to move to a specific workflow step.',
+    'Use action "change_step" with workflowStepId from list_workflows. Optional workflowId selects the workflow; otherwise the current workflow is retrieved from the variant.',
     'Use action "cancel_scheduled_publish" or "cancel_scheduled_unpublish" to cancel scheduled operations.'
   ]
 })
   .input(
     z.object({
+      environmentId: environmentIdInput,
       itemIdentifier: z
         .string()
         .describe('The ID, codename, or external ID of the content item'),
@@ -44,7 +46,15 @@ export let manageWorkflow = SlateTool.create(spec, {
       workflowStepId: z
         .string()
         .optional()
-        .describe('Target workflow step ID (required for "change_step" action)')
+        .describe(
+          'Target workflow step ID from list_workflows (required for "change_step" action)'
+        ),
+      workflowId: z
+        .string()
+        .optional()
+        .describe(
+          'Workflow ID from list_workflows for change_step. Omit to use the variant current workflow; supplying it avoids the extra read request.'
+        )
     })
   )
   .output(
@@ -56,7 +66,7 @@ export let manageWorkflow = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
     let {
@@ -65,8 +75,20 @@ export let manageWorkflow = SlateTool.create(spec, {
       languageCodename,
       action,
       scheduledTo,
-      workflowStepId
+      workflowStepId,
+      workflowId
     } = ctx.input;
+
+    if (scheduledTo !== undefined) {
+      if (action !== 'publish' && action !== 'unpublish') {
+        throw createApiServiceError('scheduledTo is only supported for publish or unpublish.');
+      }
+      if (!z.iso.datetime({ offset: true }).safeParse(scheduledTo).success) {
+        throw createApiServiceError(
+          'scheduledTo must be an ISO 8601 datetime with a UTC or numeric timezone offset.'
+        );
+      }
+    }
 
     switch (action) {
       case 'publish':
@@ -89,14 +111,17 @@ export let manageWorkflow = SlateTool.create(spec, {
         await client.createNewVersion(itemIdentifier, itemIdentifierType, languageCodename);
         break;
       case 'change_step':
-        if (!workflowStepId) {
-          throw new Error('workflowStepId is required for the "change_step" action');
+        if (!workflowStepId?.trim()) {
+          throw createApiServiceError(
+            'workflowStepId from list_workflows is required for the "change_step" action.'
+          );
         }
         await client.changeWorkflowStep(
           itemIdentifier,
           itemIdentifierType,
           languageCodename,
-          workflowStepId
+          workflowStepId,
+          workflowId
         );
         break;
       case 'cancel_scheduled_publish':

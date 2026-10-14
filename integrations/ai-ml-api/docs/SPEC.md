@@ -1,83 +1,54 @@
-# Slates Specification for AI/ML API
+# AI/ML API Specification
 
-## Overview
+## Authentication and configuration
 
-AI/ML API is a unified gateway to Chat, Reasoning, Image, Video, Audio, Voice, Search, and 3D models under one bill. As of early 2026, the platform provides access to more than 400 models from providers like OpenAI, Google, Anthropic, Meta, DeepSeek, and others. The API is fully backward-compatible with OpenAI's API, allowing drop-in replacement by changing the base URL and API key.
+Authenticate with an AI/ML API key using `Authorization: Bearer <API_KEY>`. The default `baseUrl` is `https://api.aimlapi.com`; endpoint methods append their API version. No OAuth scopes or tenant identifiers are required. `get_current_user` reads `/v2/billing/detail`, whose documented response includes the user ID, email, balance, and currency.
 
-## Authentication
+## Registered capabilities
 
-AI/ML API uses **API key authentication** via Bearer tokens.
+| Tool | Provider endpoint |
+| --- | --- |
+| `chat_completion` | `POST /v1/chat/completions` |
+| `generate_image` | `POST /v1/images/generations` |
+| `text_to_speech` | `POST /v1/tts` |
+| `speech_to_text` | `POST /v1/stt/create`, followed by `GET /v1/stt/{generation_id}` |
+| `generate_embeddings` | `POST /v1/embeddings` |
+| `moderate_content` | `POST /v1/chat/completions` |
+| `generate_video` | `POST /v2/video/generations`, followed by `GET /v2/video/generations?generation_id=…` |
+| `list_models` | `GET /v1/models` |
+| `get_current_user` | `GET /v2/billing/detail` |
+| `get_video_result` | `GET /v2/video/generations?generation_id=…` |
+| `get_transcription_result` | `GET /v1/stt/{generation_id}` |
 
-To use the AI/ML API, an API key is required. This key is essential for authenticating requests to the API. API keys can be easily generated and managed through the account dashboard.
+The existing tools retain their keys, input types, optionality, enums, and output fields. `list_models` additionally accepts optional model ID, endpoint type, tag, modality, and capability filters, plus requested detail sections. New optional model metadata preserves legacy `object` and `ownedBy` values when present. `generate_embeddings` retains numeric vectors and adds `encodedEmbedding` when the provider returns base64.
 
-- **Method**: Bearer token in the `Authorization` header.
-- **Header format**: `Authorization: Bearer <YOUR_AIMLAPI_KEY>`
-- **Base URL**: `https://api.aimlapi.com/v1` (also supports `https://api.aimlapi.com/v2`)
-- **Key management**: You can find your AIML API key on the account page. An AIML API key is a credential that grants you access to the API from your code. It is a sensitive string that is shown only at creation time and should be kept confidential. Do not share this key with anyone. If you lose it, generate a new key from your dashboard.
-- API keys from third-party organizations (e.g., OpenAI keys) cannot be used with this API — you need an AIML API Key.
+Generated image, video, and audio files are downloadable. Image generation accepts both documented `data` and legacy/example `images` response arrays. Existing image URL/base64 fallback values, video URLs, and audio URLs remain available. Speech synthesis accepts both the documented string/object audio URL responses and binary audio responses. URL expiration is not specified in the reviewed model documentation; no expiration duration is assumed.
 
-No OAuth2 or other authentication methods are supported. There are no scopes or tenant IDs required.
+## Model-specific constraints
 
-## Features
+Model discovery returns aliases and official documentation URLs. Provider-specific inputs remain dependent on the chosen model. The classic Flux IDs `flux/schnell`, `flux/dev`, `flux-pro`, and `flux-pro/v1.1` use `num_images` and `image_size`; the existing image count and size fields map to those documented parameters. `WIDTHxHEIGHT` maps to an image-size object for these models. Other models retain the existing `n` and `size` mappings. Negative prompts, guidance scale, aspect ratio, and prompt enhancement support vary by model.
 
-### Text Generation (LLMs)
+Moderation maps the existing default model alias `Meta-Llama-Guard-3-8B` to the documented `meta-llama/Meta-Llama-Guard-3-8B` ID. Image moderation requires a compatible vision model. Empty moderation input is rejected.
 
-Supports completion and chat completion, streaming mode, code generation, thinking/reasoning, function calling, vision in text models (image-to-text), and web search. Models include GPT, Claude, Gemini, DeepSeek, Qwen, Llama, and many others. You specify the model by its ID (e.g., `gpt-4o`, `deepseek/deepseek-r1`). Supports system/developer/user/assistant message roles, temperature, max tokens, stop sequences, structured output (JSON mode), and seed for reproducibility. Not all models support all capabilities — every chat model includes a features list that clearly shows what the model can do.
+Video creation accepts the current `id` response and the legacy `generation_id`. Transcription polling recognizes current and legacy pending statuses and reads both legacy `result` and current `output` text, including per-channel transcript alternatives. Failure statuses are reported as service failures. The result tools allow subsequent retrieval after the initial polling window; transcription results are stored for one hour.
 
-### Image Generation
+The existing `webSearch` input and its `web_search` mapping are retained for compatibility. The reviewed capability page lists supported search models but does not establish that generic parameter for every chat model. Provider-specific search behavior needs live verification.
 
-Generate images from text prompts or edit existing images. Image models are available from multiple developers. Supports models like Flux, Stable Diffusion, DALL-E, and others. Output options include various resolutions and aspect ratios depending on the model.
+## Official references
 
-### Video Generation
-
-Dedicated Text-to-Video and Image-to-Video APIs offer flexible entry points for both concept-driven storytelling and visual iteration. Supports models from providers like Kling AI, MiniMax, and others. Video generation is typically asynchronous — you submit a request and retrieve results later.
-
-### Music Generation
-
-Generate music from text prompts. Supports multimodal inputs, diverse genres, and neural audio synthesis for media, gaming, and entertainment applications. Includes models from MiniMax, Google (Lyria 2), and others.
-
-### Voice and Speech
-
-- **Speech-to-Text**: Speech-to-text models convert spoken language into written text, enabling voice-based interactions. Supports models from OpenAI (Whisper), Deepgram (Nova-2), and Assembly AI. Generated audio transcriptions are stored on the server for 1 hour from the time of creation.
-- **Text-to-Speech**: Convert text to spoken audio using models from Deepgram (Aura), ElevenLabs, and Microsoft. Supports 120+ languages and low-latency inference.
-
-### Content Moderation
-
-Use content moderation models to classify input content as safe or unsafe instantly. Supports text analysis, image analysis, both image URLs and base64 encoded images, and analyzing multiple images in a single request. Uses Meta's Llama Guard models.
-
-### 3D Model Generation
-
-3D-generating models create three-dimensional objects, environments, and textures based on input data such as text prompts, reference images, or existing 3D models. Supports text-to-3D generation, image-to-3D conversion, and mesh and texture generation. Currently limited to a small number of models (e.g., TripoSR by Stability AI).
-
-### Vision and OCR
-
-Analyze images using vision-capable models. Includes optical character recognition (OCR) via Google OCR and Mistral OCR, as well as optical feature recognition (OFR) for structured data extraction from images.
-
-### Embeddings
-
-Generate text embeddings for semantic search, similarity analysis, and other downstream tasks. Supports embedding models from Anthropic (Voyage), and others.
-
-### AI Search Engine
-
-AI Web Search Engine is designed to retrieve real-time information from the internet. This solution processes user queries and returns relevant data from various online sources. Uses specialized API endpoints, each designed to search for only one specific type of information. These endpoints return structured responses, making them more suitable for integration into specialized services. Also available as a general chat completion with web search capability.
-
-### OpenAI Assistants
-
-Create tailored AI Assistants capable of handling customer support, data analysis, content generation, and more. Compatible with the OpenAI Assistants API format.
-
-### Realtime API
-
-The Realtime API works through a combination of client-sent events and server-sent events. Clients can send events to update session configuration or send text and audio inputs. Server events confirm when audio responses have completed, or when a text response from the model has been received. Used for real-time voice and text interaction via WebSocket.
-
-## Events
-
-AI/ML API supports **webhooks** for asynchronous operations, following the same pattern as OpenAI's webhook system.
-
-### Response Events
-
-Triggered when background (asynchronous) responses complete or fail. The SDK supports unwrapping webhook payloads and verifying that the webhook was sent from AI/ML API. Event types include:
-
-- `response.completed` — A background response has been completed.
-- `response.failed` — A background response has failed.
-
-Webhook endpoints are configured with a URL and a signing secret for signature verification. The webhook payload includes the event type, event ID, timestamp, and associated resource ID.
+- [Model catalogue](https://docs.aimlapi.com/api-references/service-endpoints/complete-model-list)
+- [Account identity and balance](https://docs.aimlapi.com/api-references/service-endpoints/account-balance)
+- [Chat completions](https://docs.aimlapi.com/api-references/text-models-llm/openai/gpt-4o)
+- [GPT Image 1](https://docs.aimlapi.com/api-references/image-models/openai/gpt-image-1)
+- [Flux Dev](https://docs.aimlapi.com/api-references/image-models/flux/flux-dev)
+- [Flux Pro](https://docs.aimlapi.com/api-references/image-models/flux/flux-pro)
+- [Flux Pro v1.1](https://docs.aimlapi.com/api-references/image-models/flux/flux-pro-v1.1)
+- [Flux Schnell](https://docs.aimlapi.com/api-references/image-models/flux/flux-schnell)
+- [Text to speech](https://docs.aimlapi.com/api-references/speech-models/text-to-speech/openai/tts-1)
+- [Speech to text](https://docs.aimlapi.com/api-references/speech-models/speech-to-text)
+- [Current transcription response](https://docs.aimlapi.com/api-references/speech-models/speech-to-text/assembly-ai/universal)
+- [Embeddings](https://docs.aimlapi.com/api-references/embedding-models/openai/text-embedding-3-large)
+- [Text moderation](https://docs.aimlapi.com/api-references/moderation-safety-models/meta/meta-llama-guard-3-8b)
+- [Image moderation](https://docs.aimlapi.com/api-references/moderation-safety-models/meta/llama-guard-3-11b-vision-turbo)
+- [MiniMax Video 01](https://docs.aimlapi.com/api-references/video-models/minimax/video-01)
+- [Web search capability](https://docs.aimlapi.com/capabilities/web-search)

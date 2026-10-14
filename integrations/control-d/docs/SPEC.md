@@ -1,6 +1,4 @@
-Now I have enough information to write the specification. Based on my research, Control D does not appear to support webhooks or any event subscription mechanism through its API.
-
-# Slates Specification for Control D
+# Control D API Specification
 
 ## Overview
 
@@ -36,6 +34,8 @@ A Profile is a collection of rules and settings enforced on a DNS resolver, also
 - Create, list, modify, and delete profiles.
 - Profiles can be chained to reduce duplication and form complex behaviors.
 - Configure profile options such as TTL settings, DNS rebind protection, and DNSSEC.
+- Discover available profile restrictions and list or toggle the restrictions enabled on a profile. Restrictions are separate from Profile Options.
+- Supply the account password when unlocking a profile.
 
 ### Filter Management
 
@@ -54,7 +54,7 @@ Granular control over individual domain names is available, including blocking s
 Endpoints are unique DNS resolvers that enforce Profiles. These should be mapped 1:1 with physical devices, which can be used by one or more people.
 
 - Create, list, modify, and delete devices.
-- Assign profiles to devices, including scheduled profile swapping.
+- Assign profiles to devices, including multiple continuously enforced profiles.
 - Filter devices by type (user devices vs. routers).
 
 ### Access Control (IP Authorization)

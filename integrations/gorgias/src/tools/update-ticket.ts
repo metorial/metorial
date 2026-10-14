@@ -17,9 +17,9 @@ export let updateTicket = SlateTool.create(spec, {
       ticketId: z.number().describe('ID of the ticket to update'),
       status: z.enum(['open', 'closed']).optional().describe('New ticket status'),
       priority: z
-        .enum(['urgent', 'high', 'normal', 'low'])
+        .enum(['urgent', 'critical', 'high', 'normal', 'low'])
         .optional()
-        .describe('New priority'),
+        .describe('New priority; urgent is an alias for critical'),
       subject: z.string().optional().describe('New subject'),
       spam: z.boolean().optional().describe('Mark as spam'),
       language: z.string().optional().describe('Language code'),
@@ -32,7 +32,7 @@ export let updateTicket = SlateTool.create(spec, {
         .number()
         .nullable()
         .optional()
-        .describe('Team ID to assign (null to unassign)'),
+        .describe('Team ID to assign; call list_teams to discover teams (null to unassign)'),
       tags: z
         .array(z.string())
         .optional()
@@ -70,7 +70,8 @@ export let updateTicket = SlateTool.create(spec, {
     let updateData: any = {};
 
     if (ctx.input.status !== undefined) updateData.status = ctx.input.status;
-    if (ctx.input.priority !== undefined) updateData.priority = ctx.input.priority;
+    if (ctx.input.priority !== undefined)
+      updateData.priority = ctx.input.priority === 'urgent' ? 'critical' : ctx.input.priority;
     if (ctx.input.subject !== undefined) updateData.subject = ctx.input.subject;
     if (ctx.input.spam !== undefined) updateData.spam = ctx.input.spam;
     if (ctx.input.language !== undefined) updateData.language = ctx.input.language;

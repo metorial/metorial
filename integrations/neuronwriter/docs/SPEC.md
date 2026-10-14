@@ -1,4 +1,6 @@
-Let me fetch the official API documentation page for more details.# Slates Specification for Neuronwriter
+# NeuronWriter Integration
+
+API reference: [NEURONwriter API guide](https://neuronwriter.com/faqs/neuronwriter-api-how-to-use/).
 
 ## Overview
 
@@ -42,7 +44,8 @@ Configurable parameters include keyword, language, search engine, and project. R
 
 ### Content Management
 
-- **Retrieve content:** Fetch the last saved content revision (HTML, title, meta description) for any query, with the option to include autosave revisions.
+- **Retrieve content:** Fetch the last saved content revision (HTML, title, meta description) for any query, with the option to include autosave revisions. The original HTML remains available in the response alongside a downloadable HTML file.
+- **Export content:** Download the saved HTML with revision metadata for editing or publishing.
 - **Import content:** Update editor content for a query by providing raw HTML or a URL to auto-import from. Optional parameters allow specifying the title, meta description, and HTML container selectors (id or class) for URL imports.
 
 ### Content Evaluation
@@ -63,4 +66,4 @@ These enable collaboration with writers or clients who may not have NeuronWriter
 
 ## Events
 
-The provider does not support events. NeuronWriter's API does not offer webhooks or any built-in event subscription mechanism.
+This integration has no event subscriptions. The referenced API guide does not document webhook registration.

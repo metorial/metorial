@@ -17,7 +17,9 @@ import {
   deleteKpiUnit,
   deleteUser,
   getKpi,
+  getKpiEntry,
   getKpiReport,
+  getUser,
   listCategories,
   listGroups,
   listKpiConfiguration,
@@ -34,13 +36,15 @@ import {
   updateGroup,
   updateGroupItem,
   updateKpi,
-  updateUser
+  updateUser,
+  updateUserKpi
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     listKpis,
     getKpi,
+    getKpiEntry,
     createKpi,
     updateKpi,
     deleteKpi,
@@ -49,11 +53,13 @@ export let provider = Slate.create({
     recordKpiEntriesBatch,
     deleteKpiEntry,
     listUsers,
+    getUser,
     createUser,
     updateUser,
     deleteUser,
     listUserKpis,
     assignKpiToUser,
+    updateUserKpi,
     removeKpiFromUser,
     listGroups,
     createGroup,

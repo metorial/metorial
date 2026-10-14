@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClearoutClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,23 +6,29 @@ import { spec } from '../spec';
 export let manageBulkFinder = SlateTool.create(spec, {
   name: 'Manage Bulk Finder',
   key: 'manage_bulk_finder',
-  description: `Manage bulk email finder lists. Supports checking progress of a running finder job or downloading completed results.
-Use **checkProgress** to poll for completion status and percentage. Use **downloadResult** to get a download URL once processing completes.`,
+  description: `Manage bulk email finder lists. Supports checking progress, downloading results, cancelling a running job, or permanently removing a list.
+Use start_bulk_finder to upload a CSV first. Use **checkProgress** to poll for completion status and percentage. Use **downloadResult** to download results once processing completes.`,
   instructions: [
     'Use "checkProgress" regularly to monitor bulk finder jobs until they complete.',
     'Only use "downloadResult" after the list reaches completed status.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
   .input(
     z.object({
       action: z
-        .enum(['checkProgress', 'downloadResult'])
+        .enum(['checkProgress', 'downloadResult', 'cancel', 'remove'])
         .describe('Action to perform on the bulk finder list'),
-      listId: z.string().describe('ID of the bulk email finder list')
+      listId: z.string().describe('ID returned by start_bulk_finder'),
+      ignoreResult: z
+        .boolean()
+        .optional()
+        .describe(
+          'For remove only: allow deletion while a result download is in progress (default false).'
+        )
     })
   )
   .output(
@@ -74,9 +80,12 @@ Use **checkProgress** to poll for completion status and percentage. Use **downlo
         let data = (result.data ?? result) as Record<string, unknown>;
         let downloadUrl = data.url as string | undefined;
         let confidenceLevel = data.confidence_level as string | undefined;
-        message = downloadUrl
-          ? `Download ready for finder list **${ctx.input.listId}**${confidenceLevel ? ` (confidence: ${confidenceLevel})` : ''}.`
-          : `Download result requested for finder list **${ctx.input.listId}**.`;
+        if (!downloadUrl)
+          throw createApiServiceError(
+            'Clearout did not return a download URL. Check progress and request results again after completion.'
+          );
+        await ctx.addAttachment({ type: 'url', url: downloadUrl, mimeType: 'text/csv' });
+        message = `Download ready for finder list **${ctx.input.listId}**${confidenceLevel ? ` (confidence: ${confidenceLevel})` : ''}.`;
         return {
           output: {
             status: result.status as string | undefined,
@@ -86,6 +95,24 @@ Use **checkProgress** to poll for completion status and percentage. Use **downlo
             rawResponse: result
           },
           message
+        };
+      }
+      case 'cancel':
+      case 'remove': {
+        result =
+          ctx.input.action === 'cancel'
+            ? await client.cancelFinderList(ctx.input.listId)
+            : await client.removeFinderList(ctx.input.listId, ctx.input.ignoreResult);
+        return {
+          output: {
+            status: result.status as string | undefined,
+            listId: ctx.input.listId,
+            rawResponse: result
+          },
+          message:
+            ctx.input.action === 'cancel'
+              ? `Cancellation requested for finder list **${ctx.input.listId}**.`
+              : `Finder list **${ctx.input.listId}** has been removed.`
         };
       }
     }

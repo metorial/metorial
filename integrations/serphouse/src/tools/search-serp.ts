@@ -47,7 +47,10 @@ export let searchSerp = SlateTool.create(spec, {
         .optional()
         .describe('Filter similar and omitted results (default: enabled)'),
       page: z.number().optional().describe('Page number of results (default: 1)'),
-      numResults: z.number().optional().describe('Number of results per page (default: 100)'),
+      numResults: z
+        .number()
+        .optional()
+        .describe('Number of results per page (default and maximum: 10)'),
       dateRange: z
         .string()
         .optional()
@@ -78,13 +81,13 @@ export let searchSerp = SlateTool.create(spec, {
       device: ctx.input.device,
       serp_type: ctx.input.serpType,
       ...(ctx.input.loc ? { loc: ctx.input.loc } : {}),
-      ...(ctx.input.locId ? { loc_id: ctx.input.locId } : {}),
+      ...(ctx.input.locId !== undefined ? { loc_id: ctx.input.locId } : {}),
       ...(ctx.input.verbatim !== undefined ? { verbatim: ctx.input.verbatim ? 1 : 0 } : {}),
       ...(ctx.input.filterSimilarResults !== undefined
         ? { gfilter: ctx.input.filterSimilarResults ? 1 : 0 }
         : {}),
-      ...(ctx.input.page ? { page: ctx.input.page } : {}),
-      ...(ctx.input.numResults ? { num_result: ctx.input.numResults } : {}),
+      ...(ctx.input.page !== undefined ? { page: ctx.input.page } : {}),
+      ...(ctx.input.numResults !== undefined ? { num_result: ctx.input.numResults } : {}),
       ...(ctx.input.dateRange ? { date_range: ctx.input.dateRange } : {})
     });
 

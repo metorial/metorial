@@ -19,7 +19,9 @@ export let createAppointment = SlateTool.create(spec, {
     z.object({
       startDateTime: z.string().describe('Start date and time in yyyy-mm-dd HH:MM format'),
       endDateTime: z.string().describe('End date and time in yyyy-mm-dd HH:MM format'),
-      calendarId: z.string().describe('Calendar ID to assign the appointment to'),
+      calendarId: z
+        .string()
+        .describe('Calendar ID from list_calendars to assign the appointment to'),
       services: z
         .string()
         .optional()
@@ -83,7 +85,7 @@ export let createAppointment = SlateTool.create(spec, {
       city: ctx.input.city,
       customernumber: ctx.input.customerNumber,
       birthday: ctx.input.birthday,
-      notificationmsg: ctx.input.notes,
+      notes: ctx.input.notes,
       location: ctx.input.location,
       sendemail: ctx.input.sendEmail,
       capacity: ctx.input.capacity,

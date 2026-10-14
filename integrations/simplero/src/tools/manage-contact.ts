@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SimpleroClient } from '../lib/client';
 import { spec } from '../spec';
@@ -90,15 +90,17 @@ Use **override** to replace existing values rather than merging. Tags added here
         contactId: ctx.input.contactId,
         contactToken: ctx.input.contactToken
       });
-      let name = `${contact.first_name || ''} ${contact.last_name || ''}`;
+      let name =
+        contact.name ||
+        `${contact.first_names || contact.first_name || ''} ${contact.last_name || ''}`.trim();
       return {
         output: { contact },
-        message: `Found contact **${name.trim() || contact.email}** (ID: ${contact.id}).`
+        message: `Found contact **${name || contact.email}** (ID: ${contact.id}).`
       };
     }
 
     if (!ctx.input.email) {
-      throw new Error('Email is required to create or update a contact.');
+      throw createApiServiceError('Email is required to create or update a contact.');
     }
 
     let contact = await client.createOrUpdateContact({
@@ -118,10 +120,12 @@ Use **override** to replace existing values rather than merging. Tags added here
       landingPageId: ctx.input.landingPageId
     });
 
-    let name = `${contact.first_name || ''} ${contact.last_name || ''}`;
+    let name =
+      contact.name ||
+      `${contact.first_names || contact.first_name || ''} ${contact.last_name || ''}`.trim();
     return {
       output: { contact },
-      message: `Contact **${name.trim() || contact.email}** (ID: ${contact.id}) created/updated successfully.`
+      message: `Contact **${name || contact.email}** (ID: ${contact.id}) created/updated successfully.`
     };
   })
   .build();

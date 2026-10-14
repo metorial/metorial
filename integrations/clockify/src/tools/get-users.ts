@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getUsers = SlateTool.create(spec, {
   name: 'Get Workspace Users',
   key: 'get_users',
-  description: `List users in the Clockify workspace. Filter by email, name, or status. Returns user profiles with roles and membership info.`,
+  description: `List users in the Clockify workspace. Filter by email, name, or status. Returns user IDs, names, email addresses, and status. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       email: z.string().optional().describe('Filter by email address'),
       name: z.string().optional().describe('Filter by name (partial match)'),
       status: z
@@ -21,8 +23,18 @@ export let getUsers = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter users who have access to this project'),
-      page: z.number().optional().describe('Page number'),
-      pageSize: z.number().optional().describe('Entries per page')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Page number'),
+      pageSize: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Entries per page')
     })
   )
   .output(
@@ -40,19 +52,15 @@ export let getUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let users = await client.getWorkspaceUsers({
       email: ctx.input.email,
       name: ctx.input.name,
       status: ctx.input.status,
-      projectId: ctx.input.projectId,
+      'project-id': ctx.input.projectId,
       page: ctx.input.page,
-      pageSize: ctx.input.pageSize
+      'page-size': ctx.input.pageSize
     });
 
     let mapped = (users as any[]).map((u: any) => ({
@@ -89,11 +97,7 @@ export let getCurrentUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let user = await client.getCurrentUser();
 

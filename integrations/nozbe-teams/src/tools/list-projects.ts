@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client, type ListParams } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let projectSchema = z.object({
@@ -28,7 +29,7 @@ export let listProjects = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      teamId: z.string().optional().describe('Filter projects by team ID'),
+      teamId: teamIdSchema.optional(),
       isFavorite: z.boolean().optional().describe('Filter to favorite projects only'),
       isSingleActions: z.boolean().optional().describe('Filter for single action projects'),
       sortBy: z
@@ -39,9 +40,17 @@ export let listProjects = SlateTool.create(spec, {
         ),
       limit: z
         .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(1)
+        .max(10000)
         .optional()
         .describe('Maximum number of projects to return (1-10000, default 100)'),
-      offset: z.number().optional().describe('Number of projects to skip for pagination')
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(0)
+        .optional()
+        .describe('Number of projects to skip for pagination')
     })
   )
   .output(
@@ -54,20 +63,16 @@ export let listProjects = SlateTool.create(spec, {
 
     let params: ListParams = {};
     if (ctx.input.teamId) params.team_id = ctx.input.teamId;
+    if (ctx.input.isFavorite !== undefined) params.is_favorite = ctx.input.isFavorite;
     if (ctx.input.isSingleActions !== undefined)
       params.is_single_actions = ctx.input.isSingleActions;
     if (ctx.input.sortBy) params.sortBy = ctx.input.sortBy;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
 
     let projects = await client.listProjects(params);
 
-    let filtered =
-      ctx.input.isFavorite !== undefined
-        ? projects.filter((p: any) => p.is_favorite === ctx.input.isFavorite)
-        : projects;
-
-    let mapped = filtered.map((p: any) => ({
+    let mapped = projects.map((p: any) => ({
       projectId: p.id,
       name: p.name,
       teamId: p.team_id,

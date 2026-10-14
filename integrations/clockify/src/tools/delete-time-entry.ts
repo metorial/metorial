@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteTimeEntry = SlateTool.create(spec, {
   name: 'Delete Time Entry',
   key: 'delete_time_entry',
-  description: `Delete a time entry from Clockify. This permanently removes the time entry.`,
+  description: `Delete a time entry from Clockify. This permanently removes the time entry. Call get_workspaces to discover the workspace ID.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +15,7 @@ export let deleteTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       timeEntryId: z.string().describe('ID of the time entry to delete')
     })
   )
@@ -23,11 +25,7 @@ export let deleteTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     await client.deleteTimeEntry(ctx.input.timeEntryId);
 

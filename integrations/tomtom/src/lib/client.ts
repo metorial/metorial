@@ -1,15 +1,24 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class TomTomClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private apiKey: string;
   private adminKey?: string;
 
   constructor(config: { token: string; adminKey?: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide a TomTom API key.');
+    }
     this.apiKey = config.token;
     this.adminKey = config.adminKey;
-    this.axios = createAxios({
-      baseURL: 'https://api.tomtom.com'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.tomtom.com',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'TomTom',
+          reason: 'TomTom API request failed',
+          nestedKeys: ['errors', 'detailedError', 'details', 'innerError']
+        })
     });
   }
 
@@ -30,6 +39,24 @@ export class TomTomClient {
     minFuzzyLevel?: number;
     maxFuzzyLevel?: number;
   }) {
+    if ((params.lat === undefined) !== (params.lon === undefined)) {
+      throw createApiServiceError('Provide both lat and lon for a search bias.');
+    }
+    if (!params.query.trim()) {
+      throw createApiServiceError('Provide a non-empty search query.');
+    }
+    if (
+      params.limit !== undefined &&
+      (!Number.isInteger(params.limit) || params.limit < 1 || params.limit > 100)
+    ) {
+      throw createApiServiceError('Search limit must be a whole number from 1 to 100.');
+    }
+    if (
+      params.offset !== undefined &&
+      (!Number.isInteger(params.offset) || params.offset < 0)
+    ) {
+      throw createApiServiceError('Search offset must be a non-negative whole number.');
+    }
     let query = encodeURIComponent(params.query);
     let response = await this.axios.get(`/search/2/search/${query}.json`, {
       params: {
@@ -80,6 +107,12 @@ export class TomTomClient {
     countrySet?: string;
     resultSet?: string;
   }) {
+    if ((params.lat === undefined) !== (params.lon === undefined)) {
+      throw createApiServiceError('Provide both lat and lon for an autocomplete bias.');
+    }
+    if (params.radius !== undefined && params.lat === undefined) {
+      throw createApiServiceError('Provide lat and lon when using an autocomplete radius.');
+    }
     let query = encodeURIComponent(params.query);
     let response = await this.axios.get(`/search/2/autocomplete/${query}.json`, {
       params: {
@@ -92,6 +125,13 @@ export class TomTomClient {
         countrySet: params.countrySet,
         resultSet: params.resultSet
       }
+    });
+    return response.data;
+  }
+
+  async listPoiCategories(language?: string) {
+    let response = await this.axios.get('/search/2/poiCategories.json', {
+      params: { key: this.apiKey, language }
     });
     return response.data;
   }
@@ -145,6 +185,17 @@ export class TomTomClient {
     hilliness?: string;
     windingness?: string;
   }) {
+    if (params.departAt !== undefined && params.arriveAt !== undefined) {
+      throw createApiServiceError('Use departAt or arriveAt, not both.');
+    }
+    if (
+      params.maxAlternatives !== undefined &&
+      (!Number.isInteger(params.maxAlternatives) ||
+        params.maxAlternatives < 0 ||
+        params.maxAlternatives > 5)
+    ) {
+      throw createApiServiceError('maxAlternatives must be a whole number from 0 to 5.');
+    }
     let locationStr = params.locations.map(l => `${l.lat},${l.lon}`).join(':');
     let response = await this.axios.get(`/routing/1/calculateRoute/${locationStr}/json`, {
       params: {
@@ -182,8 +233,37 @@ export class TomTomClient {
     travelMode?: string;
     vehicleEngineType?: string;
     vehicleMaxSpeed?: number;
+    constantSpeedConsumptionInLitersPerHundredkm?: string;
+    constantSpeedConsumptionInkWhPerHundredkm?: string;
     avoid?: string[];
   }) {
+    let budgets = [
+      params.fuelBudgetInLiters,
+      params.energyBudgetInkWh,
+      params.timeBudgetInSec,
+      params.distanceBudgetInMeters
+    ].filter(value => value !== undefined);
+    if (budgets.length !== 1 || !Number.isFinite(budgets[0]) || budgets[0]! < 0) {
+      throw createApiServiceError('Provide exactly one non-negative reachable-range budget.');
+    }
+    if (
+      params.fuelBudgetInLiters !== undefined &&
+      (!params.constantSpeedConsumptionInLitersPerHundredkm ||
+        params.vehicleEngineType === 'electric')
+    ) {
+      throw createApiServiceError(
+        'A fuel budget requires a combustion engine and constantSpeedConsumptionInLitersPerHundredkm.'
+      );
+    }
+    if (
+      params.energyBudgetInkWh !== undefined &&
+      (!params.constantSpeedConsumptionInkWhPerHundredkm ||
+        params.vehicleEngineType === 'combustion')
+    ) {
+      throw createApiServiceError(
+        'An energy budget requires an electric engine and constantSpeedConsumptionInkWhPerHundredkm.'
+      );
+    }
     let origin = `${params.originLat},${params.originLon}`;
     let response = await this.axios.get(`/routing/1/calculateReachableRange/${origin}/json`, {
       params: {
@@ -195,8 +275,14 @@ export class TomTomClient {
         routeType: params.routeType,
         traffic: params.traffic,
         travelMode: params.travelMode,
-        vehicleEngineType: params.vehicleEngineType,
+        vehicleEngineType:
+          params.vehicleEngineType ??
+          (params.energyBudgetInkWh !== undefined ? 'electric' : undefined),
         vehicleMaxSpeed: params.vehicleMaxSpeed,
+        constantSpeedConsumptionInLitersPerHundredkm:
+          params.constantSpeedConsumptionInLitersPerHundredkm,
+        constantSpeedConsumptionInkWhPerHundredkm:
+          params.constantSpeedConsumptionInkWhPerHundredkm,
         avoid: params.avoid?.join(',')
       }
     });
@@ -212,6 +298,17 @@ export class TomTomClient {
     departAt?: string;
     avoid?: string[];
   }) {
+    if (params.routeType && params.routeType !== 'fastest') {
+      throw createApiServiceError('Synchronous matrix routing supports routeType fastest.');
+    }
+    if (params.travelMode && !['car', 'truck', 'pedestrian'].includes(params.travelMode)) {
+      throw createApiServiceError(
+        'Synchronous matrix routing supports car, truck, or pedestrian travelMode.'
+      );
+    }
+    if (params.traffic === 'live' && params.departAt === 'any') {
+      throw createApiServiceError('Live matrix traffic requires departAt now or a date/time.');
+    }
     let response = await this.axios.post(
       '/routing/matrix/2',
       {
@@ -223,7 +320,7 @@ export class TomTomClient {
           routeType: params.routeType,
           traffic: params.traffic,
           travelMode: params.travelMode,
-          departAt: params.departAt,
+          departAt: params.departAt ?? (params.traffic === 'live' ? 'now' : undefined),
           avoid: params.avoid
         }
       },
@@ -247,6 +344,42 @@ export class TomTomClient {
     traffic?: string;
     departAt?: string;
   }) {
+    if (params.waypoints.length > 12) {
+      throw createApiServiceError('Waypoint optimization supports at most 12 waypoints.');
+    }
+    for (let index of [params.originIndex, params.destinationIndex]) {
+      if (
+        index !== undefined &&
+        (!Number.isInteger(index) || index < -1 || index >= params.waypoints.length)
+      ) {
+        throw createApiServiceError(
+          'Waypoint indices must be whole numbers from -1 to the last waypoint index.'
+        );
+      }
+    }
+    for (let waypoint of params.waypoints) {
+      if (
+        waypoint.serviceTimeInSeconds !== undefined &&
+        (!Number.isInteger(waypoint.serviceTimeInSeconds) || waypoint.serviceTimeInSeconds < 0)
+      ) {
+        throw createApiServiceError(
+          'serviceTimeInSeconds must be a non-negative whole number.'
+        );
+      }
+    }
+    if (
+      params.waypoints.some(waypoint => waypoint.serviceTimeInSeconds !== undefined) &&
+      (!params.departAt || params.departAt === 'any')
+    ) {
+      throw createApiServiceError(
+        'Set departAt to now or a date/time when using service times.'
+      );
+    }
+    if (params.traffic === 'live' && params.departAt === 'any') {
+      throw createApiServiceError(
+        'Live waypoint traffic requires departAt now or a date/time.'
+      );
+    }
     let body: any = {
       waypoints: params.waypoints.map(w => ({
         point: { latitude: w.lat, longitude: w.lon },
@@ -257,7 +390,9 @@ export class TomTomClient {
       options: {
         travelMode: params.travelMode || 'car',
         traffic: params.traffic || 'historical',
-        ...(params.departAt ? { departAt: params.departAt } : {}),
+        ...(params.departAt || params.traffic === 'live'
+          ? { departAt: params.departAt ?? 'now' }
+          : {}),
         outputExtensions: ['travelTimes', 'routeLengths'],
         waypointConstraints: {
           ...(params.originIndex !== undefined ? { originIndex: params.originIndex } : {}),
@@ -285,6 +420,9 @@ export class TomTomClient {
     thickness?: number;
     openLr?: boolean;
   }) {
+    if (!Number.isInteger(params.zoom)) {
+      throw createApiServiceError('Traffic zoom must be a whole number from 0 to 22.');
+    }
     let response = await this.axios.get(
       `/traffic/services/4/flowSegmentData/absolute/${params.zoom}/json`,
       {
@@ -307,7 +445,12 @@ export class TomTomClient {
     timeValidityFilter?: string;
   }) {
     let bb = params.boundingBox;
-    let bbox = `${bb.minLat},${bb.minLon},${bb.maxLat},${bb.maxLon}`;
+    if (bb.minLat >= bb.maxLat || bb.minLon >= bb.maxLon) {
+      throw createApiServiceError(
+        'Bounding-box minimum coordinates must be below the maximums.'
+      );
+    }
+    let bbox = `${bb.minLon},${bb.minLat},${bb.maxLon},${bb.maxLat}`;
     let response = await this.axios.get(`/traffic/services/5/incidentDetails`, {
       params: {
         key: this.apiKey,
@@ -325,14 +468,17 @@ export class TomTomClient {
   // ─── Geofencing ───────────────────────────────────────────────────
 
   async createProject(params: { name: string }) {
-    let response = await this.axios.post('/geofencing/1/projects/project', null, {
-      params: {
-        key: this.apiKey,
-        adminKey: this.adminKey
-      },
-      headers: { 'Content-Type': 'application/json' },
-      data: { name: params.name }
-    });
+    let response = await this.axios.post(
+      '/geofencing/1/projects/project',
+      { name: params.name },
+      {
+        params: {
+          key: this.apiKey,
+          adminKey: this.adminKey
+        },
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
     return response.data;
   }
 
@@ -533,15 +679,31 @@ export class TomTomClient {
     return response.data;
   }
 
-  async getObjectLocationHistory(params: { objectId: string; from?: string; to?: string }) {
+  async getObjectLocationHistory(params: {
+    objectId: string;
+    from?: string;
+    to?: string;
+    maxResult?: number;
+    pageNumber?: number;
+  }) {
+    if (!params.from) {
+      throw createApiServiceError('Provide from to retrieve Location History positions.');
+    }
+    if (!this.adminKey) {
+      throw createApiServiceError(
+        'Provide an Admin Key to retrieve Location History positions.'
+      );
+    }
     let response = await this.axios.get(
-      `/locationHistory/1/objects/${params.objectId}/positions`,
+      `/locationHistory/1/history/positions/${encodeURIComponent(params.objectId)}`,
       {
         params: {
           key: this.apiKey,
           adminKey: this.adminKey,
           from: params.from,
-          to: params.to
+          to: params.to,
+          maxResult: params.maxResult,
+          pageNumber: params.pageNumber
         }
       }
     );
@@ -556,16 +718,21 @@ export class TomTomClient {
     speed?: number;
     heading?: number;
   }) {
+    if (params.speed !== undefined || params.heading !== undefined) {
+      throw createApiServiceError(
+        'Location History estimates speed and heading from positions; omit speed and heading.'
+      );
+    }
     let response = await this.axios.post(
-      `/locationHistory/1/objects/${params.objectId}/positions/position`,
+      '/locationHistory/1/history/positions',
       {
-        position: {
-          latitude: params.lat,
-          longitude: params.lon
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [params.lon, params.lat]
         },
-        ...(params.timestamp ? { timestamp: params.timestamp } : {}),
-        ...(params.speed !== undefined ? { speed: params.speed } : {}),
-        ...(params.heading !== undefined ? { heading: params.heading } : {})
+        object: params.objectId,
+        ...(params.timestamp ? { timestamp: params.timestamp } : {})
       },
       {
         params: {
@@ -584,19 +751,25 @@ export class TomTomClient {
     points: Array<{ lat: number; lon: number; timestamp?: string }>;
     fieldSet?: string;
   }) {
+    if (params.points.length < 2 || params.points.length > 5000) {
+      throw createApiServiceError('Snap to Roads requires between 2 and 5,000 points.');
+    }
     let response = await this.axios.post(
-      '/snap-to-roads/1/snap-to-roads',
+      '/snapToRoads/1',
       {
         points: params.points.map(p => ({
-          latitude: p.lat,
-          longitude: p.lon,
-          ...(p.timestamp ? { timestamp: p.timestamp } : {})
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+          properties: p.timestamp ? { timestamp: p.timestamp } : {}
         }))
       },
       {
         params: {
           key: this.apiKey,
-          fields: params.fieldSet
+          fields:
+            params.fieldSet ??
+            '{projectedPoints{type,geometry{type,coordinates},properties{routeIndex,snapResult}},route{properties{speedLimits{value,unit,type},address{roadName,roadNumbers}}}}',
+          measurementSystem: 'metric'
         },
         headers: { 'Content-Type': 'application/json' }
       }

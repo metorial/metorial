@@ -12,8 +12,10 @@ import {
   extractEntitiesTool,
   extractRelationshipsTool,
   extractTopicsTool,
+  getApiInfoTool,
   getSyntaxDependenciesTool,
   getTextEmbeddingTool,
+  listSupportedLanguagesTool,
   splitSentencesTool,
   tokenizeTextTool,
   translateNameTool,
@@ -39,7 +41,9 @@ export let provider = Slate.create({
     transliterateTextTool,
     getTextEmbeddingTool,
     compareAddressesTool,
-    compareRecordsTool
+    compareRecordsTool,
+    getApiInfoTool,
+    listSupportedLanguagesTool
   ],
   triggers: []
 });

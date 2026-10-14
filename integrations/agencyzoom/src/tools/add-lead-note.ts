@@ -26,11 +26,7 @@ export let addLeadNote = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let result = await client.addLeadNote(ctx.input.leadId, { note: ctx.input.note });
     let noteData = result.data ?? result;

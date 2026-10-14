@@ -1,6 +1,6 @@
 # Referral Rock
 
-Manage referral marketing programs, members, referrals, rewards, and payouts. Create and update program members (advocates) with unique referral codes and sharing URLs. Track and manage referrals through approval workflows (Pending, Qualified, Approved, Denied). Create, issue, and manage rewards tied to members or referrals. View pending payouts and process payout transactions. Manage email unsubscribe lists. Send contacts to invite feeds for automatic referral campaigns. Generate member access URLs for embedding share widgets and portals. Subscribe to webhooks for program, member, referral, reward, and email events.
+Manage referral marketing programs, members, referrals, rewards, and payouts. Create and update program members (advocates) with unique referral codes and sharing URLs. Track and manage referrals through approval workflows (Pending, Qualified, Approved, Denied). Create, issue, and manage rewards tied to members or referrals. View pending payouts and process payout transactions. Manage email unsubscribe lists. Send contacts to invite feeds for automatic referral campaigns. Generate member access URLs for embedding share widgets and portals. Retrieve member activity statistics, update reward details, and submit customer feeds with per-customer outcomes. Customer feeds can approve matching referrals and trigger configured rewards.
 
 ## License
 

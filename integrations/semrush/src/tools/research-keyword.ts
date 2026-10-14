@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SemrushAnalyticsClient } from '../lib/client';
 import { transformResults } from '../lib/csv-parser';
@@ -75,6 +75,12 @@ Also supports fetching related keywords, broad match keywords, question-based ke
 
     let db = ctx.input.database || ctx.config.database;
     let results: Record<string, unknown>[];
+    let keywordsInput = Array.isArray(ctx.input.keywords)
+      ? ctx.input.keywords
+      : [ctx.input.keywords];
+    if (!keywordsInput.length || keywordsInput.some(keyword => !keyword.trim())) {
+      throw createApiServiceError('Provide at least one non-empty keyword.');
+    }
     let isBatch = Array.isArray(ctx.input.keywords);
     let phrase = isBatch ? '' : (ctx.input.keywords as string);
 
@@ -94,7 +100,10 @@ Also supports fetching related keywords, broad match keywords, question-based ke
         break;
 
       case 'organic_results':
-        if (isBatch) throw new Error('Organic results report only supports a single keyword.');
+        if (isBatch)
+          throw createApiServiceError(
+            'Organic results report only supports a single keyword.'
+          );
         results = await client.getKeywordOrganicResults({
           phrase,
           database: db,
@@ -105,7 +114,9 @@ Also supports fetching related keywords, broad match keywords, question-based ke
 
       case 'related':
         if (isBatch)
-          throw new Error('Related keywords report only supports a single keyword.');
+          throw createApiServiceError(
+            'Related keywords report only supports a single keyword.'
+          );
         results = await client.getRelatedKeywords({
           phrase,
           database: db,
@@ -117,7 +128,8 @@ Also supports fetching related keywords, broad match keywords, question-based ke
         break;
 
       case 'broad_match':
-        if (isBatch) throw new Error('Broad match report only supports a single keyword.');
+        if (isBatch)
+          throw createApiServiceError('Broad match report only supports a single keyword.');
         results = await client.getBroadMatchKeywords({
           phrase,
           database: db,
@@ -129,7 +141,8 @@ Also supports fetching related keywords, broad match keywords, question-based ke
         break;
 
       case 'questions':
-        if (isBatch) throw new Error('Questions report only supports a single keyword.');
+        if (isBatch)
+          throw createApiServiceError('Questions report only supports a single keyword.');
         results = await client.getPhraseQuestions({
           phrase,
           database: db,
@@ -141,7 +154,8 @@ Also supports fetching related keywords, broad match keywords, question-based ke
         break;
 
       case 'difficulty':
-        if (isBatch) throw new Error('Difficulty report only supports a single keyword.');
+        if (isBatch)
+          throw createApiServiceError('Difficulty report only supports a single keyword.');
         results = await client.getKeywordDifficulty({
           phrase,
           database: db
@@ -149,7 +163,7 @@ Also supports fetching related keywords, broad match keywords, question-based ke
         break;
 
       default:
-        throw new Error(`Unknown report type: ${ctx.input.reportType}`);
+        throw createApiServiceError(`Unknown report type: ${ctx.input.reportType}`);
     }
 
     let keywords = transformResults(results);

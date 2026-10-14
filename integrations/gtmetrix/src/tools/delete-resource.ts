@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -38,8 +38,12 @@ export let deleteResource = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.pageId && ctx.input.reportId) {
+      throw createApiServiceError('Provide only one of pageId or reportId.');
+    }
+
     if (!ctx.input.pageId && !ctx.input.reportId) {
-      throw new Error('Either pageId or reportId must be provided');
+      throw createApiServiceError('Either pageId or reportId must be provided');
     }
 
     if (ctx.input.pageId) {

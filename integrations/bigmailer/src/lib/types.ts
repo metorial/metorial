@@ -1,7 +1,7 @@
 export interface PaginatedResponse<T> {
   has_more: boolean;
   cursor: string;
-  total: number;
+  total?: number;
   data: T[];
 }
 
@@ -116,5 +116,16 @@ export interface BulkCampaign {
   started: number;
   sent: number;
   delayed_until: number;
+  created: number;
+}
+
+export interface TransactionalCampaign {
+  id: string;
+  name: string;
+  subject?: string;
+  status: string;
+  list_id?: string;
+  message_type_id?: string;
+  num_sent?: number;
   created: number;
 }

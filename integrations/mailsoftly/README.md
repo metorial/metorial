@@ -1,6 +1,14 @@
 # Mailsoftly
 
-Create, manage, and search contacts for email marketing campaigns. Organize contacts into lists, apply tags, and send email campaigns with attachments. Create and manage contact lists, add contacts individually or in bulk, and retrieve contact details. Create email drafts, check draft status, and send campaigns. Supports custom contact fields, contact segmentation, and tag-based categorization.
+Manage contacts, contact lists, custom fields, and tags for email marketing.
+Discover available senders, create campaign drafts with recipient lists and
+public file URLs, check preparation and sending restrictions, and submit ready
+drafts for delivery. Retrieve campaign lists and delivery/engagement statistics.
+Identify the connected account and inspect plan limits and sending channels.
+
+Contact listings and search support optional pagination. Search uses exact
+email, first-name, or last-name matches. See [the integration reference](docs/SPEC.md)
+for audience, sender, asynchronous draft preparation, and API-key restrictions.
 
 ## License
 

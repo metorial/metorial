@@ -30,17 +30,11 @@ export let configureAutoFeedback = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let data = await client.configureAutoFeedback({
+    await client.configureAutoFeedback({
       businessId: ctx.input.businessId,
       autoFeedback: ctx.input.enabled ? 1 : 0,
       autoSend: ctx.input.requestsPerDay
     });
-
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to configure auto feedback: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
 
     return {
       output: { success: true },

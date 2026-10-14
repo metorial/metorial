@@ -6,8 +6,11 @@ import { spec } from '../spec';
 export let findEmail = SlateTool.create(spec, {
   name: 'Find Email',
   key: 'find_email',
-  description: `Find a prospect's most likely business email address given a domain, first name, and last name. Each successful lookup consumes account credits.`,
-  constraints: ['Each lookup consumes GetProspect account credits.'],
+  description: `Find a prospect's verified business email address given a domain, first name, and last name. Newly revealed valid emails consume account credits.`,
+  constraints: [
+    'A newly found valid email costs one email credit. Not-found results and emails already owned by the workspace are free.',
+    'A live lookup can take more than a minute.'
+  ],
   tags: {
     readOnly: true
   }
@@ -25,8 +28,18 @@ export let findEmail = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe('Status of the lookup (e.g. "found", "not_found")'),
-      confidence: z.number().optional().describe('Confidence score of the found email')
+        .describe('Status of the lookup (e.g. "valid", "not_found")'),
+      confidence: z.number().optional().describe('Confidence score, when provided'),
+      domain: z.string().optional().describe('Email domain'),
+      domainStatus: z
+        .string()
+        .optional()
+        .describe('Domain health, separate from mailbox status'),
+      smtpProvider: z.string().optional().describe('Mail provider'),
+      freeEmail: z
+        .boolean()
+        .optional()
+        .describe('Whether the address uses a free email provider')
     })
   )
   .handleInvocation(async ctx => {
@@ -40,9 +53,13 @@ export let findEmail = SlateTool.create(spec, {
 
     return {
       output: {
-        email: result.email,
+        email: result.email ?? undefined,
         status: result.status,
-        confidence: result.confidence
+        confidence: result.confidence,
+        domain: result.domain ?? undefined,
+        domainStatus: result.domain_status ?? undefined,
+        smtpProvider: result.smtp_provider ?? undefined,
+        freeEmail: result.free_email ?? undefined
       },
       message: result.email
         ? `Found email **${result.email}** for ${ctx.input.firstName} ${ctx.input.lastName} at ${ctx.input.domain}.`

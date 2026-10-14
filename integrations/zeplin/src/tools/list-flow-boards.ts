@@ -1,7 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ZeplinClient } from '../lib/client';
+import { type PaginationParams, ZeplinClient } from '../lib/client';
 import { spec } from '../spec';
+
+let collectFlowBoardPages = async (
+  fetchPage: (pagination: PaginationParams) => Promise<unknown[]>
+) => {
+  let items: unknown[] = [];
+  let limit = 100;
+  let offset = 0;
+  while (true) {
+    let page = await fetchPage({ limit, offset });
+    items.push(...page);
+    if (page.length < limit) return items;
+    offset += page.length;
+  }
+};
 
 export let listFlowBoards = SlateTool.create(spec, {
   name: 'List Flow Boards',
@@ -71,8 +85,12 @@ export let getFlowBoard = SlateTool.create(spec, {
 
     let [flowBoard, nodes, connectors] = await Promise.all([
       client.getFlowBoard(ctx.input.projectId, ctx.input.flowBoardId),
-      client.listFlowBoardNodes(ctx.input.projectId, ctx.input.flowBoardId),
-      client.listFlowBoardConnectors(ctx.input.projectId, ctx.input.flowBoardId)
+      collectFlowBoardPages(pagination =>
+        client.listFlowBoardNodes(ctx.input.projectId, ctx.input.flowBoardId, pagination)
+      ),
+      collectFlowBoardPages(pagination =>
+        client.listFlowBoardConnectors(ctx.input.projectId, ctx.input.flowBoardId, pagination)
+      )
     ]);
 
     return {

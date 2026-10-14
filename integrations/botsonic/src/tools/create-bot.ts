@@ -13,7 +13,7 @@ export let createBot = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().optional().describe('Name for the new bot'),
+      name: z.string().min(1).max(30).optional().describe('Name for the new bot'),
       templateId: z
         .enum(['e_commerce', 'customer_support', 'personalized', 'openai_assistant', 'agent'])
         .optional()
@@ -31,10 +31,10 @@ export let createBot = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(ctx.auth.token, ctx.auth.credentialType);
 
-    let params: Record<string, any> = {};
-    if (ctx.input.name) params.name = ctx.input.name;
+    let params: { bot_name?: string; bot_template_id?: string; workspace_id?: string } = {};
+    if (ctx.input.name) params.bot_name = ctx.input.name;
     if (ctx.input.templateId) params.bot_template_id = ctx.input.templateId;
     if (ctx.input.workspaceId) params.workspace_id = ctx.input.workspaceId;
 

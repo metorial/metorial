@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let expenseOutputSchema = z.object({
@@ -26,10 +27,10 @@ let mapExpense = (e: any, projectId: number) => ({
   date: e.date,
   title: e.title,
   quantity: e.quantity,
-  unit: e.unit,
+  unit: e.unit ?? undefined,
   unitPrice: e.unit_price,
   unitCost: e.unit_cost,
-  netTotal: e.net_total,
+  netTotal: e.price ?? e.net_total,
   billable: e.billable,
   billed: e.billed,
   budgetRelevant: e.budget_relevant,
@@ -47,6 +48,7 @@ export let listProjectExpenses = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       projectId: z.number().describe('The project ID to list expenses for'),
       billable: z.boolean().optional().describe('Filter by billable status'),
       billed: z.boolean().optional().describe('Filter by billed status'),
@@ -63,6 +65,8 @@ export let listProjectExpenses = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.billable !== undefined) params.billable = ctx.input.billable;
     if (ctx.input.billed !== undefined) params.billed = ctx.input.billed;
     if (ctx.input.budgetRelevant !== undefined)

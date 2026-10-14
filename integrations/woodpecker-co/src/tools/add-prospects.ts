@@ -58,7 +58,15 @@ export let addProspects = SlateTool.create(spec, {
   .output(
     z.object({
       addedCount: z.number().describe('Number of prospects processed'),
-      status: z.string().describe('Operation result status')
+      status: z.string().describe('Operation result status'),
+      results: z
+        .array(z.any())
+        .optional()
+        .describe('Per-prospect IDs and provider results, including any failures'),
+      failedCount: z
+        .number()
+        .optional()
+        .describe('Number of prospects rejected by the provider')
     })
   )
   .handleInvocation(async ctx => {
@@ -69,21 +77,21 @@ export let addProspects = SlateTool.create(spec, {
 
     let mapped = ctx.input.prospects.map(p => {
       let prospect: Record<string, any> = { email: p.email };
-      if (p.firstName) prospect.first_name = p.firstName;
-      if (p.lastName) prospect.last_name = p.lastName;
-      if (p.company) prospect.company = p.company;
-      if (p.title) prospect.title = p.title;
-      if (p.phone) prospect.phone = p.phone;
-      if (p.website) prospect.website = p.website;
-      if (p.industry) prospect.industry = p.industry;
-      if (p.address) prospect.address = p.address;
-      if (p.city) prospect.city = p.city;
-      if (p.state) prospect.state = p.state;
-      if (p.country) prospect.country = p.country;
-      if (p.tags) prospect.tags = p.tags;
+      if (p.firstName !== undefined) prospect.first_name = p.firstName;
+      if (p.lastName !== undefined) prospect.last_name = p.lastName;
+      if (p.company !== undefined) prospect.company = p.company;
+      if (p.title !== undefined) prospect.title = p.title;
+      if (p.phone !== undefined) prospect.phone = p.phone;
+      if (p.website !== undefined) prospect.website = p.website;
+      if (p.industry !== undefined) prospect.industry = p.industry;
+      if (p.address !== undefined) prospect.address = p.address;
+      if (p.city !== undefined) prospect.city = p.city;
+      if (p.state !== undefined) prospect.state = p.state;
+      if (p.country !== undefined) prospect.country = p.country;
+      if (p.tags !== undefined) prospect.tags = p.tags;
       for (let i = 1; i <= 15; i++) {
         let key = `snippet${i}` as keyof typeof p;
-        if (p[key]) prospect[`snippet${i}`] = p[key];
+        if (p[key] !== undefined) prospect[`snippet${i}`] = p[key];
       }
       return prospect;
     });
@@ -95,14 +103,20 @@ export let addProspects = SlateTool.create(spec, {
       result = await client.addProspectsToDatabase(mapped);
     }
 
+    let results: any[] = result?.prospects ?? [];
+    let failedCount = results.filter(p => p.status === 'ERROR').length;
+    let addedCount = results.filter(p => p.id != null && p.status !== 'ERROR').length;
     return {
       output: {
-        addedCount: ctx.input.prospects.length,
-        status: result?.status ?? 'OK'
+        addedCount,
+        status:
+          typeof result?.status === 'string'
+            ? result.status
+            : (result?.status?.status ?? 'OK'),
+        results,
+        failedCount
       },
-      message: ctx.input.campaignId
-        ? `Added **${ctx.input.prospects.length}** prospect(s) to campaign ${ctx.input.campaignId}.`
-        : `Added **${ctx.input.prospects.length}** prospect(s) to the global database.`
+      message: `Processed **${ctx.input.prospects.length}** prospect(s): ${addedCount} accepted, ${failedCount} rejected.`
     };
   })
   .build();

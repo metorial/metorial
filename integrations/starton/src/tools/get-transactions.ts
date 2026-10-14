@@ -15,8 +15,13 @@ export let getTransactions = SlateTool.create(spec, {
     z.object({
       transactionId: z.string().optional().describe('Specific transaction ID to retrieve'),
       network: z.string().optional().describe('Filter transactions by blockchain network'),
-      limit: z.number().default(20).describe('Number of transactions to return'),
-      page: z.number().default(0).describe('Page number for pagination')
+      limit: z
+        .number()
+        .min(1)
+        .max(2500)
+        .default(20)
+        .describe('Number of transactions to return'),
+      page: z.number().min(0).default(0).describe('Page number for pagination')
     })
   )
   .output(
@@ -52,11 +57,11 @@ export let getTransactions = SlateTool.create(spec, {
           transactions: [
             {
               transactionId: tx.id || ctx.input.transactionId,
-              transactionHash: tx.transactionHash,
+              transactionHash: tx.transactionHash ?? undefined,
               network: tx.network,
               state: tx.state,
               from: tx.from,
-              to: tx.to,
+              to: tx.to ?? undefined,
               value: tx.value,
               createdAt: tx.createdAt
             }
@@ -73,21 +78,21 @@ export let getTransactions = SlateTool.create(spec, {
       network: ctx.input.network
     });
 
-    let items = result.items || result || [];
+    let items = result.items ?? (Array.isArray(result) ? result : []);
 
     return {
       output: {
         transactions: items.map((tx: any) => ({
           transactionId: tx.id || '',
-          transactionHash: tx.transactionHash,
+          transactionHash: tx.transactionHash ?? undefined,
           network: tx.network,
           state: tx.state,
           from: tx.from,
-          to: tx.to,
+          to: tx.to ?? undefined,
           value: tx.value,
           createdAt: tx.createdAt
         })),
-        totalCount: result.meta?.totalCount || items.length
+        totalCount: result.meta?.totalItems ?? result.meta?.totalCount ?? items.length
       },
       message: `Found **${items.length}** transactions${ctx.input.network ? ` on ${ctx.input.network}` : ''}.`
     };

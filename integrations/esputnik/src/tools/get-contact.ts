@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getGroupNames } from '../lib/client';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -66,8 +66,10 @@ export let getContact = SlateTool.create(spec, {
         lastName: contact.lastName,
         channels: contact.channels,
         fields: contact.fields,
-        address: contact.address,
-        groups: contact.groups,
+        address: contact.address
+          ? { ...contact.address, countryCode: contact.address.countryCode ?? undefined }
+          : undefined,
+        groups: getGroupNames(contact.groups),
         externalCustomerId: contact.externalCustomerId,
         languageCode: contact.languageCode,
         timeZone: contact.timeZone

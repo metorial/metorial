@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { boardItemOutputSchema, mapBoardItem } from '../lib/board-items';
 import { MiroClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -31,35 +32,7 @@ export let getBoardItems = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      items: z
-        .array(
-          z.object({
-            itemId: z.string().describe('Item ID'),
-            itemType: z.string().describe('Item type'),
-            content: z.string().optional().describe('Text content if available'),
-            title: z.string().optional().describe('Title if available'),
-            position: z
-              .object({
-                x: z.number().optional(),
-                y: z.number().optional()
-              })
-              .optional()
-              .describe('Position on the board'),
-            geometry: z
-              .object({
-                width: z.number().optional(),
-                height: z.number().optional(),
-                rotation: z.number().optional()
-              })
-              .optional()
-              .describe('Size and rotation'),
-            parentId: z.string().optional().describe('Parent frame ID'),
-            createdAt: z.string().optional().describe('Creation timestamp'),
-            modifiedAt: z.string().optional().describe('Last modification timestamp'),
-            createdBy: z.string().optional().describe('Creator user ID')
-          })
-        )
-        .describe('List of items'),
+      items: z.array(boardItemOutputSchema).describe('List of items'),
       cursor: z.string().optional().describe('Cursor for the next page'),
       total: z.number().optional().describe('Total item count')
     })
@@ -69,7 +42,7 @@ export let getBoardItems = SlateTool.create(spec, {
 
     if (ctx.input.itemId) {
       let item = await client.getItem(ctx.input.boardId, ctx.input.itemId);
-      let mapped = mapItem(item);
+      let mapped = mapBoardItem(item);
       return {
         output: {
           items: [mapped],
@@ -86,39 +59,15 @@ export let getBoardItems = SlateTool.create(spec, {
       cursor: ctx.input.cursor
     });
 
-    let items = (result.data || []).map(mapItem);
+    let items = (result.data || []).map(mapBoardItem);
 
     return {
       output: {
         items,
-        cursor: result.cursor,
-        total: result.total
+        cursor: result.cursor ?? undefined,
+        total: result.total ?? undefined
       },
       message: `Found **${items.length}** item(s) on board ${ctx.input.boardId}.`
     };
   })
   .build();
-
-let mapItem = (item: any) => ({
-  itemId: item.id,
-  itemType: item.type,
-  content: item.data?.content,
-  title: item.data?.title,
-  position: item.position
-    ? {
-        x: item.position.x,
-        y: item.position.y
-      }
-    : undefined,
-  geometry: item.geometry
-    ? {
-        width: item.geometry.width,
-        height: item.geometry.height,
-        rotation: item.geometry.rotation
-      }
-    : undefined,
-  parentId: item.parent?.id,
-  createdAt: item.createdAt,
-  modifiedAt: item.modifiedAt,
-  createdBy: item.createdBy?.id?.toString()
-});

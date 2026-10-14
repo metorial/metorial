@@ -1,8 +1,10 @@
+export { getAllocatedTrafficLimit } from './get-account-capacity';
 export { getProxyEndpoints } from './get-endpoints';
 export { getSubscriptions } from './get-subscriptions';
 export {
   createSubUser,
   deleteSubUser,
+  getSubUser,
   getSubUserTraffic,
   listSubUsers,
   updateSubUser

@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -30,26 +31,17 @@ export let auth = SlateAuth.create()
       output: { token: string };
       input: { apiKey: string; apiSecret: string };
     }) => {
-      let axios = createAxios({
-        baseURL: 'https://app.helpwise.io/dev-apis'
-      });
-
-      let response = await axios.request({
-        method: 'GET',
-        url: '/v1/users/me',
-        headers: {
-          Authorization: ctx.output.token,
-          Accept: 'application/json'
-        }
-      });
-
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getMe();
 
       return {
         profile: {
           id: user.id?.toString(),
           email: user.email,
-          name: user.name || user.full_name
+          name:
+            user.name ||
+            user.full_name ||
+            user.displayName ||
+            [user.firstname, user.lastname].filter(Boolean).join(' ')
         }
       };
     }

@@ -1,8 +1,21 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
-let http = createAxios({
-  baseURL: 'https://doodle.com'
+let http = createAuthenticatedAxios({
+  baseURL: 'https://doodle.com',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Doodle',
+      operation: 'OAuth request',
+      reason: 'doodle_oauth_error'
+    })
 });
 
 type DoodleOAuthOutput = {
@@ -96,23 +109,19 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Doodle',
+          operation: 'token exchange'
+        })
       };
     },
 
     handleTokenRefresh: async (ctx: DoodleTokenRefreshContext) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No Doodle refresh token is available. Reconnect your Doodle account.'
+        );
       }
 
       let response = await http.post(
@@ -130,17 +139,13 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Doodle',
+          operation: 'token refresh',
+          previousRefreshToken: ctx.output.refreshToken,
+          refreshTokenFallbackMode: 'falsy'
+        })
       };
     },
 
@@ -149,13 +154,7 @@ export let auth = SlateAuth.create()
       input: {};
       scopes: string[];
     }) => {
-      let response = await http.get('/api/v2.0/users/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getCurrentUser();
 
       return {
         profile: {

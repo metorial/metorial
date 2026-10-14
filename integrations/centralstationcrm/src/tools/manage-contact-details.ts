@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -79,7 +79,9 @@ export let manageContactDetails = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.contactDetailId) {
-        throw new Error('contactDetailId is required when updating a contact detail');
+        throw createApiServiceError(
+          'contactDetailId is required when updating a contact detail'
+        );
       }
       let data: Record<string, unknown> = {};
       if (ctx.input.contactValue !== undefined) data.name = ctx.input.contactValue;
@@ -103,7 +105,9 @@ export let manageContactDetails = SlateTool.create(spec, {
 
     // remove
     if (!ctx.input.contactDetailId) {
-      throw new Error('contactDetailId is required when removing a contact detail');
+      throw createApiServiceError(
+        'contactDetailId is required when removing a contact detail'
+      );
     }
     await client.deletePersonContactDetail(ctx.input.personId, ctx.input.contactDetailId);
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AhaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -53,12 +53,13 @@ export let manageRelease = SlateTool.create(spec, {
   )
   .output(releaseOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new AhaClient(ctx.config.subdomain, ctx.auth.token);
+    let client = AhaClient.fromContext(ctx);
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.productId) throw new Error('productId is required to create a release');
-      if (!ctx.input.name) throw new Error('name is required to create a release');
+      if (!ctx.input.productId)
+        throw createApiServiceError('productId is required to create a release');
+      if (!ctx.input.name) throw createApiServiceError('name is required to create a release');
 
       let release = await client.createRelease(ctx.input.productId, {
         name: ctx.input.name,
@@ -87,7 +88,8 @@ export let manageRelease = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.releaseId) throw new Error('releaseId is required for this action');
+    if (!ctx.input.releaseId)
+      throw createApiServiceError('releaseId is required for this action');
 
     if (action === 'delete') {
       await client.deleteRelease(ctx.input.releaseId);

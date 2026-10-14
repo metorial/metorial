@@ -19,9 +19,12 @@ export let getSuite = SlateTool.create(spec, {
   .output(
     z.object({
       suiteId: z.string().describe('Unique identifier of the suite'),
-      name: z.string().describe('Name of the suite'),
-      created: z.string().describe('ISO timestamp when the suite was created'),
-      lastModified: z.string().describe('ISO timestamp when the suite was last modified'),
+      name: z.string().nullable().describe('Name of the suite'),
+      created: z.string().optional().describe('ISO timestamp when the suite was created'),
+      lastModified: z
+        .string()
+        .optional()
+        .describe('ISO timestamp when the suite was last modified'),
       lastRunStatus: z.string().nullable().describe('Status of the most recent run'),
       tests: z.array(z.string()).describe('IDs of tests included in this suite'),
       testsCount: z.number().describe('Number of tests in the suite')
@@ -38,11 +41,11 @@ export let getSuite = SlateTool.create(spec, {
         name: suite.name,
         created: suite.created,
         lastModified: suite.lastModified,
-        lastRunStatus: suite.lastRunStatus,
-        tests: suite.tests,
+        lastRunStatus: suite.latestRun?.status ?? suite.lastRunStatus ?? null,
+        tests: suite.tests.map(test => (typeof test === 'string' ? test : test.id)),
         testsCount: suite.testsCount
       },
-      message: `Retrieved suite **${suite.name}** with ${suite.testsCount} test(s). Last run status: ${suite.lastRunStatus ?? 'never run'}.`
+      message: `Retrieved suite **${suite.name}** with ${suite.testsCount} test(s). Last run status: ${suite.lastRunStatus ?? 'not available'}.`
     };
   })
   .build();

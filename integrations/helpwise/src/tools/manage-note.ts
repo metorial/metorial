@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,7 @@ export let manageNote = SlateTool.create(spec, {
     }
 
     if (action === 'add') {
-      if (!body) throw new Error('body is required for add action');
+      if (!body) throw createApiServiceError('body is required for add action');
       let note = await client.addNote(conversationId, { body, mailbox_id: mailboxId });
       return {
         output: { note, success: true },
@@ -53,7 +53,7 @@ export let manageNote = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!noteId) throw new Error('noteId is required for delete action');
+      if (!noteId) throw createApiServiceError('noteId is required for delete action');
       await client.deleteNote(conversationId, noteId);
       return {
         output: { success: true },
@@ -61,6 +61,6 @@ export let manageNote = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

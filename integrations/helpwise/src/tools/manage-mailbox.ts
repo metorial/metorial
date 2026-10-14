@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,7 @@ export let manageMailbox = SlateTool.create(spec, {
     let { action, mailboxId, email, displayName } = ctx.input;
 
     if (action === 'get') {
-      if (!mailboxId) throw new Error('mailboxId is required for get action');
+      if (!mailboxId) throw createApiServiceError('mailboxId is required for get action');
       let mailbox = await client.getMailbox(mailboxId);
       return {
         output: { mailbox, success: true },
@@ -53,8 +53,9 @@ export let manageMailbox = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!email) throw new Error('email is required for create action');
-      if (!displayName) throw new Error('displayName is required for create action');
+      if (!email) throw createApiServiceError('email is required for create action');
+      if (!displayName)
+        throw createApiServiceError('displayName is required for create action');
       let mailbox = await client.createMailbox({ email, display_name: displayName });
       return {
         output: { mailbox, success: true },
@@ -63,7 +64,7 @@ export let manageMailbox = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!mailboxId) throw new Error('mailboxId is required for update action');
+      if (!mailboxId) throw createApiServiceError('mailboxId is required for update action');
       let updateData: Record<string, any> = {};
       if (displayName !== undefined) updateData.display_name = displayName;
       if (email !== undefined) updateData.email = email;
@@ -75,7 +76,7 @@ export let manageMailbox = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!mailboxId) throw new Error('mailboxId is required for delete action');
+      if (!mailboxId) throw createApiServiceError('mailboxId is required for delete action');
       await client.deleteMailbox(mailboxId);
       return {
         output: { success: true },
@@ -83,6 +84,6 @@ export let manageMailbox = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

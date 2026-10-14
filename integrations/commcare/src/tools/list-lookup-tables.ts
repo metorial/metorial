@@ -26,7 +26,8 @@ export let listLookupTables = SlateTool.create(spec, {
         z.object({
           tableId: z.string(),
           fixtureType: z.string(),
-          fields: z.array(z.any())
+          fields: z.array(z.any()),
+          fieldValues: z.record(z.string(), z.unknown()).optional()
         })
       ),
       totalCount: z.number(),
@@ -49,8 +50,11 @@ export let listLookupTables = SlateTool.create(spec, {
 
     let tables = result.objects.map(t => ({
       tableId: t.id,
-      fixtureType: t.fixture_type,
-      fields: t.fields
+      fixtureType: t.fixture_type ?? '',
+      fields: Array.isArray(t.fields)
+        ? t.fields
+        : Object.entries(t.fields).map(([name, value]) => ({ name, value })),
+      fieldValues: Array.isArray(t.fields) ? undefined : t.fields
     }));
 
     return {

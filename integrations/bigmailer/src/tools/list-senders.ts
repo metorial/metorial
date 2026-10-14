@@ -18,6 +18,7 @@ export let listSenders = SlateTool.create(spec, {
         .number()
         .min(1)
         .max(100)
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
         .optional()
         .describe('Number of senders to return (1-100). Defaults to 10.'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
@@ -27,13 +28,21 @@ export let listSenders = SlateTool.create(spec, {
     z.object({
       hasMore: z.boolean().describe('Whether more senders exist beyond this page'),
       cursor: z.string().describe('Cursor for fetching the next page'),
-      total: z.number().describe('Total number of senders'),
+      total: z.number().optional().describe('Total count, only when supplied by BigMailer'),
       senders: z.array(
         z.object({
           senderId: z.string().describe('Sender unique identifier'),
           identityType: z.string().describe('Type: domain or email'),
           identity: z.string().describe('The domain or email address'),
           bounceDomain: z.string().describe('MAIL FROM domain for bounces'),
+          dnsRecords: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe('DNS records required to verify the sender'),
+          bounceDnsRecords: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe('DNS records required to verify the bounce domain'),
           shareType: z.string().describe('Sharing scope: all or none'),
           verified: z.boolean().describe('Whether the sender is verified'),
           bounceVerified: z.boolean().describe('Whether the bounce domain is verified'),
@@ -54,6 +63,8 @@ export let listSenders = SlateTool.create(spec, {
       identityType: s.identity_type,
       identity: s.identity,
       bounceDomain: s.bounce_domain,
+      dnsRecords: s.dns_records,
+      bounceDnsRecords: s.bounce_dns_records,
       shareType: s.share_type,
       verified: s.verified,
       bounceVerified: s.bounce_verified,
@@ -67,7 +78,7 @@ export let listSenders = SlateTool.create(spec, {
         total: result.total,
         senders
       },
-      message: `Found **${result.total}** sender(s). Returned **${senders.length}** sender(s)${result.has_more ? ' (more available)' : ''}.`
+      message: `Returned **${senders.length}** sender(s)${result.has_more ? ' (more available)' : ''}.`
     };
   })
   .build();

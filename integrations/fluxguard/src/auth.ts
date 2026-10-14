@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { FluxguardClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,23 +18,25 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      let token = ctx.input.token.trim();
+      if (!token) {
+        throw createApiServiceError(
+          'Provide a Fluxguard API key from your organization settings.'
+        );
+      }
       return {
         output: {
-          token: ctx.input.token
+          token
         }
       };
     },
 
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.fluxguard.com',
-        headers: {
-          'x-api-key': ctx.output.token
-        }
-      });
-
-      let response = await http.get('/account');
-      let account = response.data;
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let client = new FluxguardClient(ctx.output.token);
+      let account = await client.getAccount();
+      if (!account || typeof account !== 'object' || Array.isArray(account)) {
+        throw createApiServiceError('Fluxguard returned invalid account data.');
+      }
 
       return {
         profile: {

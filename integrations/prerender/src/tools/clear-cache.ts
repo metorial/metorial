@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { buildApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrerenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -50,15 +50,21 @@ export let clearCache = SlateTool.create(spec, {
     if (ctx.input.checkStatus) {
       try {
         let statusResponse = await client.getClearCacheStatus();
-        jobStatus = statusResponse as Record<string, unknown>;
-      } catch {
-        jobStatus = { status: 'unable_to_fetch' };
+        jobStatus = statusResponse;
+      } catch (error) {
+        jobStatus = {
+          status: 'unable_to_fetch',
+          message: buildApiServiceError(error, {
+            providerLabel: 'Prerender',
+            reason: 'prerender_status_error'
+          }).message
+        };
       }
     }
 
     return {
       output: {
-        clearResponse: clearResponse as Record<string, unknown>,
+        clearResponse,
         jobStatus
       },
       message: `Scheduled cache clear for pattern **"${ctx.input.query}"**.${jobStatus ? ` Job status: ${JSON.stringify(jobStatus)}` : ''}`

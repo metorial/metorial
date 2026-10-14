@@ -1,6 +1,6 @@
 # Ticktick
 
-Create, read, update, complete, and delete tasks and subtasks. Manage projects (task lists) and organize tasks with due dates, priorities, tags, reminders, and recurrence rules. Perform batch operations to add, update, or delete multiple tasks at once. Retrieve project details with associated tasks and access user profile information.
+Create, read, update, complete, and delete tasks and subtasks. Manage projects (task lists) and organize tasks with due dates, priorities, tags, reminders, and recurrence rules. Search tasks, retrieve completed tasks, move tasks between lists, and create or update tasks in bulk. Delete tasks individually or through a batch request. Retrieve project details with associated tasks and access user profile information.
 
 ## License
 

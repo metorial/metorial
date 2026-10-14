@@ -6,12 +6,14 @@ import { spec } from '../spec';
 export let renderDocument = SlateTool.create(spec, {
   name: 'Render Document',
   key: 'render_document',
-  description: `Generate a document by merging a Carbone template with JSON data. Returns a render ID that can be used to download the generated document. Supports output format conversion (PDF, DOCX, XLSX, CSV, etc.), locale/timezone settings, dynamic filenames, currency conversion, and batch generation.`,
+  description: `Generate a document by merging a Carbone template with JSON data. Synchronous renders include a downloadable document and retain the render ID. For asynchronous renders, use download_document after the completion webhook. Supports output format conversion, locale/timezone settings, dynamic filenames, currency conversion, and batch generation.`,
   instructions: [
     'Use convertTo to specify the desired output format (e.g. "pdf", "docx", "xlsx", "csv").',
     'Use converter to choose the rendering engine: "L" for LibreOffice (default), "O" for OnlyOffice (best for DOCX/XLSX/PPTX), "C" for Chromium (best for HTML-to-PDF).',
     'For batch generation, set batchSplitBy to the array path in your data (e.g. "d.items") and use webhookUrl for async processing.',
-    'The returned renderId is valid for 1 hour and can only be downloaded once.'
+    'A generated document expires after 1 hour and can only be downloaded once. Download it promptly; expired or already downloaded reports cannot be renewed.',
+    'When inlineTemplate is provided, Carbone renders it without storing it; templateIdOrVersionId is ignored.',
+    'For asynchronous renders, the initial renderId is empty. Wait for the completion webhook and pass its renderId to download_document.'
   ],
   constraints: [
     'Batch generation requires a webhookUrl for asynchronous processing.',
@@ -67,7 +69,7 @@ export let renderDocument = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Dynamic filename template for the generated document (e.g. "{d.clientName}_invoice.pdf").'
+          'Dynamic filename without an extension (e.g. "{d.clientName}_invoice"). Carbone appends the output extension.'
         ),
       enumeration: z
         .record(z.string(), z.unknown())
@@ -83,7 +85,10 @@ export let renderDocument = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .optional()
         .describe('Custom currency exchange rates object.'),
-      hardRefresh: z.boolean().optional().describe('Force a fresh render ignoring any cache.'),
+      hardRefresh: z
+        .boolean()
+        .optional()
+        .describe('Recompute pagination and the table of contents. Requires convertTo.'),
       batchSplitBy: z
         .string()
         .optional()
@@ -149,12 +154,17 @@ export let renderDocument = SlateTool.create(spec, {
       webhookHeaders: ctx.input.webhookHeaders
     });
 
-    let asyncNote = ctx.input.webhookUrl
-      ? ' The webhook will be notified when rendering is complete.'
-      : '';
+    if (!ctx.input.webhookUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        ...client.getDownloadDetails('render', result.renderId)
+      });
+    }
     return {
       output: result,
-      message: `Document rendered successfully. Render ID: **${result.renderId}**.${asyncNote} Use this ID to download the generated document.`
+      message: ctx.input.webhookUrl
+        ? 'Rendering requested. The completed render ID will arrive at the webhook; use that ID with download_document.'
+        : `Document ready for download. Render ID: **${result.renderId}**. Download within 1 hour; the report can be downloaded once.`
     };
   })
   .build();

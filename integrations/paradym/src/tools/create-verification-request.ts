@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createVerificationRequest = SlateTool.create(spec, {
@@ -8,12 +9,14 @@ export let createVerificationRequest = SlateTool.create(spec, {
   key: 'create_verification_request',
   description: `Create a credential verification request to ask a holder to present their credentials. Supports both **OpenID4VC** (for SD-JWT VC and mDOC) and **DIDComm** (for AnonCreds) protocols. Returns a URI/QR code the holder can scan to present their credentials.`,
   instructions: [
+    'Call list_projects to choose the projectId for this operation.',
     'A presentation template must be created first before creating a verification request.',
     'For didcomm: provide either a didcommConnectionId or set createInvitation to true.'
   ]
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       protocol: z.enum(['openid4vc', 'didcomm']).describe('Protocol to use for verification'),
       presentationTemplateId: z
         .string()
@@ -52,9 +55,37 @@ export let createVerificationRequest = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
+    if (
+      ctx.input.expirationInMinutes !== undefined &&
+      (ctx.input.expirationInMinutes < 1 || ctx.input.expirationInMinutes > 10080)
+    ) {
+      throw createApiServiceError('expirationInMinutes must be between 1 and 10080.');
+    }
+    if (
+      ctx.input.protocol === 'didcomm' &&
+      (ctx.input.expirationInMinutes !== undefined ||
+        ctx.input.requireResponseEncryption !== undefined)
+    ) {
+      throw createApiServiceError(
+        'expirationInMinutes and requireResponseEncryption are supported only for openid4vc verification.'
+      );
+    }
+    if (
+      ctx.input.protocol === 'openid4vc' &&
+      (ctx.input.didcommConnectionId || ctx.input.createInvitation !== undefined)
+    ) {
+      throw createApiServiceError(
+        'didcommConnectionId and createInvitation are supported only for didcomm verification.'
+      );
+    }
+    if (ctx.input.didcommConnectionId && ctx.input.createInvitation !== undefined) {
+      throw createApiServiceError(
+        'Provide didcommConnectionId or createInvitation, not both.'
+      );
+    }
     if (ctx.input.protocol === 'openid4vc') {
       let result = await client.createOpenId4VcVerification({
         presentationTemplateId: ctx.input.presentationTemplateId,
@@ -92,7 +123,7 @@ export let createVerificationRequest = SlateTool.create(spec, {
         status: data.didcommVerification?.status ?? data.status,
         invitationUri: data.didcommInvitation?.invitationUri,
         presentationTemplateId: ctx.input.presentationTemplateId,
-        createdAt: data.createdAt
+        createdAt: data.didcommVerification?.createdAt ?? data.createdAt
       },
       message: `Created DIDComm verification request. Status: **${data.didcommVerification?.status ?? data.status}**.`
     };

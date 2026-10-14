@@ -17,7 +17,7 @@ export let getCompany = SlateTool.create(spec, {
       includes: z
         .string()
         .optional()
-        .describe('Comma-separated list of related data to include (e.g., "people,tags")')
+        .describe('Space-separated list of related data to include (e.g., "positions tags")')
     })
   )
   .output(
@@ -40,7 +40,7 @@ export let getCompany = SlateTool.create(spec, {
     });
 
     let result = await client.getCompany(ctx.input.companyId, {
-      includes: ctx.input.includes
+      includes: ctx.input.includes?.replace(/,/g, ' ')
     });
 
     let company = result?.company ?? result;

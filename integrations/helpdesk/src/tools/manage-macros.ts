@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -74,7 +74,7 @@ export let manageMacros = SlateTool.create(spec, {
 
     if (action === 'get') {
       if (!ctx.input.macroId) {
-        throw new Error('macroId is required for the get action.');
+        throw createApiServiceError('macroId is required for the get action.');
       }
       let macro = await client.getMacro(ctx.input.macroId);
       return {
@@ -85,7 +85,7 @@ export let manageMacros = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required for the create action.');
+        throw createApiServiceError('name is required for the create action.');
       }
       let macro = await client.createMacro({
         name: ctx.input.name,
@@ -100,7 +100,7 @@ export let manageMacros = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.macroId) {
-        throw new Error('macroId is required for the update action.');
+        throw createApiServiceError('macroId is required for the update action.');
       }
       let input: Record<string, any> = {};
       if (ctx.input.name !== undefined) input.name = ctx.input.name;
@@ -116,7 +116,7 @@ export let manageMacros = SlateTool.create(spec, {
 
     // delete
     if (!ctx.input.macroId) {
-      throw new Error('macroId is required for the delete action.');
+      throw createApiServiceError('macroId is required for the delete action.');
     }
     await client.deleteMacro(ctx.input.macroId);
     return {

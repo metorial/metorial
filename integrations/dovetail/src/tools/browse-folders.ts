@@ -8,7 +8,7 @@ export let browseFolders = SlateTool.create(spec, {
   key: 'browse_folders',
   description: `Navigate the workspace folder hierarchy. List folders (optionally filtered by parent folder), get folder details, or browse a folder's contents (projects, docs, channels, etc.).`,
   instructions: [
-    'To list root-level folders, set parentFolderId to null or omit folderId.',
+    'To list root-level folders, set parentFolderId to null. Omitting parentFolderId lists all folders.',
     "To browse a folder's contents, provide a folderId.",
     'To list subfolders of a specific folder, provide parentFolderId.'
   ],
@@ -37,7 +37,12 @@ export let browseFolders = SlateTool.create(spec, {
         .enum(['created_at:asc', 'created_at:desc', 'title:asc', 'title:desc'])
         .optional()
         .describe('Sort order'),
-      limit: z.number().optional().describe('Max results per page (1-100, default 100)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results per page (1-100, default 100)'),
       startCursor: z.string().optional().describe('Pagination cursor')
     })
   )

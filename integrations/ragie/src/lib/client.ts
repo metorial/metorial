@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginationInfo {
   nextCursor: string | null;
@@ -25,6 +25,8 @@ export interface ScoredChunk {
   index: number;
   metadata: Record<string, any>;
   documentMetadata: Record<string, any>;
+  documentId: string;
+  documentName: string;
   links: Record<string, any>;
 }
 
@@ -67,16 +69,20 @@ export interface WebhookEndpoint {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private partition?: string;
 
   constructor(config: { token: string; partition?: string }) {
     this.partition = config.partition;
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.ragie.ai',
-      headers: {
-        Authorization: `Bearer ${config.token}`
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Ragie',
+          reason: 'ragie_api_error',
+          operation: 'API request'
+        })
     });
   }
 
@@ -86,6 +92,15 @@ export class Client {
       return { partition };
     }
     return {};
+  }
+
+  private validatePageSize(pageSize?: number) {
+    if (
+      pageSize !== undefined &&
+      (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100)
+    ) {
+      throw createApiServiceError('pageSize must be a whole number between 1 and 100.');
+    }
   }
 
   // ===== Documents =====
@@ -134,7 +149,10 @@ export class Client {
   }): Promise<{ documents: RagieDocument[]; pagination: PaginationInfo }> {
     let queryParams: Record<string, any> = {};
     if (params?.cursor) queryParams.cursor = params.cursor;
-    if (params?.pageSize) queryParams.page_size = params.pageSize;
+    if (params?.pageSize !== undefined) {
+      this.validatePageSize(params.pageSize);
+      queryParams.page_size = params.pageSize;
+    }
     if (params?.filter) queryParams.filter = JSON.stringify(params.filter);
 
     let res = await this.axios.get('/documents', {
@@ -144,14 +162,14 @@ export class Client {
     return {
       documents: res.data.documents.map((d: any) => this.mapDocument(d)),
       pagination: {
-        nextCursor: res.data.pagination.next_cursor,
+        nextCursor: res.data.pagination.next_cursor ?? null,
         totalCount: res.data.pagination.total_count
       }
     };
   }
 
   async getDocument(documentId: string, partition?: string): Promise<RagieDocument> {
-    let res = await this.axios.get(`/documents/${documentId}`, {
+    let res = await this.axios.get(`/documents/${encodeURIComponent(documentId)}`, {
       headers: this.getHeaders(partition)
     });
     return this.mapDocument(res.data);
@@ -161,7 +179,7 @@ export class Client {
     documentId: string,
     params?: { async?: boolean; partition?: string }
   ): Promise<{ status: string }> {
-    let res = await this.axios.delete(`/documents/${documentId}`, {
+    let res = await this.axios.delete(`/documents/${encodeURIComponent(documentId)}`, {
       params: params?.async ? { async: true } : undefined,
       headers: this.getHeaders(params?.partition)
     });
@@ -176,7 +194,7 @@ export class Client {
     }
   ): Promise<any> {
     let res = await this.axios.patch(
-      `/documents/${documentId}/metadata`,
+      `/documents/${encodeURIComponent(documentId)}/metadata`,
       {
         metadata: params.metadata
       },
@@ -195,7 +213,7 @@ export class Client {
     }
   ): Promise<{ status: string }> {
     let res = await this.axios.put(
-      `/documents/${documentId}/raw`,
+      `/documents/${encodeURIComponent(documentId)}/raw`,
       {
         data: params.data
       },
@@ -215,7 +233,7 @@ export class Client {
     }
   ): Promise<{ status: string }> {
     let res = await this.axios.put(
-      `/documents/${documentId}/url`,
+      `/documents/${encodeURIComponent(documentId)}/url`,
       {
         url: params.url,
         mode: params.mode
@@ -233,7 +251,8 @@ export class Client {
       partition?: string;
     }
   ): Promise<any> {
-    let res = await this.axios.get(`/documents/${documentId}/content`, {
+    let res = await this.axios.get(`/documents/${encodeURIComponent(documentId)}/content`, {
+      params: { media_type: 'application/json' },
       headers: this.getHeaders(params?.partition)
     });
     return res.data;
@@ -245,7 +264,7 @@ export class Client {
       partition?: string;
     }
   ): Promise<any> {
-    let res = await this.axios.get(`/documents/${documentId}/summary`, {
+    let res = await this.axios.get(`/documents/${encodeURIComponent(documentId)}/summary`, {
       headers: this.getHeaders(params?.partition)
     });
     return res.data;
@@ -256,21 +275,29 @@ export class Client {
     params?: {
       cursor?: string;
       pageSize?: number;
+      startIndex?: number;
+      endIndex?: number;
       partition?: string;
     }
   ): Promise<{ chunks: any[]; pagination: PaginationInfo }> {
     let queryParams: Record<string, any> = {};
     if (params?.cursor) queryParams.cursor = params.cursor;
-    if (params?.pageSize) queryParams.page_size = params.pageSize;
+    if (params?.pageSize !== undefined) {
+      this.validatePageSize(params.pageSize);
+      queryParams.page_size = params.pageSize;
+    }
 
-    let res = await this.axios.get(`/documents/${documentId}/chunks`, {
+    if (params?.startIndex !== undefined) queryParams.start_index = params.startIndex;
+    if (params?.endIndex !== undefined) queryParams.end_index = params.endIndex;
+
+    let res = await this.axios.get(`/documents/${encodeURIComponent(documentId)}/chunks`, {
       params: queryParams,
       headers: this.getHeaders(params?.partition)
     });
     return {
       chunks: res.data.chunks,
       pagination: {
-        nextCursor: res.data.pagination.next_cursor,
+        nextCursor: res.data.pagination.next_cursor ?? null,
         totalCount: res.data.pagination.total_count
       }
     };
@@ -284,21 +311,18 @@ export class Client {
     rerank?: boolean;
     filter?: Record<string, any>;
     maxChunksPerDocument?: number;
+    recencyBias?: boolean;
     partition?: string;
   }): Promise<{ scoredChunks: ScoredChunk[] }> {
-    let res = await this.axios.post(
-      '/retrievals',
-      {
-        query: params.query,
-        top_k: params.topK,
-        rerank: params.rerank,
-        filter: params.filter,
-        max_chunks_per_document: params.maxChunksPerDocument
-      },
-      {
-        headers: this.getHeaders(params.partition)
-      }
-    );
+    let res = await this.axios.post('/retrievals', {
+      query: params.query,
+      top_k: params.topK,
+      rerank: params.rerank,
+      filter: params.filter,
+      max_chunks_per_document: params.maxChunksPerDocument,
+      recency_bias: params.recencyBias,
+      partition: params.partition ?? this.partition
+    });
     return {
       scoredChunks: (res.data.scored_chunks || []).map((c: any) => ({
         id: c.id,
@@ -307,6 +331,8 @@ export class Client {
         index: c.index,
         metadata: c.metadata || {},
         documentMetadata: c.document_metadata || {},
+        documentId: c.document_id,
+        documentName: c.document_name,
         links: c.links || {}
       }))
     };
@@ -325,7 +351,7 @@ export class Client {
     if (partition) {
       tools.push({ type: 'retrieve', partitions: [partition] });
     } else {
-      tools.push({ type: 'retrieve' });
+      tools.push({ type: 'retrieve', partitions: ['default'] });
     }
 
     let body: Record<string, any> = {
@@ -358,6 +384,9 @@ export class Client {
     entitySchema?: Record<string, any>;
     scope?: string;
     filter?: Record<string, any>;
+    active?: boolean;
+    contextTemplate?: string;
+    partition?: string;
   }): Promise<Instruction> {
     let body: Record<string, any> = {
       prompt: params.prompt
@@ -366,6 +395,11 @@ export class Client {
     if (params.entitySchema) body.entity_schema = params.entitySchema;
     if (params.scope) body.scope = params.scope;
     if (params.filter) body.filter = params.filter;
+    if (params.active !== undefined) body.active = params.active;
+    if (params.contextTemplate !== undefined) body.context_template = params.contextTemplate;
+    if ((params.partition ?? this.partition) !== undefined) {
+      body.partition = params.partition ?? this.partition;
+    }
 
     let res = await this.axios.post('/instructions', body);
     return this.mapInstruction(res.data);
@@ -379,6 +413,8 @@ export class Client {
       entitySchema?: Record<string, any>;
       scope?: string;
       filter?: Record<string, any>;
+      active?: boolean;
+      contextTemplate?: string;
     }
   ): Promise<Instruction> {
     let body: Record<string, any> = {};
@@ -387,13 +423,18 @@ export class Client {
     if (params.entitySchema !== undefined) body.entity_schema = params.entitySchema;
     if (params.scope !== undefined) body.scope = params.scope;
     if (params.filter !== undefined) body.filter = params.filter;
+    if (params.active !== undefined) body.active = params.active;
+    if (params.contextTemplate !== undefined) body.context_template = params.contextTemplate;
 
-    let res = await this.axios.put(`/instructions/${instructionId}`, body);
+    let res = await this.axios.patch(
+      `/instructions/${encodeURIComponent(instructionId)}`,
+      body
+    );
     return this.mapInstruction(res.data);
   }
 
   async deleteInstruction(instructionId: string): Promise<void> {
-    await this.axios.delete(`/instructions/${instructionId}`);
+    await this.axios.delete(`/instructions/${encodeURIComponent(instructionId)}`);
   }
 
   async getInstructionEntities(
@@ -406,17 +447,23 @@ export class Client {
   ): Promise<{ entities: any[]; pagination: PaginationInfo }> {
     let queryParams: Record<string, any> = {};
     if (params?.cursor) queryParams.cursor = params.cursor;
-    if (params?.pageSize) queryParams.page_size = params.pageSize;
+    if (params?.pageSize !== undefined) {
+      this.validatePageSize(params.pageSize);
+      queryParams.page_size = params.pageSize;
+    }
 
-    let res = await this.axios.get(`/instructions/${instructionId}/entities`, {
-      params: queryParams,
-      headers: this.getHeaders(params?.partition)
-    });
+    let res = await this.axios.get(
+      `/instructions/${encodeURIComponent(instructionId)}/entities`,
+      {
+        params: queryParams,
+        headers: this.getHeaders(params?.partition)
+      }
+    );
     return {
       entities: res.data.entities || res.data,
       pagination: res.data.pagination
         ? {
-            nextCursor: res.data.pagination.next_cursor,
+            nextCursor: res.data.pagination.next_cursor ?? null,
             totalCount: res.data.pagination.total_count
           }
         : { nextCursor: null, totalCount: 0 }
@@ -426,28 +473,57 @@ export class Client {
   async getDocumentEntities(
     documentId: string,
     params?: {
+      cursor?: string;
+      pageSize?: number;
       partition?: string;
     }
-  ): Promise<any[]> {
-    let res = await this.axios.get(`/documents/${documentId}/entities`, {
+  ): Promise<{ entities: any[]; pagination: PaginationInfo }> {
+    this.validatePageSize(params?.pageSize);
+    let res = await this.axios.get(`/documents/${encodeURIComponent(documentId)}/entities`, {
+      params: { cursor: params?.cursor, page_size: params?.pageSize },
       headers: this.getHeaders(params?.partition)
     });
-    return res.data.entities || res.data;
+    return {
+      entities: res.data.entities,
+      pagination: {
+        nextCursor: res.data.pagination.next_cursor ?? null,
+        totalCount: res.data.pagination.total_count
+      }
+    };
   }
 
   // ===== Connections =====
 
-  async listConnections(): Promise<Connection[]> {
-    let res = await this.axios.get('/connections');
+  async listConnections(params?: {
+    cursor?: string;
+    pageSize?: number;
+    filter?: Record<string, any>;
+    partition?: string;
+  }): Promise<{ connections: Connection[]; pagination: PaginationInfo }> {
+    this.validatePageSize(params?.pageSize);
+    let res = await this.axios.get('/connections', {
+      params: {
+        cursor: params?.cursor,
+        page_size: params?.pageSize,
+        filter: params?.filter === undefined ? undefined : JSON.stringify(params.filter)
+      },
+      headers: this.getHeaders(params?.partition)
+    });
     let connections = res.data.connections || res.data;
     if (Array.isArray(connections)) {
-      return connections.map((c: any) => this.mapConnection(c));
+      return {
+        connections: connections.map((c: any) => this.mapConnection(c)),
+        pagination: {
+          nextCursor: res.data.pagination?.next_cursor ?? null,
+          totalCount: res.data.pagination?.total_count ?? connections.length
+        }
+      };
     }
-    return [];
+    throw createApiServiceError('Ragie returned an invalid connection list.');
   }
 
   async getConnection(connectionId: string): Promise<Connection> {
-    let res = await this.axios.get(`/connections/${connectionId}`);
+    let res = await this.axios.get(`/connections/${encodeURIComponent(connectionId)}`);
     return this.mapConnection(res.data);
   }
 
@@ -462,29 +538,35 @@ export class Client {
     if (params.partitionStrategy) body.partition_strategy = params.partitionStrategy;
     if (params.metadata) body.metadata = params.metadata;
 
-    let res = await this.axios.put(`/connections/${connectionId}`, body);
+    let res = await this.axios.put(`/connections/${encodeURIComponent(connectionId)}`, body);
     return this.mapConnection(res.data);
   }
 
   async setConnectionEnabled(connectionId: string, enabled: boolean): Promise<any> {
-    let res = await this.axios.put(`/connections/${connectionId}/enabled`, { enabled });
+    let res = await this.axios.put(
+      `/connections/${encodeURIComponent(connectionId)}/enabled`,
+      { enabled }
+    );
     return res.data;
   }
 
   async getConnectionStats(connectionId: string): Promise<any> {
-    let res = await this.axios.get(`/connections/${connectionId}/stats`);
+    let res = await this.axios.get(`/connections/${encodeURIComponent(connectionId)}/stats`);
     return res.data;
   }
 
   async deleteConnection(connectionId: string, keepFiles?: boolean): Promise<any> {
-    let res = await this.axios.post(`/connections/${connectionId}`, {
-      keep_files: keepFiles ?? false
-    });
+    let res = await this.axios.post(
+      `/connections/${encodeURIComponent(connectionId)}/delete`,
+      {
+        keep_files: keepFiles ?? false
+      }
+    );
     return res.data;
   }
 
   async syncConnection(connectionId: string): Promise<any> {
-    let res = await this.axios.post(`/connections/${connectionId}/sync`);
+    let res = await this.axios.post(`/connections/${encodeURIComponent(connectionId)}/sync`);
     return res.data;
   }
 
@@ -495,27 +577,83 @@ export class Client {
 
   // ===== Partitions =====
 
-  async listPartitions(): Promise<Partition[]> {
-    let res = await this.axios.get('/partitions');
-    let partitions = res.data.partitions || res.data;
-    if (Array.isArray(partitions)) {
-      return partitions.map((p: any) => this.mapPartition(p));
-    }
-    return [];
+  async listPartitions(params?: { cursor?: string; pageSize?: number }): Promise<{
+    partitions: Record<string, any>[];
+    pagination: PaginationInfo;
+  }> {
+    this.validatePageSize(params?.pageSize);
+    let res = await this.axios.get('/partitions', {
+      params: { cursor: params?.cursor, page_size: params?.pageSize }
+    });
+    return {
+      partitions: res.data.partitions,
+      pagination: {
+        nextCursor: res.data.pagination.next_cursor ?? null,
+        totalCount: res.data.pagination.total_count
+      }
+    };
   }
 
-  async createPartition(params: { name: string }): Promise<Partition> {
+  async listLegacyPartitions(params?: {
+    cursor?: string;
+    pageSize?: number;
+  }): Promise<Partition[]> {
+    let result = await this.listPartitions(params);
+    for (let partition of result.partitions) {
+      if (
+        typeof partition.created_at !== 'string' ||
+        typeof partition.updated_at !== 'string'
+      ) {
+        throw createApiServiceError(
+          'Ragie did not return the timestamps required by this partition listing. Use list_partitions to browse partitions and manage_partitions with action "get" for usage metrics.'
+        );
+      }
+    }
+    let partitions = await Promise.all(
+      result.partitions.map(async partition => {
+        if (
+          partition.document_count !== undefined ||
+          partition.stats?.document_count !== undefined
+        ) {
+          return partition;
+        }
+        let detail = await this.getPartition(partition.id ?? partition.name);
+        return { ...partition, ...detail };
+      })
+    );
+    return partitions.map(partition => {
+      if (typeof (partition.document_count ?? partition.stats?.document_count) !== 'number') {
+        throw createApiServiceError(
+          'Ragie did not return a document count for this partition. Use list_partitions to browse available partition details.'
+        );
+      }
+      return this.mapPartition(partition);
+    });
+  }
+
+  async createPartition(params: { name: string }): Promise<Record<string, any>> {
     let res = await this.axios.post('/partitions', { name: params.name });
-    return this.mapPartition(res.data);
+    return {
+      ...res.data,
+      partitionId: res.data.id ?? res.data.name,
+      ...(res.data.document_count !== undefined
+        ? { documentCount: res.data.document_count }
+        : {}),
+      ...(res.data.stats?.document_count !== undefined
+        ? { documentCount: res.data.stats.document_count }
+        : {}),
+      ...(res.data.created_at !== undefined ? { createdAt: res.data.created_at } : {}),
+      ...(res.data.updated_at !== undefined ? { updatedAt: res.data.updated_at } : {})
+    };
   }
 
   async getPartition(partitionId: string): Promise<any> {
-    let res = await this.axios.get(`/partitions/${partitionId}`);
+    let res = await this.axios.get(`/partitions/${encodeURIComponent(partitionId)}`);
     return res.data;
   }
 
   async deletePartition(partitionId: string): Promise<{ status: string }> {
-    let res = await this.axios.delete(`/partitions/${partitionId}`);
+    let res = await this.axios.delete(`/partitions/${encodeURIComponent(partitionId)}`);
     return { status: res.data.status };
   }
 
@@ -579,8 +717,16 @@ export class Client {
     return {
       id: c.id,
       name: c.name,
-      status: c.status,
-      sourceType: c.source_type,
+      status:
+        c.status ??
+        (c.disabled_by_system
+          ? 'disabled_by_system'
+          : c.syncing
+            ? 'syncing'
+            : c.enabled
+              ? 'enabled'
+              : 'disabled'),
+      sourceType: c.source_type ?? c.type,
       partition: c.partition || null,
       metadata: c.metadata || {},
       enabled: c.enabled,
@@ -591,9 +737,9 @@ export class Client {
 
   private mapPartition(p: any): Partition {
     return {
-      id: p.id,
+      id: p.id ?? p.name,
       name: p.name,
-      documentCount: p.document_count ?? 0,
+      documentCount: p.document_count ?? p.stats?.document_count,
       createdAt: p.created_at,
       updatedAt: p.updated_at
     };

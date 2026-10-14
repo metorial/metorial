@@ -79,7 +79,7 @@ export let createEstimate = SlateTool.create(spec, {
     };
     if (ctx.input.clientId) data.client_id = ctx.input.clientId;
     if (ctx.input.poNumber) data.po_number = ctx.input.poNumber;
-    if (ctx.input.notes) data.notes = ctx.input.notes;
+    if (ctx.input.notes !== undefined) data.note = ctx.input.notes;
     if (ctx.input.tax !== undefined) data.tax = ctx.input.tax;
     if (ctx.input.tax2 !== undefined) data.tax2 = ctx.input.tax2;
     if (ctx.input.tax3 !== undefined) data.tax3 = ctx.input.tax3;
@@ -89,9 +89,9 @@ export let createEstimate = SlateTool.create(spec, {
         title: item.title,
         quantity: item.quantity,
         price: item.price,
-        taxable: item.taxable,
-        taxable2: item.taxable2,
-        taxable3: item.taxable3
+        taxable: item.taxable ?? undefined,
+        taxable2: item.taxable2 ?? undefined,
+        taxable3: item.taxable3 ?? undefined
       }));
     }
 
@@ -149,7 +149,7 @@ export let updateEstimate = SlateTool.create(spec, {
     if (ctx.input.date !== undefined) data.date = ctx.input.date;
     if (ctx.input.currencyCode !== undefined) data.currency_code = ctx.input.currencyCode;
     if (ctx.input.poNumber !== undefined) data.po_number = ctx.input.poNumber;
-    if (ctx.input.notes !== undefined) data.notes = ctx.input.notes;
+    if (ctx.input.notes !== undefined) data.note = ctx.input.notes;
     if (ctx.input.tax !== undefined) data.tax = ctx.input.tax;
     if (ctx.input.tax2 !== undefined) data.tax2 = ctx.input.tax2;
     if (ctx.input.tax3 !== undefined) data.tax3 = ctx.input.tax3;
@@ -225,8 +225,8 @@ export let getEstimates = SlateTool.create(spec, {
     return {
       output: {
         estimates,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${estimates.length} estimate(s).`
     };
@@ -303,27 +303,27 @@ export let sendEstimate = SlateTool.create(spec, {
 
 let mapEstimate = (est: any) => ({
   estimateId: est.id,
-  clientId: est.client_id,
-  number: est.number,
-  date: est.date,
-  currencyCode: est.currency_code,
-  status: est.status_label || String(est.status),
-  subtotal: est.subtotal,
-  total: est.total,
-  tax: est.tax,
-  tax2: est.tax2,
-  tax3: est.tax3,
-  notes: est.notes,
-  poNumber: est.po_number,
+  clientId: est.client_id ?? undefined,
+  number: est.number ?? undefined,
+  date: est.date ?? undefined,
+  currencyCode: est.currency_code ?? undefined,
+  status: est.status_label || (est.status == null ? undefined : String(est.status)),
+  subtotal: est.subtotal ?? undefined,
+  total: est.total ?? est.total_cost ?? undefined,
+  tax: est.tax ?? undefined,
+  tax2: est.tax2 ?? undefined,
+  tax3: est.tax3 ?? undefined,
+  notes: est.notes ?? est.note ?? undefined,
+  poNumber: est.po_number ?? undefined,
   items: est.estimate_items
     ? est.estimate_items.map((item: any) => ({
-        estimateItemId: item.id,
+        estimateItemId: item.id ?? undefined,
         title: item.title,
         quantity: item.quantity,
         price: item.price,
-        taxable: item.taxable,
-        taxable2: item.taxable2,
-        taxable3: item.taxable3
+        taxable: item.taxable ?? undefined,
+        taxable2: item.taxable2 ?? undefined,
+        taxable3: item.taxable3 ?? undefined
       }))
     : undefined
 });

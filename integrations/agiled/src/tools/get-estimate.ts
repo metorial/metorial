@@ -12,6 +12,7 @@ export let getEstimate = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       estimateId: z

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EagleDocClient } from '../lib/client';
 import { spec } from '../spec';
@@ -68,7 +68,9 @@ export let submitFeedback = SlateTool.create(spec, {
 
     if (ctx.input.feedbackType === 'standard') {
       if (!ctx.input.fileBase64 || !ctx.input.fileName || !ctx.input.originalJson) {
-        throw new Error('Standard feedback requires fileBase64, fileName, and originalJson');
+        throw createApiServiceError(
+          'Standard feedback requires fileBase64, fileName, and originalJson'
+        );
       }
       result = await client.submitFeedback({
         fileBase64: ctx.input.fileBase64,
@@ -78,7 +80,7 @@ export let submitFeedback = SlateTool.create(spec, {
       });
     } else {
       if (!ctx.input.instructions) {
-        throw new Error('Instruction-based feedback requires instructions');
+        throw createApiServiceError('Instruction-based feedback requires instructions');
       }
       result = await client.submitFeedbackWithInstructions({
         correctedJson: ctx.input.correctedJson,

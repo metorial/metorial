@@ -1,8 +1,11 @@
 export { createRecord } from './create-record';
 export { deleteRecord } from './delete-record';
+export { getJobResult } from './get-job-result';
 export { getRecord } from './get-record';
 export { getSiteInfo } from './get-site-info';
+export { listFields } from './list-fields';
 export { listModels } from './list-models';
+export { listRecordVersions } from './list-record-versions';
 export { listRecords } from './list-records';
 export { listUploads } from './list-uploads';
 export { manageBuildTrigger } from './manage-build-trigger';

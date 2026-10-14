@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getExportStatus = SlateTool.create(spec, {
   name: 'Get Export Status',
   key: 'get_export_status',
-  description: `Check the status of a previously submitted lead export request. Returns the current status and download URL when the export is processed.`,
+  description: `Check the status of a previously submitted lead export request. Returns the current status, download URL, and a downloadable JSON report when the export is processed.`,
   tags: {
     readOnly: true
   }
@@ -30,6 +30,14 @@ export let getExportStatus = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new LeadfeederClient(ctx.auth.token);
     let exportStatus = await client.getExportStatus(ctx.input.exportId);
+
+    if (exportStatus.status === 'processed' && exportStatus.downloadUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: exportStatus.downloadUrl,
+        mimeType: 'application/json'
+      });
+    }
 
     return {
       output: exportStatus,

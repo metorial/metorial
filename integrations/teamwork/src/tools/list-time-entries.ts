@@ -77,7 +77,12 @@ export let listTimeEntries = SlateTool.create(spec, {
       minutes: e.minutes != null ? String(e.minutes) : undefined,
       description: e.description || undefined,
       isBillable:
-        e.isbillable === '1' || e.isbillable === true || e.isBillable === true || undefined
+        e.isbillable != null || e.isBillable != null
+          ? e.isbillable === '1' ||
+            e.isbillable === 1 ||
+            e.isbillable === true ||
+            e.isBillable === true
+          : undefined
     }));
 
     return {

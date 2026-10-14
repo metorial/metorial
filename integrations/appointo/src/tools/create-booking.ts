@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { bookingSchema, getAppointoRecord, mapBooking } from '../lib/bookings';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -37,7 +38,11 @@ export let createBooking = SlateTool.create(spec, {
         status: z.string().optional().describe('Booking status'),
         customerName: z.string().optional().describe('Customer name'),
         customerEmail: z.string().optional().describe('Customer email'),
-        startTime: z.string().optional().describe('Booking start time')
+        startTime: z.string().optional().describe('Booking start time'),
+        bookings: z
+          .array(bookingSchema)
+          .optional()
+          .describe('All bookings returned by the creation request')
       })
       .passthrough()
   )
@@ -53,16 +58,14 @@ export let createBooking = SlateTool.create(spec, {
       quantity: ctx.input.quantity
     });
 
-    let booking = result?.booking ?? result?.data ?? result;
+    let booking = getAppointoRecord(result, 'booking');
 
-    let output = {
-      bookingId: booking?.id ?? booking?.booking_id,
-      status: booking?.status,
-      customerName: booking?.customer_name ?? booking?.name,
-      customerEmail: booking?.customer_email ?? booking?.email,
-      startTime: booking?.start_time ?? booking?.timestring,
-      ...booking
-    };
+    let records = Array.isArray(result)
+      ? result
+      : Array.isArray(result?.data)
+        ? result.data
+        : [booking];
+    let output = { ...mapBooking(booking), bookings: records.map(mapBooking) };
 
     return {
       output,

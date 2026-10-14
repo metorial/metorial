@@ -6,10 +6,13 @@ import {
   deleteCollection,
   deleteFilesFromCollection,
   getCollection,
+  getCollectionStats,
   getFileDownloadUrl,
   getFileUploadUrl,
+  getFileUrl,
   listCollectionFiles,
   listCollections,
+  listConnectorFiles,
   listConnectors,
   searchCollection
 } from './tools';
@@ -19,6 +22,7 @@ export let provider = Slate.create({
   tools: [
     listCollections,
     getCollection,
+    getCollectionStats,
     createCollection,
     deleteCollection,
     searchCollection,
@@ -27,7 +31,9 @@ export let provider = Slate.create({
     deleteFilesFromCollection,
     getFileUploadUrl,
     getFileDownloadUrl,
-    listConnectors
+    getFileUrl,
+    listConnectors,
+    listConnectorFiles
   ],
   triggers: []
 });

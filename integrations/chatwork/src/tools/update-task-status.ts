@@ -34,8 +34,8 @@ export let updateTaskStatus = SlateTool.create(spec, {
 
     return {
       output: {
-        taskId: result.task_id,
-        status: result.status
+        taskId: ctx.input.taskId,
+        status: ctx.input.status
       },
       message: `Task ${result.task_id} marked as **${ctx.input.status}**.`
     };

@@ -79,27 +79,29 @@ export let getEsignSession = SlateTool.create(spec, {
 
     let output: Record<string, unknown> = {
       sessionId: session.sessionId || session._id || session.id,
-      documentName: session.documentName,
-      status: session.status,
+      documentName: session.documentName ?? undefined,
+      status: session.status ?? undefined,
       signers: session.signers?.map((s: any) => ({
-        email: s.email,
-        name: s.name,
-        status: s.status,
-        signedAt: s.signedAt
+        email: s.email ?? undefined,
+        name: s.name ?? undefined,
+        status: s.status ?? undefined,
+        signedAt: s.signedAt ?? undefined
       })),
-      createdAt: session.createdAt,
-      completedAt: session.completedAt,
-      signedPdfUrl: session.signedPdfUrl
+      createdAt: session.createdAt ?? undefined,
+      completedAt: session.completedAt ?? undefined,
+      signedPdfUrl: session.signedPdfUrl ?? undefined
     };
 
     if (ctx.input.includeLinks) {
       let links = await client.getEsignSessionLinks(ctx.input.sessionId);
-      let linksArray = Array.isArray(links) ? links : links.links || links.signingLinks || [];
+      let linksArray = Array.isArray(links)
+        ? links
+        : links.signers || links.links || links.signingLinks || [];
       output.signingLinks = linksArray.map((l: any) => ({
-        email: l.email,
-        signingLink: l.signingLink || l.link,
-        status: l.status,
-        expiresAt: l.expiresAt
+        email: l.email ?? undefined,
+        signingLink: l.signingLink || l.link || undefined,
+        status: l.status ?? undefined,
+        expiresAt: l.expiresAt ?? undefined
       }));
     }
 
@@ -107,10 +109,18 @@ export let getEsignSession = SlateTool.create(spec, {
       let audit = await client.getEsignSessionAudit(ctx.input.sessionId);
       let auditArray = Array.isArray(audit) ? audit : audit.events || audit.auditTrail || [];
       output.auditTrail = auditArray.map((e: any) => ({
-        eventType: e.eventType || e.type || e.event,
-        timestamp: e.timestamp || e.createdAt,
-        description: e.description || e.message
+        eventType: e.eventType || e.type || e.event || undefined,
+        timestamp: e.timestamp || e.createdAt || undefined,
+        description: e.description || e.message || undefined
       }));
+    }
+
+    if (session.signedPdfUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: session.signedPdfUrl,
+        mimeType: 'application/pdf'
+      });
     }
 
     return {

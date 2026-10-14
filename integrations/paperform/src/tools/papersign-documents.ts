@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,7 @@ let documentOutputSchema = z.object({
   status: z
     .string()
     .describe(
-      'Document status (draft, inProgress, completed, cancelled, expired, rejected, archived)'
+      'Document status (draft, in_progress, completed, canceled, expired, rejected, archived)'
     ),
   folderName: z.string().nullable().describe('Folder name containing the document'),
   folderId: z.number().nullable().describe('Folder ID'),
@@ -58,8 +58,8 @@ let mapDocument = (d: Awaited<ReturnType<Client['getPapersignDocument']>>) => ({
   variables: d.variables,
   createdAt: d.created_at_utc,
   updatedAt: d.updated_at_utc,
-  sentAt: d.sent_at_utc,
-  completedAt: d.completed_at_utc
+  sentAt: d.sent_at_utc ?? null,
+  completedAt: d.completed_at_utc ?? null
 });
 
 export let listPapersignDocuments = SlateTool.create(spec, {
@@ -80,6 +80,7 @@ export let listPapersignDocuments = SlateTool.create(spec, {
           z.enum([
             'draft',
             'inProgress',
+            'in_progress',
             'archived',
             'canceled',
             'expired',
@@ -202,6 +203,36 @@ export let sendPapersignDocument = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.expiration !== undefined) {
+      let expiration = Date.parse(ctx.input.expiration);
+      if (!Number.isFinite(expiration) || expiration < Date.now() + 30 * 60 * 1000) {
+        throw createApiServiceError(
+          'expiration must be a date-time at least 30 minutes in the future.'
+        );
+      }
+    }
+    if (ctx.input.inviteMessage !== undefined && ctx.input.inviteMessage.length > 1000) {
+      throw createApiServiceError('inviteMessage must be at most 1000 characters.');
+    }
+    if ((ctx.input.documentRecipientEmails?.length ?? 0) > 5) {
+      throw createApiServiceError('Provide at most 5 documentRecipientEmails.');
+    }
+    if (ctx.input.automaticReminders) {
+      let { firstAfterDays, followUpEveryDays } = ctx.input.automaticReminders;
+      if (
+        firstAfterDays === undefined ||
+        followUpEveryDays === undefined ||
+        !Number.isInteger(firstAfterDays) ||
+        !Number.isInteger(followUpEveryDays) ||
+        firstAfterDays < 1 ||
+        followUpEveryDays < 1
+      ) {
+        throw createApiServiceError(
+          'automaticReminders requires firstAfterDays and followUpEveryDays as positive whole numbers.'
+        );
+      }
+    }
+
     let sendData: Parameters<Client['sendPapersignDocument']>[1] = {};
     if (ctx.input.signers) {
       sendData.signers = ctx.input.signers.map(s => ({
@@ -214,14 +245,16 @@ export let sendPapersignDocument = SlateTool.create(spec, {
       }));
     }
     if (ctx.input.variables) sendData.variables = ctx.input.variables;
-    if (ctx.input.expiration) sendData.expiration = ctx.input.expiration;
-    if (ctx.input.inviteMessage) sendData.inviteMessage = ctx.input.inviteMessage;
-    if (ctx.input.fromUserEmail) sendData.fromUserEmail = ctx.input.fromUserEmail;
+    if (ctx.input.expiration !== undefined) sendData.expiration = ctx.input.expiration;
+    if (ctx.input.inviteMessage !== undefined)
+      sendData.inviteMessage = ctx.input.inviteMessage;
+    if (ctx.input.fromUserEmail !== undefined)
+      sendData.fromUserEmail = ctx.input.fromUserEmail;
     if (ctx.input.documentRecipientEmails)
       sendData.documentRecipientEmails = ctx.input.documentRecipientEmails;
     if (ctx.input.automaticReminders)
       sendData.automaticReminders = ctx.input.automaticReminders;
-    if (ctx.input.copyBeforeSending) sendData.copy = true;
+    if (ctx.input.copyBeforeSending !== undefined) sendData.copy = ctx.input.copyBeforeSending;
 
     let d = await client.sendPapersignDocument(ctx.input.documentId, sendData);
 

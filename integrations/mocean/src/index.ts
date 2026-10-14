@@ -8,6 +8,7 @@ import {
   makeVoiceCall,
   manageWhatsAppTemplates,
   numberLookup,
+  reportSmsConversion,
   resendVerification,
   sendSms,
   sendVerification,
@@ -24,6 +25,7 @@ export let provider = Slate.create({
     checkVerification,
     resendVerification,
     numberLookup,
+    reportSmsConversion,
     sendWhatsApp,
     manageWhatsAppTemplates,
     getAccountInfo

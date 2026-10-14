@@ -28,9 +28,17 @@ export let listPages = SlateTool.create(spec, {
         ),
       pageSize: z
         .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be safe whole numbers')
+        .min(1)
+        .max(500)
         .optional()
         .describe('Number of results per page (1-500, default 10)'),
-      pageNumber: z.number().optional().describe('Page number for pagination')
+      pageNumber: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be safe whole numbers')
+        .min(1)
+        .optional()
+        .describe('Page number for pagination')
     })
   )
   .output(

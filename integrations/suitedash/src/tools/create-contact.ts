@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type ContactInput } from '../lib/client';
 import { spec } from '../spec';
 
 export let createContact = SlateTool.create(spec, {
@@ -49,7 +49,7 @@ export let createContact = SlateTool.create(spec, {
       secretKey: ctx.auth.secretKey
     });
 
-    let payload: Record<string, unknown> = {
+    let payload: ContactInput = {
       first_name: ctx.input.firstName,
       last_name: ctx.input.lastName,
       role: ctx.input.role
@@ -65,7 +65,7 @@ export let createContact = SlateTool.create(spec, {
       Object.assign(payload, ctx.input.customFields);
     }
 
-    let result = await client.createContact(payload as any);
+    let result = await client.createContact(payload);
 
     return {
       output: { contact: result },

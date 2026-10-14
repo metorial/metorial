@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SignPathClient } from '../lib/client';
+import { createSignPathClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let approveDenySigningRequest = SlateTool.create(spec, {
@@ -18,6 +18,11 @@ export let approveDenySigningRequest = SlateTool.create(spec, {
   .input(
     z.object({
       signingRequestId: z.string().describe('ID of the signing request to approve or deny'),
+      denyReason: z
+        .string()
+        .max(5000)
+        .optional()
+        .describe('Optional reason when action is deny'),
       action: z
         .enum(['approve', 'deny'])
         .describe('Whether to approve or deny the signing request')
@@ -28,20 +33,24 @@ export let approveDenySigningRequest = SlateTool.create(spec, {
       signingRequestId: z
         .string()
         .describe('ID of the signing request that was approved or denied'),
+      denyReason: z
+        .string()
+        .max(5000)
+        .optional()
+        .describe('Optional reason when action is deny'),
       action: z.string().describe('Action that was performed (approve or deny)')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SignPathClient({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createSignPathClient(ctx);
 
+    if (ctx.input.action === 'approve' && ctx.input.denyReason !== undefined) {
+      throw createApiServiceError('denyReason can only be used when action is deny.');
+    }
     if (ctx.input.action === 'approve') {
       await client.approveSigningRequest(ctx.input.signingRequestId);
     } else {
-      await client.denySigningRequest(ctx.input.signingRequestId);
+      await client.denySigningRequest(ctx.input.signingRequestId, ctx.input.denyReason);
     }
 
     return {

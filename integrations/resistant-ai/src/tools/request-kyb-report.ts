@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let requestKybReport = SlateTool.create(spec, {
   name: 'Request KYB Report',
   key: 'request_kyb_report',
-  description: `Requests a Know Your Business (KYB) report for a business entity. Supports global KYB reports, UBO (Ultimate Beneficial Owner) reports for Australian entities, and ASIC Director Reports for Australian companies. Use this to verify and gather information about a business entity.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Requests a Know Your Business (KYB) report for a business entity. Supports global KYB reports, UBO (Ultimate Beneficial Owner) reports for Australian entities, and ASIC Director Reports for Australian companies. Use this to verify and gather information about a business entity.`,
   instructions: [
     'For UBO reports, the entity must be Australian.',
     'For ASIC Director Reports, the entity must be an Australian company.',
@@ -53,7 +53,7 @@ export let requestKybReport = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.createKybReport({
       companyName: ctx.input.companyName,

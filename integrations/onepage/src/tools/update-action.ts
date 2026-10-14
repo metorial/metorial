@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { actionSchema } from '../lib/schemas';
@@ -8,6 +8,7 @@ export let updateAction = SlateTool.create(spec, {
   name: 'Update Action',
   key: 'update_action',
   description: `Update an existing action, or mark it as complete/incomplete. Use this to change the action text, due date, status, or completion state.`,
+  instructions: ['Submit completion changes using done separately from action field edits.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -19,9 +20,12 @@ export let updateAction = SlateTool.create(spec, {
       text: z.string().optional().describe('Updated action description'),
       assigneeId: z.string().optional().describe('ID of the user to assign this action to'),
       date: z.string().optional().describe('Due date (YYYY-MM-DD)'),
-      exactTime: z.number().optional().describe('Exact due time as Unix timestamp'),
+      exactTime: z
+        .number()
+        .optional()
+        .describe('Exact due time as Unix timestamp; use status date_time'),
       status: z
-        .enum(['asap', 'date', 'waiting', 'queued'])
+        .enum(['asap', 'date', 'date_time', 'waiting', 'queued', 'queued_with_date'])
         .optional()
         .describe('Action priority status'),
       done: z
@@ -38,7 +42,12 @@ export let updateAction = SlateTool.create(spec, {
     });
 
     let { actionId, done, ...updateData } = ctx.input;
-    let action: any;
+    if (done !== undefined && Object.values(updateData).some(value => value !== undefined)) {
+      throw createApiServiceError(
+        'Update the action fields separately before completing or reopening the action.'
+      );
+    }
+    let action: Awaited<ReturnType<Client['updateAction']>>;
 
     if (done === true) {
       action = await client.completeAction(actionId);

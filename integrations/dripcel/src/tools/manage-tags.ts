@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageTags = SlateTool.create(spec, {
   key: 'manage_tags',
   description: `List all tags, retrieve a specific tag by ID, or delete a tag. Deleting a tag removes it from all associated contacts and campaigns.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -42,7 +42,7 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (!ctx.input.tagId) {
-      throw new Error('tagId is required for get and delete actions');
+      throw createApiServiceError('tagId is required for get and delete actions');
     }
 
     if (ctx.input.action === 'get') {

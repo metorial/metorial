@@ -29,7 +29,9 @@ export let getDocument = SlateTool.create(spec, {
       fileUrl: z.string().nullable().describe('URL to download the original file'),
       contentType: z.string().nullable().describe('MIME content type'),
       created: z.string().describe('Upload timestamp'),
-      modified: z.string().describe('Last modification timestamp'),
+      modified: z
+        .string()
+        .describe('Processing timestamp, or upload timestamp while processing is pending'),
       creditUsage: z.number().describe('Credits consumed'),
       parsedResult: z.record(z.string(), z.any()).nullable().describe('Extracted/parsed data'),
       logs: z

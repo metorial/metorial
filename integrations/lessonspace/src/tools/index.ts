@@ -1,3 +1,6 @@
+export * from './delete-session-recordings';
+export * from './delete-space-recordings';
+export * from './get-file-url';
 export * from './get-recording';
 export * from './get-session';
 export * from './get-transcript';

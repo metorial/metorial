@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageActions = SlateTool.create(spec, {
@@ -14,6 +15,7 @@ export let manageActions = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       action: z
         .enum(['list', 'describe', 'trigger', 'pause', 'delete'])
         .describe('Operation to perform'),
@@ -57,8 +59,8 @@ export let manageActions = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     if (ctx.input.action === 'list') {
@@ -66,21 +68,22 @@ export let manageActions = SlateTool.create(spec, {
       return {
         output: {
           actions: actions.map(a => ({
-            actionId: a.id,
-            name: a.name,
-            pipeline: a.pipeline,
-            source: a.source,
-            status: a.status,
-            endpoint: a.endpoint,
-            dateCreated: a.dateCreated,
-            lastSeen: a.lastSeen
+            actionId: a.id ?? undefined,
+            name: a.name ?? undefined,
+            pipeline: a.pipeline ?? undefined,
+            source: a.source ?? undefined,
+            status: a.status ?? undefined,
+            endpoint: a.endpoint ?? undefined,
+            dateCreated: a.dateCreated ?? undefined,
+            lastSeen: a.lastSeen ?? undefined
           }))
         },
         message: `Found **${actions.length}** pipeline actions.`
       };
     }
 
-    if (!ctx.input.actionId) throw new Error('actionId is required for this operation');
+    if (!ctx.input.actionId)
+      throw createApiServiceError('actionId is required for this operation');
 
     if (ctx.input.action === 'trigger') {
       let workflowId = await client.triggerAction(ctx.input.actionId, ctx.input.triggerParams);
@@ -110,12 +113,12 @@ export let manageActions = SlateTool.create(spec, {
     let actionDetail = await client.describeAction(ctx.input.actionId);
     return {
       output: {
-        actionId: actionDetail.id,
-        name: actionDetail.name,
-        pipeline: actionDetail.pipeline,
-        source: actionDetail.source,
-        status: actionDetail.status,
-        endpoint: actionDetail.endpoint
+        actionId: actionDetail.id ?? undefined,
+        name: actionDetail.name ?? undefined,
+        pipeline: actionDetail.pipeline ?? undefined,
+        source: actionDetail.source ?? undefined,
+        status: actionDetail.status ?? undefined,
+        endpoint: actionDetail.endpoint ?? undefined
       },
       message: `Action **${actionDetail.name || ctx.input.actionId}** — Source: **${actionDetail.source || 'unknown'}**, Status: **${actionDetail.status || 'unknown'}**.`
     };

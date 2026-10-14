@@ -26,13 +26,19 @@ Poll this endpoint until the job status is "completed" or "failed".`,
   )
   .output(
     z.object({
-      status: z.string().describe('Job status (e.g. "processing", "completed", "failed")'),
+      status: z
+        .string()
+        .describe('Job status (e.g. "queued", "active", "completed", "failed")'),
       content: z
         .union([z.array(transcriptChunkSchema), z.string()])
         .optional()
         .describe('Transcript content when job is completed'),
       lang: z.string().optional().describe('Language of the returned transcript'),
-      availableLangs: z.array(z.string()).optional().describe('Available language codes')
+      availableLangs: z.array(z.string()).optional().describe('Available language codes'),
+      error: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Error details if the job failed')
     })
   )
   .handleInvocation(async ctx => {
@@ -40,17 +46,20 @@ Poll this endpoint until the job status is "completed" or "failed".`,
 
     let result = await client.getTranscriptResult(ctx.input.jobId);
 
+    let transcript = result.result ?? result;
+
     return {
       output: {
         status: result.status,
-        content: result.content,
-        lang: result.lang,
-        availableLangs: result.availableLangs
+        content: transcript.content,
+        lang: transcript.lang,
+        availableLangs: transcript.availableLangs,
+        error: result.error ?? undefined
       },
       message:
         result.status === 'completed'
           ? `Transcript job completed successfully.`
-          : `Transcript job status: **${result.status}**. ${result.status === 'processing' ? 'Try again shortly.' : ''}`
+          : `Transcript job status: **${result.status}**. ${['queued', 'active', 'processing'].includes(result.status) ? 'Try again shortly.' : ''}`
     };
   })
   .build();

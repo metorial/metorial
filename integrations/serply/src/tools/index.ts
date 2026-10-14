@@ -1,6 +1,7 @@
 export * from './bing-search';
 export * from './image-search';
 export * from './job-search';
+export * from './maps-search';
 export * from './news-search';
 export * from './product-search';
 export * from './scholar-search';

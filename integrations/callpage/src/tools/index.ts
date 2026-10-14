@@ -4,6 +4,7 @@ export * from './create-widget';
 export * from './delete-user';
 export * from './delete-widget';
 export * from './get-call';
+export * from './get-manager';
 export * from './get-user';
 export * from './get-widget';
 export * from './initiate-call';

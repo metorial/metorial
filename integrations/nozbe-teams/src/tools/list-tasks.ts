@@ -40,8 +40,8 @@ export let listTasks = SlateTool.create(spec, {
   description: `Retrieve tasks from Nozbe Teams. Filter by project, responsible user, completion status, priority, and due dates. Supports sorting and pagination.`,
   instructions: [
     'Use projectId to filter tasks within a specific project.',
-    'Set endedAt to null to get only open (incomplete) tasks.',
-    'Use priorityPosition with ne:null filter via sortBy to get prioritized tasks.'
+    'Set isCompleted to false to get only open tasks.',
+    'Set isPrioritized to true to get priority tasks, or false to get tasks without priority.'
   ],
   tags: {
     readOnly: true
@@ -72,9 +72,17 @@ export let listTasks = SlateTool.create(spec, {
         ),
       limit: z
         .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(1)
+        .max(10000)
         .optional()
         .describe('Maximum number of tasks to return (1-10000, default 100)'),
-      offset: z.number().optional().describe('Number of tasks to skip for pagination')
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .min(0)
+        .optional()
+        .describe('Number of tasks to skip for pagination')
     })
   )
   .output(
@@ -89,19 +97,21 @@ export let listTasks = SlateTool.create(spec, {
     if (ctx.input.projectId) params.project_id = ctx.input.projectId;
     if (ctx.input.responsibleId) params.responsible_id = ctx.input.responsibleId;
     if (ctx.input.sortBy) params.sortBy = ctx.input.sortBy;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.offset) params.offset = ctx.input.offset;
+    if (ctx.input.limit !== undefined) params.limit = ctx.input.limit;
+    if (ctx.input.offset !== undefined) params.offset = ctx.input.offset;
 
     // Filter by completion status
     if (ctx.input.isCompleted === true) {
       params['ended_at[ne]'] = 'null';
     } else if (ctx.input.isCompleted === false) {
-      params.ended_at = null;
+      params.ended_at = 'null';
     }
 
     // Filter by priority
     if (ctx.input.isPrioritized === true) {
       params['priority_position[ne]'] = 'null';
+    } else if (ctx.input.isPrioritized === false) {
+      params.priority_position = 'null';
     }
 
     let tasks = await client.listTasks(params);

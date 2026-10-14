@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 let projectSchema = z.object({
@@ -31,7 +31,7 @@ export let listProjectsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let projects = await client.getProjects(ctx.input.teamId);
 
     let mapped = projects.map((p: any) => ({

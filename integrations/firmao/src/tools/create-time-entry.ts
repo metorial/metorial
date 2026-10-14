@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FirmaoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -30,23 +30,48 @@ export let createTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.dateTimeFrom && !ctx.input.dateTimeTo) {
+      throw createApiServiceError('Provide a start time, an end time, or both.');
+    }
+    for (let value of [ctx.input.dateTimeFrom, ctx.input.dateTimeTo]) {
+      if (value !== undefined && !z.iso.datetime({ offset: true }).safeParse(value).success) {
+        throw createApiServiceError('Time-entry dates must be valid ISO 8601 timestamps.');
+      }
+    }
+    if (
+      ctx.input.dateTimeFrom &&
+      ctx.input.dateTimeTo &&
+      Date.parse(ctx.input.dateTimeTo) < Date.parse(ctx.input.dateTimeFrom)
+    ) {
+      throw createApiServiceError('The end time must be on or after the start time.');
+    }
     let client = new FirmaoClient({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId
     });
 
     let body: Record<string, any> = {
-      user: ctx.input.userId
+      user: ctx.input.userId,
+      type: ctx.input.type ?? 'TASK'
     };
 
     if (ctx.input.dateTimeFrom) body.dateTimeFrom = ctx.input.dateTimeFrom;
     if (ctx.input.dateTimeTo) body.dateTimeTo = ctx.input.dateTimeTo;
     if (ctx.input.taskId !== undefined) body.task = ctx.input.taskId;
     if (ctx.input.description) body.description = ctx.input.description;
-    if (ctx.input.type) body.type = ctx.input.type;
 
     let result = await client.create('timeentries', body);
-    let createdId = result?.changelog?.[0]?.objectId ?? result?.id;
+    let entryChange = result?.changelog?.find(
+      (change: { modification?: string; newValueClass?: string }) =>
+        change.modification === 'ATTACH' && change.newValueClass === 'timeentry'
+    );
+    let createdId = Number(entryChange?.newValueId ?? result?.id ?? result?.data?.id);
+    if (!Number.isSafeInteger(createdId) || createdId <= 0) {
+      throw createApiServiceError(
+        'Firmao accepted the request but did not return a time-entry ID. Check list_time_entries before retrying.',
+        { reason: 'firmao_invalid_response' }
+      );
+    }
 
     return {
       output: {

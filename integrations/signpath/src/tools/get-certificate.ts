@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SignPathClient } from '../lib/client';
+import { createSignPathClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getCertificate = SlateTool.create(spec, {
@@ -43,46 +43,39 @@ export let getCertificate = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SignPathClient({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createSignPathClient(ctx);
 
-    if (ctx.input.projectSlug && ctx.input.signingPolicySlug) {
-      let certInfo = await client.getCertificateForSigningPolicy(
-        ctx.input.projectSlug,
-        ctx.input.signingPolicySlug
+    let policyLookup = Boolean(ctx.input.projectSlug && ctx.input.signingPolicySlug);
+    if (ctx.input.certificateSlug && (ctx.input.projectSlug || ctx.input.signingPolicySlug)) {
+      throw createApiServiceError(
+        'Provide certificateSlug alone, or both projectSlug and signingPolicySlug.'
       );
-
-      return {
-        output: {
-          thumbprint: certInfo.thumbprint || '',
-          commonName: certInfo.commonName,
-          issuer: certInfo.issuer,
-          validFrom: certInfo.validFrom,
-          validTo: certInfo.validTo
-        },
-        message: `Certificate for signing policy **${ctx.input.signingPolicySlug}** in project **${ctx.input.projectSlug}**: ${certInfo.commonName || certInfo.thumbprint}`
-      };
     }
-
-    if (ctx.input.certificateSlug) {
-      let cert = await client.getCertificate(ctx.input.certificateSlug);
-
-      return {
-        output: {
-          slug: cert.slug,
-          name: cert.name,
-          thumbprint: cert.thumbprint || '',
-          isActive: cert.isActive
-        },
-        message: `Certificate **${cert.name}** (${cert.slug}), thumbprint: ${cert.thumbprint}, active: ${cert.isActive}`
-      };
+    if (!ctx.input.certificateSlug && !policyLookup) {
+      throw createApiServiceError(
+        'Provide either certificateSlug, or both projectSlug and signingPolicySlug.'
+      );
     }
-
-    throw new Error(
-      'Provide either certificateSlug, or both projectSlug and signingPolicySlug.'
-    );
+    let cert = ctx.input.certificateSlug
+      ? await client.getCertificate(ctx.input.certificateSlug)
+      : await client.getCertificateForSigningPolicy(
+          ctx.input.projectSlug ?? '',
+          ctx.input.signingPolicySlug ?? ''
+        );
+    let details = cert.x509CertificateData ?? cert.x509Certificate;
+    let thumbprint = await client.getCertificateThumbprint(cert);
+    return {
+      output: {
+        slug: cert.slug,
+        name: cert.name,
+        thumbprint,
+        isActive: cert.isActive ?? cert.status === 'Valid',
+        commonName: details?.subjectNameParts?.commonName,
+        issuer: details?.x509CertificateChain?.[0]?.issuer ?? undefined,
+        validFrom: details?.validFrom ?? undefined,
+        validTo: details?.validTo ?? undefined
+      },
+      message: `Certificate **${cert.name}** (${cert.slug}) is ${cert.status}.`
+    };
   })
   .build();

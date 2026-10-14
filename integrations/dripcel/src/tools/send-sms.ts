@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -50,8 +50,8 @@ export let sendSms = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let sendOptions: Record<string, any> | undefined;
-    if (ctx.input.testMode) {
-      sendOptions = { test: true };
+    if (ctx.input.testMode !== undefined) {
+      sendOptions = { testMode: ctx.input.testMode };
     }
     let result = await client.sendSms({
       content: ctx.input.content,
@@ -62,12 +62,19 @@ export let sendSms = SlateTool.create(spec, {
       campaignId: ctx.input.campaignId,
       sendOptions
     });
+    let customerId = result.data?.customerId ?? result.customerId;
+    let totalCost = result.data?.totalCost ?? result.totalCost;
+    if (typeof customerId !== 'string' || typeof totalCost !== 'number') {
+      throw createApiServiceError(
+        'Dripcel did not return the SMS tracking ID and cost. Check send logs before retrying.'
+      );
+    }
     return {
       output: {
-        customerId: result.data?.customerId ?? result.customerId ?? '',
-        totalCost: result.data?.totalCost ?? result.totalCost ?? 0
+        customerId,
+        totalCost
       },
-      message: `SMS sent to **${ctx.input.cell}**. Customer ID: \`${result.data?.customerId ?? result.customerId}\`, cost: ${result.data?.totalCost ?? result.totalCost} credits.`
+      message: `${ctx.input.testMode ? 'SMS test completed' : 'SMS sent'} for **${ctx.input.cell}**. Customer ID: \`${customerId}\`, cost: ${totalCost} credits.`
     };
   })
   .build();

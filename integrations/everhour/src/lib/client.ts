@@ -1,15 +1,24 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class EverhourClient {
   private axios;
 
   constructor(token: string) {
-    this.axios = createAxios({
+    if (typeof token !== 'string' || !token.trim()) {
+      throw createApiServiceError(
+        'An Everhour API key is required. Reconnect with your API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.everhour.com',
-      headers: {
-        'X-Api-Key': token,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30000,
+      authHeader: { name: 'X-Api-Key', value: token },
+      headers: { 'X-Accept-Version': '1.2' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Everhour',
+          reason: 'everhour_api_error'
+        })
     });
   }
 
@@ -83,7 +92,12 @@ export class EverhourClient {
   }
 
   async getProject(projectId: string) {
-    let response = await this.axios.get(`/projects/${projectId}`);
+    let response = await this.axios.get(`/projects/${encodeURIComponent(projectId)}`);
+    return response.data;
+  }
+
+  async syncProject(projectId: string) {
+    let response = await this.axios.post(`/projects/${encodeURIComponent(projectId)}/sync`);
     return response.data;
   }
 
@@ -93,16 +107,19 @@ export class EverhourClient {
   }
 
   async updateProject(projectId: string, data: { name?: string; users?: number[] }) {
-    let response = await this.axios.put(`/projects/${projectId}`, data);
+    let response = await this.axios.put(`/projects/${encodeURIComponent(projectId)}`, data);
     return response.data;
   }
 
   async deleteProject(projectId: string) {
-    await this.axios.delete(`/projects/${projectId}`);
+    await this.axios.delete(`/projects/${encodeURIComponent(projectId)}`);
   }
 
   async archiveProject(projectId: string, archived: boolean) {
-    let response = await this.axios.patch(`/projects/${projectId}/archive`, { archived });
+    let response = await this.axios.patch(
+      `/projects/${encodeURIComponent(projectId)}/archive`,
+      { archived }
+    );
     return response.data;
   }
 
@@ -127,14 +144,17 @@ export class EverhourClient {
       };
     }
   ) {
-    let response = await this.axios.put(`/projects/${projectId}/billing`, data);
+    let response = await this.axios.put(
+      `/projects/${encodeURIComponent(projectId)}/billing`,
+      data
+    );
     return response.data;
   }
 
   // ─── Sections ────────────────────────────────────────────
 
   async listSections(projectId: string) {
-    let response = await this.axios.get(`/projects/${projectId}/sections`);
+    let response = await this.axios.get(`/projects/${encodeURIComponent(projectId)}/sections`);
     return response.data;
   }
 
@@ -147,7 +167,10 @@ export class EverhourClient {
     projectId: string,
     data: { name: string; position?: number; status?: string }
   ) {
-    let response = await this.axios.post(`/projects/${projectId}/sections`, data);
+    let response = await this.axios.post(
+      `/projects/${encodeURIComponent(projectId)}/sections`,
+      data
+    );
     return response.data;
   }
 
@@ -169,12 +192,14 @@ export class EverhourClient {
     projectId: string,
     params?: { page?: number; limit?: number; 'exclude-closed'?: boolean; query?: string }
   ) {
-    let response = await this.axios.get(`/projects/${projectId}/tasks`, { params });
+    let response = await this.axios.get(`/projects/${encodeURIComponent(projectId)}/tasks`, {
+      params
+    });
     return response.data;
   }
 
   async getTask(taskId: string) {
-    let response = await this.axios.get(`/tasks/${taskId}`);
+    let response = await this.axios.get(`/tasks/${encodeURIComponent(taskId)}`);
     return response.data;
   }
 
@@ -187,7 +212,10 @@ export class EverhourClient {
     projectId: string,
     params: { query?: string; limit?: number; searchInClosed?: boolean }
   ) {
-    let response = await this.axios.get(`/projects/${projectId}/tasks/search`, { params });
+    let response = await this.axios.get(
+      `/projects/${encodeURIComponent(projectId)}/tasks/search`,
+      { params }
+    );
     return response.data;
   }
 
@@ -203,7 +231,10 @@ export class EverhourClient {
       status?: string;
     }
   ) {
-    let response = await this.axios.post(`/projects/${projectId}/tasks`, data);
+    let response = await this.axios.post(
+      `/projects/${encodeURIComponent(projectId)}/tasks`,
+      data
+    );
     return response.data;
   }
 
@@ -219,24 +250,24 @@ export class EverhourClient {
       status?: string;
     }
   ) {
-    let response = await this.axios.put(`/tasks/${taskId}`, data);
+    let response = await this.axios.put(`/tasks/${encodeURIComponent(taskId)}`, data);
     return response.data;
   }
 
   async deleteTask(taskId: string) {
-    await this.axios.delete(`/tasks/${taskId}`);
+    await this.axios.delete(`/tasks/${encodeURIComponent(taskId)}`);
   }
 
   async setTaskEstimate(
     taskId: string,
     data: { total: number; type: string; users?: Record<string, number> }
   ) {
-    let response = await this.axios.put(`/tasks/${taskId}/estimate`, data);
+    let response = await this.axios.put(`/tasks/${encodeURIComponent(taskId)}/estimate`, data);
     return response.data;
   }
 
   async removeTaskEstimate(taskId: string) {
-    await this.axios.delete(`/tasks/${taskId}/estimate`);
+    await this.axios.delete(`/tasks/${encodeURIComponent(taskId)}/estimate`);
   }
 
   // ─── Time Records ───────────────────────────────────────
@@ -254,8 +285,13 @@ export class EverhourClient {
     return response.data;
   }
 
-  async listTaskTime(taskId: string, params?: { from?: string; to?: string }) {
-    let response = await this.axios.get(`/tasks/${taskId}/time`, { params });
+  async listTaskTime(
+    taskId: string,
+    params?: { from?: string; to?: string; limit?: number; page?: number }
+  ) {
+    let response = await this.axios.get(`/tasks/${encodeURIComponent(taskId)}/time`, {
+      params
+    });
     return response.data;
   }
 
@@ -263,7 +299,9 @@ export class EverhourClient {
     projectId: string,
     params?: { from?: string; to?: string; limit?: number; page?: number }
   ) {
-    let response = await this.axios.get(`/projects/${projectId}/time`, { params });
+    let response = await this.axios.get(`/projects/${encodeURIComponent(projectId)}/time`, {
+      params
+    });
     return response.data;
   }
 
@@ -569,7 +607,9 @@ export class EverhourClient {
   // ─── Timecards ───────────────────────────────────────────
 
   async getUserTimecard(userId: number, date: string) {
-    let response = await this.axios.get(`/users/${userId}/timecards/${date}`);
+    let response = await this.axios.get(
+      `/users/${userId}/timecards/${encodeURIComponent(date)}`
+    );
     return response.data;
   }
 
@@ -598,12 +638,15 @@ export class EverhourClient {
     date: string,
     data: { clockIn?: string; clockOut?: string; breakTime?: number }
   ) {
-    let response = await this.axios.put(`/users/${userId}/timecards/${date}`, data);
+    let response = await this.axios.put(
+      `/users/${userId}/timecards/${encodeURIComponent(date)}`,
+      data
+    );
     return response.data;
   }
 
   async deleteTimecard(userId: number, date: string) {
-    await this.axios.delete(`/users/${userId}/timecards/${date}`);
+    await this.axios.delete(`/users/${userId}/timecards/${encodeURIComponent(date)}`);
   }
 
   // ─── Timesheets ──────────────────────────────────────────

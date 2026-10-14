@@ -2,6 +2,8 @@ export * from './complete-task';
 export * from './create-task';
 export * from './delete-task';
 export * from './get-collaborators';
+export * from './get-completed-tasks';
+export * from './get-current-user';
 export * from './get-productivity-stats';
 export * from './get-projects';
 export * from './get-tasks';

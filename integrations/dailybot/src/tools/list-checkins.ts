@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listCheckins = SlateTool.create(spec, {
   name: 'List Check-ins',
   key: 'list_checkins',
-  description: `List all check-ins (async stand-ups and recurring surveys) visible to the authenticated user. Optionally include summary data for a specific date.`,
+  description: `List a page of check-ins (async stand-ups and recurring surveys) visible to the authenticated user. Optionally filter by name, team, or user and include summary data for a specific date.`,
   tags: {
     readOnly: true
   }
@@ -17,6 +17,11 @@ export let listCheckins = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Whether to include check-in summary data in the response'),
+      page: z.number().optional().describe('Page number, starting at 1'),
+      pageSize: z.number().optional().describe('Check-ins per page; default 50, maximum 200'),
+      search: z.string().optional().describe('Search by check-in name'),
+      teamUuid: z.string().optional().describe('Team UUID. Use list_teams to discover teams.'),
+      userUuid: z.string().optional().describe('User UUID. Use list_users to discover users.'),
       date: z
         .string()
         .optional()
@@ -41,16 +46,17 @@ export let listCheckins = SlateTool.create(spec, {
               .describe('Summary data for the check-in (when requested)')
           })
         )
-        .describe('List of check-ins')
+        .describe('List of check-ins'),
+      count: z.number().optional().describe('Total number of matching check-ins'),
+      next: z.string().nullable().optional().describe('URL of the next page, or null'),
+      previous: z.string().nullable().optional().describe('URL of the previous page, or null')
     })
   )
   .handleInvocation(async ctx => {
     let client = new DailyBotClient({ token: ctx.auth.token });
 
-    let checkins = await client.listCheckins({
-      includeSummary: ctx.input.includeSummary,
-      date: ctx.input.date
-    });
+    let result = await client.listCheckins(ctx.input);
+    let checkins = result?.results ?? result;
 
     let mapped = checkins.map((c: any) => ({
       checkinUuid: c.uuid,
@@ -62,7 +68,12 @@ export let listCheckins = SlateTool.create(spec, {
     }));
 
     return {
-      output: { checkins: mapped },
+      output: {
+        checkins: mapped,
+        count: result?.count,
+        next: result?.next,
+        previous: result?.previous
+      },
       message: `Found **${mapped.length}** check-in(s).`
     };
   })

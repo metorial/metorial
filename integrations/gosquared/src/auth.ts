@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,11 @@ export let auth = SlateAuth.create()
         .describe('GoSquared API key. Generated from Settings > Your Account > API Access.')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError(
+          'Enter a GoSquared API key from your API Access settings.'
+        );
+      }
       return {
         output: {
           token: ctx.input.apiKey

@@ -1,8 +1,17 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let api = createAxios({
-  baseURL: 'https://api.zeplin.dev/v1'
+let api = createAuthenticatedAxios({
+  baseURL: 'https://api.zeplin.dev/v1',
+  timeout: 30_000,
+  errorAdapter: error =>
+    buildApiServiceError(error, { providerLabel: 'Zeplin', reason: 'zeplin_api_error' })
 });
 
 type AuthOutput = {
@@ -61,6 +70,7 @@ export let auth = SlateAuth.create()
     }) => {
       let params = new URLSearchParams({
         client_id: ctx.clientId,
+        response_type: 'code',
         redirect_uri: ctx.redirectUri,
         state: ctx.state
       });
@@ -88,23 +98,11 @@ export let auth = SlateAuth.create()
         client_secret: ctx.clientSecret
       });
 
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Zeplin',
+          operation: 'token exchange'
+        })
       };
     },
 
@@ -116,7 +114,9 @@ export let auth = SlateAuth.create()
       scopes: string[];
     }) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'Zeplin refresh token is missing. Reconnect your account.'
+        );
       }
 
       let response = await api.post('/oauth/token', {
@@ -126,23 +126,12 @@ export let auth = SlateAuth.create()
         client_secret: ctx.clientSecret
       });
 
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'Zeplin',
+          operation: 'token refresh',
+          previousRefreshToken: ctx.output.refreshToken
+        })
       };
     },
 

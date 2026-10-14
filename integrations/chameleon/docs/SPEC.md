@@ -1,6 +1,4 @@
-Now I have enough information to write the specification. Let me compile everything.
-
-# Slates Specification for Chameleon
+# Chameleon Specification
 
 ## Overview
 

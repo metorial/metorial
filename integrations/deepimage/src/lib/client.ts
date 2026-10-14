@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
 
 let BASE_URL = 'https://deep-image.ai/rest_api';
 
@@ -34,6 +35,7 @@ export interface ProcessImageParams {
       itemAreaPercentage?: number;
       backgroundUrl?: string;
       color?: number[];
+      contextImages?: string[];
     };
   };
   fit?: string | { canvas?: string; crop?: string };
@@ -63,11 +65,86 @@ export interface AccountInfo {
   username: string;
   email: string;
   credits: number;
-  apiKey: string;
   language: string;
   webhooks: Record<string, string>;
   billingAddress: Record<string, string>;
 }
+
+let processResponseSchema = z.object({
+  status: z.string().optional(),
+  job: z.string().optional(),
+  result_url: z.string().optional()
+});
+
+let accountResponseSchema = z.object({
+  username: z.string(),
+  email: z.string(),
+  credits: z.number(),
+  language: z.string(),
+  webhooks: z.record(z.string(), z.string()).optional(),
+  address: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+    .optional(),
+  billing_address: z.record(z.string(), z.string()).optional()
+});
+
+let validateProcessParams = (params: ProcessImageParams) => {
+  for (let [name, value] of [
+    ['width', params.width],
+    ['height', params.height],
+    ['minLength', params.minLength]
+  ] as const) {
+    if (value === undefined) continue;
+    if (typeof value === 'number') {
+      if (!Number.isInteger(value) || value <= 0) {
+        throw createApiServiceError(`${name} must be a positive whole number of pixels.`);
+      }
+    }
+  }
+
+  if (
+    params.outputQuality !== undefined &&
+    (!Number.isInteger(params.outputQuality) ||
+      params.outputQuality < 1 ||
+      params.outputQuality > 100)
+  ) {
+    throw createApiServiceError('outputQuality must be a whole number from 1 to 100.');
+  }
+
+  let color = params.background?.generate?.color;
+  if (
+    color !== undefined &&
+    (color.length !== 3 ||
+      color.some(value => !Number.isInteger(value) || value < 0 || value > 255))
+  ) {
+    throw createApiServiceError(
+      'generateBackgroundColor must contain three RGB values from 0 to 255.'
+    );
+  }
+};
+
+let mapProcessResult = (
+  response: unknown,
+  defaults: { status?: string; jobId?: string } = {}
+): ProcessResult => {
+  let parsed = processResponseSchema.safeParse(response);
+  if (!parsed.success) {
+    throw createApiServiceError('Deep Image returned an invalid processing response.');
+  }
+  let status = parsed.data.status ?? (parsed.data.result_url ? 'complete' : defaults.status);
+  let jobId = parsed.data.job ?? defaults.jobId;
+  if (!status || !jobId) {
+    throw createApiServiceError(
+      'Deep Image did not return the processing status and job identifier.'
+    );
+  }
+  if (status === 'complete' && !parsed.data.result_url) {
+    throw createApiServiceError(
+      'Deep Image completed the job without returning a result URL.'
+    );
+  }
+  return { status, jobId, resultUrl: parsed.data.result_url };
+};
 
 let toSnakeCase = (params: ProcessImageParams): Record<string, unknown> => {
   let body: Record<string, unknown> = {};
@@ -76,8 +153,9 @@ let toSnakeCase = (params: ProcessImageParams): Record<string, unknown> => {
   if (params.width !== undefined) body.width = params.width;
   if (params.height !== undefined) body.height = params.height;
   if (params.minLength !== undefined) body.min_length = params.minLength;
-  if (params.outputFormat !== undefined) body.output_format = params.outputFormat;
-  if (params.outputQuality !== undefined) body.output_quality = params.outputQuality;
+  if (params.outputFormat !== undefined)
+    body.output_format = params.outputFormat === 'jpg' ? 'jpeg' : params.outputFormat;
+  if (params.outputQuality !== undefined) body.quality = params.outputQuality;
   if (params.maxFileSize !== undefined) body.max_file_size = params.maxFileSize;
   if (params.enhancements !== undefined) body.enhancements = params.enhancements;
   if (params.generativeUpscale !== undefined)
@@ -154,6 +232,7 @@ let toSnakeCase = (params: ProcessImageParams): Record<string, unknown> => {
       if (g.itemAreaPercentage !== undefined) gen.item_area_percentage = g.itemAreaPercentage;
       if (g.backgroundUrl !== undefined) gen.background_url = g.backgroundUrl;
       if (g.color !== undefined) gen.color = g.color;
+      if (g.contextImages !== undefined) gen.context_images = g.contextImages;
       bg.generate = gen;
     }
     body.background = bg;
@@ -177,70 +256,71 @@ let toSnakeCase = (params: ProcessImageParams): Record<string, unknown> => {
 };
 
 export class Client {
-  private token: string;
+  private axios;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
-
-  private createAxiosInstance() {
-    return createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Deep Image API key is required. Reconnect with an API key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'X-API-KEY': this.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-API-KEY', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Deep Image',
+          reason: 'deep_image_api_error'
+        })
     });
   }
 
   async processImageSync(params: ProcessImageParams): Promise<ProcessResult> {
-    let axios = this.createAxiosInstance();
+    validateProcessParams(params);
     let body = toSnakeCase(params);
-    let response = await axios.post('/process_result', body);
-    return {
-      status: response.data.status,
-      jobId: response.data.job,
-      resultUrl: response.data.result_url
-    };
+    let response = await this.axios.post('/process_result', body);
+    return mapProcessResult(response.data, { status: 'received' });
   }
 
   async processImageAsync(params: ProcessImageParams): Promise<ProcessResult> {
-    let axios = this.createAxiosInstance();
+    validateProcessParams(params);
     let body = toSnakeCase(params);
-    let response = await axios.post('/process', body);
-    return {
-      status: response.data.status,
-      jobId: response.data.job,
-      resultUrl: response.data.result_url
-    };
+    let response = await this.axios.post('/process', body);
+    return mapProcessResult(response.data, { status: 'received' });
   }
 
   async getResult(jobHash: string): Promise<ProcessResult> {
-    let axios = this.createAxiosInstance();
-    let response = await axios.get(`/result/${jobHash}`);
-    return {
-      status: response.data.status,
-      jobId: jobHash,
-      resultUrl: response.data.result_url
-    };
+    if (!jobHash.trim()) throw createApiServiceError('jobId must not be empty.');
+    let response = await this.axios.get(`/result/${encodeURIComponent(jobHash)}`);
+    let result = mapProcessResult(response.data, { jobId: jobHash });
+    return { ...result, jobId: jobHash };
   }
 
   async deleteResult(jobHash: string): Promise<void> {
-    let axios = this.createAxiosInstance();
-    await axios.delete(`/result/${jobHash}`);
+    if (!jobHash.trim()) throw createApiServiceError('jobId must not be empty.');
+    await this.axios.delete(`/result/${encodeURIComponent(jobHash)}`);
   }
 
   async getAccountInfo(): Promise<AccountInfo> {
-    let axios = this.createAxiosInstance();
-    let response = await axios.get('/me');
+    let response = await this.axios.get('/me');
+    let parsed = accountResponseSchema.safeParse(response.data);
+    if (!parsed.success) {
+      throw createApiServiceError('Deep Image returned an invalid account response.');
+    }
+    let account = parsed.data;
     return {
-      username: response.data.username,
-      email: response.data.email,
-      credits: response.data.credits,
-      apiKey: response.data.api_key,
-      language: response.data.language,
-      webhooks: response.data.webhooks || {},
-      billingAddress: response.data.billing_address || {}
+      username: account.username,
+      email: account.email,
+      credits: account.credits,
+      language: account.language,
+      webhooks: account.webhooks ?? {},
+      billingAddress: account.address
+        ? Object.fromEntries(
+            Object.entries(account.address)
+              .filter(([, value]) => value !== null)
+              .map(([key, value]) => [key, String(value)])
+          )
+        : (account.billing_address ?? {})
     };
   }
 }

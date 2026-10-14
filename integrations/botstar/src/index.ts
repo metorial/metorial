@@ -2,8 +2,11 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   broadcastMessage,
+  createBot,
   createUserAttribute,
   getBot,
+  getCmsEntity,
+  getCmsItem,
   getUser,
   listBots,
   listCmsEntities,
@@ -20,6 +23,9 @@ export let provider = Slate.create({
   tools: [
     listBots,
     getBot,
+    createBot,
+    getCmsEntity,
+    getCmsItem,
     getUser,
     updateUser,
     createUserAttribute,

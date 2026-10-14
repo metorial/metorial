@@ -25,8 +25,8 @@ export let optimizeWaypoints = SlateTool.create(spec, {
               .describe('Time spent at this waypoint in seconds')
           })
         )
-        .min(3)
-        .describe('Waypoints to optimize (minimum 3)'),
+        .min(2)
+        .describe('Waypoints to optimize (2-12)'),
       originIndex: z.number().optional().describe('Index of the fixed starting waypoint'),
       destinationIndex: z.number().optional().describe('Index of the fixed ending waypoint'),
       travelMode: z.enum(['car', 'truck']).optional().describe('Travel mode (default: car)'),

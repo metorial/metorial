@@ -2,8 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getActivity,
+  getCurrentUser,
   getProject,
   getTask,
+  listMilestones,
   listPeople,
   listProjects,
   listTasks,
@@ -31,7 +33,9 @@ export let provider = Slate.create({
     manageTimeEntry,
     listTimeEntries,
     manageMilestone,
+    listMilestones,
     listPeople,
+    getCurrentUser,
     manageMessage,
     manageComment,
     manageNotebook,

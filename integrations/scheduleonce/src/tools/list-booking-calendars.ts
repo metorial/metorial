@@ -7,7 +7,7 @@ let bookingCalendarSchema = z.object({
   calendarId: z.string().describe('Unique booking calendar identifier'),
   subject: z.string().describe('Customer-facing subject/title'),
   name: z.string().describe('Internal name of the booking calendar'),
-  host: z.string().describe('User ID of the host'),
+  host: z.string().describe('User or team ID of the host'),
   url: z.string().describe('Public booking URL'),
   published: z.boolean().describe('Whether the calendar is published'),
   durationMinutes: z.number().describe('Meeting duration in minutes')
@@ -27,6 +27,9 @@ Booking calendars are scheduling resources that define how meetings are offered 
     z.object({
       limit: z
         .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe integer.')
+        .min(1)
+        .max(100)
         .optional()
         .describe('Number of calendars to return (1-100, default 10)'),
       cursor: z.string().optional().describe('Cursor for pagination')
@@ -34,7 +37,12 @@ Booking calendars are scheduling resources that define how meetings are offered 
   )
   .output(
     z.object({
-      count: z.number().describe('Total number of booking calendars'),
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextCursor: z
+        .string()
+        .nullable()
+        .describe('Pass this ID as cursor to fetch the next page'),
+      count: z.number().describe('Number of calendars returned in this page'),
       calendars: z.array(bookingCalendarSchema).describe('List of booking calendars')
     })
   )
@@ -59,9 +67,11 @@ Booking calendars are scheduling resources that define how meetings are offered 
     return {
       output: {
         count: result.count,
+        hasMore: result.has_more,
+        nextCursor: result.has_more ? (result.data.at(-1)?.id ?? null) : null,
         calendars
       },
-      message: `Found **${result.count}** booking calendar(s). Returned **${calendars.length}** in this page.`
+      message: `Returned **${calendars.length}** booking calendar(s) in this page.`
     };
   })
   .build();

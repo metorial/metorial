@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createCompany = SlateTool.create(spec, {
@@ -108,12 +109,14 @@ export let listCompanies = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      pageToken: pageTokenSchema,
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Maximum number of companies to return')
     })
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       companies: z
         .array(
           z.object({
@@ -128,6 +131,7 @@ export let listCompanies = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listCompanies({
+      pageToken: ctx.input.pageToken,
       offset: ctx.input.offset,
       limit: ctx.input.limit
     });
@@ -135,7 +139,7 @@ export let listCompanies = SlateTool.create(spec, {
     let companies = Array.isArray(result) ? result : (result.companies ?? result.data ?? []);
 
     return {
-      output: { companies },
+      output: { companies, pagination: result.pagination },
       message: `Found **${companies.length}** company(ies).`
     };
   })

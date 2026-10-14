@@ -3,7 +3,10 @@ import { spec } from './spec';
 import {
   createOrganization,
   getBilling,
+  getCurrentUser,
+  getNetwork,
   getOrganization,
+  getPolicy,
   getQueryLog,
   getTrafficReport,
   listCategories,
@@ -29,14 +32,17 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     listOrganizations,
     getOrganization,
     createOrganization,
     updateOrganization,
     listPolicies,
+    getPolicy,
     managePolicy,
     manageScheduledPolicy,
     listNetworks,
+    getNetwork,
     manageNetwork,
     manageNetworkSecretKey,
     manageIpAddresses,

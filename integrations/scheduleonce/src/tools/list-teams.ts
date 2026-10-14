@@ -20,13 +20,24 @@ Teams are groups of users used as scheduling resources for team-based booking sc
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Number of teams to return (1-100, default 10)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe integer.')
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Number of teams to return (1-100, default 10)'),
       cursor: z.string().optional().describe('Cursor for pagination')
     })
   )
   .output(
     z.object({
-      count: z.number().describe('Total number of teams'),
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextCursor: z
+        .string()
+        .nullable()
+        .describe('Pass this ID as cursor to fetch the next page'),
+      count: z.number().describe('Number of teams returned in this page'),
       teams: z.array(teamSchema).describe('List of teams')
     })
   )
@@ -46,9 +57,11 @@ Teams are groups of users used as scheduling resources for team-based booking sc
     return {
       output: {
         count: result.count,
+        hasMore: result.has_more,
+        nextCursor: result.has_more ? (result.data.at(-1)?.id ?? null) : null,
         teams
       },
-      message: `Found **${result.count}** team(s). Returned **${teams.length}** in this page.`
+      message: `Returned **${teams.length}** team(s) in this page.`
     };
   })
   .build();

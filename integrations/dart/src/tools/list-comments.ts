@@ -27,6 +27,18 @@ export let listComments = SlateTool.create(spec, {
   .output(
     z.object({
       count: z.number().describe('Total number of comments'),
+      next: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Next page URL, or null when there are no more results; use its offset with the same filters'
+        ),
+      previous: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Previous page URL, or null on the first page'),
       comments: z.array(commentSchema).describe('List of comments')
     })
   )
@@ -37,6 +49,8 @@ export let listComments = SlateTool.create(spec, {
     return {
       output: {
         count: result.count,
+        next: result.next,
+        previous: result.previous,
         comments: result.results
       },
       message: `Found **${result.count}** comment(s) on task **${ctx.input.taskId}**.`

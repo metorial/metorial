@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NextDnsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -31,8 +31,9 @@ export let getLogs = SlateTool.create(spec, {
   name: 'Get DNS Logs',
   key: 'get_logs',
   description: `Retrieve DNS query logs for a NextDNS profile. Each log entry includes the timestamp, queried domain, protocol, client IP, device info, query status, and blocking reasons. Supports filtering by date range, device, status, and domain search.`,
+  tags: { readOnly: true },
   instructions: [
-    'Use the cursor from meta.pagination.cursor to paginate through results.',
+    'Pass the returned cursor to paginate through results.',
     'Status filter options: "default", "blocked", "allowed", "error".'
   ]
 })
@@ -50,8 +51,16 @@ export let getLogs = SlateTool.create(spec, {
         .optional()
         .describe('Filter by query status'),
       search: z.string().optional().describe('Search by domain name'),
-      limit: z.number().optional().describe('Number of results per page (10-1000)'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+      limit: z.number().optional().describe('Number of results per page (integer, 10-1000)'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      sort: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe('Return oldest first (asc) or newest first (desc, default)'),
+      raw: z
+        .boolean()
+        .optional()
+        .describe('Include all DNS queries without navigational filtering or deduplication')
     })
   )
   .output(
@@ -62,17 +71,22 @@ export let getLogs = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new NextDnsClient({ token: ctx.auth.token });
-    let params: Record<string, string | number | boolean | undefined> = {};
+    let { profileId, deviceId, raw, ...filters } = ctx.input;
+    if (
+      filters.limit !== undefined &&
+      (!Number.isInteger(filters.limit) || filters.limit < 10 || filters.limit > 1000)
+    ) {
+      throw createApiServiceError('Logs limit must be an integer between 10 and 1000.', {
+        reason: 'nextdns_invalid_logs_limit'
+      });
+    }
+    let params = {
+      ...filters,
+      device: deviceId,
+      raw: raw === undefined ? undefined : raw ? 1 : 0
+    };
 
-    if (ctx.input.from) params.from = ctx.input.from;
-    if (ctx.input.to) params.to = ctx.input.to;
-    if (ctx.input.deviceId) params.device = ctx.input.deviceId;
-    if (ctx.input.status) params.status = ctx.input.status;
-    if (ctx.input.search) params.search = ctx.input.search;
-    if (ctx.input.limit) params.limit = ctx.input.limit;
-    if (ctx.input.cursor) params.cursor = ctx.input.cursor;
-
-    let result = await client.getLogs(ctx.input.profileId, params);
+    let result = await client.getLogs(profileId, params);
     let entries = (result.data || []).map((entry: any) => ({
       timestamp: entry.timestamp,
       domain: entry.domain,

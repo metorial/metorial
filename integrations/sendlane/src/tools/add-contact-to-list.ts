@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendlaneClient } from '../lib/client';
 import { spec } from '../spec';
@@ -39,6 +39,9 @@ export let addContactToList = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.email?.trim() && !ctx.input.phone?.trim()) {
+      throw createApiServiceError('Provide an email address or phone number for the contact.');
+    }
     let client = new SendlaneClient(ctx.auth.token);
 
     await client.addContactToList(ctx.input.listId, {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,6 +45,29 @@ export let manageFolder = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.folderId !== undefined && !ctx.input.folderId.trim()) {
+      throw createApiServiceError(
+        'Provide a nonempty folder ID. Call list_folders to find folder IDs.'
+      );
+    }
+    if (ctx.input.delete && !ctx.input.folderId) {
+      throw createApiServiceError('Provide folderId to delete a folder.');
+    }
+    if (ctx.input.name !== undefined && !ctx.input.name.trim()) {
+      throw createApiServiceError('Folder name must not be empty.');
+    }
+    if (!ctx.input.delete && !ctx.input.folderId && !ctx.input.name?.trim()) {
+      throw createApiServiceError('Provide a name to create a folder.');
+    }
+    if (
+      !ctx.input.delete &&
+      ctx.input.folderId &&
+      ctx.input.name === undefined &&
+      ctx.input.parentId === undefined
+    ) {
+      throw createApiServiceError('Provide a name or parentId to update a folder.');
+    }
+
     if (ctx.input.delete && ctx.input.folderId) {
       await client.deleteFolder(ctx.input.folderId);
       return {
@@ -62,12 +85,16 @@ export let manageFolder = SlateTool.create(spec, {
       parentId: ctx.input.parentId
     });
 
+    if (!result.id && !ctx.input.folderId) {
+      throw createApiServiceError('Wachete did not return the created folder ID.');
+    }
+
     let action = ctx.input.folderId ? ('updated' as const) : ('created' as const);
 
     return {
       output: {
-        folderId: result.id,
-        name: result.name,
+        folderId: result.id ?? ctx.input.folderId,
+        name: result.name ?? undefined,
         action
       },
       message: `${action === 'created' ? 'Created' : 'Updated'} folder **${result.name}** (ID: \`${result.id}\`).`

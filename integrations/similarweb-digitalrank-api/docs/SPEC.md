@@ -1,62 +1,37 @@
-Now let me check the specific DigitalRank API documentation to understand the exact endpoints.Now I have enough information to write the specification. The DigitalRank API is specifically the free tier of SimilarWeb's API focused on website ranking data. Let me compile the spec.
+# Similarweb Digital Rank API
 
-# Slates Specification for SimilarWeb Digital Rank API
-
-## Overview
-
-SimilarWeb DigitalRank API is a free REST API that provides global website ranking data based on SimilarWeb's SimilarRank algorithm. It offers metrics such as global rank, country rank, and category rank for any domain, derived from over 10 billion daily digital signals. The free tier includes 100 data credits per month.
+This read-only integration uses Similarweb's documented REST ranking endpoints. Availability, countries, and historical date ranges depend on the account subscription.
 
 ## Authentication
 
-SimilarWeb DigitalRank API uses API keys for authentication.
+An active API key is supplied as the `api_key` query parameter. Account admins generate API keys under Settings > Account > API > Standard API / Batch API. Empty keys are rejected before making requests. There is no OAuth flow or additional connection configuration.
 
-To get started, you'll need to have a Similarweb account and generate a personalized API key. Steps to obtain an API key:
+## Tools and API contracts
 
-1. Click the Settings icon and select Account. From the API page, click Generate A New API Key.
-2. Insert a name for your key (e.g., "MySimilarwebAPIKey") and click Create. Your API key will appear in the Generated Keys table.
+| Tool | API request | Result |
+| --- | --- | --- |
+| `get_website_rank` with `rankType: global` | `GET /v1/website/{domain}/global-rank/global-rank` | Monthly `global_rank` entries, or the aggregated last 28 days when both dates are omitted. |
+| `get_website_rank` with `rankType: country` | `GET /v1/website/{domain}/country-rank/country-rank` | `country_rank` entries for the required country; worldwide is unsupported. |
+| `get_website_rank` with `rankType: category` | `GET /v1/website/{domain}/category-rank/category-rank` | Previous month's industry category and worldwide industry rank. The existing category field names remain unchanged. |
+| `get_top_websites` | `GET /v1/similar-rank/top-sites/` | `top_sites` containing domain and rank; limit defaults to 10 and accepts whole numbers from 1 to 5,000. |
+| `get_remaining_credits` | `GET /capabilities` | Account-level `remaining_hits`, exposed as the existing `remainingHits` output. |
+| `get_capabilities` | `GET /capabilities` | Account-level credits plus the provider's dataset-specific countries and snapshot intervals. |
 
-The API key is passed as a query parameter `api_key` on each request. For example:
+Domains are normalized to lowercase and must omit protocols, paths, and `www.`. Global and country date filters use `YYYY-MM` with a valid month, and start dates must not follow end dates. Dates and the main-domain flag apply only to global and country rankings, preserving the existing category branch behavior. Country values are normalized to lowercase and must contain two letters; subscription availability is checked by Similarweb.
 
-```
-https://api.similarweb.com/user-capabilities?api_key=YOUR_API_KEY
-```
+HTTP failures and unsuccessful provider status responses become user-facing service errors. Unexpected response structures are rejected rather than converted to empty rankings or zero credits. Returned identifiers and ranking fields retain their existing names and types. Ranking requests use JSON responses.
 
-If an API key has been created but not activated, you will receive an "Invalid API key" error when trying to pull data with it. Under the Activation column, make sure the toggle is on for the relevant API key.
+Global/country rankings and top sites cost 1 hit per request or 1 data credit per result; industry rank costs 1 hit per request or 2 data credits per result. Capabilities requests do not consume credits. The `/user-capabilities` endpoint returns allocated user allowance and `user_remaining`; it is distinct from account credits and is not used by this integration's account-level tools.
 
-## Features
+## Official documentation
 
-### Website Global Rank Lookup
+- [API-key authentication](https://developers.similarweb.com/docs/authentication)
+- [Global rank](https://developers.similarweb.com/reference/global-rank)
+- [Country rank](https://developers.similarweb.com/reference/country-rank)
+- [Industry rank](https://developers.similarweb.com/reference/industry-rank)
+- [Top SimilarRank sites](https://developers.similarweb.com/reference/top-similarrank-sites-all-traffic)
+- [Account capabilities](https://developers.similarweb.com/docs/check-capabilities)
+- [Allocated user usage](https://developers.similarweb.com/docs/check-user-usage)
+- [REST errors](https://developers.similarweb.com/docs/error-codes-rest)
 
-Retrieves the global rank of a specific website using Similarweb's Digital Rank API. Returns SimilarWeb's monthly Global Rank for a given domain.
-
-- **Parameters:** Domain name, optional start/end date (format: YYYY-MM), optional main domain only flag (include or exclude subdomains), output format (JSON or XML).
-- To retrieve last 28 days, remove the start_date and end_date parameters from the URL.
-
-### Website Country Rank
-
-Returns SimilarWeb's monthly Country Rank for a given domain.
-
-- **Parameters:** Domain name, start/end date, country filter as a 2-letter ISO country code, optional main domain only flag, output format.
-- Worldwide country filter is not currently supported.
-
-### Website Category Rank
-
-Returns the Category of a given domain and its Global Rank within its given category.
-
-- **Parameters:** Domain name, output format (JSON or XML).
-
-### Top Ranked Websites
-
-Lists the top-ranking websites globally. Rankings are calculated via SimilarWeb's SimilarRank algorithm.
-
-- **Parameters:** `limit` — default is 10, returns up to 5,000 results max.
-
-### Subscription Status and Remaining Credits
-
-Returns the number of monthly data points remaining in your Similarweb account.
-
-- This endpoint does not cost any hits.
-
-## Events
-
-The provider does not support events. The DigitalRank API is a read-only data retrieval API with no webhook or event subscription capabilities.
+These ranking and capabilities endpoints remain listed in Similarweb's current documentation. Similarweb also documents V5; this package retains the existing ranking contracts rather than switching to different metrics or account requirements. No suitable current-user/profile endpoint is documented for this ranking surface. No events or file exports are exposed.

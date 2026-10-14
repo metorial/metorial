@@ -1,10 +1,15 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface PaginatedResponse<T> {
   [key: string]: T[] | number | undefined;
   page?: number;
   pageSize?: number;
+  total?: number;
   totalResults?: number;
+}
+
+export interface LocationParams {
+  overrideLocation?: string;
 }
 
 export interface PaginationParams {
@@ -12,52 +17,106 @@ export interface PaginationParams {
   pageSize?: number;
 }
 
+export interface EventPaginationParams extends PaginationParams, LocationParams {
+  inFutureOnly?: boolean;
+  since?: string;
+}
+
+export interface OrderPaginationParams extends PaginationParams, LocationParams {
+  eventDateId?: string;
+  since?: string;
+}
+
+export interface TicketPaginationParams extends OrderPaginationParams {
+  status?: 'complete' | 'cancelled';
+}
+
 export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('A Humanitix API key is required. Reconnect your account.');
+    }
+
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.humanitix.com/v1',
+      authHeader: { name: 'x-api-key', value: config.token },
       headers: {
-        'x-api-key': config.token,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
+        Accept: 'application/json'
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Humanitix',
+          reason: 'humanitix_api_error'
+        })
     });
   }
 
-  async getEvents(params?: PaginationParams): Promise<any> {
-    let response = await this.axios.get('/events', { params });
+  async getEvents(params?: EventPaginationParams): Promise<any> {
+    let response = await this.axios.get('/events', { params: this.paginationParams(params) });
     return response.data;
   }
 
-  async getEvent(eventId: string): Promise<any> {
-    let response = await this.axios.get(`/events/${eventId}`);
+  async getEvent(eventId: string, params?: LocationParams): Promise<any> {
+    let response = await this.axios.get(`/events/${this.encodeId(eventId, 'Event')}`, {
+      params
+    });
     return response.data;
   }
 
-  async getOrders(eventId: string, params?: PaginationParams): Promise<any> {
-    let response = await this.axios.get(`/events/${eventId}/orders`, { params });
+  async getOrders(eventId: string, params?: OrderPaginationParams): Promise<any> {
+    let response = await this.axios.get(`/events/${this.encodeId(eventId, 'Event')}/orders`, {
+      params: this.paginationParams(params)
+    });
     return response.data;
   }
 
-  async getOrder(eventId: string, orderId: string): Promise<any> {
-    let response = await this.axios.get(`/events/${eventId}/orders/${orderId}`);
+  async getOrder(eventId: string, orderId: string, params?: LocationParams): Promise<any> {
+    let response = await this.axios.get(
+      `/events/${this.encodeId(eventId, 'Event')}/orders/${this.encodeId(orderId, 'Order')}`,
+      { params }
+    );
     return response.data;
   }
 
-  async getTickets(eventId: string, params?: PaginationParams): Promise<any> {
-    let response = await this.axios.get(`/events/${eventId}/tickets`, { params });
+  async getTickets(eventId: string, params?: TicketPaginationParams): Promise<any> {
+    let response = await this.axios.get(`/events/${this.encodeId(eventId, 'Event')}/tickets`, {
+      params: this.paginationParams(params)
+    });
     return response.data;
   }
 
-  async getTicket(eventId: string, ticketId: string): Promise<any> {
-    let response = await this.axios.get(`/events/${eventId}/tickets/${ticketId}`);
+  async getTicket(eventId: string, ticketId: string, params?: LocationParams): Promise<any> {
+    let response = await this.axios.get(
+      `/events/${this.encodeId(eventId, 'Event')}/tickets/${this.encodeId(ticketId, 'Ticket')}`,
+      { params }
+    );
+    return response.data;
+  }
+
+  async manageTicketCheckIn(
+    eventId: string,
+    ticketId: string,
+    action: 'check_in' | 'check_out',
+    params?: LocationParams
+  ): Promise<{ scanningMessages: { header: string; message: string }[] }> {
+    let endpoint = action === 'check_in' ? 'check-in' : 'check-out';
+    let response = await this.axios.post(
+      `/events/${this.encodeId(eventId, 'Event')}/tickets/${this.encodeId(ticketId, 'Ticket')}/${endpoint}`,
+      undefined,
+      { params }
+    );
     return response.data;
   }
 
   async getTags(params?: PaginationParams): Promise<any> {
-    let response = await this.axios.get('/tags', { params });
+    let response = await this.axios.get('/tags', { params: this.paginationParams(params) });
+    return response.data;
+  }
+
+  async getTag(tagId: string): Promise<any> {
+    let response = await this.axios.get(`/tags/${this.encodeId(tagId, 'Tag')}`);
     return response.data;
   }
 
@@ -77,6 +136,28 @@ export class Client {
     return this.paginate(page => this.getTags({ page, pageSize: 100 }), 'tags');
   }
 
+  private encodeId(id: string, resource: string): string {
+    if (!id.trim()) {
+      throw createApiServiceError(`${resource} ID must not be empty.`);
+    }
+    return encodeURIComponent(id);
+  }
+
+  private paginationParams(params?: PaginationParams) {
+    let page = params?.page ?? 1;
+    if (!Number.isInteger(page) || page < 1) {
+      throw createApiServiceError('Page must be a whole number greater than or equal to 1.');
+    }
+    let pageSize = params?.pageSize;
+    if (
+      pageSize !== undefined &&
+      (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100)
+    ) {
+      throw createApiServiceError('Page size must be a whole number between 1 and 100.');
+    }
+    return { ...params, page };
+  }
+
   private async paginate(
     fetchPage: (page: number) => Promise<any>,
     key: string
@@ -90,8 +171,11 @@ export class Client {
       let items = response[key] || [];
       allItems.push(...items);
 
-      let totalResults = response.totalResults || 0;
-      if (allItems.length >= totalResults || items.length === 0) {
+      let totalResults = response.total ?? response.totalResults;
+      if (
+        items.length === 0 ||
+        (typeof totalResults === 'number' && allItems.length >= totalResults)
+      ) {
         hasMore = false;
       } else {
         page++;

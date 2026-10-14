@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClearoutClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,14 +7,14 @@ export let manageBulkVerification = SlateTool.create(spec, {
   name: 'Manage Bulk Verification',
   key: 'manage_bulk_verification',
   description: `Manage bulk email verification lists. Supports checking progress of a running verification, downloading completed results, cancelling an in-progress verification, or removing a completed list.
-Use **checkProgress** to poll for completion status and percentage. Use **downloadResult** to get a download URL once processing completes. Use **cancel** to stop a running verification. Use **remove** to permanently delete a list.`,
+Use start_bulk_verification to upload a CSV first. Use **checkProgress** to poll for completion status and percentage. Use **downloadResult** to download results once processing completes. Use **cancel** to stop a running verification. Use **remove** to permanently delete a list.`,
   instructions: [
     'Use "checkProgress" regularly to monitor bulk verification jobs until they complete.',
     'Only use "downloadResult" after the list reaches completed status.',
     'Cancelling a list charges credits for already-verified emails; unverified emails are marked as Unknown.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -23,7 +23,13 @@ Use **checkProgress** to poll for completion status and percentage. Use **downlo
       action: z
         .enum(['checkProgress', 'downloadResult', 'cancel', 'remove'])
         .describe('Action to perform on the bulk verification list'),
-      listId: z.string().describe('ID of the bulk verification list')
+      listId: z.string().describe('ID returned by start_bulk_verification'),
+      ignoreResult: z
+        .boolean()
+        .optional()
+        .describe(
+          'For remove only: allow deletion while a result download is in progress (default false).'
+        )
     })
   )
   .output(
@@ -53,7 +59,7 @@ Use **checkProgress** to poll for completion status and percentage. Use **downlo
         result = await client.bulkVerifyProgress(ctx.input.listId);
         let data = (result.data ?? result) as Record<string, unknown>;
         let progressStatus = String(data.progress_status ?? 'unknown');
-        let percentage = data.percentage as number | undefined;
+        let percentage = (data.percentile ?? data.percentage) as number | undefined;
         message = `Bulk verification list **${ctx.input.listId}** — Status: **${progressStatus}**${percentage !== undefined ? `, Progress: **${percentage}%**` : ''}`;
         return {
           output: {
@@ -70,9 +76,12 @@ Use **checkProgress** to poll for completion status and percentage. Use **downlo
         result = await client.downloadResult(ctx.input.listId);
         let data = (result.data ?? result) as Record<string, unknown>;
         let downloadUrl = data.url as string | undefined;
-        message = downloadUrl
-          ? `Download ready for list **${ctx.input.listId}**.`
-          : `Download result requested for list **${ctx.input.listId}**.`;
+        if (!downloadUrl)
+          throw createApiServiceError(
+            'Clearout did not return a download URL. Check progress and request results again after completion.'
+          );
+        await ctx.addAttachment({ type: 'url', url: downloadUrl, mimeType: 'text/csv' });
+        message = `Download ready for list **${ctx.input.listId}**.`;
         return {
           output: {
             status: result.status as string | undefined,
@@ -96,7 +105,7 @@ Use **checkProgress** to poll for completion status and percentage. Use **downlo
         };
       }
       case 'remove': {
-        result = await client.removeVerifyList(ctx.input.listId);
+        result = await client.removeVerifyList(ctx.input.listId, ctx.input.ignoreResult);
         message = `List **${ctx.input.listId}** has been removed.`;
         return {
           output: {

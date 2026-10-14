@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendbirdChatClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,6 +47,14 @@ export let manageGroupChannelMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.action !== 'list' &&
+      (!ctx.input.userIds?.length || ctx.input.userIds.some(id => !id.trim()))
+    ) {
+      throw createApiServiceError(
+        'Provide at least one non-empty user ID for invite or remove.'
+      );
+    }
     let client = new SendbirdChatClient({
       applicationId: ctx.config.applicationId,
       token: ctx.auth.token

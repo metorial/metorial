@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'byteforms',
   name: 'Byteforms',
   description:
-    'Form builder platform for creating forms, surveys, and quizzes with submission management, payment collection, and third-party integrations.',
+    'Read account forms and their configuration, and retrieve submissions with pagination, ordering, and search filtering.',
   metadata: {},
   config,
   auth

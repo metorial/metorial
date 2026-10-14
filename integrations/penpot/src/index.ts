@@ -5,12 +5,15 @@ import {
   exportFileTool,
   getFileSummaryTool,
   getFileTool,
+  getFileUrl,
   getPageTool,
   getProfileTool,
+  listFileSnapshotsTool,
   listFilesTool,
   listProjectsTool,
   listTeamsTool,
   manageCommentsTool,
+  manageFileSnapshotTool,
   manageFileTool,
   manageLibrariesTool,
   managePagesTool,
@@ -26,7 +29,9 @@ export let provider = Slate.create({
     listProjectsTool,
     manageProjectTool,
     listFilesTool,
+    listFileSnapshotsTool,
     manageFileTool,
+    manageFileSnapshotTool,
     getFileTool,
     getFileSummaryTool,
     getPageTool,
@@ -34,7 +39,8 @@ export let provider = Slate.create({
     manageCommentsTool,
     manageLibrariesTool,
     addMediaFromUrlTool,
-    exportFileTool
+    exportFileTool,
+    getFileUrl
   ],
   triggers: []
 });

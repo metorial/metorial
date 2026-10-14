@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -34,7 +39,29 @@ export interface ChatCompletionParams {
   webSearchContextSize?: string;
   tools?: Record<string, unknown>[];
   toolChoice?: string | Record<string, unknown>;
+  toolsModel?: string;
   responseFormat?: Record<string, unknown>;
+  user?: string;
+}
+
+export interface ChatCompletionResponse {
+  id: string;
+  model: string;
+  provider?: string;
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+      tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }>;
+    };
+    finish_reason?: string | null;
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    cost?: number | string;
+    latency_ms?: number;
+  };
 }
 
 export interface ImageGenerationParams {
@@ -111,211 +138,288 @@ export interface RagDeleteParams {
   ids?: string[];
 }
 
+export interface StateResponse {
+  scope: string;
+  key: string;
+  settings: Record<string, unknown>;
+  enable_inline_cli?: boolean;
+  enable_user_states?: boolean;
+  gui_only?: boolean;
+}
+
+export interface StateUpdateParams {
+  settings?: Record<string, unknown>;
+  deleteKeys?: string[];
+  enableInlineCli?: boolean;
+  enableUserStates?: boolean;
+  guiOnly?: boolean;
+}
+
+export let parseCost = (value: unknown): number | undefined => {
+  if (value === undefined || value === null) return undefined;
+  let cost =
+    typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN;
+  if (!Number.isFinite(cost)) {
+    throw createApiServiceError('APIpie AI returned an invalid usage cost.');
+  }
+  return cost;
+};
+
+let validateCount = (value: number | undefined, name: string, minimum = 1) => {
+  if (value !== undefined && (!Number.isInteger(value) || value < minimum)) {
+    throw createApiServiceError(`"${name}" must be a whole number of at least ${minimum}.`);
+  }
+};
+
 export class Client {
-  private token: string;
   private defaultProvider?: string;
   private routing?: string;
+  private api;
+  private ragApi;
 
   constructor(config: ClientConfig) {
-    this.token = config.token;
     this.defaultProvider = config.defaultProvider;
     this.routing = config.routing;
-  }
-
-  private createAxiosInstance(baseURL: string = 'https://apipie.ai/v1') {
-    return createAxios({
-      baseURL,
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    let options = {
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 180_000,
+      errorAdapter: (error: unknown) =>
+        buildApiServiceError(error, { providerLabel: 'APIpie AI', reason: 'apipie_api_error' })
+    };
+    this.api = createAuthenticatedAxios({ ...options, baseURL: 'https://apipie.ai/v1' });
+    this.ragApi = createAuthenticatedAxios({ ...options, baseURL: 'https://apipie.ai' });
   }
 
   async chatCompletion(params: ChatCompletionParams) {
-    let axios = this.createAxiosInstance();
-    let body: Record<string, unknown> = {
-      model: params.model,
-      messages: params.messages
-    };
-
-    if (params.provider ?? this.defaultProvider)
-      body.provider = params.provider ?? this.defaultProvider;
-    if (params.maxTokens !== undefined) body.max_tokens = params.maxTokens;
-    if (params.temperature !== undefined) body.temperature = params.temperature;
-    if (params.topP !== undefined) body.top_p = params.topP;
-    if (params.topK !== undefined) body.top_k = params.topK;
-    if (params.frequencyPenalty !== undefined)
-      body.frequency_penalty = params.frequencyPenalty;
-    if (params.presencePenalty !== undefined) body.presence_penalty = params.presencePenalty;
-    if (params.n !== undefined) body.n = params.n;
-    if (params.routing ?? this.routing) body.routing = params.routing ?? this.routing;
-    if (params.ragTune) body.rag_tune = params.ragTune;
-    if (params.integrity !== undefined) body.integrity = params.integrity;
-    if (params.memory !== undefined) body.memory = params.memory;
-    if (params.memSession) body.mem_session = params.memSession;
-    if (params.memExpire !== undefined) body.mem_expire = params.memExpire;
-    if (params.memClear) body.mem_clear = 1;
-    if (params.online !== undefined) body.online = params.online;
-    if (params.searches !== undefined) body.searches = params.searches;
-    if (params.pull !== undefined) body.pull = params.pull;
-    if (params.use !== undefined) body.use = params.use;
-    if (params.scrapeLength !== undefined) body.scrape_length = params.scrapeLength;
-    if (params.searchLang) body.search_lang = params.searchLang;
-    if (params.searchGeo) body.search_geo = params.searchGeo;
-    if (params.webSearchContextSize)
-      body.web_search_options = { search_context_size: params.webSearchContextSize };
-    if (params.tools) body.tools = params.tools;
-    if (params.toolChoice) body.tool_choice = params.toolChoice;
-    if (params.responseFormat) body.response_format = params.responseFormat;
-
-    let response = await axios.post('/chat/completions', body);
+    for (let [name, value] of Object.entries({
+      maxTokens: params.maxTokens,
+      n: params.n
+    })) {
+      validateCount(value, name);
+    }
+    for (let [name, value] of Object.entries({
+      searches: params.searches,
+      pull: params.pull,
+      use: params.use,
+      scrapeLength: params.scrapeLength
+    })) {
+      validateCount(value, name, 0);
+    }
+    validateCount(params.topK, 'topK', 0);
+    validateCount(params.memExpire, 'memExpire');
+    if (params.memExpire !== undefined && params.memExpire > 1440) {
+      throw createApiServiceError('"memExpire" cannot exceed 1440 minutes.');
+    }
+    if (params.messages.length === 0) {
+      throw createApiServiceError('Provide at least one conversation message.');
+    }
+    let toolChoice = params.toolChoice;
+    if (typeof toolChoice === 'string' && !['auto', 'none', 'required'].includes(toolChoice)) {
+      toolChoice = { type: 'function', function: { name: toolChoice } };
+    }
+    let response = await this.api.post<ChatCompletionResponse>(
+      '/chat/completions',
+      pickDefined({
+        model: params.model,
+        messages: params.messages,
+        provider: params.provider ?? this.defaultProvider,
+        max_tokens: params.maxTokens,
+        temperature: params.temperature,
+        top_p: params.topP,
+        top_k: params.topK,
+        frequency_penalty: params.frequencyPenalty,
+        presence_penalty: params.presencePenalty,
+        n: params.n,
+        routing: params.routing ?? this.routing,
+        rag_tune: params.ragTune,
+        integrity: params.integrity,
+        memory: params.memory,
+        mem_session: params.memSession,
+        mem_expire: params.memExpire,
+        mem_clear: params.memClear === undefined ? undefined : params.memClear ? 1 : 0,
+        online: params.online,
+        searches: params.searches,
+        pull: params.pull,
+        use: params.use,
+        scrape_length: params.scrapeLength,
+        search_lang: params.searchLang,
+        search_geo: params.searchGeo,
+        web_search_options: params.webSearchContextSize
+          ? { search_context_size: params.webSearchContextSize }
+          : undefined,
+        tools: params.tools,
+        tool_choice: toolChoice,
+        tools_model: params.toolsModel,
+        response_format: params.responseFormat,
+        user: params.user
+      })
+    );
+    if (!response.data?.id || !response.data.model || !Array.isArray(response.data.choices)) {
+      throw createApiServiceError('APIpie AI returned an invalid chat completion response.');
+    }
     return response.data;
   }
 
   async generateImage(params: ImageGenerationParams) {
-    let axios = this.createAxiosInstance();
-    let body: Record<string, unknown> = {
-      model: params.model,
-      prompt: params.prompt
-    };
-
-    if (params.provider ?? this.defaultProvider)
-      body.provider = params.provider ?? this.defaultProvider;
-    if (params.n !== undefined) body.n = params.n;
-    if (params.size) body.size = params.size;
-    if (params.quality) body.quality = params.quality;
-    if (params.style) body.style = params.style;
-    if (params.responseFormat) body.response_format = params.responseFormat;
-    if (params.image) body.image = params.image;
-
-    let response = await axios.post('/images/generations', body);
+    validateCount(params.n, 'n');
+    let response = await this.api.post(
+      '/images/generations',
+      pickDefined({
+        model: params.model,
+        prompt: params.prompt,
+        provider: params.provider ?? this.defaultProvider,
+        n: params.n,
+        size: params.size,
+        quality: params.quality,
+        style: params.style,
+        response_format: params.responseFormat,
+        image: params.image
+      })
+    );
+    if (!Array.isArray(response.data?.data) || response.data.data.length === 0) {
+      throw createApiServiceError('APIpie AI returned no generated images.');
+    }
     return response.data;
   }
 
   async textToSpeech(params: TextToSpeechParams) {
-    let axios = this.createAxiosInstance();
-    let body: Record<string, unknown> = {
-      model: params.model,
-      voice: params.voice,
-      input: params.input
-    };
-
-    if (params.provider ?? this.defaultProvider)
-      body.provider = params.provider ?? this.defaultProvider;
-    if (params.responseFormat) body.response_format = params.responseFormat;
-    if (params.speed !== undefined) body.speed = params.speed;
-    if (params.voiceSettings) {
-      body.voice_settings = {
-        stability: params.voiceSettings.stability,
-        similarity_boost: params.voiceSettings.similarityBoost,
-        style: params.voiceSettings.style,
-        use_speaker_boost: params.voiceSettings.useSpeakerBoost
-      };
-    }
-
-    let response = await axios.post('/audio/speech', body);
-    return response;
+    return this.api.post(
+      '/audio/speech',
+      pickDefined({
+        model: params.model,
+        voice: params.voice,
+        input: params.input,
+        provider: params.provider ?? this.defaultProvider,
+        response_format: params.responseFormat,
+        speed: params.speed,
+        voice_settings: params.voiceSettings
+          ? pickDefined({
+              stability: params.voiceSettings.stability,
+              similarity_boost: params.voiceSettings.similarityBoost,
+              style: params.voiceSettings.style,
+              use_speaker_boost: params.voiceSettings.useSpeakerBoost
+            })
+          : undefined
+      }),
+      { responseType: 'arraybuffer' }
+    );
   }
 
   async createEmbeddings(params: EmbeddingsParams) {
-    let axios = this.createAxiosInstance();
-    let body: Record<string, unknown> = {
-      model: params.model,
-      input: params.input
-    };
-
-    if (params.encodingFormat) body.encoding_format = params.encodingFormat;
-    if (params.dimensions !== undefined) body.dimensions = params.dimensions;
-
-    let response = await axios.post('/embeddings', body);
+    validateCount(params.dimensions, 'dimensions');
+    let response = await this.api.post(
+      '/embeddings',
+      pickDefined({
+        model: params.model,
+        input: params.input,
+        encoding_format: params.encodingFormat,
+        dimensions: params.dimensions
+      })
+    );
+    if (
+      !Array.isArray(response.data?.data) ||
+      response.data.data.some(
+        (item: { embedding?: unknown }) =>
+          !Array.isArray(item.embedding) ||
+          item.embedding.some(
+            (value: unknown) => typeof value !== 'number' || !Number.isFinite(value)
+          )
+      )
+    ) {
+      throw createApiServiceError('APIpie AI returned an invalid numeric embedding response.');
+    }
     return response.data;
   }
 
   async listModels(params: ModelsParams = {}) {
-    let axios = this.createAxiosInstance();
-    let queryParams: Record<string, unknown> = {};
-
-    if (params.type) queryParams.type = params.type;
-    if (params.subtype) queryParams.subtype = params.subtype;
-    if (params.provider) queryParams.provider = params.provider;
-    if (params.model) queryParams.model = params.model;
-    if (params.enabled !== undefined) queryParams.enabled = params.enabled;
-    if (params.voices) queryParams.voices = '';
-
-    let response = await axios.get('/models', { params: queryParams });
+    let response = await this.api.get('/models', {
+      params: pickDefined({
+        type: params.type,
+        subtype: params.subtype,
+        provider: params.provider,
+        model: params.model,
+        enabled: params.enabled,
+        voices: params.voices ? '' : undefined
+      })
+    });
+    if (!Array.isArray(response.data?.data)) {
+      throw createApiServiceError('APIpie AI returned an invalid model catalog.');
+    }
     return response.data;
   }
 
   async search(params: SearchParams) {
-    let axios = this.createAxiosInstance();
-    let body: Record<string, unknown> = {
-      query: params.query
-    };
-
-    if (params.searchProvider) body.search_provider = params.searchProvider;
-    if (params.geo) body.geo = params.geo;
-    if (params.lang) body.lang = params.lang;
-    if (params.results !== undefined) body.results = params.results;
-    if (params.safeSearch !== undefined) body.safeSearch = params.safeSearch;
-
-    let response = await axios.post('/search', body);
+    validateCount(params.results, 'results');
+    let response = await this.api.post(
+      '/search',
+      pickDefined({
+        query: params.query,
+        search_provider: params.searchProvider,
+        geo: params.geo,
+        lang: params.lang,
+        results: params.results,
+        safeSearch: params.safeSearch
+      })
+    );
     return response.data;
   }
 
   async scrape(params: ScrapeParams) {
-    let axios = this.createAxiosInstance();
-    let body: Record<string, unknown> = {
-      url: params.url
-    };
-
-    if (params.format) body.format = params.format;
-
-    let response = await axios.post('/scrape', body);
+    let response = await this.api.post('/scrape', pickDefined(params));
     return response.data;
   }
 
   async getUsage(params: UsageParams = {}) {
-    let axios = this.createAxiosInstance();
-    let queryParams: Record<string, unknown> = {};
-
-    if (params.limit !== undefined) queryParams.limit = params.limit;
-    if (params.offset !== undefined) queryParams.offset = params.offset;
-
-    let response = await axios.get('/queries/', { params: queryParams });
+    validateCount(params.limit, 'limit');
+    validateCount(params.offset, 'offset', 0);
+    let response = await this.api.get('/queries/', { params: pickDefined(params) });
+    if (!Array.isArray(response.data?.items)) {
+      throw createApiServiceError('APIpie AI returned an invalid usage history response.');
+    }
     return response.data;
   }
 
   async uploadRagDocument(params: RagUploadParams) {
-    let axios = this.createAxiosInstance('https://apipie.ai');
-    let body: Record<string, unknown> = {
-      collection: params.collection,
-      url: params.url
-    };
-
-    if (params.metatag) body.metatag = params.metatag;
-
-    let response = await axios.post('/ragtune', body);
+    let response = await this.ragApi.post('/ragtune', pickDefined(params));
     return response.data;
   }
 
   async listRagCollections() {
-    let axios = this.createAxiosInstance('https://apipie.ai');
-    let response = await axios.post('/ragtune/listCollections', {});
+    let response = await this.ragApi.post('/ragtune/listCollections', {});
     return response.data;
   }
 
   async deleteRagCollection(params: RagDeleteParams) {
-    let axios = this.createAxiosInstance('https://apipie.ai');
-    let body: Record<string, unknown> = {
-      collection: params.collection,
-      collectionName: params.collection
-    };
+    let response = await this.ragApi.post(
+      '/ragtune/deleteCollection',
+      pickDefined({
+        collection: params.collection,
+        collectionName: params.collection,
+        deleteAll: params.deleteAll,
+        ids: params.ids
+      })
+    );
+    return response.data;
+  }
 
-    if (params.deleteAll !== undefined) body.deleteAll = params.deleteAll;
-    if (params.ids) body.ids = params.ids;
+  async getState(params: { user?: string; appName?: string } = {}) {
+    let response = await this.api.get<StateResponse>('/state', {
+      params: pickDefined({ user: params.user, app_name: params.appName })
+    });
+    return response.data;
+  }
 
-    let response = await axios.post('/ragtune/deleteCollection', body);
+  async updateState(params: StateUpdateParams) {
+    let response = await this.api.post<StateResponse>(
+      '/state',
+      pickDefined({
+        settings: params.settings,
+        delete: params.deleteKeys,
+        enable_inline_cli: params.enableInlineCli,
+        enable_user_states: params.enableUserStates,
+        gui_only: params.guiOnly
+      })
+    );
     return response.data;
   }
 }
@@ -323,10 +427,9 @@ export class Client {
 export let createClient = (ctx: {
   auth: { token: string };
   config: { defaultProvider?: string; routing?: string };
-}) => {
-  return new Client({
+}) =>
+  new Client({
     token: ctx.auth.token,
     defaultProvider: ctx.config.defaultProvider,
     routing: ctx.config.routing
   });
-};

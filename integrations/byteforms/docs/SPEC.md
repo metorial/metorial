@@ -1,55 +1,44 @@
-Now let me look at the actual ByteForms API documentation and check for webhook support:Let me try to access the ByteForms API documentation directly:Now I have sufficient information to write the specification. Let me compile what I've found:
-
-# Slates Specification for Byteforms
-
-## Overview
-
-ByteForms is a form builder platform by BytePlexure (part of the ByteSuite product family) that allows users to create forms, surveys, and quizzes. It provides form creation, submission management, and data integration. It supports payment collection, calendar appointment booking, and integrations with third-party services.
+# ByteForms API specification
 
 ## Authentication
 
-ByteForms uses API keys for authentication. The API key is passed in the `Authorization` header of each request.
+Create an API key on the ByteForms account page. Requests use the base URL
+`https://api.forms.bytesuite.io/api` and the `Authorization` header containing
+the API key without a `Bearer` prefix.
 
-- **Base URL:** `https://api.forms.bytesuite.io/api`
-- **Header:** `Authorization: <api_key>`
+The [official API documentation](https://forms.bytesuite.io/docs/api#authentication)
+describes this authentication method. No OAuth scopes are required.
 
-The API key can be obtained from your ByteForms account settings. No OAuth flow or additional scopes are required.
+## Available operations
 
-**Example request:**
+The [endpoint reference](https://forms.bytesuite.io/docs/api#endpoints) documents:
 
-```
-GET https://api.forms.bytesuite.io/api/form
-Authorization: YOUR_API_KEY
-```
+| Tool | Request | Result |
+| --- | --- | --- |
+| `list_forms` | `GET /form` | All forms created by the authenticated user |
+| `get_form` | `GET /form/{formId}` | One form and its configuration |
+| `list_form_submissions` | `GET /form/responses/{formId}` | A page of submissions with a count and cursors |
 
-## Features
+Call `list_forms` to discover a form ID. Submission requests support `limit`,
+`order` (`asc` or `desc`), `query`, `after`, and `before`. Pass the returned
+`after` or `before` cursor to retrieve another page. A supplied limit must be a
+positive whole number; the reference does not document a maximum or default.
 
-### Form Management
+## Returned data
 
-Retrieve a list of forms associated with your account. This allows you to programmatically access form metadata and configuration. You can access ByteForms forms through the programming interface provided by ByteForms.
+The [model reference](https://forms.bytesuite.io/docs/api#models) defines numeric
+form and submission IDs, field definitions, page configuration, owner IDs,
+creation/update timestamps, and nullable deletion timestamps. Form options
+include submission limits and deadlines, confirmation messages, layout,
+visibility, and notification settings.
 
-- Forms can be identified by a unique form ID.
+Submission responses preserve the provider's field values, including nested
+objects used by file, ReCaptcha, and Calendly fields. The IP address is returned
+when the provider supplies it as a string.
 
-### Submission Management
+## Errors
 
-Access and retrieve form submissions (responses) for a specific form. All form submissions are stored in the ByteForms Inbox, where you can view submissions, access daily analytics reports, and export data to CSV or JSON formats.
-
-- Submissions can be listed per form using the form ID.
-- Submissions include a `created_at` timestamp and unique ID.
-- Results are returned in a cursor-based paginated format.
-
-### Third-Party Integrations
-
-ByteForms can send form submission data as messages to Slack channels. Forms can be connected with dozens of popular third-party services to ensure data is delivered to the right destinations.
-
-### Payment Collection
-
-ByteForms supports collecting payments online through forms. This feature may have limited availability as some payment features are marked as coming soon.
-
-### Calendar Booking
-
-Users can manage calendar appointments and bookings directly through their forms.
-
-## Events
-
-The provider does not support native webhooks or purpose-built event subscription mechanisms through its API. Third-party platforms like Zapier trigger when a new form submission is received, but this is implemented via polling for new submissions rather than native webhooks. Similarly, Pipedream emits new events when a user submission to a form occurs, using a polling-based mechanism that checks for new submissions at regular intervals based on the `created_at` timestamp.
+ByteForms documents API failures as an object containing `message` and
+`status: "fail"`. HTTP failures, unsuccessful response envelopes, and malformed
+collection responses produce a structured service error. Empty credentials and
+form IDs are rejected before sending a request.

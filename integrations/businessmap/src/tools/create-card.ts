@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createCardTool = SlateTool.create(spec, {
   name: 'Create Card',
   key: 'create_card',
-  description: `Create a new card on a Kanbanize board. Requires board, workflow, column, and lane placement. Optionally set properties like description, owner, priority, size, color, deadline, and card type.`,
+  description: `Create a new card on a Businessmap board. Requires board, workflow, column, and lane placement. Optionally set properties like description, owner, priority, size, color, deadline, and card type.`,
   instructions: [
     'Use "Get Board Details" first to find valid workflow, column, and lane IDs for the target board.'
   ]
@@ -20,15 +20,31 @@ export let createCardTool = SlateTool.create(spec, {
       title: z.string().describe('Card title'),
       description: z.string().optional().describe('Card description (supports HTML)'),
       customId: z.string().optional().describe('Custom card identifier'),
-      ownerUserId: z.number().optional().describe('User ID of the card owner'),
-      typeId: z.number().optional().describe('Card type ID'),
+      ownerUserId: z
+        .number()
+        .optional()
+        .describe('User ID of the card owner. Call list_users to discover users.'),
+      typeId: z
+        .number()
+        .optional()
+        .describe(
+          'Card type ID. Call list_card_types to discover types available on this board.'
+        ),
       size: z.number().optional().describe('Card size estimate'),
       priority: z
         .number()
         .optional()
-        .describe('Card priority (0=None, 1=Low, 2=Average, 3=High, 4=Critical)'),
-      color: z.string().optional().describe('Card color as hex code (e.g. "#ff0000")'),
-      deadline: z.string().optional().describe('Deadline in YYYY-MM-DD format')
+        .describe(
+          'Card priority (1=Critical, 2=High, 3=Average, 4=Low; values above 4 are treated as Low)'
+        ),
+      color: z
+        .string()
+        .optional()
+        .describe('Card color as a six-character hexadecimal value (e.g. "ff0000")'),
+      deadline: z
+        .string()
+        .optional()
+        .describe('Deadline as an ISO 8601 datetime including a timezone offset')
     })
   )
   .output(
@@ -42,10 +58,7 @@ export let createCardTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     let card = await client.createCard({
       boardId: ctx.input.boardId,

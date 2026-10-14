@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -28,14 +28,11 @@ export let manageSubtasksTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.description)
-        throw new Error('Description is required to create a subtask.');
+        throw createApiServiceError('Description is required to create a subtask.');
       let subtask = await client.createSubtask(ctx.input.cardId, {
         description: ctx.input.description,
         ownerUserId: ctx.input.ownerUserId,
@@ -46,14 +43,15 @@ export let manageSubtasksTool = SlateTool.create(spec, {
           subtaskId: subtask?.subtask_id,
           description: subtask?.description,
           ownerUserId: subtask?.owner_user_id,
-          isFinished: subtask?.is_finished
+          isFinished: subtask?.is_finished ?? (subtask?.finished_at ? 1 : 0)
         },
         message: `Created subtask on card **${ctx.input.cardId}**.`
       };
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.subtaskId) throw new Error('subtaskId is required to update a subtask.');
+      if (!ctx.input.subtaskId)
+        throw createApiServiceError('subtaskId is required to update a subtask.');
       let subtask = await client.updateSubtask(ctx.input.cardId, ctx.input.subtaskId, {
         description: ctx.input.description,
         ownerUserId: ctx.input.ownerUserId,
@@ -65,14 +63,25 @@ export let manageSubtasksTool = SlateTool.create(spec, {
           subtaskId: subtask?.subtask_id ?? ctx.input.subtaskId,
           description: subtask?.description,
           ownerUserId: subtask?.owner_user_id,
-          isFinished: subtask?.is_finished
+          isFinished:
+            subtask?.is_finished ??
+            (subtask
+              ? subtask.finished_at
+                ? 1
+                : 0
+              : ctx.input.isFinished === undefined
+                ? undefined
+                : ctx.input.isFinished
+                  ? 1
+                  : 0)
         },
         message: `Updated subtask **${ctx.input.subtaskId}** on card **${ctx.input.cardId}**.`
       };
     }
 
     // delete
-    if (!ctx.input.subtaskId) throw new Error('subtaskId is required to delete a subtask.');
+    if (!ctx.input.subtaskId)
+      throw createApiServiceError('subtaskId is required to delete a subtask.');
     await client.deleteSubtask(ctx.input.cardId, ctx.input.subtaskId);
     return {
       output: {

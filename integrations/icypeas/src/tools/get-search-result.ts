@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let getSearchResult = SlateTool.create(spec, {
   name: 'Get Search Result',
   key: 'get_search_result',
-  description: `Retrieve the result of a single search (email search, email verification, or domain scan) using its search ID. Results include found email addresses, confidence levels, verification status, and MX provider information. A search status of **DEBITED** means the search is complete.`,
+  description: `Retrieve a search result (email search, email verification, or domain scan) using its search ID. Results include found email addresses, confidence levels, verification status, and MX provider information. **FOUND** or **DEBITED** indicates a completed search with a result.`,
   instructions: [
     'The search ID is returned when submitting a search via the Search Email, Verify Email, or Scan Domain tools.',
-    'Statuses: NONE, SCHEDULED, IN_PROGRESS mean still processing; DEBITED means complete with results.'
+    'Statuses NONE, SCHEDULED and IN_PROGRESS mean processing. FOUND or DEBITED means a result was found; NOT_FOUND or DEBITED_NOT_FOUND means the search finished without a result.'
   ],
   tags: {
     readOnly: true,
@@ -47,24 +47,28 @@ export let getSearchResult = SlateTool.create(spec, {
     let result = await client.getSearchResult(ctx.input.searchId);
 
     let item = result?.item || result?.items?.[0] || result;
+    let details = item?.results || item;
+    let emails = details?.emails;
+    let primaryEmail = emails?.[0];
+    let email = details?.email || primaryEmail?.email;
+    let certainty = details?.certainty || primaryEmail?.certainty;
 
     return {
       output: {
         searchId: item?._id || ctx.input.searchId,
         status: item?.status,
-        email: item?.email,
-        emails: item?.emails,
-        certainty: item?.certainty,
-        firstname: item?.firstname,
-        lastname: item?.lastname,
-        mxProvider: item?.mxProvider,
-        gender: item?.gender,
+        email,
+        emails,
+        certainty,
+        firstname: details?.firstname,
+        lastname: details?.lastname,
+        mxProvider: details?.mxProvider || primaryEmail?.mxProvider,
+        gender: details?.gender,
         raw: item
       },
-      message:
-        item?.status === 'DEBITED'
-          ? `Search complete. ${item?.email ? `Email: **${item.email}** (${item.certainty || 'unknown confidence'})` : 'No email found.'}`
-          : `Search status: **${item?.status || 'unknown'}**. ${['NONE', 'SCHEDULED', 'IN_PROGRESS'].includes(item?.status) ? 'Still processing, try again shortly.' : ''}`
+      message: ['FOUND', 'DEBITED', 'NOT_FOUND', 'DEBITED_NOT_FOUND'].includes(item?.status)
+        ? `Search complete. ${email ? `Email: **${email}** (${certainty || 'unknown confidence'})` : 'No email found.'}`
+        : `Search status: **${item?.status || 'unknown'}**. ${['NONE', 'SCHEDULED', 'IN_PROGRESS'].includes(item?.status) ? 'Still processing, try again shortly.' : ''}`
     };
   })
   .build();

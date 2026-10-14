@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let searchBookings = SlateTool.create(spec, {
   name: 'Search Bookings',
   key: 'search_bookings',
-  description: `Search and filter bookings using advanced query operators. Filter by resource, project, date ranges, and more.
+  description: `Search and filter bookings using advanced query operators. Filter by resource, project, date ranges, and more. Use page and limit to retrieve additional results; the API returns 20 bookings by default.
 Use operators like **$in**, **$nin**, **$lt**, **$lte**, **$gte**, **$gt** for flexible querying.`,
   tags: {
     readOnly: true
@@ -14,6 +14,14 @@ Use operators like **$in**, **$nin**, **$lt**, **$lte**, **$gte**, **$gt** for f
 })
   .input(
     z.object({
+      page: z.number().int().min(0).optional().describe('Page number (0-based)'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Results per page, up to 1000'),
       resources: z
         .any()
         .optional()
@@ -62,21 +70,21 @@ Use operators like **$in**, **$nin**, **$lt**, **$lte**, **$gte**, **$gt** for f
     if (ctx.input.metadata !== undefined) filters.metadata = ctx.input.metadata;
     if (ctx.input.deleted !== undefined) filters.deleted = ctx.input.deleted;
 
-    let bookings = await client.searchBookings(filters);
+    let bookings = await client.searchBookings(filters, ctx.input.page, ctx.input.limit);
     return {
       output: {
         bookings: bookings.map((b: any) => ({
           bookingId: b._id,
-          resourceId: b.resource,
-          projectId: b.project,
-          start: b.start,
-          end: b.end,
-          title: b.title,
-          state: b.state,
-          stateValue: b.stateValue,
-          type: b.type,
-          createdDate: b.createdDate,
-          updatedDate: b.updatedDate
+          resourceId: b.resource ?? undefined,
+          projectId: b.project ?? undefined,
+          start: b.start ?? undefined,
+          end: b.end ?? undefined,
+          title: b.title ?? undefined,
+          state: b.state ?? undefined,
+          stateValue: b.stateValue ?? undefined,
+          type: b.type ?? undefined,
+          createdDate: b.createdDate ?? undefined,
+          updatedDate: b.updatedDate ?? undefined
         }))
       },
       message: `Found **${bookings.length}** bookings matching the search criteria.`

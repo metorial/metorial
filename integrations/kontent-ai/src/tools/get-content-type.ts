@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getContentType = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getContentType = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      environmentId: environmentIdInput,
       identifier: z.string().describe('The ID, codename, or external ID of the content type'),
       identifierType: z
         .enum(['id', 'codename', 'external_id'])
@@ -54,7 +56,7 @@ export let getContentType = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
     let type = await client.getContentType(ctx.input.identifier, ctx.input.identifierType);

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -79,9 +79,9 @@ export let startChatbot = SlateTool.create(spec, {
       });
 
       let chatbots = (result?.chatbot_list || []).map((c: any) => ({
-        chatbotId: c.id,
-        name: c.name,
-        created: c.created
+        chatbotId: c.id ?? undefined,
+        name: c.name ?? undefined,
+        created: c.created ?? undefined
       }));
 
       return {
@@ -92,17 +92,24 @@ export let startChatbot = SlateTool.create(spec, {
 
     if (ctx.input.action === 'start') {
       if (!ctx.input.chatbotId || !ctx.input.target) {
-        throw new Error('chatbotId and target are required for starting a chatbot.');
+        throw createApiServiceError(
+          'chatbotId and target are required for starting a chatbot.'
+        );
       }
 
       let result = await client.startChatbot(ctx.input.chatbotId, ctx.input.target);
+      if (result?.result !== true) {
+        throw createApiServiceError(
+          'Wati returned no confirmation that the chatbot started. Check the conversation before retrying.'
+        );
+      }
 
       return {
-        output: { result: result?.result ?? true },
+        output: { result: result?.result },
         message: `Chatbot **${ctx.input.chatbotId}** started for **${ctx.input.target}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

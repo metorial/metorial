@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CustomGPTClient } from '../lib/client';
 import { spec } from '../spec';
@@ -14,8 +14,21 @@ export let manageLabels = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['list', 'create', 'rename', 'delete']).describe('Action to perform'),
-      projectId: z.number().describe('ID of the agent'),
-      labelId: z.number().optional().describe('Label ID (required for rename and delete)'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
+      labelId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .optional()
+        .describe('Label ID (required for rename and delete)'),
       name: z.string().optional().describe('Label name (required for create and rename)')
     })
   )
@@ -47,7 +60,7 @@ export let manageLabels = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required for create action');
+        throw createApiServiceError('name is required for create action');
       }
       let label = await client.createLabel(projectId, ctx.input.name);
       return {
@@ -57,12 +70,12 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (!ctx.input.labelId) {
-      throw new Error('labelId is required for rename and delete actions');
+      throw createApiServiceError('labelId is required for rename and delete actions');
     }
 
     if (action === 'rename') {
       if (!ctx.input.name) {
-        throw new Error('name is required for rename action');
+        throw createApiServiceError('name is required for rename action');
       }
       let label = await client.renameLabel(projectId, ctx.input.labelId, ctx.input.name);
       return {

@@ -20,6 +20,7 @@ export let listTags = SlateTool.create(spec, {
         .array(
           z.object({
             tag: z.string().describe('Tag name'),
+            tagId: z.number().optional().describe('Unique tag ID'),
             status: z.string().optional().describe('Tag status')
           })
         )
@@ -36,6 +37,7 @@ export let listTags = SlateTool.create(spec, {
 
     let tagList = (result.tags ?? []).map(t => ({
       tag: t.tag,
+      tagId: t.tag_id,
       status: t.status
     }));
 

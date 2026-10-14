@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,7 +40,8 @@ export let manageAccessAccount = SlateTool.create(spec, {
     let { action, accessAccountId, name, email, password } = ctx.input;
 
     if (action === 'delete') {
-      if (!accessAccountId) throw new Error('accessAccountId is required for delete action');
+      if (!accessAccountId)
+        throw createApiServiceError('accessAccountId is required for delete action');
       await client.deleteAccessAccount(accessAccountId);
       return {
         output: { accessAccountId },
@@ -49,9 +50,9 @@ export let manageAccessAccount = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
-      if (!email) throw new Error('email is required for create action');
-      if (!password) throw new Error('password is required for create action');
+      if (!name) throw createApiServiceError('name is required for create action');
+      if (!email) throw createApiServiceError('email is required for create action');
+      if (!password) throw createApiServiceError('password is required for create action');
       let result = await client.createAccessAccount({ name, email, password });
       return {
         output: {
@@ -66,7 +67,8 @@ export let manageAccessAccount = SlateTool.create(spec, {
     }
 
     // update
-    if (!accessAccountId) throw new Error('accessAccountId is required for update action');
+    if (!accessAccountId)
+      throw createApiServiceError('accessAccountId is required for update action');
     let result = await client.updateAccessAccount(accessAccountId, { name, email, password });
     return {
       output: {

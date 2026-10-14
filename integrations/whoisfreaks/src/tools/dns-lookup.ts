@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhoisFreaksClient } from '../lib/client';
 import { spec } from '../spec';
@@ -17,12 +17,22 @@ export let dnsLookup = SlateTool.create(spec, {
     z.object({
       domainName: z
         .string()
+        .trim()
+        .min(1)
         .optional()
         .describe('Single domain name to look up DNS records for'),
       domainNames: z
-        .array(z.string())
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(100)
         .optional()
         .describe('Array of domain names for bulk DNS lookup (max 100)'),
+      ipAddress: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('IP address for a single live PTR lookup; may accompany domainName'),
       recordType: z
         .string()
         .default('all')
@@ -37,9 +47,16 @@ export let dnsLookup = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.domainName !== undefined && ctx.input.domainNames !== undefined) {
+      throw createApiServiceError('Provide either domainName or domainNames, not both.');
+    }
+
     let client = new WhoisFreaksClient({ token: ctx.auth.token });
 
     if (ctx.input.domainNames && ctx.input.domainNames.length > 0) {
+      if (ctx.input.ipAddress !== undefined) {
+        throw createApiServiceError('Use ipAddress with a single lookup, not domainNames.');
+      }
       let result = await client.bulkDnsLookup(ctx.input.domainNames, ctx.input.recordType);
       return {
         output: { dnsRecords: result },
@@ -47,14 +64,18 @@ export let dnsLookup = SlateTool.create(spec, {
       };
     }
 
-    if (ctx.input.domainName) {
-      let result = await client.liveDnsLookup(ctx.input.domainName, ctx.input.recordType);
+    if (ctx.input.domainName || ctx.input.ipAddress) {
+      let result = await client.liveDnsLookup(
+        ctx.input.domainName,
+        ctx.input.recordType,
+        ctx.input.ipAddress
+      );
       return {
         output: { dnsRecords: result },
-        message: `Retrieved DNS records (type: **${ctx.input.recordType}**) for **${ctx.input.domainName}**.`
+        message: `Retrieved DNS records (type: **${ctx.input.recordType}**) for **${ctx.input.domainName ?? ctx.input.ipAddress}**.`
       };
     }
 
-    throw new Error('Either domainName or domainNames must be provided.');
+    throw createApiServiceError('Provide domainName, domainNames, or ipAddress.');
   })
   .build();

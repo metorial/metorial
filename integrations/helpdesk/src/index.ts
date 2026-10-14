@@ -5,7 +5,9 @@ import {
   deleteTicket,
   getReport,
   getTicket,
+  listLicenses,
   listTickets,
+  listViews,
   manageAgents,
   manageCannedResponses,
   manageCustomFields,
@@ -16,12 +18,16 @@ import {
   mergeTickets,
   queryAuditLog,
   sendRatingRequest,
+  sendTicketMessage,
   updateTicket
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
     listTickets,
+    listLicenses,
+    listViews,
+    sendTicketMessage,
     getTicket,
     createTicket,
     updateTicket,

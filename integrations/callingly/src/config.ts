@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Client account ID for agency partners managing multiple accounts. Leave empty if not using agency features.'
+        'Client account ID for agency partners managing multiple accounts. Use list_clients to discover IDs. Leave empty if not using agency features.'
       )
   })
 );

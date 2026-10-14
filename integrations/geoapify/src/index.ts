@@ -3,10 +3,12 @@ import { spec } from './spec';
 import {
   autocompleteAddress,
   batchGeocode,
+  batchReverseGeocode,
   calculateIsoline,
   calculateRoute,
   calculateRouteMatrix,
   checkBatchGeocode,
+  checkIsoline,
   geocodeAddress,
   getPlaceDetails,
   ipGeolocation,
@@ -33,7 +35,9 @@ export let provider = Slate.create({
     lookupPostcodes,
     mapMatch,
     batchGeocode,
-    checkBatchGeocode
+    batchReverseGeocode,
+    checkBatchGeocode,
+    checkIsoline
   ],
   triggers: []
 });

@@ -53,6 +53,7 @@ export let customerOutputSchema = z.object({
   phoneNumber: z.string().nullable().optional().describe('Phone number'),
   mobileNumber: z.string().nullable().optional().describe('Mobile number'),
   status: z.string().optional().describe('Customer status'),
+  chasing: z.boolean().optional().describe('Whether chasing is enabled for the customer'),
   groups: z.array(groupSchema).optional().describe('Groups/tags'),
   addresses: z.array(addressSchema).optional().describe('Addresses'),
   paymentPortalLink: z.string().nullable().optional().describe('Payment portal link'),
@@ -123,6 +124,15 @@ export let invoiceInputSchema = z.object({
     .nullable()
     .optional()
     .describe('Date invoice was fully paid (ISO 8601)'),
+  expectPaymentDate: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Expected payment date (ISO 8601)'),
+  invoicePdfLinkSource: z
+    .string()
+    .optional()
+    .describe('Source URL from which Chaser can fetch the invoice PDF'),
   customerExternalId: z.string().describe('External ID of the associated customer')
 });
 
@@ -139,15 +149,18 @@ export let invoiceOutputSchema = z.object({
   date: z.string().describe('Issue date'),
   dueDate: z.string().describe('Due date'),
   fullyPaidDate: z.string().nullable().optional().describe('Fully paid date'),
+  expectPaymentDate: z.string().nullable().optional().describe('Expected payment date'),
   customerExternalId: z.string().describe('Customer external ID'),
   customerName: z.string().nullable().optional().describe('Customer name'),
   payments: z.array(paymentSchema).optional().describe('Payment history'),
   invoicePdfLink: z.string().nullable().optional().describe('URL to uploaded PDF'),
+  invoicePdfLinkSource: z.string().nullable().optional().describe('Source URL for the PDF'),
   invoicePdfLinkUpdatedAt: z
     .string()
     .nullable()
     .optional()
-    .describe('When PDF was last updated')
+    .describe('When PDF was last updated'),
+  chasing: z.boolean().optional().describe('Whether chasing is enabled for the invoice')
 });
 
 // --- Credit Note ---
@@ -210,7 +223,14 @@ export let organisationOutputSchema = z.object({
   baseCurrency: z.string().describe('Base currency code'),
   countryCode: z.string().describe('Country code'),
   timezone: z.string().describe('Timezone'),
-  lastSyncDate: z.string().nullable().optional().describe('Last sync date (ISO 8601)')
+  lastSyncDate: z.string().nullable().optional().describe('Last sync date (ISO 8601)'),
+  chasing: z.boolean().optional().describe('Whether organisation chasing is enabled')
+});
+
+export let omittedEntrySchema = z.object({
+  id: z.string().optional().describe('Identifier of the omitted record, when provided'),
+  index: z.number().optional().describe('Index of the record in the submitted batch'),
+  reason: z.string().optional().describe('Reason the record was omitted')
 });
 
 export let syncTaskEnum = z.enum([

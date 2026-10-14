@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listUsersTool = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `List all users in your Kanbanize account. Optionally filter to show only enabled or disabled users. Returns user IDs, names, and emails useful for assigning cards and subtasks.`,
+  description: `List all users in your Businessmap account. Optionally filter to show only enabled or disabled users. Returns user IDs, names, and emails useful for assigning cards and subtasks.`,
   tags: {
     readOnly: true
   }
@@ -38,10 +38,7 @@ export let listUsersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     let enabledOnly = ctx.input.enabledOnly !== false;
     let result = await client.listUsers({

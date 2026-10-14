@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ChatClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let sendMessageTool = SlateTool.create(spec, {
-  name: 'Send Chat Message',
+  name: 'Submit APIchat Message',
   key: 'send_message',
-  description: `Send a message to a customer via a chat channel. Supports sending **text**, **image**, and **location** messages. Requires the channel-specific auth token and the customer's token.`,
+  description: `Submit an incoming customer message to an APIchat channel so the bot can respond. Supports **text**, **image**, and **location** messages. An unknown customer token creates a customer. Use send_customer_text to send an outbound message to an existing customer.`,
   instructions: [
     'The channelToken is the auth token generated for the specific channel (found in channel configuration), not the account API token.',
     'Set messageType to "text" for plain text, "image" for image URLs, or "location" for map locations.'
@@ -38,7 +38,10 @@ export let sendMessageTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Longitude coordinate (required when messageType is "location")'),
-      address: z.string().optional().describe('Display address for the location (optional)')
+      address: z
+        .string()
+        .optional()
+        .describe('Caption or address text for the location (optional)')
     })
   )
   .output(
@@ -48,22 +51,28 @@ export let sendMessageTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.customerToken.trim()) {
+      throw createApiServiceError('A non-empty customer token is required.');
+    }
     let chatClient = new ChatClient(ctx.input.channelToken);
     let response: any;
 
     if (ctx.input.messageType === 'text') {
-      if (!ctx.input.text) throw new Error('text is required when messageType is "text"');
+      if (!ctx.input.text)
+        throw createApiServiceError('text is required when messageType is "text"');
       response = await chatClient.sendTextMessage(ctx.input.customerToken, ctx.input.text);
     } else if (ctx.input.messageType === 'image') {
       if (!ctx.input.imageUrl)
-        throw new Error('imageUrl is required when messageType is "image"');
+        throw createApiServiceError('imageUrl is required when messageType is "image"');
       response = await chatClient.sendImageMessage(
         ctx.input.customerToken,
         ctx.input.imageUrl
       );
     } else if (ctx.input.messageType === 'location') {
       if (!ctx.input.latitude || !ctx.input.longitude)
-        throw new Error('latitude and longitude are required when messageType is "location"');
+        throw createApiServiceError(
+          'latitude and longitude are required when messageType is "location"'
+        );
       response = await chatClient.sendLocationMessage(
         ctx.input.customerToken,
         ctx.input.latitude,
@@ -77,6 +86,6 @@ export let sendMessageTool = SlateTool.create(spec, {
         success: true,
         response
       },
-      message: `Sent **${ctx.input.messageType}** message to customer.`
+      message: `Submitted **${ctx.input.messageType}** customer message to APIchat.`
     };
   });

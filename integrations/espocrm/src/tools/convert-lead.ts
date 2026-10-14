@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let convertLead = SlateTool.create(spec, {
   name: 'Convert Lead',
   key: 'convert_lead',
-  description: `Convert a Lead into a Contact, Account, and/or Opportunity in EspoCRM. Optionally specify an existing Account or Contact to link to, or provide details for new records to be created.`,
+  description: `Convert a Lead into a Contact, Account, and/or Opportunity in EspoCRM. Optionally associate new Contacts and Opportunities with an existing Account. Lead attributes are copied into new records using the instance's conversion settings.`,
   instructions: [
-    'At least one of createAccount, createContact, or createOpportunity should be provided.',
-    'If an existing accountId is provided, the lead will be linked to that account instead of creating a new one.'
+    'Accounts and Contacts are created by default. Set createAccount or createContact to false to omit them; Opportunities are only created when requested.',
+    'If accountId is provided, no new Account is created. The existing Account is associated through a newly created Contact or Opportunity.'
   ],
   tags: {
     destructive: true
@@ -54,26 +54,48 @@ export let convertLead = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
     let records: Record<string, any> = {};
+    let createAccount = ctx.input.createAccount !== false && !ctx.input.accountId;
+    let createContact = ctx.input.createContact !== false;
+    let createOpportunity = ctx.input.createOpportunity === true;
 
-    if (ctx.input.createAccount !== false) {
-      if (ctx.input.accountId) {
-        records.Account = ctx.input.accountId;
-      } else {
-        records.Account = true;
+    if (!createAccount && !createContact && !createOpportunity) {
+      throw createApiServiceError(
+        'Select at least one record type to create when converting the lead. An existing accountId requires a new Contact or Opportunity.'
+      );
+    }
+
+    let defaults = await client.getLeadConversionAttributes(ctx.input.leadId);
+    for (let entityType of [
+      ...(createAccount ? ['Account'] : []),
+      ...(createContact ? ['Contact'] : []),
+      ...(createOpportunity ? ['Opportunity'] : [])
+    ]) {
+      if (!defaults[entityType]) {
+        throw createApiServiceError(
+          `EspoCRM cannot prepare ${entityType} conversion. Check create permissions and the instance's lead conversion settings.`
+        );
       }
     }
 
-    if (ctx.input.createContact !== false) {
-      records.Contact = true;
+    if (createAccount) {
+      records.Account = { ...defaults.Account };
     }
 
-    if (ctx.input.createOpportunity) {
-      let oppData: Record<string, any> = {};
-      if (ctx.input.opportunityName) oppData.name = ctx.input.opportunityName;
-      if (ctx.input.opportunityStage) oppData.stage = ctx.input.opportunityStage;
-      if (ctx.input.opportunityAmount) oppData.amount = ctx.input.opportunityAmount;
-      if (ctx.input.opportunityCloseDate) oppData.closeDate = ctx.input.opportunityCloseDate;
-      records.Opportunity = Object.keys(oppData).length > 0 ? oppData : true;
+    if (createContact) {
+      records.Contact = { ...defaults.Contact };
+      if (ctx.input.accountId) records.Contact.accountId = ctx.input.accountId;
+    }
+
+    if (createOpportunity) {
+      let oppData: Record<string, any> = { ...defaults.Opportunity };
+      if (ctx.input.accountId) oppData.accountId = ctx.input.accountId;
+      if (ctx.input.opportunityName !== undefined) oppData.name = ctx.input.opportunityName;
+      if (ctx.input.opportunityStage !== undefined) oppData.stage = ctx.input.opportunityStage;
+      if (ctx.input.opportunityAmount !== undefined)
+        oppData.amount = ctx.input.opportunityAmount;
+      if (ctx.input.opportunityCloseDate !== undefined)
+        oppData.closeDate = ctx.input.opportunityCloseDate;
+      records.Opportunity = oppData;
     }
 
     let result = await client.convertLead(ctx.input.leadId, records);
@@ -81,9 +103,14 @@ export let convertLead = SlateTool.create(spec, {
     return {
       output: {
         leadId: ctx.input.leadId,
-        accountId: result.accountId || result.Account?.id,
-        contactId: result.contactId || result.Contact?.id,
-        opportunityId: result.opportunityId || result.Opportunity?.id
+        accountId:
+          result.createdAccountId ||
+          result.accountId ||
+          result.Account?.id ||
+          ctx.input.accountId,
+        contactId: result.createdContactId || result.contactId || result.Contact?.id,
+        opportunityId:
+          result.createdOpportunityId || result.opportunityId || result.Opportunity?.id
       },
       message: `Lead **${ctx.input.leadId}** converted successfully.`
     };

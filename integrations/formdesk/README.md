@@ -1,6 +1,10 @@
 # <img src="logo.svg" height="20"> Formdesk
 
-Manage online forms, submissions, and visitors on Formdesk. Retrieve form lists, query and filter form results by date, status, or sync state, and export submissions to Excel, CSV, XML, or PDF. Add, update, and remove form result entries programmatically, including file uploads. Manage form visitors (list, add, update, remove, authenticate) and retrieve visitor-associated results. Pre-fill forms using data parking with ticketed URLs. Mark results as processed for incremental sync workflows. Supports single sign-on for users and visitors, and retrieves uploaded files and pre-defined filters.
+Manage Formdesk forms, submissions, visitors, and uploaded files. Discover forms and field identifiers, filter results, add or update string field values, and mark submissions as processed for synchronization. Download uploaded files, export result files, and generate completed-form PDFs. Manage visitor accounts, retrieve visitor profiles and submission history, generate sign-on URLs, and pre-fill forms using parking tickets.
+
+Connect with an API key and the account folder name. The connection discovers the correct Formdesk server. API credits and account permissions apply.
+
+The legacy visitor credential-validation endpoint is retained but is not described in the current REST documentation. Legacy export formats `dbase` and `foxpro`, PDF paper size `Legal`, and filename-based file lookup are also not established by the current documentation. Prefer documented formats, paper sizes, and file IDs from `list_files`.
 
 ## License
 

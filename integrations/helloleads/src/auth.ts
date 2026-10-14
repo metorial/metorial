@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -24,6 +24,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim() || !ctx.input.email.trim()) {
+        throw createApiServiceError(
+          'Provide your HelloLeads API key and account email address.'
+        );
+      }
       return {
         output: {
           token: ctx.input.apiKey,

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import type { EntryWrite } from '../lib/client';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -38,7 +39,7 @@ export let recordKpiEntriesBatch = SlateTool.create(spec, {
     let client = createClient(ctx.config, ctx.auth);
 
     let entries = ctx.input.entries.map(e => {
-      let entry: Record<string, unknown> = {
+      let entry: EntryWrite = {
         kpi_id: e.kpiId,
         entry_date: e.entryDate
       };
@@ -51,7 +52,7 @@ export let recordKpiEntriesBatch = SlateTool.create(spec, {
     });
 
     let result = await client.createKpiEntriesBatch({
-      entries: entries as any,
+      entries,
       hasActuals: ctx.input.hasActuals,
       hasTargets: ctx.input.hasTargets,
       hasNotes: ctx.input.hasNotes

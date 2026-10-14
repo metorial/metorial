@@ -68,8 +68,8 @@ export let createTask = SlateTool.create(spec, {
       output: {
         taskId: result.id,
         description: result.description,
-        dueOn: result.dueOn,
-        createdAt: result.createdAt
+        dueOn: result.dueOn ?? undefined,
+        createdAt: result.createdAt ?? undefined
       },
       message: `Created task **"${result.description}"** (ID: ${result.id}).`
     };

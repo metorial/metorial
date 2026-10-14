@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -28,7 +28,9 @@ export let sendTemplateMessage = SlateTool.create(spec, {
       templateParameters: z
         .array(z.any())
         .optional()
-        .describe('Template parameter values in order'),
+        .describe(
+          'Body template parameter values in order, or parameter objects. Use templateComponents for header and button parameters.'
+        ),
       templateComponents: z
         .array(z.any())
         .optional()
@@ -50,11 +52,24 @@ export let sendTemplateMessage = SlateTool.create(spec, {
       }
     };
 
-    if (ctx.input.templateLanguage) {
-      message.template.language = ctx.input.templateLanguage;
-    }
+    if (!ctx.input.templateLanguage?.trim())
+      throw createApiServiceError('Provide templateLanguage from List Message Templates.');
+    message.template.languageCode = ctx.input.templateLanguage;
     if (ctx.input.templateParameters) {
-      message.template.parameters = ctx.input.templateParameters;
+      if (ctx.input.templateComponents)
+        throw createApiServiceError(
+          'Provide either templateParameters for body parameters or templateComponents for complete components.'
+        );
+      message.template.components = [
+        {
+          type: 'body',
+          parameters: ctx.input.templateParameters.map(value =>
+            typeof value === 'string' || typeof value === 'number'
+              ? { type: 'text', text: String(value) }
+              : value
+          )
+        }
+      ];
     }
     if (ctx.input.templateComponents) {
       message.template.components = ctx.input.templateComponents;

@@ -1,5 +1,11 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 import type {
+  AvailableTimeSlot,
   Booking,
   BookingCalendar,
   BookingPage,
@@ -14,16 +20,45 @@ import type {
 } from './types';
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.oncehub.com/v2',
-      headers: {
-        'API-Key': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'API-Key', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'OnceHub',
+          reason: 'oncehub_api_error'
+        })
     });
+  }
+
+  private async list<T>(
+    path: string,
+    params: PaginationParams,
+    filters: Record<string, string> = {}
+  ): Promise<PaginatedResponse<T>> {
+    let response = await this.http.get<{ data: T[]; has_more: boolean }>(path, {
+      params: { ...pickDefined(params), ...filters }
+    });
+    if (!Array.isArray(response.data?.data) || typeof response.data.has_more !== 'boolean') {
+      throw createApiServiceError('OnceHub returned an invalid list response.', {
+        reason: 'oncehub_invalid_response'
+      });
+    }
+    return { ...response.data, count: response.data.data.length };
+  }
+
+  async getAccountIdentity(): Promise<{ message: string; accountEmail: string | null }> {
+    let response = await this.http.get<{ message: string }>('/test');
+    if (typeof response.data?.message !== 'string' || !response.data.message.trim()) {
+      throw createApiServiceError('OnceHub returned an invalid account identity response.', {
+        reason: 'oncehub_invalid_response'
+      });
+    }
+    let accountEmail = response.data.message.match(/account:\s*(\S+@\S+)\s*$/i)?.[1] ?? null;
+    return { message: response.data.message, accountEmail };
   }
 
   async listBookings(params: ListBookingsParams = {}): Promise<PaginatedResponse<Booking>> {
@@ -45,112 +80,107 @@ export class Client {
     if (params.after) queryParams.after = params.after;
     if (params.before) queryParams.before = params.before;
 
-    let response = await this.http.get('/bookings', { params: queryParams });
-    return response.data;
+    return this.list('/bookings', {}, queryParams);
   }
 
   async getBooking(bookingId: string, expand?: string[]): Promise<Booking> {
     let queryParams: Record<string, string> = {};
     if (expand && expand.length > 0) queryParams.expand = expand.join(',');
 
-    let response = await this.http.get(`/bookings/${bookingId}`, { params: queryParams });
+    let response = await this.http.get<Booking>(`/bookings/${encodeURIComponent(bookingId)}`, {
+      params: queryParams
+    });
     return response.data;
   }
 
   async listBookingCalendars(
     params: PaginationParams = {}
   ): Promise<PaginatedResponse<BookingCalendar>> {
-    let queryParams: Record<string, string> = {};
-    if (params.limit) queryParams.limit = String(params.limit);
-    if (params.after) queryParams.after = params.after;
-    if (params.before) queryParams.before = params.before;
-
-    let response = await this.http.get('/booking-calendars', { params: queryParams });
-    return response.data;
+    return this.list('/booking-calendars', params);
   }
 
   async getBookingCalendar(calendarId: string): Promise<BookingCalendar> {
-    let response = await this.http.get(`/booking-calendars/${calendarId}`);
+    let response = await this.http.get(`/booking-calendars/${encodeURIComponent(calendarId)}`);
     return response.data;
   }
 
   async listBookingPages(
     params: PaginationParams = {}
   ): Promise<PaginatedResponse<BookingPage>> {
-    let queryParams: Record<string, string> = {};
-    if (params.limit) queryParams.limit = String(params.limit);
-    if (params.after) queryParams.after = params.after;
-    if (params.before) queryParams.before = params.before;
-
-    let response = await this.http.get('/booking-pages', { params: queryParams });
-    return response.data;
+    return this.list('/booking-pages', params);
   }
 
   async getBookingPage(pageId: string): Promise<BookingPage> {
-    let response = await this.http.get(`/booking-pages/${pageId}`);
+    let response = await this.http.get(`/booking-pages/${encodeURIComponent(pageId)}`);
     return response.data;
   }
 
   async listMasterPages(
     params: PaginationParams = {}
   ): Promise<PaginatedResponse<MasterPage>> {
-    let queryParams: Record<string, string> = {};
-    if (params.limit) queryParams.limit = String(params.limit);
-    if (params.after) queryParams.after = params.after;
-    if (params.before) queryParams.before = params.before;
-
-    let response = await this.http.get('/master-pages', { params: queryParams });
-    return response.data;
+    return this.list('/master-pages', params);
   }
 
   async getMasterPage(masterPageId: string): Promise<MasterPage> {
-    let response = await this.http.get(`/master-pages/${masterPageId}`);
+    let response = await this.http.get(`/master-pages/${encodeURIComponent(masterPageId)}`);
     return response.data;
   }
 
   async listEventTypes(params: PaginationParams = {}): Promise<PaginatedResponse<EventType>> {
-    let queryParams: Record<string, string> = {};
-    if (params.limit) queryParams.limit = String(params.limit);
-    if (params.after) queryParams.after = params.after;
-    if (params.before) queryParams.before = params.before;
-
-    let response = await this.http.get('/event-types', { params: queryParams });
-    return response.data;
+    return this.list('/event-types', params);
   }
 
   async getEventType(eventTypeId: string): Promise<EventType> {
-    let response = await this.http.get(`/event-types/${eventTypeId}`);
+    let response = await this.http.get(`/event-types/${encodeURIComponent(eventTypeId)}`);
     return response.data;
   }
 
   async listUsers(params: PaginationParams = {}): Promise<PaginatedResponse<User>> {
-    let queryParams: Record<string, string> = {};
-    if (params.limit) queryParams.limit = String(params.limit);
-    if (params.after) queryParams.after = params.after;
-    if (params.before) queryParams.before = params.before;
-
-    let response = await this.http.get('/users', { params: queryParams });
-    return response.data;
+    return this.list('/users', params);
   }
 
   async getUser(userId: string): Promise<User> {
-    let response = await this.http.get(`/users/${userId}`);
+    let response = await this.http.get(`/users/${encodeURIComponent(userId)}`);
     return response.data;
   }
 
   async listTeams(params: PaginationParams = {}): Promise<PaginatedResponse<Team>> {
-    let queryParams: Record<string, string> = {};
-    if (params.limit) queryParams.limit = String(params.limit);
-    if (params.after) queryParams.after = params.after;
-    if (params.before) queryParams.before = params.before;
+    return this.list('/teams', params);
+  }
 
-    let response = await this.http.get('/teams', { params: queryParams });
+  async cancelBooking(
+    bookingId: string,
+    cancellationReason?: string,
+    sendCancellationEmail?: boolean
+  ): Promise<void> {
+    await this.http.post(
+      `/bookings/${encodeURIComponent(bookingId)}/cancel`,
+      pickDefined({
+        cancellation_reason: cancellationReason,
+        send_cancellation_email: sendCancellationEmail
+      })
+    );
+  }
+
+  async getAvailableTimeSlots(
+    calendarId: string,
+    startTime: string,
+    endTime: string
+  ): Promise<AvailableTimeSlot[]> {
+    let response = await this.http.get<AvailableTimeSlot[]>(
+      `/booking-calendars/${encodeURIComponent(calendarId)}/time-slots`,
+      { params: { start_time: startTime, end_time: endTime } }
+    );
+    if (!Array.isArray(response.data)) {
+      throw createApiServiceError('OnceHub returned an invalid availability response.', {
+        reason: 'oncehub_invalid_response'
+      });
+    }
     return response.data;
   }
 
   async listWebhooks(): Promise<PaginatedResponse<Webhook>> {
-    let response = await this.http.get('/webhooks');
-    return response.data;
+    return this.list('/webhooks', {});
   }
 
   async createWebhook(name: string, url: string, events: string[]): Promise<Webhook> {

@@ -21,7 +21,12 @@ export let historicalDnsLookup = SlateTool.create(spec, {
         .describe(
           'DNS record type: "a", "aaaa", "cname", "mx", "ns", "txt", "spf", "ptr", "soa", or "all"'
         ),
-      page: z.number().optional().describe('Page number for paginated results')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Page number must be a safe integer.')
+        .min(1)
+        .optional()
+        .describe('Page number for paginated results')
     })
   )
   .output(

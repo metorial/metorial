@@ -1,24 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTrustedEntities = SlateTool.create(spec, {
   name: 'List Trusted Entities',
   key: 'list_trusted_entities',
   description: `Retrieve trusted entities configured in a Paradym project. Trusted entities define which issuers (identified by DIDs or X.509 certificates) are accepted during credential verification.`,
+  instructions: ['Call list_projects to choose the projectId for this operation.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      pageBefore: z.string().optional().describe('Cursor for fetching the previous page'),
+      projectId: projectIdSchema,
       pageSize: z.number().optional().describe('Number of entities to return per page'),
       pageAfter: z.string().optional().describe('Cursor for fetching the next page of results')
     })
   )
   .output(
     z.object({
+      metadata: z
+        .any()
+        .optional()
+        .describe('Provider pagination metadata, including next and previous page URLs'),
       entities: z
         .array(
           z.object({
@@ -38,24 +46,27 @@ export let listTrustedEntities = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
     let result = await client.listTrustedEntities({
       pageSize: ctx.input.pageSize,
+      pageBefore: ctx.input.pageBefore,
       pageAfter: ctx.input.pageAfter
     });
 
     let entities = (result.data ?? []).map((e: any) => ({
       trustedEntityId: e.id,
       name: e.name,
-      dids: e.dids,
-      certificates: e.certificates,
+      dids: e.dids?.map((entry: any) => (typeof entry === 'string' ? entry : entry.did)),
+      certificates: e.certificates?.map((entry: any) =>
+        typeof entry === 'string' ? entry : entry.certificate
+      ),
       createdAt: e.createdAt
     }));
 
     return {
-      output: { entities },
+      output: { entities, metadata: result.meta },
       message: `Found **${entities.length}** trusted entity(ies).`
     };
   })

@@ -17,11 +17,14 @@ let mapInvoiceOutput = (data: any) => ({
   date: data.date || '',
   dueDate: data.dueDate || '',
   fullyPaidDate: data.fullyPaidDate ?? null,
+  expectPaymentDate: data.expectPaymentDate,
   customerExternalId: data.customerExternalId || '',
   customerName: data.customerName ?? null,
   payments: data.payments,
   invoicePdfLink: data.invoicePdfLink ?? null,
-  invoicePdfLinkUpdatedAt: data.invoicePdfLinkUpdatedAt ?? null
+  invoicePdfLinkSource: data.invoicePdfLinkSource,
+  invoicePdfLinkUpdatedAt: data.invoicePdfLinkUpdatedAt ?? null,
+  chasing: data.chasing
 });
 
 export let upsertInvoice = SlateTool.create(spec, {

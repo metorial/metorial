@@ -1,17 +1,19 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageCommentTool = SlateTool.create(spec, {
   name: 'Manage Comment',
   key: 'manage_comment',
-  description: `Create or update a comment on any Basecamp recording (to-do, message, document, etc.).
+  description: `Call list_accounts to discover the accountId for this operation. Create or update a comment on any Basecamp recording (to-do, message, document, etc.).
 To **create**, provide the \`projectId\`, \`recordingId\`, and \`content\`.
 To **update**, provide the \`projectId\`, \`commentId\`, and new \`content\`.`
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project (bucket)'),
       action: z.enum(['create', 'update']).describe('Action to perform'),
       recordingId: z
@@ -33,14 +35,15 @@ To **update**, provide the \`projectId\`, \`commentId\`, and new \`content\`.`
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let { action, projectId } = ctx.input;
 
     if (action === 'create') {
       if (!ctx.input.recordingId)
-        throw new Error('recordingId is required for creating a comment');
+        throw createApiServiceError('recordingId is required for creating a comment');
 
       let comment = await client.createComment(projectId, ctx.input.recordingId, {
         content: ctx.input.content
@@ -58,7 +61,8 @@ To **update**, provide the \`projectId\`, \`commentId\`, and new \`content\`.`
     }
 
     // update
-    if (!ctx.input.commentId) throw new Error('commentId is required for updating a comment');
+    if (!ctx.input.commentId)
+      throw createApiServiceError('commentId is required for updating a comment');
 
     let comment = await client.updateComment(projectId, ctx.input.commentId, {
       content: ctx.input.content

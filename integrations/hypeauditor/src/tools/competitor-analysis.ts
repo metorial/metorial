@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -77,9 +77,21 @@ export let competitorAnalysis = SlateTool.create(spec, {
 
     switch (action) {
       case 'create': {
-        if (!ctx.input.username) throw new Error('username is required for create action');
-        if (!ctx.input.dateFrom) throw new Error('dateFrom is required for create action');
-        if (!ctx.input.dateTo) throw new Error('dateTo is required for create action');
+        if (!ctx.input.username)
+          throw createApiServiceError('username is required for create action.');
+        if (!ctx.input.dateFrom)
+          throw createApiServiceError('dateFrom is required for create action.');
+        if (!ctx.input.dateTo)
+          throw createApiServiceError('dateTo is required for create action.');
+        if (
+          !/^\d{4}-\d{2}-\d{2}$/.test(ctx.input.dateFrom) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(ctx.input.dateTo) ||
+          ctx.input.dateFrom > ctx.input.dateTo
+        ) {
+          throw createApiServiceError(
+            'Use YYYY-MM-DD dates with dateFrom on or before dateTo.'
+          );
+        }
 
         let response = await client.createCompetitorAnalysis({
           username: ctx.input.username,
@@ -102,7 +114,8 @@ export let competitorAnalysis = SlateTool.create(spec, {
       }
 
       case 'get': {
-        if (!ctx.input.reportId) throw new Error('reportId is required for get action');
+        if (!ctx.input.reportId)
+          throw createApiServiceError('reportId is required for get action.');
 
         let response = await client.getCompetitorAnalysis(ctx.input.reportId);
 
@@ -117,7 +130,8 @@ export let competitorAnalysis = SlateTool.create(spec, {
       }
 
       case 'get_posts': {
-        if (!ctx.input.reportId) throw new Error('reportId is required for get_posts action');
+        if (!ctx.input.reportId)
+          throw createApiServiceError('reportId is required for get_posts action.');
 
         let response = await client.getCompetitorAnalysisPosts(
           ctx.input.reportId,

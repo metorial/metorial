@@ -1,6 +1,8 @@
 # <img src="logo.svg" height="20"> Lessonspace
 
-Create and manage virtual classroom spaces for online tutoring and teaching. Launch spaces with configurable whiteboards, video conferencing, and document editing. Generate per-user join URLs with customizable roles, permissions, and feature toggles. Manage sessions, retrieve session recordings, transcriptions, and AI-generated lesson summaries. List and manage organisation users. Configure space branding, theming, locale, and access restrictions.
+Create and manage virtual classroom spaces for online tutoring and teaching. Launch spaces with configurable whiteboards, video conferencing, and document editing. Generate per-user join URLs with customizable roles, permissions, and feature toggles. Manage sessions, retrieve session recordings, transcriptions, and AI-generated lesson summaries. List and manage organisation users. Permanently delete session or space recordings for retention workflows. Configure space branding, theming, locale, and access restrictions.
+
+Connect with an API key from Settings > Developer; no organisation ID is needed. Transcript downloads contain the complete JSON file, and recording viewing links report whether playback is ready. See [supported tools and API behavior](docs/SPEC.md).
 
 ## License
 

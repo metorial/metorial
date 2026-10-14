@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SevdeskClient } from '../lib/client';
+import { SevdeskClient, sevdeskDateToTimestamp } from '../lib/client';
 import { spec } from '../spec';
 
 export let exportDatev = SlateTool.create(spec, {
   name: 'Export DATEV',
   key: 'export_datev',
-  description: `Export accounting data in DATEV CSV format for a given date range. Used for transferring data to tax advisors or external accounting systems (e.g., DATEV Unternehmen Online).`,
+  description: `Prepare a downloadable ZIP of accounting data in DATEV CSV format for a given date range. Used for transferring outgoing invoices and incoming vouchers to a tax advisor. The accounting year must already be configured in sevDesk.`,
   tags: {
     readOnly: true
   }
@@ -22,19 +22,45 @@ export let exportDatev = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      exportContent: z.any().describe('DATEV export data (CSV content or download reference)'),
+      exportContent: z
+        .any()
+        .describe(
+          'Provider DATEV export data or download reference, alongside the downloadable ZIP.'
+        ),
       startDate: z.string(),
       endDate: z.string(),
       scope: z.string()
     })
   )
   .handleInvocation(async ctx => {
+    let startDate = sevdeskDateToTimestamp(ctx.input.startDate, 'startDate');
+    let endDate = sevdeskDateToTimestamp(ctx.input.endDate, 'endDate');
+    if (startDate > endDate) {
+      throw createApiServiceError('startDate must be on or before endDate.');
+    }
+    let filename = `datev-${ctx.input.startDate}-${ctx.input.endDate}.zip`;
+    let scope = { REVENUE: 'E', EXPENSE: 'X', ALL: 'EX' }[ctx.input.scope];
     let client = new SevdeskClient({ token: ctx.auth.token });
-
     let result = await client.exportDatev({
-      startDate: ctx.input.startDate,
-      endDate: ctx.input.endDate,
-      scope: ctx.input.scope
+      startDate,
+      endDate,
+      scope,
+      Download: false,
+      enshrine: false
+    });
+    await ctx.addAttachment({
+      type: 'url',
+      url: 'https://my.sevdesk.de/api/v1/Export/datevCSV',
+      headers: { Authorization: ctx.auth.token },
+      query: {
+        Download: 'true',
+        startDate: String(startDate),
+        endDate: String(endDate),
+        scope,
+        enshrine: 'false'
+      },
+      filename,
+      mimeType: 'application/zip'
     });
 
     return {

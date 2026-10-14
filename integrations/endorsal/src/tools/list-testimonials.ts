@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client, type EndorsalListResponse, type EndorsalTestimonial } from '../lib/client';
+import { mapTestimonial, testimonialListOutputSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTestimonials = SlateTool.create(spec, {
@@ -19,41 +20,28 @@ export let listTestimonials = SlateTool.create(spec, {
         .describe('Filter testimonials by a specific contact ID'),
       tagId: z.string().optional().describe('Filter testimonials by a specific tag ID'),
       limit: z.number().optional().describe('Maximum number of testimonials to return'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Positive whole-number page, starting at 1. Pagination is applied to the complete API response.'
+        )
     })
   )
-  .output(
-    z.object({
-      testimonials: z.array(
-        z.object({
-          testimonialId: z.string().describe('Unique testimonial ID'),
-          name: z.string().optional().describe('Reviewer name'),
-          email: z.string().optional().describe('Reviewer email'),
-          comments: z.string().optional().describe('Testimonial text content'),
-          rating: z.number().optional().describe('Star rating (1-5)'),
-          company: z.string().optional().describe('Reviewer company'),
-          position: z.string().optional().describe('Reviewer job title'),
-          location: z.string().optional().describe('Reviewer location'),
-          avatar: z.string().optional().describe('Reviewer avatar URL'),
-          approved: z.number().optional().describe('Approval status'),
-          featured: z.number().optional().describe('Whether the testimonial is featured'),
-          added: z.number().optional().describe('Timestamp when testimonial was added'),
-          source: z.string().optional().describe('Source platform of the testimonial'),
-          tags: z.array(z.string()).optional().describe('Tags associated with the testimonial')
-        })
-      ),
-      total: z.number().optional().describe('Total number of testimonials')
-    })
-  )
+  .output(testimonialListOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+
+    if (ctx.input.contactId && ctx.input.tagId) {
+      throw createApiServiceError('Provide either contactId or tagId, not both.');
+    }
 
     let result: EndorsalListResponse<EndorsalTestimonial>;
 
     if (ctx.input.contactId) {
-      result = await client.getTestimonialsForContact(ctx.input.contactId);
+      result = await client.getTestimonialsForContact(ctx.input.contactId, ctx.input);
     } else if (ctx.input.tagId) {
-      result = await client.getTestimonialsForTag(ctx.input.tagId);
+      result = await client.getTestimonialsForTag(ctx.input.tagId, ctx.input);
     } else {
       result = await client.listTestimonials({
         limit: ctx.input.limit,
@@ -61,22 +49,7 @@ export let listTestimonials = SlateTool.create(spec, {
       });
     }
 
-    let testimonials = (result.data || []).map(t => ({
-      testimonialId: t._id,
-      name: t.name,
-      email: t.email,
-      comments: t.comments,
-      rating: t.rating,
-      company: t.company,
-      position: t.position,
-      location: t.location,
-      avatar: t.avatar,
-      approved: t.approved,
-      featured: t.featured,
-      added: t.added,
-      source: t.source,
-      tags: t.tags
-    }));
+    let testimonials = result.data.map(mapTestimonial);
 
     let filterDesc = ctx.input.contactId
       ? ` for contact ${ctx.input.contactId}`

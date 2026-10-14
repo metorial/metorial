@@ -1,6 +1,6 @@
 {
   "name": "@metorial/scrapfly",
-  "description": "Scrape web pages with anti-bot bypass, proxy rotation across 120+ countries, and JavaScript rendering. Capture full-page or targeted screenshots of any website. Extract structured data from web content using AI models, LLM prompts, or custom template rules. Crawl entire websites recursively with configurable depth, limits, and URL filtering. Supports browser automation scenarios, multiple output formats (HTML, JSON, markdown, text), session persistence, caching, and asynchronous processing via webhooks. Manage scraping projects with separate API keys, budgets, and quotas.",
+  "description": "Scrape web pages with anti-bot bypass, proxy rotation, and JavaScript rendering. Capture full-page or targeted screenshots, extract structured document data, and crawl websites with configurable depth and URL filtering. Monitor or cancel crawls, retrieve paginated content, download WARC or HAR archives, and inspect account usage and subscription details.",
   "categories": ["apis-and-http-requests", "web-search"],
   "skills": [
     "scrape web pages",
@@ -12,6 +12,8 @@
     "automate browser interactions",
     "rotate proxies globally",
     "AI-powered data extraction",
-    "manage scraping projects"
+    "inspect scraping account usage",
+    "cancel website crawls",
+    "download crawl archives"
   ]
 }

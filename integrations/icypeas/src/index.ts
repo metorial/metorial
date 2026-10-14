@@ -6,6 +6,8 @@ import {
   getBulkSearchResults,
   getSearchResult,
   getSubscription,
+  listBulkSearches,
+  reverseEmailLookup,
   scanDomain,
   scrapeCompany,
   scrapeProfile,
@@ -28,7 +30,9 @@ export let provider = Slate.create({
     findProfileUrl,
     searchLeads,
     searchCompanies,
-    getSubscription
+    getSubscription,
+    reverseEmailLookup,
+    listBulkSearches
   ],
   triggers: []
 });

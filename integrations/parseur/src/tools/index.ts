@@ -1,3 +1,4 @@
+export * from './copy-mailbox';
 export * from './create-mailbox';
 export * from './delete-mailbox';
 export * from './get-document';
@@ -10,3 +11,4 @@ export * from './manage-template';
 export * from './manage-webhook';
 export * from './update-mailbox';
 export * from './upload-document';
+export * from './upload-file';

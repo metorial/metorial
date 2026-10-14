@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { OdpClient } from '../lib/odp-client';
 import { spec } from '../spec';
@@ -58,13 +58,13 @@ Also supports querying historical events for a customer.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OdpClient(ctx.auth.token);
+    let client = new OdpClient(ctx.auth.token, ctx.auth.odpRegion);
 
     switch (ctx.input.action) {
       case 'send': {
-        if (!ctx.input.eventType) throw new Error('eventType is required');
-        if (!ctx.input.eventAction) throw new Error('eventAction is required');
-        if (!ctx.input.identifiers) throw new Error('identifiers is required');
+        if (!ctx.input.eventType) throw createApiServiceError('eventType is required');
+        if (!ctx.input.eventAction) throw createApiServiceError('eventAction is required');
+        if (!ctx.input.identifiers) throw createApiServiceError('identifiers is required');
         await client.sendEvent({
           type: ctx.input.eventType,
           action: ctx.input.eventAction,
@@ -78,7 +78,9 @@ Also supports querying historical events for a customer.`,
       }
       case 'send_batch': {
         if (!ctx.input.events || ctx.input.events.length === 0)
-          throw new Error('events array is required');
+          throw createApiServiceError('events array is required');
+        if (ctx.input.events.length > 500)
+          throw createApiServiceError('Send at most 500 events per batch.');
         await client.sendEvents(
           ctx.input.events.map(e => ({
             type: e.type,
@@ -93,8 +95,10 @@ Also supports querying historical events for a customer.`,
         };
       }
       case 'query': {
-        if (!ctx.input.identifierField) throw new Error('identifierField is required');
-        if (!ctx.input.identifierValue) throw new Error('identifierValue is required');
+        if (!ctx.input.identifierField)
+          throw createApiServiceError('identifierField is required');
+        if (!ctx.input.identifierValue)
+          throw createApiServiceError('identifierValue is required');
         let events = await client.queryEvents({
           identifierField: ctx.input.identifierField,
           identifierValue: ctx.input.identifierValue,

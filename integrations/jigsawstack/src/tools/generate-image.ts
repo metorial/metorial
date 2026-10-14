@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let generateImage = SlateTool.create(spec, {
   name: 'Generate Image',
   key: 'generate_image',
-  description: `Generate images from text prompts using AI. Returns a URL to the generated image. Supports various aspect ratios, custom dimensions, and output formats (PNG, SVG). Advanced options include negative prompts, guidance scale, and seed for reproducibility.`,
+  description: `Generate images from text prompts using the archived JigsawStack image generation API. This API is no longer maintained by the provider. Returns a URL to the generated image. Supports various aspect ratios, custom dimensions, and output formats (PNG, SVG). Advanced options include negative prompts, guidance scale, and seed for reproducibility.`,
   constraints: [
     'Prompt must be 1-5000 characters.',
     'Width and height range: 256-1920 pixels.',
@@ -55,6 +55,10 @@ export let generateImage = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       imageUrl: z.string().describe('URL to the generated image')
     })
   )
@@ -62,9 +66,11 @@ export let generateImage = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let advanceConfig =
-      ctx.input.negativePrompt || ctx.input.guidance || ctx.input.seed
+      ctx.input.negativePrompt !== undefined ||
+      ctx.input.guidance !== undefined ||
+      ctx.input.seed !== undefined
         ? {
-            negativePompt: ctx.input.negativePrompt,
+            negativePrompt: ctx.input.negativePrompt,
             guidance: ctx.input.guidance,
             seed: ctx.input.seed
           }
@@ -80,9 +86,17 @@ export let generateImage = SlateTool.create(spec, {
       advanceConfig
     });
 
+    await ctx.addAttachment(
+      await client.prepareGeneratedDownload(result.url, {
+        filename: `generated-image.${ctx.input.outputFormat ?? 'png'}`,
+        mimeType: ctx.input.outputFormat === 'svg' ? 'image/svg+xml' : 'image/png'
+      })
+    );
+
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         imageUrl: result.url
       },
       message: `Generated image from prompt. Image URL: ${result.url}`

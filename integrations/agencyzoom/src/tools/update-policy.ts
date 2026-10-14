@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -45,6 +45,18 @@ export let updatePolicy = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Array of tags to set on the policy (for "update_tags" action)'),
+      soldDate: z.string().optional().describe('Sold date for policy details, YYYY-MM-DD.'),
+      items: z.number().optional().describe('Number of covered policy items for update.'),
+      leadSourceId: z.string().optional().describe('Lead source ID for update.'),
+      locationId: z.string().optional().describe('Agency location number for update.'),
+      endorsementNumber: z
+        .string()
+        .optional()
+        .describe('Required endorsement number for add_endorsement.'),
+      endorsementDescription: z
+        .string()
+        .optional()
+        .describe('Required endorsement description for add_endorsement.'),
       endorsementPremiumChange: z
         .number()
         .optional()
@@ -59,15 +71,15 @@ export let updatePolicy = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     switch (ctx.input.action) {
       case 'update': {
         let data: Record<string, any> = {};
+        if (ctx.input.soldDate !== undefined) data.soldDate = ctx.input.soldDate;
+        if (ctx.input.items !== undefined) data.items = ctx.input.items;
+        if (ctx.input.leadSourceId !== undefined) data.leadSourceId = ctx.input.leadSourceId;
+        if (ctx.input.locationId !== undefined) data.locationId = ctx.input.locationId;
         if (ctx.input.carrier !== undefined) data.carrier = ctx.input.carrier;
         if (ctx.input.productLine !== undefined) data.productLine = ctx.input.productLine;
         if (ctx.input.premium !== undefined) data.premium = ctx.input.premium;
@@ -85,7 +97,7 @@ export let updatePolicy = SlateTool.create(spec, {
       }
       case 'change_status': {
         if (!ctx.input.status) {
-          throw new Error('status is required for "change_status" action');
+          throw createApiServiceError('status is required for "change_status" action');
         }
         let result = await client.updatePolicyStatus(ctx.input.policyId, {
           status: ctx.input.status
@@ -97,7 +109,7 @@ export let updatePolicy = SlateTool.create(spec, {
       }
       case 'update_tags': {
         if (!ctx.input.tags) {
-          throw new Error('tags is required for "update_tags" action');
+          throw createApiServiceError('tags is required for "update_tags" action');
         }
         let result = await client.updatePolicyTags(ctx.input.policyId, {
           tags: ctx.input.tags
@@ -109,6 +121,12 @@ export let updatePolicy = SlateTool.create(spec, {
       }
       case 'add_endorsement': {
         let endorsementData: Record<string, any> = {};
+        if (ctx.input.effectiveDate !== undefined)
+          endorsementData.effectiveDate = ctx.input.effectiveDate;
+        if (ctx.input.endorsementNumber !== undefined)
+          endorsementData.endorsementNumber = ctx.input.endorsementNumber;
+        if (ctx.input.endorsementDescription !== undefined)
+          endorsementData.description = ctx.input.endorsementDescription;
         if (ctx.input.endorsementPremiumChange !== undefined) {
           endorsementData.premiumChange = ctx.input.endorsementPremiumChange;
         }

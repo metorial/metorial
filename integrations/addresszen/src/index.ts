@@ -1,10 +1,12 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getCurrentKeyInfo,
   getKeyInfo,
   getUsageStats,
   resolveAddress,
   searchAddresses,
+  updateKeySettings,
   validateEmail,
   validatePhone,
   verifyAddress
@@ -19,7 +21,9 @@ export let provider = Slate.create({
     validateEmail,
     validatePhone,
     getKeyInfo,
-    getUsageStats
+    getUsageStats,
+    getCurrentKeyInfo,
+    updateKeySettings
   ],
   triggers: []
 });

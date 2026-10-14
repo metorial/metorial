@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MgmtClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,12 +32,14 @@ export let manageFolder = SlateTool.create(spec, {
       token: ctx.auth.token,
       guid: ctx.config.guid,
       locale: ctx.config.locale,
-      region: ctx.auth.region
+      region: ctx.auth.region,
+      authMethod: ctx.auth.authMethod
     });
 
     switch (ctx.input.operation) {
       case 'create': {
-        if (!ctx.input.folderName) throw new Error('folderName is required for create');
+        if (!ctx.input.folderName)
+          throw createApiServiceError('folderName is required for create');
         await client.createFolder(ctx.input.folderName, ctx.input.parentFolder);
         return {
           output: { success: true },
@@ -45,7 +47,8 @@ export let manageFolder = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.folderPath) throw new Error('folderPath is required for delete');
+        if (!ctx.input.folderPath)
+          throw createApiServiceError('folderPath is required for delete');
         await client.deleteFolder(ctx.input.folderPath);
         return {
           output: { success: true },
@@ -53,8 +56,9 @@ export let manageFolder = SlateTool.create(spec, {
         };
       }
       case 'rename': {
-        if (!ctx.input.folderPath) throw new Error('folderPath is required for rename');
-        if (!ctx.input.newName) throw new Error('newName is required for rename');
+        if (!ctx.input.folderPath)
+          throw createApiServiceError('folderPath is required for rename');
+        if (!ctx.input.newName) throw createApiServiceError('newName is required for rename');
         await client.renameFolder(ctx.input.folderPath, ctx.input.newName);
         return {
           output: { success: true },

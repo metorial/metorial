@@ -13,8 +13,14 @@ export let getStats = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      dateFrom: z.string().optional().describe('Start date for stats (ISO 8601 format)'),
-      dateTo: z.string().optional().describe('End date for stats (ISO 8601 format)'),
+      dateFrom: z
+        .string()
+        .optional()
+        .describe('Start date for stats, sent as startDate (ISO 8601 format)'),
+      dateTo: z
+        .string()
+        .optional()
+        .describe('End date for stats, sent as endDate (ISO 8601 format)'),
       accountIds: z.array(z.number()).optional().describe('Filter by LinkedIn account IDs'),
       campaignIds: z.array(z.number()).optional().describe('Filter by campaign IDs')
     })

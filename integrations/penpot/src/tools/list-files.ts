@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 let fileSchema = z.object({
@@ -44,28 +44,29 @@ export let listFilesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let { source, projectId, teamId, searchTerm } = ctx.input;
     let rawFiles: any[];
 
     switch (source) {
       case 'project': {
-        if (!projectId) throw new Error('projectId is required for project source');
+        if (!projectId)
+          throw createApiServiceError('projectId is required for project source');
         rawFiles = await client.getProjectFiles(projectId);
         break;
       }
       case 'recent': {
-        if (!teamId) throw new Error('teamId is required for recent source');
+        if (!teamId) throw createApiServiceError('teamId is required for recent source');
         rawFiles = await client.getTeamRecentFiles(teamId);
         break;
       }
       case 'shared': {
-        if (!teamId) throw new Error('teamId is required for shared source');
+        if (!teamId) throw createApiServiceError('teamId is required for shared source');
         rawFiles = await client.getTeamSharedFiles(teamId);
         break;
       }
       case 'search': {
-        if (!teamId) throw new Error('teamId is required for search source');
+        if (!teamId) throw createApiServiceError('teamId is required for search source');
         rawFiles = await client.searchFiles(teamId, searchTerm);
         break;
       }

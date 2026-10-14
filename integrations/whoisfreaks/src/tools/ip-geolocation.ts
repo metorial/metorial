@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhoisFreaksClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,9 +15,16 @@ export let ipGeolocation = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      ip: z.string().optional().describe('Single IPv4 or IPv6 address to geolocate'),
+      ip: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Single IPv4 or IPv6 address to geolocate'),
       ips: z
-        .array(z.string())
+        .array(z.string().trim().min(1))
+        .min(1)
+        .max(100)
         .optional()
         .describe('Array of IP addresses for bulk geolocation lookup (max 100)')
     })
@@ -30,6 +37,10 @@ export let ipGeolocation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.ip !== undefined && ctx.input.ips !== undefined) {
+      throw createApiServiceError('Provide either ip or ips, not both.');
+    }
+
     let client = new WhoisFreaksClient({ token: ctx.auth.token });
 
     if (ctx.input.ips && ctx.input.ips.length > 0) {
@@ -48,6 +59,6 @@ export let ipGeolocation = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('Either ip or ips must be provided.');
+    throw createApiServiceError('Either ip or ips must be provided.');
   })
   .build();

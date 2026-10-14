@@ -1,13 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getResult, getStringList, getText } from '../lib/response';
 import { spec } from '../spec';
 
 export let lookupLinkedInProfile = SlateTool.create(spec, {
   name: 'Lookup LinkedIn Profile',
   key: 'lookup_linkedin_profile',
-  description: `Retrieve detailed profile information for a LinkedIn user. Provide a LinkedIn profile URL to get the person's name, job title, current company, previous companies, education, skills, verified emails, and phone numbers.`,
-  constraints: ['Each API call consumes 1 credit from your AeroLeads account.'],
+  description:
+    'Look up a prospect by LinkedIn profile URL. Returns available names, job and company details, location, education, skills, email addresses, and phone numbers.',
+  constraints: ['Lookups may consume credits from your AeroLeads account.'],
   tags: {
     readOnly: true
   }
@@ -28,8 +30,14 @@ export let lookupLinkedInProfile = SlateTool.create(spec, {
       lastName: z.string().optional().describe('Last name of the prospect.'),
       jobTitle: z.string().optional().describe('Current job title.'),
       currentCompany: z.string().optional().describe('Current company name.'),
+      companyWebsite: z.string().optional().describe('Current company website.'),
+      companyLinkedinUrl: z.string().optional().describe('Current company LinkedIn URL.'),
       location: z.string().optional().describe('Location of the prospect.'),
-      emails: z.array(z.string()).optional().describe('List of verified email addresses.'),
+      city: z.string().optional().describe('City of the prospect.'),
+      country: z.string().optional().describe('Country of the prospect.'),
+      industry: z.string().optional().describe('Industry of the prospect.'),
+      profilePictureUrl: z.string().optional().describe('Profile picture URL.'),
+      emails: z.array(z.string()).optional().describe('Available email addresses.'),
       phoneNumbers: z.array(z.string()).optional().describe('List of phone numbers.'),
       previousCompanies: z
         .array(z.string())
@@ -47,43 +55,32 @@ export let lookupLinkedInProfile = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.getLinkedInDetails(ctx.input.linkedinUrl);
+    let response = await client.getLinkedInDetails(ctx.input.linkedinUrl);
+    let result = getResult(response);
 
-    let name = result.name || result.full_name || undefined;
-    let firstName = result.first_name || undefined;
-    let lastName = result.last_name || undefined;
-    let jobTitle = result.title || result.job_title || undefined;
-    let currentCompany = result.company || result.current_company || undefined;
-    let location = result.location || undefined;
+    let firstName = getText(result.first_name);
+    let lastName = getText(result.last_name);
+    let name =
+      getText(result.name, result.full_name) ??
+      getText([firstName, lastName].filter(Boolean).join(' '));
+    let jobTitle = getText(result.title, result.job_title, result.job_title_role);
+    let currentCompany = getText(
+      result.company,
+      result.current_company,
+      result.job_company_name
+    );
+    let city = getText(result.city);
+    let country = getText(result.country);
+    let location =
+      getText(result.location, result.address) ??
+      getText([city, country].filter(Boolean).join(', '));
 
-    let emails: string[] = [];
-    if (Array.isArray(result.emails)) {
-      emails = result.emails;
-    } else if (result.email) {
-      emails = Array.isArray(result.email) ? result.email : [result.email];
-    }
-
-    let phoneNumbers: string[] = [];
-    if (Array.isArray(result.phone_numbers)) {
-      phoneNumbers = result.phone_numbers;
-    } else if (result.phone) {
-      phoneNumbers = Array.isArray(result.phone) ? result.phone : [result.phone];
-    }
-
-    let previousCompanies: string[] = [];
-    if (Array.isArray(result.previous_companies)) {
-      previousCompanies = result.previous_companies;
-    }
-
-    let education: string[] = [];
-    if (Array.isArray(result.education)) {
-      education = result.education;
-    }
-
-    let skills: string[] = [];
-    if (Array.isArray(result.skills)) {
-      skills = result.skills;
-    }
+    let emails = getStringList(result.emails, result.email, result.emails_s2);
+    let phoneNumbers = getStringList(
+      result.phone_numbers,
+      result.phone,
+      result.phone_numbers_s2
+    );
 
     let output = {
       name,
@@ -91,22 +88,27 @@ export let lookupLinkedInProfile = SlateTool.create(spec, {
       lastName,
       jobTitle,
       currentCompany,
+      companyWebsite: getText(result.job_company_website),
+      companyLinkedinUrl: getText(result.job_company_linkedin_url),
       location,
-      emails: emails.length > 0 ? emails : undefined,
-      phoneNumbers: phoneNumbers.length > 0 ? phoneNumbers : undefined,
-      previousCompanies: previousCompanies.length > 0 ? previousCompanies : undefined,
-      education: education.length > 0 ? education : undefined,
-      skills: skills.length > 0 ? skills : undefined,
+      city,
+      country,
+      industry: getText(result.industry),
+      profilePictureUrl: getText(result.profile_picture_url),
+      emails,
+      phoneNumbers,
+      previousCompanies: getStringList(result.previous_companies),
+      education: getStringList(result.education),
+      skills: getStringList(result.skills),
       linkedinUrl: ctx.input.linkedinUrl,
-      rawResponse: result
+      rawResponse: response
     };
 
     let messageParts = [`**${name || 'Profile'}**`];
     if (jobTitle) messageParts.push(`${jobTitle}`);
     if (currentCompany) messageParts.push(`at ${currentCompany}`);
-    if (emails && emails.length > 0) messageParts.push(`\nEmails: ${emails.join(', ')}`);
-    if (phoneNumbers && phoneNumbers.length > 0)
-      messageParts.push(`\nPhone: ${phoneNumbers.join(', ')}`);
+    if (emails) messageParts.push(`\nEmails: ${emails.join(', ')}`);
+    if (phoneNumbers) messageParts.push(`\nPhone: ${phoneNumbers.join(', ')}`);
 
     return {
       output,

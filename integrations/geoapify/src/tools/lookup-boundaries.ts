@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GeoapifyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -48,7 +48,10 @@ export let lookupBoundaries = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Geometry detail level (e.g. "geometry_1000" for simplified polygons)'),
-      level: z.string().optional().describe('Subdivision level to retrieve (for consists_of)')
+      level: z
+        .string()
+        .optional()
+        .describe('Non-negative integer subdivision depth (for consists_of)')
     })
   )
   .output(
@@ -57,6 +60,34 @@ export let lookupBoundaries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let hasCoordinates = ctx.input.lat !== undefined || ctx.input.lon !== undefined;
+    if (ctx.input.direction === 'consists_of') {
+      if (!ctx.input.placeId?.trim()) {
+        throw createApiServiceError('Provide a placeId for consists_of boundary lookup.');
+      }
+      if (hasCoordinates) {
+        throw createApiServiceError(
+          'Coordinates are supported only for part_of boundary lookup.'
+        );
+      }
+      if (ctx.input.level !== undefined && !/^\d+$/.test(ctx.input.level)) {
+        throw createApiServiceError(
+          'Provide level as a non-negative integer string, such as "1".'
+        );
+      }
+    } else {
+      if (ctx.input.placeId?.trim() && hasCoordinates) {
+        throw createApiServiceError(
+          'Provide either a placeId or lat/lon coordinates, not both.'
+        );
+      }
+      if (
+        !ctx.input.placeId?.trim() &&
+        (ctx.input.lat === undefined || ctx.input.lon === undefined)
+      ) {
+        throw createApiServiceError('Provide a placeId or both lat and lon coordinates.');
+      }
+    }
     let client = new GeoapifyClient({ token: ctx.auth.token });
 
     let data: any;

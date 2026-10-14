@@ -14,12 +14,29 @@ export let searchContacts = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().describe('Search term to match against contact fields'),
-      limit: z.number().optional().describe('Maximum number of results to return'),
-      page: z.number().optional().describe('Page number for pagination')
+      limit: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Maximum number of results to return'),
+      page: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Page number; converted to offset using limit (20 if omitted)'),
+      offset: z
+        .number()
+        .nonnegative()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Number of contacts to skip; takes precedence over page')
     })
   )
   .output(
     z.object({
+      nextPage: z.boolean().optional().describe('Whether more contacts are available'),
       contacts: z.array(z.record(z.string(), z.any())).describe('List of matching contacts')
     })
   )
@@ -29,13 +46,16 @@ export let searchContacts = SlateTool.create(spec, {
     let result = await client.searchContacts({
       query: ctx.input.query,
       limit: ctx.input.limit,
-      page: ctx.input.page
+      page: ctx.input.page,
+      offset: ctx.input.offset
     });
 
-    let contacts = Array.isArray(result) ? result : (result.contacts ?? result.data ?? []);
+    let contacts = Array.isArray(result)
+      ? result
+      : (result.result ?? result.contacts ?? result.data?.contacts ?? result.data ?? []);
 
     return {
-      output: { contacts },
+      output: { contacts, nextPage: result.nextPage },
       message: `Found ${contacts.length} contact(s) matching "${ctx.input.query}".`
     };
   })

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -34,7 +34,9 @@ export let createCustomer = SlateTool.create(spec, {
       delayHours: z
         .number()
         .optional()
-        .describe('Hours to delay the feedback request (0 = immediate)')
+        .describe(
+          'Hours to delay a requested feedback message (0 = immediate). The business must use Manual Mode; Automatic Mode ignores this delay.'
+        )
     })
   )
   .output(
@@ -51,6 +53,11 @@ export let createCustomer = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.email?.trim() && !ctx.input.phone?.trim()) {
+      throw createApiServiceError(
+        'Provide an email address or phone number for the customer.'
+      );
+    }
     let client = createClient(ctx);
     let data = await client.createCustomer({
       businessId: ctx.input.businessId,
@@ -66,20 +73,20 @@ export let createCustomer = SlateTool.create(spec, {
       delayFeedbackRequest: ctx.input.delayHours
     });
 
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to create customer: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
+    let requestCode = data.feedbackRequestErrorCode;
+    let requestSucceeded = requestCode === undefined ? undefined : Number(requestCode) === 0;
+    let requestError =
+      requestCode !== undefined && !requestSucceeded
+        ? data.feedbackRequestErrorMessage
+        : undefined;
 
     return {
       output: {
         customerId: data.customerId,
-        feedbackRequestSent: data.feedbackRequestErrorCode === 0,
-        feedbackRequestError:
-          data.feedbackRequestErrorCode !== 0 ? data.feedbackRequestErrorMessage : undefined
+        feedbackRequestSent: requestSucceeded,
+        feedbackRequestError: requestError
       },
-      message: `Created customer **${ctx.input.firstName} ${ctx.input.lastName}** with ID **${data.customerId}**.${ctx.input.sendFeedbackRequest ? ' Feedback request sent.' : ''}`
+      message: `Created customer **${ctx.input.firstName} ${ctx.input.lastName}** with ID **${data.customerId}**.${requestError ? ` Feedback request failed: ${requestError}` : requestSucceeded ? (ctx.input.delayHours ? ' Feedback request accepted; any delay depends on the business communication mode.' : ' Feedback request sent.') : ''}`
     };
   })
   .build();

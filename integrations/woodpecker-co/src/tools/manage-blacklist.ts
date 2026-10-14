@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,6 +37,12 @@ export let manageBlacklist = SlateTool.create(spec, {
       token: ctx.auth.token,
       companyId: ctx.config.companyId
     });
+
+    if (!ctx.input.emails?.length && !ctx.input.domains?.length) {
+      throw createApiServiceError('Provide at least one email address or domain.', {
+        reason: 'missing_blacklist_entries'
+      });
+    }
 
     let emailCount = 0;
     let domainCount = 0;

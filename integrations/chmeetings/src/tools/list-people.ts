@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type PagedResponse, type PersonRecord } from '../lib/client';
 import { spec } from '../spec';
 
 export let listPeople = SlateTool.create(spec, {
@@ -13,28 +13,30 @@ export let listPeople = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      searchText: z.string().optional().describe('Search by full name, mobile, or email'),
-      organizationId: z.string().optional().describe('Filter people by organization ID'),
-      name: z
+      searchText: z
         .string()
         .optional()
-        .describe('Filter by name (when searching within an organization)'),
-      mobile: z
+        .describe('Legacy name search. Use name, mobile, or email for explicit filters'),
+      organizationId: z
         .string()
         .optional()
-        .describe('Filter by mobile number (when searching within an organization)'),
-      email: z
-        .string()
-        .optional()
-        .describe('Filter by email (when searching within an organization)'),
+        .describe('Filter people by organization ID from list_organizations'),
+      name: z.string().optional().describe('Filter by name'),
+      mobile: z.string().optional().describe('Filter by mobile number'),
+      email: z.string().optional().describe('Filter by email'),
       includeFamilyMembers: z
         .boolean()
         .optional()
-        .describe('Include family members in the results (organization search only)'),
+        .describe('Include family members in the results'),
       includeAdditionalFields: z
         .boolean()
         .optional()
-        .describe('Include additional profile fields (organization search only)'),
+        .describe('Include additional profile fields'),
+      includeOrganizations: z
+        .boolean()
+        .optional()
+        .describe("Include each person's organizations"),
+      includeGroups: z.boolean().optional().describe("Include each person's groups"),
       page: z.number().optional().describe('Page number (default: 1)'),
       pageSize: z.number().optional().describe('Number of results per page (default: 100)')
     })
@@ -50,22 +52,32 @@ export let listPeople = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: any;
+    let result: PagedResponse<PersonRecord>;
     if (ctx.input.organizationId) {
       result = await client.listPeopleByOrganization(ctx.input.organizationId, {
         page: ctx.input.page,
         pageSize: ctx.input.pageSize,
         name: ctx.input.name,
+        searchText: ctx.input.searchText,
         mobile: ctx.input.mobile,
         email: ctx.input.email,
         includeFamilyMembers: ctx.input.includeFamilyMembers,
-        includeAdditionalFields: ctx.input.includeAdditionalFields
+        includeAdditionalFields: ctx.input.includeAdditionalFields,
+        includeOrganizations: ctx.input.includeOrganizations,
+        includeGroups: ctx.input.includeGroups
       });
     } else {
       result = await client.listPeople({
         page: ctx.input.page,
         pageSize: ctx.input.pageSize,
-        searchText: ctx.input.searchText
+        searchText: ctx.input.searchText,
+        name: ctx.input.name,
+        mobile: ctx.input.mobile,
+        email: ctx.input.email,
+        includeFamilyMembers: ctx.input.includeFamilyMembers,
+        includeAdditionalFields: ctx.input.includeAdditionalFields,
+        includeOrganizations: ctx.input.includeOrganizations,
+        includeGroups: ctx.input.includeGroups
       });
     }
 

@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTeam = SlateTool.create(spec, {
   name: 'Manage Team',
   key: 'manage_team',
-  description: `Create or update a team in Timely. Provide a **teamId** to update an existing team, or omit it to create a new one.`,
+  description: `Call list_accounts to choose a workspace when needed. Create or update a team in Timely. Provide a **teamId** to update an existing team, or omit it to create a new one.`,
   tags: { destructive: false }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       teamId: z.string().optional().describe('Team ID to update. Omit to create a new team'),
       name: z.string().describe('Team name'),
       color: z.string().optional().describe('Color hex code'),
@@ -25,10 +27,7 @@ export let manageTeam = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let result: any;
     let action: string;

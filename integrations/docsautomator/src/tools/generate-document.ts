@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -51,9 +51,23 @@ Returns the generated PDF URL and optionally a Google Doc URL. For async jobs, r
         .describe('Airtable record ID to fetch data from (e.g., "recXXXXXXXXXX").'),
       googleSheetsRowNumber: z
         .number()
+        .min(1)
+        .refine(Number.isInteger, 'The row number must be a whole number.')
         .optional()
         .describe('Google Sheets row number to fetch data from.'),
       clickupTaskId: z.string().optional().describe('ClickUp task ID to fetch data from.'),
+      async: z
+        .boolean()
+        .optional()
+        .describe(
+          'Return a job ID immediately instead of waiting for the generated document. Poll get_job_status for the result.'
+        ),
+      skipEsign: z
+        .boolean()
+        .optional()
+        .describe(
+          'Generate a draft without starting signing or sending signing invitations, even when the automation has signing enabled.'
+        ),
       webhookParams: z
         .record(z.string(), z.unknown())
         .optional()
@@ -86,57 +100,60 @@ Returns the generated PDF URL and optionally a Google Doc URL. For async jobs, r
         .optional()
         .describe(
           'Job ID for async document generation. Use this with the Get Job Status tool to check progress.'
+        ),
+      signingSessionId: z
+        .string()
+        .optional()
+        .describe(
+          'Signing session ID when generation starts an e-signature workflow. Use get_esign_session to track it.'
         )
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.automationId?.trim() && !ctx.input.docTemplateLink?.trim()) {
+      throw createApiServiceError(
+        'Provide an automationId from list_automations or a docTemplateLink to generate a document.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
+    let result = await client.createDocument(
+      pickDefined({
+        docId: ctx.input.automationId,
+        docTemplateLink: ctx.input.docTemplateLink,
+        documentName: ctx.input.documentName,
+        data: ctx.input.templateData,
+        recId: ctx.input.airtableRecordId,
+        rowNumber: ctx.input.googleSheetsRowNumber,
+        taskId: ctx.input.clickupTaskId,
+        webhookParams: ctx.input.webhookParams,
+        async: ctx.input.async,
+        skipEsign: ctx.input.skipEsign
+      })
+    );
 
-    let params: Record<string, unknown> = {};
-
-    if (ctx.input.automationId) {
-      params.docId = ctx.input.automationId;
-    }
-    if (ctx.input.docTemplateLink) {
-      params.docTemplateLink = ctx.input.docTemplateLink;
-    }
-    if (ctx.input.documentName) {
-      params.documentName = ctx.input.documentName;
-    }
-    if (ctx.input.templateData) {
-      params.data = ctx.input.templateData;
-    }
-    if (ctx.input.airtableRecordId) {
-      params.recId = ctx.input.airtableRecordId;
-    }
-    if (ctx.input.googleSheetsRowNumber !== undefined) {
-      params.rowId = ctx.input.googleSheetsRowNumber;
-    }
-    if (ctx.input.clickupTaskId) {
-      params.taskId = ctx.input.clickupTaskId;
-    }
-    if (ctx.input.webhookParams) {
-      params.webhookParams = ctx.input.webhookParams;
+    if (result.pdfUrl) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.pdfUrl,
+        mimeType: 'application/pdf'
+      });
     }
 
-    let result = await client.createDocument(params as any);
-
-    let output: Record<string, unknown> = {
-      message: result.message
+    let output = {
+      message: result.message ?? undefined,
+      pdfUrl: result.pdfUrl ?? undefined,
+      googleDocUrl: result.googleDocUrl ?? undefined,
+      googleDriveFolderId: result.savePdfGoogleDriveFolderId ?? undefined,
+      googleDriveFileId: result.savePdfGoogleDriveFileId ?? undefined,
+      jobId: result.jobId ?? undefined,
+      signingSessionId: result.signingSessionId ?? undefined
     };
-
-    if (result.pdfUrl) output.pdfUrl = result.pdfUrl;
-    if (result.googleDocUrl) output.googleDocUrl = result.googleDocUrl;
-    if (result.savePdfGoogleDriveFolderId)
-      output.googleDriveFolderId = result.savePdfGoogleDriveFolderId;
-    if (result.savePdfGoogleDriveFileId)
-      output.googleDriveFileId = result.savePdfGoogleDriveFileId;
-    if (result.jobId) output.jobId = result.jobId;
 
     let isAsync = !!result.jobId;
 
     return {
-      output: output as any,
+      output,
       message: isAsync
         ? `Document generation queued. Job ID: **${result.jobId}**. Use the Get Job Status tool to check progress.`
         : `Document generated successfully.${result.pdfUrl ? ` [Download PDF](${result.pdfUrl})` : ''}`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -51,6 +51,7 @@ export let manageCalls = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
     let { action, callId, customFields, ...fields } = ctx.input;
+    if (fields.duration !== undefined) fields.duration *= 60;
 
     if (action === 'create') {
       let data: Record<string, any> = { ...fields, ...customFields };
@@ -58,22 +59,22 @@ export let manageCalls = SlateTool.create(spec, {
       return {
         output: {
           callId: result.id,
-          name: result.name,
-          status: result.status,
-          direction: result.direction,
-          dateStart: result.dateStart,
-          dateEnd: result.dateEnd,
-          parentType: result.parentType,
-          parentId: result.parentId,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          status: result.status ?? undefined,
+          direction: result.direction ?? undefined,
+          dateStart: result.dateStart ?? undefined,
+          dateEnd: result.dateEnd ?? undefined,
+          parentType: result.parentType ?? undefined,
+          parentId: result.parentId ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Call **${result.name || ''}** created successfully.`
       };
     }
 
     if (action === 'update') {
-      if (!callId) throw new Error('callId is required for update');
+      if (!callId) throw createApiServiceError('callId is required for update');
       let data: Record<string, any> = { ...fields, ...customFields };
       Object.keys(data).forEach(key => {
         if (data[key] === undefined) delete data[key];
@@ -82,22 +83,22 @@ export let manageCalls = SlateTool.create(spec, {
       return {
         output: {
           callId: result.id,
-          name: result.name,
-          status: result.status,
-          direction: result.direction,
-          dateStart: result.dateStart,
-          dateEnd: result.dateEnd,
-          parentType: result.parentType,
-          parentId: result.parentId,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          status: result.status ?? undefined,
+          direction: result.direction ?? undefined,
+          dateStart: result.dateStart ?? undefined,
+          dateEnd: result.dateEnd ?? undefined,
+          parentType: result.parentType ?? undefined,
+          parentId: result.parentId ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Call **${result.name || ''}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      if (!callId) throw new Error('callId is required for delete');
+      if (!callId) throw createApiServiceError('callId is required for delete');
       await client.deleteRecord('Call', callId);
       return {
         output: {
@@ -107,6 +108,6 @@ export let manageCalls = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,5 +1,6 @@
 export * from './create-query';
 export * from './evaluate-content';
+export * from './export-content';
 export * from './get-content';
 export * from './get-recommendations';
 export * from './import-content';

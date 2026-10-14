@@ -30,7 +30,10 @@ export let getCustomer = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.getCustomer(ctx.input.customerId);
+    let additionalFields = ctx.input.includeAdditionalFields
+      ? ['payment_portal_link', 'payer_rating', 'average_days_to_pay']
+      : undefined;
+    let result = await client.getCustomer(ctx.input.customerId, additionalFields);
 
     return {
       output: {
@@ -43,6 +46,7 @@ export let getCustomer = SlateTool.create(spec, {
         phoneNumber: result.phoneNumber ?? null,
         mobileNumber: result.mobileNumber ?? null,
         status: result.status,
+        chasing: result.chasing,
         groups: result.groups,
         addresses: result.addresses,
         paymentPortalLink: result.paymentPortalLink ?? null,

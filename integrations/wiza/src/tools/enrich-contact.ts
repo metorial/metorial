@@ -20,8 +20,8 @@ The enrichment is asynchronous — use the **Get Enrichment Result** tool to ret
     'Use callbackUrl to receive results via webhook instead of polling.'
   ],
   constraints: [
-    'Rate limit: 15 requests per second.',
-    'Credits are consumed based on enrichment level: 1 credit for profile data, 2 for emails, 5 for phone numbers.'
+    'Concurrent enrichment and queue limits depend on your API plan.',
+    'API credits are charged when data is returned: 1 for matched profile data, 2 for a valid email, and 5 for a phone number.'
   ],
   tags: {
     destructive: false,
@@ -116,7 +116,10 @@ The enrichment is asynchronous — use the **Get Enrichment Result** tool to ret
         isComplete: result.data.is_complete,
         message: result.status.message
       },
-      message: `Enrichment request started with ID **${result.data.id}**. Status: **${result.data.status}**. Use the "Get Enrichment Result" tool to retrieve results once processing completes.`
+      message:
+        result.data.status === 'failed'
+          ? `Enrichment **${result.data.id}** failed: ${result.data.fail_error || result.status.message || 'Unknown error'}. Use Get Enrichment Result to retrieve the request details.`
+          : `Enrichment request started with ID **${result.data.id}**. Status: **${result.data.status}**. Use the "Get Enrichment Result" tool to retrieve results once processing completes.`
     };
   })
   .build();

@@ -1,17 +1,24 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validatePagination } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listSegments = SlateTool.create(spec, {
   name: 'List Segments',
   key: 'list_segments',
-  description: `Retrieve all segments (groups) in your eSputnik account. Returns each segment's ID, name, and type (Static or Dynamic).`,
+  description: `Retrieve a page of segments (groups) in your eSputnik account. Returns each segment's ID, name, and type.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      name: z.string().optional().describe('Filter by segment name'),
+      startIndex: z.number().optional().describe('First result index; numbering starts at 1'),
+      maxRows: z.number().optional().describe('Page size, from 1 to 500; defaults to 500')
+    })
+  )
   .output(
     z.object({
       segments: z
@@ -22,12 +29,18 @@ export let listSegments = SlateTool.create(spec, {
             type: z.string().describe('Segment type (Static or Dynamic)')
           })
         )
-        .describe('All segments in the account')
+        .describe('Segments in the requested page'),
+      nextStartIndex: z.number().optional().describe('Next page index when this page is full')
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination(ctx.input.startIndex, ctx.input.maxRows);
     let client = new Client({ token: ctx.auth.token });
-    let segments = await client.getSegments();
+    let segments = await client.getSegments({
+      name: ctx.input.name,
+      startindex: ctx.input.startIndex,
+      maxrows: ctx.input.maxRows
+    });
 
     let mapped = (Array.isArray(segments) ? segments : []).map((s: any) => ({
       segmentId: s.id,
@@ -36,7 +49,13 @@ export let listSegments = SlateTool.create(spec, {
     }));
 
     return {
-      output: { segments: mapped },
+      output: {
+        segments: mapped,
+        nextStartIndex:
+          mapped.length === (ctx.input.maxRows ?? 500)
+            ? (ctx.input.startIndex ?? 1) + mapped.length
+            : undefined
+      },
       message: `Found **${mapped.length}** segment(s).`
     };
   })
@@ -45,14 +64,21 @@ export let listSegments = SlateTool.create(spec, {
 export let getSegmentContacts = SlateTool.create(spec, {
   name: 'Get Segment Contacts',
   key: 'get_segment_contacts',
-  description: `Retrieve all contacts belonging to a specific segment. Provide the segment ID to get its members.`,
+  description: `Retrieve a page of contacts belonging to a segment. Call list_segments to discover its ID.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      segmentId: z.number().describe('ID of the segment to retrieve contacts from')
+      segmentId: z.number().describe('Segment ID. Call list_segments to discover IDs.'),
+      startIndex: z.number().optional().describe('First result index; numbering starts at 1'),
+      maxRows: z.number().optional().describe('Page size, from 1 to 500; defaults to 500'),
+      orderByTs: z
+        .boolean()
+        .optional()
+        .describe('Order by the time contacts were added to the segment'),
+      asc: z.boolean().optional().describe('Ascending order when true, descending when false')
     })
   )
   .output(
@@ -75,12 +101,19 @@ export let getSegmentContacts = SlateTool.create(spec, {
             externalCustomerId: z.string().optional().describe('External customer ID')
           })
         )
-        .describe('Contacts in the segment')
+        .describe('Contacts in the requested page'),
+      nextStartIndex: z.number().optional().describe('Next page index when this page is full')
     })
   )
   .handleInvocation(async ctx => {
+    validatePagination(ctx.input.startIndex, ctx.input.maxRows);
     let client = new Client({ token: ctx.auth.token });
-    let contacts = await client.getSegmentContacts(ctx.input.segmentId);
+    let contacts = await client.getSegmentContacts(ctx.input.segmentId, {
+      startindex: ctx.input.startIndex,
+      maxrows: ctx.input.maxRows,
+      orderByTs: ctx.input.orderByTs,
+      asc: ctx.input.asc
+    });
 
     let mapped = (Array.isArray(contacts) ? contacts : []).map((c: any) => ({
       contactId: c.id,
@@ -91,7 +124,13 @@ export let getSegmentContacts = SlateTool.create(spec, {
     }));
 
     return {
-      output: { contacts: mapped },
+      output: {
+        contacts: mapped,
+        nextStartIndex:
+          mapped.length === (ctx.input.maxRows ?? 500)
+            ? (ctx.input.startIndex ?? 1) + mapped.length
+            : undefined
+      },
       message: `Retrieved **${mapped.length}** contact(s) from segment ${ctx.input.segmentId}.`
     };
   })
@@ -112,7 +151,7 @@ export let updateSegmentMembership = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      segmentId: z.number().describe('ID of the static segment'),
+      segmentId: z.number().describe('Static segment ID. Call list_segments to discover IDs.'),
       action: z.enum(['attach', 'detach']).describe('Whether to attach or detach contacts'),
       contacts: z
         .array(
@@ -132,6 +171,15 @@ export let updateSegmentMembership = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.contacts.some(
+        contact => contact.contactId === undefined && !contact.externalCustomerId
+      )
+    ) {
+      throw createApiServiceError(
+        'Each contact must include contactId or externalCustomerId. No request was sent.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'attach') {

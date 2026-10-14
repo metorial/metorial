@@ -1,6 +1,4 @@
-Now I have a comprehensive picture. Let me also check the webhook event types more completely.Now I have all the information I need. Let me compile the specification.
-
-# Slates Specification for Acuity Scheduling
+# Integration Specification for Acuity Scheduling
 
 ## Overview
 
@@ -105,3 +103,13 @@ Webhook payloads include the action type, the resource ID (appointment or order)
 ### Order Events
 
 - **`order.completed`** — Fired when a package, gift certificate, or subscription order is completed.
+
+## API Contract Notes
+
+- OAuth authorization-code exchange uses form-encoded POST data. The documented token response contains an access token without a refresh token or expiry.
+- Appointment notification suppression is a `noEmail` query parameter. Administrator options are query parameters and must be explicitly selected; notes require administrator booking or updating.
+- Canceled-only appointment listing uses `canceled=true`; `showall=true` returns both scheduled and canceled records.
+- Client listing supports the provider's `search` query; named contact filters are applied to returned records. Clients are updated and deleted at `/clients` using current first name, last name, and optional phone query selectors. Numeric IDs are not used for these operations.
+- Class availability exposes session identifiers, times, series status, and remaining seats. Certificate discovery accepts product, order, appointment type, and client email filters.
+
+Official reference: [OAuth](https://developers.acuityscheduling.com/docs/oauth2), [appointments](https://developers.acuityscheduling.com/reference/get-appointments), [client updates](https://developers.acuityscheduling.com/reference/put-clients), [class availability](https://developers.acuityscheduling.com/reference/get-availability-classes), [certificates](https://developers.acuityscheduling.com/reference/get-certificates).

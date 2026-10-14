@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
-  description: `Lists users in the MaintainX organization. Can filter to only return assignable users (those who can be assigned to work orders).`,
+  description: `Lists users in the MaintainX organization. Can filter to only return assignable users (those who can be assigned to work orders). For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,11 +15,18 @@ export let listUsers = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       onlyAssignable: z
         .boolean()
         .optional()
         .describe('When true, only return users that can be assigned to work orders'),
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -41,10 +49,7 @@ export let listUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listUsers({
       onlyAssignable: ctx.input.onlyAssignable,
@@ -53,13 +58,13 @@ export let listUsers = SlateTool.create(spec, {
     });
 
     let users = (result.users ?? []).map((u: any) => ({
-      userId: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      email: u.email,
-      role: u.role,
-      createdAt: u.createdAt,
-      updatedAt: u.updatedAt
+      userId: u.id ?? undefined,
+      firstName: u.firstName ?? undefined,
+      lastName: u.lastName ?? undefined,
+      email: u.email ?? undefined,
+      role: u.role ?? undefined,
+      createdAt: u.createdAt ?? undefined,
+      updatedAt: u.updatedAt ?? undefined
     }));
 
     return {

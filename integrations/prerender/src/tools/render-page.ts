@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let renderPage = SlateTool.create(spec, {
   name: 'Render Page',
   key: 'render_page',
-  description: `Render a URL through Prerender's headless browser and retrieve the fully rendered HTML. This uses the core rendering service endpoint to produce a pre-rendered HTML snapshot of a JavaScript-heavy page.`,
+  description: `Render a URL through Prerender's headless browser and retrieve the fully rendered HTML and a downloadable HTML snapshot. This uses the core rendering service endpoint to produce a pre-rendered HTML snapshot of a JavaScript-heavy page.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -26,6 +26,12 @@ export let renderPage = SlateTool.create(spec, {
     let client = new PrerenderClient({ token: ctx.auth.token });
 
     let html = await client.renderPage(ctx.input.url);
+    await ctx.addAttachment({
+      type: 'url',
+      url: `https://service.prerender.io/${ctx.input.url}`,
+      headers: { 'X-Prerender-Token': ctx.auth.token },
+      mimeType: 'text/html'
+    });
 
     return {
       output: {

@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 import type {
   Agent,
   AuditLogEntry,
@@ -23,17 +28,168 @@ import type {
   Webhook
 } from './types';
 
+const ticketPriorities = { low: -10, medium: 0, high: 10, urgent: 20 } as const;
+type ApiTicketEvent = Omit<
+  NonNullable<Ticket['events']>[number],
+  'id' | 'createdAt' | 'author' | 'message' | 'attachments'
+> & {
+  ID: string;
+  date: string;
+  author?: { ID?: string; type?: string; name?: string; email?: string };
+  message?: { text?: string; richTextHtml?: string | null; isPrivate?: boolean };
+  attachments?: {
+    isPrivate?: boolean;
+    files?: Array<{
+      token: string;
+      cid?: string;
+      name: string;
+      type: string;
+      size: number;
+      url?: string;
+    }>;
+  };
+};
+type ApiTicket = Omit<
+  Ticket,
+  | 'id'
+  | 'status'
+  | 'priority'
+  | 'teamID'
+  | 'assigneeID'
+  | 'tags'
+  | 'ccRecipients'
+  | 'parentTicketID'
+  | 'childTicketIDs'
+  | 'rating'
+  | 'language'
+  | 'spam'
+  | 'events'
+> & {
+  ID: string;
+  status: Exclude<Ticket['status'], 'on hold'> | 'onhold';
+  priority: -10 | 0 | 10 | 20;
+  assignment: { team: { ID: string }; agent?: { ID: string } | null };
+  tagIDs?: string[];
+  cc?: Array<{ email: string; name?: string }>;
+  parentTicket?: { ID: string } | null;
+  childTickets?: Array<{ ID: string }>;
+  rating?: { rate: NonNullable<Ticket['rating']>['score']; comment?: string } | null;
+  detectedLanguage?: string;
+  spam?: { status?: boolean };
+  events?: ApiTicketEvent[];
+};
+
+let normalizeTicket = (ticket: ApiTicket): Ticket => {
+  let priority = (Object.keys(ticketPriorities) as Ticket['priority'][]).find(
+    key => ticketPriorities[key] === ticket.priority
+  );
+  if (!priority || !ticket.ID || !ticket.assignment?.team?.ID) {
+    throw createApiServiceError(
+      'HelpDesk returned a ticket without a valid ID, priority, or assigned team.'
+    );
+  }
+  return {
+    ...ticket,
+    id: ticket.ID,
+    status: ticket.status === 'onhold' ? 'on hold' : ticket.status,
+    priority,
+    teamID: ticket.assignment.team.ID,
+    assigneeID: ticket.assignment.agent?.ID,
+    tags: ticket.tagIDs ?? [],
+    followers: ticket.followers ?? [],
+    ccRecipients: ticket.cc?.map(person => person.email),
+    parentTicketID: ticket.parentTicket?.ID,
+    childTicketIDs: ticket.childTickets?.map(child => child.ID),
+    rating: ticket.rating
+      ? { score: ticket.rating.rate, comment: ticket.rating.comment }
+      : undefined,
+    language: ticket.detectedLanguage,
+    spam: ticket.spam?.status,
+    events: ticket.events?.map(event => ({
+      ...event,
+      id: event.ID,
+      createdAt: event.date,
+      author: event.author ? { ...event.author, id: event.author.ID } : undefined,
+      message: event.message
+        ? { text: event.message.text, html: event.message.richTextHtml ?? undefined }
+        : undefined,
+      visibility: event.message
+        ? event.message.isPrivate
+          ? ('private' as const)
+          : ('public' as const)
+        : event.attachments
+          ? event.attachments.isPrivate
+            ? ('private' as const)
+            : ('public' as const)
+          : undefined,
+      attachments: event.attachments?.files?.map(file => ({
+        id: file.token,
+        name: file.name,
+        contentType: file.type,
+        size: file.size,
+        url: file.url
+      }))
+    }))
+  };
+};
+
+let ticketPayload = (input: CreateTicketInput | UpdateTicketInput) =>
+  pickDefined({
+    subject: input.subject,
+    requester: 'requester' in input ? input.requester : undefined,
+    status: input.status === 'on hold' ? 'onhold' : input.status,
+    priority: input.priority !== undefined ? ticketPriorities[input.priority] : undefined,
+    assignment:
+      input.teamID !== undefined || input.assigneeID !== undefined
+        ? pickDefined({
+            team: input.teamID !== undefined ? { ID: input.teamID } : undefined,
+            agent: input.assigneeID !== undefined ? { ID: input.assigneeID } : undefined
+          })
+        : undefined,
+    tagIDs: 'tags' in input ? input.tags : undefined,
+    followers: 'followers' in input ? input.followers : undefined,
+    cc: input.ccRecipients?.map(email => ({ email })),
+    customFields: input.customFields,
+    message: input.message,
+    isPrivate: input.isPrivate,
+    transactionID: input.transactionID
+  });
+
+let parseCursor = (value: string): { ID: string; value: string } => {
+  try {
+    let cursor: unknown = JSON.parse(atob(value));
+    if (
+      typeof cursor === 'object' &&
+      cursor !== null &&
+      'ID' in cursor &&
+      'value' in cursor &&
+      typeof cursor.ID === 'string' &&
+      typeof cursor.value === 'string'
+    ) {
+      return { ID: cursor.ID, value: cursor.value };
+    }
+  } catch {
+    // Invalid input is reported using the provider error contract below.
+  }
+  throw createApiServiceError('Use the pagination cursor returned by list_tickets.');
+};
+
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
     let isBasicAuth = config.token.startsWith('Basic ');
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.helpdesk.com',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'HelpDesk',
+          reason: 'helpdesk_api_error'
+        }),
       headers: {
         Authorization: isBasicAuth ? config.token : `Bearer ${config.token}`,
         'Content-Type': 'application/json',
-        'User-Agent': 'Slates-HelpDesk-Integration/1.0'
+        'User-Agent': 'HelpDesk-Integration/1.0'
       }
     });
   }
@@ -41,41 +197,81 @@ export class Client {
   // ── Tickets ──
 
   async listTickets(params: ListTicketsParams = {}): Promise<PaginatedResponse<Ticket>> {
-    let query: Record<string, string> = {};
-    if (params.status) query.status = params.status;
-    if (params.teamID) query.teamID = params.teamID;
-    if (params.assigneeID) query.assigneeID = params.assigneeID;
-    if (params.tags && params.tags.length > 0) query.tags = params.tags.join(',');
-    if (params.requesterEmail) query.requesterEmail = params.requesterEmail;
-    if (params.createdFrom) query.createdFrom = params.createdFrom;
-    if (params.createdTo) query.createdTo = params.createdTo;
-    if (params.updatedFrom) query.updatedFrom = params.updatedFrom;
-    if (params.updatedTo) query.updatedTo = params.updatedTo;
-    if (params.search) query.search = params.search;
-    if (params.sortBy) query.sortBy = params.sortBy;
-    if (params.sortOrder) query.sortOrder = params.sortOrder;
-    if (params.pageAfter) query.pageAfter = params.pageAfter;
-    if (params.pageBefore) query.pageBefore = params.pageBefore;
-    if (params.limit) query.limit = String(params.limit);
-    if (params.silo) query.silo = params.silo;
-
-    let response = await this.http.get('/v1/tickets', { params: query });
-    return response.data as PaginatedResponse<Ticket>;
+    if (params.limit !== undefined && !Number.isInteger(params.limit)) {
+      throw createApiServiceError('limit must be a whole number between 1 and 100.');
+    }
+    let sortBy = params.sortBy ?? 'createdAt';
+    if (!['createdAt', 'updatedAt', 'lastMessageAt'].includes(sortBy)) {
+      throw createApiServiceError('sortBy must be createdAt, updatedAt, or lastMessageAt.');
+    }
+    let query = pickDefined({
+      status: params.status === 'on hold' ? 'onhold' : params.status,
+      'assignment.team.ID': params.teamID,
+      'assignment.agent.ID': params.assigneeID,
+      'tagIDs[]': params.tags?.join(','),
+      'requester.email': params.requesterEmail,
+      createdDateFrom: params.createdFrom,
+      createdDateTo: params.createdTo,
+      updatedDateFrom: params.updatedFrom,
+      updatedDateTo: params.updatedTo,
+      query: params.search,
+      sortBy,
+      order: params.sortOrder,
+      pageSize: params.limit,
+      silo: params.silo
+    });
+    let cursorQuery: Record<string, string> = {};
+    if (params.pageAfter && params.pageBefore) {
+      throw createApiServiceError('Provide either a next or previous ticket cursor.');
+    }
+    if (params.pageAfter || params.pageBefore) {
+      let cursor = parseCursor(params.pageAfter ?? params.pageBefore ?? '');
+      let direction = params.pageAfter ? 'next' : 'prev';
+      cursorQuery[`${direction}.ID`] = cursor.ID;
+      cursorQuery[`${direction}.value`] = cursor.value;
+    }
+    let response = await this.http.get<ApiTicket[]>('/v1/tickets', {
+      params: { ...query, ...cursorQuery }
+    });
+    let data = response.data.map(normalizeTicket);
+    let makeCursor = (ticket: Ticket | undefined) => {
+      if (!ticket) return undefined;
+      let value = ticket[sortBy as 'createdAt' | 'updatedAt' | 'lastMessageAt'];
+      return value ? btoa(JSON.stringify({ ID: ticket.id, value })) : undefined;
+    };
+    return {
+      data,
+      pagination: {
+        after: makeCursor(data.at(-1)),
+        before: makeCursor(data[0]),
+        hasMore: data.length === (params.limit ?? 20)
+      }
+    };
   }
 
   async getTicket(ticketId: string): Promise<Ticket> {
-    let response = await this.http.get(`/v1/tickets/${ticketId}`);
-    return response.data as Ticket;
+    let response = await this.http.get<ApiTicket>(
+      `/v1/tickets/${encodeURIComponent(ticketId)}`
+    );
+    return normalizeTicket(response.data);
   }
 
   async createTicket(input: CreateTicketInput): Promise<Ticket> {
-    let response = await this.http.post('/v1/tickets', input);
-    return response.data as Ticket;
+    if (!input.message?.text.trim()) {
+      throw createApiServiceError(
+        'Provide message with the first plain-text message to create a ticket.'
+      );
+    }
+    let response = await this.http.post<ApiTicket>('/v1/tickets', ticketPayload(input));
+    return normalizeTicket(response.data);
   }
 
   async updateTicket(ticketId: string, input: UpdateTicketInput): Promise<Ticket> {
-    let response = await this.http.patch(`/v1/tickets/${ticketId}`, input);
-    return response.data as Ticket;
+    let response = await this.http.patch<ApiTicket>(
+      `/v1/tickets/${encodeURIComponent(ticketId)}`,
+      ticketPayload(input)
+    );
+    return normalizeTicket(response.data);
   }
 
   async deleteTicket(ticketId: string): Promise<void> {
@@ -83,11 +279,15 @@ export class Client {
   }
 
   async addTicketTags(ticketId: string, tags: string[]): Promise<void> {
-    await this.http.post(`/v1/tickets/${ticketId}/tags`, { tags });
+    await this.http.post(`/v1/tickets/${encodeURIComponent(ticketId)}/tags`, { tagIDs: tags });
   }
 
   async removeTicketTags(ticketId: string, tags: string[]): Promise<void> {
-    await this.http.delete(`/v1/tickets/${ticketId}/tags`, { data: { tags } });
+    for (let tagId of tags) {
+      await this.http.delete(
+        `/v1/tickets/${encodeURIComponent(ticketId)}/tags/${encodeURIComponent(tagId)}`
+      );
+    }
   }
 
   async addTicketFollowers(ticketId: string, agentIds: string[]): Promise<void> {
@@ -95,17 +295,29 @@ export class Client {
   }
 
   async removeTicketFollowers(ticketId: string, agentIds: string[]): Promise<void> {
-    await this.http.delete(`/v1/tickets/${ticketId}/followers`, {
-      data: { followers: agentIds }
-    });
+    for (let agentId of agentIds) {
+      await this.http.delete(
+        `/v1/tickets/${encodeURIComponent(ticketId)}/followers/${encodeURIComponent(agentId)}`
+      );
+    }
   }
 
   async mergeTickets(parentTicketId: string, childTicketIds: string[]): Promise<void> {
-    await this.http.post(`/v1/tickets/${parentTicketId}/merge`, { ticketIDs: childTicketIds });
+    for (let childTicketID of childTicketIds) {
+      await this.http.post(`/v1/tickets/${encodeURIComponent(parentTicketId)}/childTickets`, {
+        childTicketID
+      });
+    }
   }
 
   async unmergeTicket(ticketId: string): Promise<void> {
-    await this.http.delete(`/v1/tickets/${ticketId}/merge`);
+    let ticket = await this.getTicket(ticketId);
+    if (!ticket.parentTicketID) {
+      throw createApiServiceError('The ticket has no parent ticket to unmerge from.');
+    }
+    await this.http.delete(
+      `/v1/tickets/${encodeURIComponent(ticket.parentTicketID)}/childTickets/${encodeURIComponent(ticketId)}`
+    );
   }
 
   async moveTicketToSilo(ticketId: string, silo: string): Promise<void> {
@@ -113,7 +325,34 @@ export class Client {
   }
 
   async sendRatingRequest(ticketId: string): Promise<void> {
-    await this.http.post(`/v1/tickets/${ticketId}/rating`);
+    await this.http.post(`/v1/tickets/${ticketId}/ratingRequests`);
+  }
+
+  async listLicenses(): Promise<
+    Array<{
+      ID: number;
+      defaultTeamID?: string;
+      settings?: { companyName?: string };
+      createdAt?: string;
+      updatedAt?: string;
+    }>
+  > {
+    let response = await this.http.get('/v1/licenses');
+    return response.data;
+  }
+
+  async listSavedViews(): Promise<
+    Array<{
+      ID: string;
+      name: string;
+      agentID?: string;
+      filters?: Record<string, unknown>;
+      createdAt?: string;
+      updatedAt?: string;
+    }>
+  > {
+    let response = await this.http.get('/v1/views');
+    return response.data;
   }
 
   // ── Transactions (Messages) ──
@@ -220,7 +459,7 @@ export class Client {
   // ── Custom Fields ──
 
   async listCustomFields(): Promise<CustomField[]> {
-    let response = await this.http.get('/v1/custom-fields');
+    let response = await this.http.get('/v1/customFields');
     let data = response.data;
     return Array.isArray(data)
       ? (data as CustomField[])
@@ -228,7 +467,7 @@ export class Client {
   }
 
   async getCustomField(fieldId: string): Promise<CustomField> {
-    let response = await this.http.get(`/v1/custom-fields/${fieldId}`);
+    let response = await this.http.get(`/v1/customFields/${fieldId}`);
     return response.data as CustomField;
   }
 
@@ -239,7 +478,7 @@ export class Client {
     teamIDs?: string[];
     active?: boolean;
   }): Promise<CustomField> {
-    let response = await this.http.post('/v1/custom-fields', input);
+    let response = await this.http.post('/v1/customFields', input);
     return response.data as CustomField;
   }
 
@@ -247,18 +486,18 @@ export class Client {
     fieldId: string,
     input: { name?: string; editPermission?: string; teamIDs?: string[]; active?: boolean }
   ): Promise<CustomField> {
-    let response = await this.http.patch(`/v1/custom-fields/${fieldId}`, input);
+    let response = await this.http.patch(`/v1/customFields/${fieldId}`, input);
     return response.data as CustomField;
   }
 
   async deleteCustomField(fieldId: string): Promise<void> {
-    await this.http.delete(`/v1/custom-fields/${fieldId}`);
+    await this.http.delete(`/v1/customFields/${fieldId}`);
   }
 
   // ── Canned Responses ──
 
   async listCannedResponses(): Promise<CannedResponse[]> {
-    let response = await this.http.get('/v1/canned-responses');
+    let response = await this.http.get('/v1/cannedResponses');
     let data = response.data;
     return Array.isArray(data)
       ? (data as CannedResponse[])
@@ -266,7 +505,7 @@ export class Client {
   }
 
   async getCannedResponse(responseId: string): Promise<CannedResponse> {
-    let response = await this.http.get(`/v1/canned-responses/${responseId}`);
+    let response = await this.http.get(`/v1/cannedResponses/${responseId}`);
     return response.data as CannedResponse;
   }
 
@@ -276,7 +515,7 @@ export class Client {
     shortcut?: string;
     teamIDs?: string[];
   }): Promise<CannedResponse> {
-    let response = await this.http.post('/v1/canned-responses', input);
+    let response = await this.http.post('/v1/cannedResponses', input);
     return response.data as CannedResponse;
   }
 
@@ -284,12 +523,12 @@ export class Client {
     responseId: string,
     input: { name?: string; content?: string; shortcut?: string; teamIDs?: string[] }
   ): Promise<CannedResponse> {
-    let response = await this.http.patch(`/v1/canned-responses/${responseId}`, input);
+    let response = await this.http.patch(`/v1/cannedResponses/${responseId}`, input);
     return response.data as CannedResponse;
   }
 
   async deleteCannedResponse(responseId: string): Promise<void> {
-    await this.http.delete(`/v1/canned-responses/${responseId}`);
+    await this.http.delete(`/v1/cannedResponses/${responseId}`);
   }
 
   // ── Rules ──
@@ -447,7 +686,7 @@ export class Client {
     if (params.limit) query.limit = String(params.limit);
     if (params.pageAfter) query.pageAfter = params.pageAfter;
 
-    let response = await this.http.get('/v1/auditlog', { params: query });
+    let response = await this.http.get('/v1/auditLog', { params: query });
     return response.data as PaginatedResponse<AuditLogEntry>;
   }
 

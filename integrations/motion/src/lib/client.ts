@@ -1,33 +1,29 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.usemotion.com/v1';
 let BETA_BASE_URL = 'https://api.usemotion.com';
 
 export class MotionClient {
-  private token: string;
+  private axios;
+  private betaAxios;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
+    if (!config.token?.trim()) {
+      throw createApiServiceError(
+        'A Motion API key is required. Reconnect with a valid API key.'
+      );
+    }
 
-  private get axios() {
-    return createAxios({
-      baseURL: BASE_URL,
-      headers: {
-        'X-API-Key': this.token,
-        'Content-Type': 'application/json'
-      }
-    });
-  }
-
-  private get betaAxios() {
-    return createAxios({
-      baseURL: BETA_BASE_URL,
-      headers: {
-        'X-API-Key': this.token,
-        'Content-Type': 'application/json'
-      }
-    });
+    let options = {
+      authHeader: { name: 'X-API-Key', value: config.token },
+      errorAdapter: (error: unknown) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Motion',
+          reason: 'motion_api_error'
+        })
+    };
+    this.axios = createAuthenticatedAxios({ baseURL: BASE_URL, ...options });
+    this.betaAxios = createAuthenticatedAxios({ baseURL: BETA_BASE_URL, ...options });
   }
 
   // ─── Tasks ──────────────────────────────────────────────
@@ -54,7 +50,7 @@ export class MotionClient {
   }
 
   async getTask(taskId: string) {
-    let response = await this.axios.get(`/tasks/${taskId}`);
+    let response = await this.axios.get(`/tasks/${encodeURIComponent(taskId)}`);
     return response.data;
   }
 
@@ -93,12 +89,12 @@ export class MotionClient {
       } | null;
     }
   ) {
-    let response = await this.axios.patch(`/tasks/${taskId}`, data);
+    let response = await this.axios.patch(`/tasks/${encodeURIComponent(taskId)}`, data);
     return response.data;
   }
 
   async deleteTask(taskId: string) {
-    let response = await this.axios.delete(`/tasks/${taskId}`);
+    let response = await this.axios.delete(`/tasks/${encodeURIComponent(taskId)}`);
     return response.data;
   }
 
@@ -109,12 +105,12 @@ export class MotionClient {
       assigneeId?: string;
     }
   ) {
-    let response = await this.axios.patch(`/tasks/${taskId}/move`, data);
+    let response = await this.axios.patch(`/tasks/${encodeURIComponent(taskId)}/move`, data);
     return response.data;
   }
 
   async unassignTask(taskId: string) {
-    let response = await this.axios.delete(`/tasks/${taskId}/assignee`);
+    let response = await this.axios.delete(`/tasks/${encodeURIComponent(taskId)}/assignee`);
     return response.data;
   }
 
@@ -133,7 +129,7 @@ export class MotionClient {
   }
 
   async getProject(projectId: string) {
-    let response = await this.axios.get(`/projects/${projectId}`);
+    let response = await this.axios.get(`/projects/${encodeURIComponent(projectId)}`);
     return response.data;
   }
 
@@ -148,7 +144,7 @@ export class MotionClient {
     name: string;
     workspaceId: string;
     assigneeId: string;
-    frequency: Record<string, unknown>;
+    frequency: string | Record<string, unknown>;
     deadlineType?: string;
     duration?: number | string;
     startingOn?: string;
@@ -167,7 +163,9 @@ export class MotionClient {
   }
 
   async deleteRecurringTask(recurringTaskId: string) {
-    let response = await this.axios.delete(`/recurring-tasks/${recurringTaskId}`);
+    let response = await this.axios.delete(
+      `/recurring-tasks/${encodeURIComponent(recurringTaskId)}`
+    );
     return response.data;
   }
 
@@ -194,20 +192,22 @@ export class MotionClient {
     }
   ) {
     let response = await this.betaAxios.post(
-      `/beta/workspaces/${workspaceId}/custom-fields`,
+      `/beta/workspaces/${encodeURIComponent(workspaceId)}/custom-fields`,
       data
     );
     return response.data;
   }
 
   async listCustomFields(workspaceId: string) {
-    let response = await this.betaAxios.get(`/beta/workspaces/${workspaceId}/custom-fields`);
+    let response = await this.betaAxios.get(
+      `/beta/workspaces/${encodeURIComponent(workspaceId)}/custom-fields`
+    );
     return response.data;
   }
 
   async deleteCustomField(workspaceId: string, customFieldId: string) {
     let response = await this.betaAxios.delete(
-      `/beta/workspaces/${workspaceId}/custom-fields/${customFieldId}`
+      `/beta/workspaces/${encodeURIComponent(workspaceId)}/custom-fields/${encodeURIComponent(customFieldId)}`
     );
     return response.data;
   }
@@ -219,7 +219,10 @@ export class MotionClient {
       value: { type: string; value: string | number };
     }
   ) {
-    let response = await this.betaAxios.post(`/beta/custom-field-values/task/${taskId}`, data);
+    let response = await this.betaAxios.post(
+      `/beta/custom-field-values/task/${encodeURIComponent(taskId)}`,
+      data
+    );
     return response.data;
   }
 
@@ -231,7 +234,7 @@ export class MotionClient {
     }
   ) {
     let response = await this.betaAxios.post(
-      `/beta/custom-field-values/project/${projectId}`,
+      `/beta/custom-field-values/project/${encodeURIComponent(projectId)}`,
       data
     );
     return response.data;
@@ -239,14 +242,14 @@ export class MotionClient {
 
   async removeCustomFieldFromTask(taskId: string, valueId: string) {
     let response = await this.betaAxios.delete(
-      `/beta/custom-field-values/task/${taskId}/custom-fields/${valueId}`
+      `/beta/custom-field-values/task/${encodeURIComponent(taskId)}/custom-fields/${encodeURIComponent(valueId)}`
     );
     return response.data;
   }
 
   async removeCustomFieldFromProject(projectId: string, valueId: string) {
     let response = await this.betaAxios.delete(
-      `/beta/custom-field-values/project/${projectId}/custom-fields/${valueId}`
+      `/beta/custom-field-values/project/${encodeURIComponent(projectId)}/custom-fields/${encodeURIComponent(valueId)}`
     );
     return response.data;
   }

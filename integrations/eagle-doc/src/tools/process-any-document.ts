@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { EagleDocClient } from '../lib/client';
+import { addSignatureImages } from '../lib/signatures';
 import { spec } from '../spec';
 
 export let processAnyDocument = SlateTool.create(spec, {
@@ -36,6 +37,8 @@ Each document type returns type-specific structured fields (e.g., bank statement
           'BusinessCard',
           'EmployeeIDCard',
           'StudentIDCard',
+          'EmployeeIdCard',
+          'StudentIdCard',
           'DrivingLicense',
           'BirthCertificate',
           'DeliverySheet',
@@ -94,9 +97,16 @@ Each document type returns type-specific structured fields (e.g., bank statement
       fileBase64: ctx.input.fileBase64,
       fileName: ctx.input.fileName,
       privacy: ctx.input.privacy,
-      docType: ctx.input.docType,
+      docType:
+        ctx.input.docType === 'EmployeeIDCard'
+          ? 'EmployeeIdCard'
+          : ctx.input.docType === 'StudentIDCard'
+            ? 'StudentIdCard'
+            : ctx.input.docType,
       configId: ctx.input.configId
     });
+
+    await addSignatureImages(ctx, result.signatures);
 
     let docType = result.docType || ctx.input.docType || 'Unknown';
     let listNames = result.lists ? Object.keys(result.lists) : [];

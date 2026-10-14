@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HyperbrowserClient } from '../lib/client';
 import { sessionOptionsSchema } from '../lib/schemas';
@@ -64,6 +64,14 @@ The AI transforms unstructured web content into structured data matching your re
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.prompt?.trim() && !ctx.input.schema) {
+      throw createApiServiceError(
+        'Provide a prompt or JSON schema describing the data to extract.'
+      );
+    }
+    if (ctx.input.urls.length === 0) {
+      throw createApiServiceError('Provide at least one URL to extract data from.');
+    }
     let client = new HyperbrowserClient({ token: ctx.auth.token });
 
     let params: Record<string, unknown> = { urls: ctx.input.urls };
@@ -81,7 +89,8 @@ The AI transforms unstructured web content into structured data matching your re
     ctx.progress('Waiting for extract job to complete...');
     let result = await client.pollForCompletion(
       () => client.getExtractJobStatus(jobId),
-      () => client.getExtractJobResult(jobId)
+      () => client.getExtractJobResult(jobId),
+      { jobId }
     );
 
     let metadata = result.metadata as Record<string, unknown> | null | undefined;

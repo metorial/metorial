@@ -30,7 +30,7 @@ export let listDeals = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Comma-separated list of related data to include (e.g., "people,companies,tags")'
+          'Space-separated list of related data to include (e.g., "people company tags")'
         )
     })
   )
@@ -49,7 +49,7 @@ export let listDeals = SlateTool.create(spec, {
     let result = await client.listDeals({
       page: ctx.input.page,
       perpage: ctx.input.perPage,
-      includes: ctx.input.includes
+      includes: ctx.input.includes?.replace(/,/g, ' ')
     });
 
     let items = Array.isArray(result) ? result : [];

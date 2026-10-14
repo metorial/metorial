@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -60,7 +60,22 @@ export let deduplicateNamesTool = SlateTool.create(spec, {
 
     let result = await client.nameDeduplication(ctx.input.names, ctx.input.threshold);
 
-    let duplicates = result.results ?? [];
+    let parsedClusters = z.array(z.string()).safeParse(result.results);
+    if (!parsedClusters.success || parsedClusters.data.length !== ctx.input.names.length) {
+      throw createApiServiceError(
+        'The Analytics API did not return a cluster ID for each input name.'
+      );
+    }
+    let groups = new Map<string, string[]>();
+    for (let [index, clusterId] of parsedClusters.data.entries()) {
+      let names = groups.get(clusterId) ?? [];
+      let inputName = ctx.input.names[index];
+      if (inputName) names.push(inputName.text);
+      groups.set(clusterId, names);
+    }
+    let duplicates = [...groups.values()]
+      .filter(names => names.length > 1)
+      .map(names => ({ name: names[0] ?? '', duplicates: names.slice(1) }));
 
     return {
       output: {

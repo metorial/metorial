@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -38,9 +38,11 @@ export let manageMessage = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.projectId) throw new Error('projectId is required to create a message');
-      if (!ctx.input.title) throw new Error('title is required to create a message');
-      if (!ctx.input.body) throw new Error('body is required to create a message');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required to create a message');
+      if (!ctx.input.title)
+        throw createApiServiceError('title is required to create a message');
+      if (!ctx.input.body) throw createApiServiceError('body is required to create a message');
       let result = await client.createMessage(ctx.input.projectId, {
         title: ctx.input.title,
         body: ctx.input.body,
@@ -59,7 +61,8 @@ export let manageMessage = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.messageId) throw new Error('messageId is required to update a message');
+      if (!ctx.input.messageId)
+        throw createApiServiceError('messageId is required to update a message');
       await client.updateMessage(ctx.input.messageId, {
         title: ctx.input.title,
         body: ctx.input.body,
@@ -73,7 +76,8 @@ export let manageMessage = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.messageId) throw new Error('messageId is required to delete a message');
+      if (!ctx.input.messageId)
+        throw createApiServiceError('messageId is required to delete a message');
       await client.deleteMessage(ctx.input.messageId);
       return {
         output: { messageId: ctx.input.messageId, deleted: true },
@@ -81,6 +85,6 @@ export let manageMessage = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

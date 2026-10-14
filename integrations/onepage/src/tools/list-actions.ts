@@ -17,7 +17,7 @@ export let listActions = SlateTool.create(spec, {
       contactId: z.string().optional().describe('Filter actions by contact ID'),
       assigneeId: z.string().optional().describe('Filter actions by assignee user ID'),
       status: z
-        .enum(['asap', 'date', 'waiting', 'queued', 'done'])
+        .enum(['asap', 'date', 'date_time', 'waiting', 'queued', 'queued_with_date', 'done'])
         .optional()
         .describe('Filter by action status'),
       page: z.number().optional().describe('Page number (starts at 1)'),

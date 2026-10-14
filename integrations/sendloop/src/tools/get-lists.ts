@@ -30,7 +30,7 @@ export let getLists = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     if (ctx.input.listId) {

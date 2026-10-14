@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type RelationshipPayload } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageRelationship = SlateTool.create(spec, {
@@ -47,13 +47,13 @@ Use \`action: "delete"\` to remove the relationship, or omit/set to \`"upsert"\`
       };
     }
 
-    let payload: Record<string, unknown> = {
+    let payload: RelationshipPayload = {
       user: ctx.input.userIdentifier,
       company: ctx.input.companyIdentifier
     };
     if (ctx.input.properties) payload.properties = ctx.input.properties;
 
-    await client.createOrUpdateRelationship(payload as any);
+    await client.createOrUpdateRelationship(payload);
 
     return {
       output: { success: true },

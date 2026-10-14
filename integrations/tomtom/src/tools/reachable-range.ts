@@ -23,6 +23,18 @@ export let reachableRange = SlateTool.create(spec, {
       distanceBudgetInMeters: z.number().optional().describe('Distance budget in meters'),
       fuelBudgetInLiters: z.number().optional().describe('Fuel budget in liters (combustion)'),
       energyBudgetInkWh: z.number().optional().describe('Energy budget in kWh (electric)'),
+      constantSpeedConsumptionInLitersPerHundredkm: z
+        .string()
+        .optional()
+        .describe(
+          'Combustion consumption curve as speed,liters-per-100km pairs separated by colons; required for a fuel budget (e.g. 50,6.3:130,11.5)'
+        ),
+      constantSpeedConsumptionInkWhPerHundredkm: z
+        .string()
+        .optional()
+        .describe(
+          'Electric consumption curve as speed,kWh-per-100km pairs separated by colons; required for an energy budget (e.g. 50,8.2:130,21.3)'
+        ),
       routeType: z
         .enum(['fastest', 'shortest', 'eco'])
         .optional()
@@ -71,6 +83,10 @@ export let reachableRange = SlateTool.create(spec, {
       distanceBudgetInMeters: ctx.input.distanceBudgetInMeters,
       fuelBudgetInLiters: ctx.input.fuelBudgetInLiters,
       energyBudgetInkWh: ctx.input.energyBudgetInkWh,
+      constantSpeedConsumptionInLitersPerHundredkm:
+        ctx.input.constantSpeedConsumptionInLitersPerHundredkm,
+      constantSpeedConsumptionInkWhPerHundredkm:
+        ctx.input.constantSpeedConsumptionInkWhPerHundredkm,
       routeType: ctx.input.routeType,
       travelMode: ctx.input.travelMode,
       traffic: ctx.input.traffic,
@@ -81,8 +97,8 @@ export let reachableRange = SlateTool.create(spec, {
 
     let range = data.reachableRange || {};
     let center = {
-      lat: range.center?.latitude || ctx.input.originLat,
-      lon: range.center?.longitude || ctx.input.originLon
+      lat: range.center?.latitude ?? ctx.input.originLat,
+      lon: range.center?.longitude ?? ctx.input.originLon
     };
     let boundary = (range.boundary || []).map((p: any) => ({
       lat: p.latitude,

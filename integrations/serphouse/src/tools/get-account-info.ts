@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAccountInfo = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account_info',
-  description: `Retrieve SERPHouse account information including active plan details, credit usage, and available credits for both live and scheduled API calls.`,
+  description: `Retrieve SERPHouse account information including plan details and available credits. Returns all plans and retains separate live and scheduled credit details when the account response provides them.`,
   tags: {
     readOnly: true
   }
@@ -25,6 +25,19 @@ export let getAccountInfo = SlateTool.create(spec, {
         })
         .optional()
         .describe('Active subscription plan details'),
+      plans: z
+        .array(
+          z.object({
+            planName: z.string().optional(),
+            planType: z.string().optional(),
+            price: z.string().optional(),
+            currency: z.string().optional(),
+            creditAvailable: z.number().optional(),
+            creditTotal: z.number().optional()
+          })
+        )
+        .optional()
+        .describe('All returned subscription plans with their individual credit balances'),
       credits: z
         .object({
           available: z.number().optional().describe('Available live API credits'),
@@ -44,19 +57,33 @@ export let getAccountInfo = SlateTool.create(spec, {
 
     let response = await client.getAccountInfo();
     let results = response?.results;
+    let plans = Array.isArray(results?.plan)
+      ? results.plan
+      : results?.plan
+        ? [results.plan]
+        : [];
+    let firstPlan = plans[0];
 
     return {
       output: {
         status: response?.status ?? 'unknown',
         name: results?.name,
         email: results?.email,
-        plan: results?.plan
+        plan: firstPlan
           ? {
-              planName: results.plan.name,
-              planType: results.plan.type,
-              price: results.plan.price
+              planName: firstPlan.name,
+              planType: firstPlan.plan_type ?? firstPlan.type,
+              price: firstPlan.price === undefined ? undefined : String(firstPlan.price)
             }
           : undefined,
+        plans: plans.map(plan => ({
+          planName: plan.name,
+          planType: plan.plan_type ?? plan.type,
+          price: plan.price === undefined ? undefined : String(plan.price),
+          currency: plan.currency,
+          creditAvailable: plan.credit_available,
+          creditTotal: plan.credit_total
+        })),
         credits: results?.credit
           ? {
               available: results.credit.available,
@@ -66,7 +93,7 @@ export let getAccountInfo = SlateTool.create(spec, {
             }
           : undefined
       },
-      message: `Account: **${results?.name ?? 'N/A'}** (${results?.email ?? 'N/A'}). Credits: ${results?.credit?.available ?? 'N/A'}/${results?.credit?.total ?? 'N/A'} live, ${results?.credit?.scheduled_available ?? 'N/A'}/${results?.credit?.scheduled_total ?? 'N/A'} scheduled.`
+      message: `Account: **${results?.name ?? 'N/A'}** (${results?.email ?? 'N/A'}). Retrieved **${plans.length}** subscription plan(s).`
     };
   })
   .build();

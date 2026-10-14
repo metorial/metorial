@@ -208,4 +208,5 @@ export interface WrikeApproval {
 export interface WrikeResponse<T> {
   kind: string;
   data: T[];
+  nextPageToken?: string;
 }

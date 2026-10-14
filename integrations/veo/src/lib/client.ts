@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
 
 let getBaseUrl = (environment: string) =>
   environment === 'development' ? 'https://apiuat.veo.co.uk/api' : 'https://api.veo.co.uk/api';
@@ -21,13 +22,31 @@ export class Client {
   private http;
 
   constructor(opts: { token: string; environment: string }) {
-    this.http = createAxios({
+    if (!opts.token) {
+      throw createApiServiceError('VEO credentials are missing. Reconnect your account.');
+    }
+    this.http = createAuthenticatedAxios({
       baseURL: getBaseUrl(opts.environment),
-      headers: {
-        Authorization: `Bearer ${opts.token}`,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30_000,
+      authHeader: { value: `Bearer ${opts.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, { providerLabel: 'VEO', reason: 'veo_api_error' })
     });
+  }
+
+  async getCurrentUser() {
+    let response = await this.http.get('/me');
+    return response.data;
+  }
+
+  async listOrganisations() {
+    let response = await this.http.get('/me/organisations');
+    return response.data;
+  }
+
+  async getVideo(videoId: string) {
+    let response = await this.http.get(`/videos/${encodeURIComponent(videoId)}`);
+    return response.data;
   }
 
   // ── Videos ──────────────────────────────────────────────────────────────
@@ -60,19 +79,37 @@ export class Client {
   }
 
   async getVideoUploadToken(videoId: string, mimeType: string) {
-    let response = await this.http.get(`/videos/${videoId}/uploadtoken`, {
-      params: { mimetype: mimeType }
+    let response = await this.http.get(`/videos/${encodeURIComponent(videoId)}/uploadtoken`, {
+      params: { mimeType }
     });
     return response.data;
   }
 
   async getVideoDownloadToken(videoId: string) {
-    let response = await this.http.get(`/videos/${videoId}/downloadtoken`);
+    let response = await this.http.get(`/videos/${encodeURIComponent(videoId)}/downloadtoken`);
     return response.data;
   }
 
+  async downloadVideo(url: string) {
+    let parsedUrl = z.url().safeParse(url);
+    if (!parsedUrl.success || !url.startsWith('https://')) {
+      throw createApiServiceError('VEO returned an invalid video download URL.');
+    }
+    let downloads = createAuthenticatedAxios({
+      contentType: false,
+      timeout: 120_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'VEO',
+          operation: 'video download',
+          reason: 'veo_download_error'
+        })
+    });
+    return downloads.get(url, { responseType: 'stream' });
+  }
+
   async getVideoTranscript(videoId: string) {
-    let response = await this.http.get(`/videos/${videoId}/transcript`);
+    let response = await this.http.get(`/videos/${encodeURIComponent(videoId)}/transcript`);
     return response.data;
   }
 
@@ -162,8 +199,30 @@ export class Client {
         OrganisationId: r.organisationId,
         Roles: r.roles
       }));
+    } else {
+      let currentUser = await this.http.get('/user', { params: { id: userId } });
+      let existingRoles = z
+        .object({
+          Roles: z.array(z.object({ OrganisationId: z.number(), RoleId: z.number() }))
+        })
+        .safeParse(currentUser.data);
+      if (!existingRoles.success) {
+        throw createApiServiceError(
+          "VEO did not return the user's existing organisation roles. Supply roles explicitly to update the user."
+        );
+      }
+      let rolesByOrganisation = new Map<number, number[]>();
+      for (let assignment of existingRoles.data.Roles) {
+        let roles = rolesByOrganisation.get(assignment.OrganisationId) ?? [];
+        roles.push(assignment.RoleId);
+        rolesByOrganisation.set(assignment.OrganisationId, roles);
+      }
+      body.Roles = Array.from(rolesByOrganisation, ([OrganisationId, Roles]) => ({
+        OrganisationId,
+        Roles
+      }));
     }
-    let response = await this.http.put(`/v2/users/${userId}`, body);
+    let response = await this.http.put(`/v2/users/${encodeURIComponent(userId)}`, body);
     return response.data;
   }
 
@@ -194,7 +253,7 @@ export class Client {
   }
 
   async getGroup(groupId: string) {
-    let response = await this.http.get(`/communities/${groupId}`);
+    let response = await this.http.get(`/communities/${encodeURIComponent(groupId)}`);
     return response.data;
   }
 
@@ -252,23 +311,25 @@ export class Client {
     if (data.featureTimeline !== undefined) body.FeatureTimeline = data.featureTimeline;
     if (data.featureVideo !== undefined) body.FeatureVideo = data.featureVideo;
     if (data.featureFile !== undefined) body.FeatureFile = data.featureFile;
-    let response = await this.http.put(`/communities/${groupId}`, body);
+    let response = await this.http.put(`/communities/${encodeURIComponent(groupId)}`, body);
     return response.data;
   }
 
   async deleteGroup(groupId: string) {
-    let response = await this.http.delete(`/communities/${groupId}`);
+    let response = await this.http.delete(`/communities/${encodeURIComponent(groupId)}`);
     return response.data;
   }
 
   async getGroupMembers(groupId: string) {
-    let response = await this.http.get(`/community/members/members/${groupId}`);
+    let response = await this.http.get(
+      `/community/members/members/${encodeURIComponent(groupId)}`
+    );
     return response.data;
   }
 
   async addGroupMember(groupId: string, userId: string, admin?: boolean) {
     let response = await this.http.post(
-      `/community/${groupId}/members/addmember/${userId}`,
+      `/community/${encodeURIComponent(groupId)}/members/addmember/${encodeURIComponent(userId)}`,
       null,
       { params: { admin: admin ?? false } }
     );
@@ -278,26 +339,33 @@ export class Client {
   // ── Comments ────────────────────────────────────────────────────────────
 
   async getVideoComments(videoId: string) {
-    let response = await this.http.get(`/videos/${videoId}/comments`);
+    let response = await this.http.get(`/videos/${encodeURIComponent(videoId)}/comments`);
     return response.data;
   }
 
   async createVideoComment(videoId: string, message: string, parentCommentId?: number) {
     let body: Record<string, unknown> = { Message: message };
     if (parentCommentId !== undefined) body.ParentCommentId = parentCommentId;
-    let response = await this.http.post(`/videos/${videoId}/comments`, body);
+    let response = await this.http.post(
+      `/videos/${encodeURIComponent(videoId)}/comments`,
+      body
+    );
     return response.data;
   }
 
   async deleteVideoComment(videoId: string, commentId: string) {
-    let response = await this.http.delete(`/videos/${videoId}/comments/${commentId}`);
+    let response = await this.http.delete(
+      `/videos/${encodeURIComponent(videoId)}/comments/${encodeURIComponent(commentId)}`
+    );
     return response.data;
   }
 
   // ── Tag Session Notes ──────────────────────────────────────────────────
 
   async getTagSessionNotes(tagSessionId: string) {
-    let response = await this.http.get(`/taggedvideo/${tagSessionId}/Notes`);
+    let response = await this.http.get(
+      `/taggedvideo/${encodeURIComponent(tagSessionId)}/Notes`
+    );
     return response.data;
   }
 
@@ -307,10 +375,10 @@ export class Client {
     message: string,
     parentCommentId?: number
   ) {
-    let body: Record<string, unknown> = { Message: message };
-    if (parentCommentId !== undefined) body.ParentCommentId = parentCommentId;
+    let body: Record<string, unknown> = { Note: message };
+    if (parentCommentId !== undefined) body.ParentNoteId = parentCommentId;
     let response = await this.http.post(
-      `/taggedvideo/${taggedVideoId}/tags/${tagId}/Notes`,
+      `/taggedvideo/${encodeURIComponent(taggedVideoId)}/tags/${encodeURIComponent(tagId)}/Notes`,
       body
     );
     return response.data;
@@ -318,7 +386,7 @@ export class Client {
 
   async deleteTagSessionNote(taggedVideoId: string, tagId: string, noteId: string) {
     let response = await this.http.delete(
-      `/taggedvideo/${taggedVideoId}/tags/${tagId}/notes/${noteId}`
+      `/taggedvideo/${encodeURIComponent(taggedVideoId)}/tags/${encodeURIComponent(tagId)}/notes/${encodeURIComponent(noteId)}`
     );
     return response.data;
   }
@@ -326,7 +394,7 @@ export class Client {
   // ── Portfolios ─────────────────────────────────────────────────────────
 
   async listPortfolios(params?: PaginationParams) {
-    let response = await this.http.get('/portfolios', {
+    let response = await this.http.get('/portfolios/v2/search', {
       params: {
         pageSize: params?.pageSize ?? 20,
         pageNumber: params?.pageNumber ?? 1,
@@ -337,27 +405,35 @@ export class Client {
   }
 
   async getPortfolio(portfolioId: string) {
-    let response = await this.http.get(`/portfolios/${portfolioId}`);
+    let response = await this.http.get(`/portfolios/${encodeURIComponent(portfolioId)}`);
     return response.data;
   }
 
   async createPortfolio(data: { name: string; description?: string }) {
-    let body: Record<string, unknown> = { Name: data.name };
+    let body: Record<string, unknown> = { Title: data.name };
     if (data.description !== undefined) body.Description = data.description;
     let response = await this.http.post('/portfolios', body);
     return response.data;
   }
 
   async updatePortfolio(portfolioId: string, data: { name?: string; description?: string }) {
-    let body: Record<string, unknown> = {};
-    if (data.name !== undefined) body.Name = data.name;
-    if (data.description !== undefined) body.Description = data.description;
-    let response = await this.http.put(`/portfolios/${portfolioId}`, body);
+    let portfolio = await this.getPortfolio(portfolioId);
+    let title = data.name ?? portfolio.Title ?? portfolio.title;
+    if (typeof title !== 'string') {
+      throw createApiServiceError(
+        'VEO did not return the portfolio title. Supply name to update it.'
+      );
+    }
+    let body: Record<string, unknown> = { Title: title };
+    let description = data.description ?? portfolio.Description ?? portfolio.description;
+    if (description !== undefined) body.Description = description;
+    if (portfolio.Module !== undefined) body.Module = portfolio.Module;
+    let response = await this.http.put(`/portfolios/${encodeURIComponent(portfolioId)}`, body);
     return response.data;
   }
 
   async deletePortfolio(portfolioId: string) {
-    let response = await this.http.delete(`/portfolios/${portfolioId}`);
+    let response = await this.http.delete(`/portfolios/${encodeURIComponent(portfolioId)}`);
     return response.data;
   }
 }

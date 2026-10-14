@@ -11,7 +11,19 @@ let transactionEntrySchema = z.object({
   unit: z.string().optional().describe('Unit of measure (e.g., pcs, hrs)'),
   unitNetPrice: z.number().describe('Net price per unit'),
   vatPercent: z.number().optional().describe('VAT percentage'),
-  discount: z.number().optional().describe('Discount percentage')
+  discount: z.number().optional().describe('Discount percentage'),
+  baseEntryId: z
+    .number()
+    .optional()
+    .describe('Original line item ID for a correction before-entry'),
+  recordId: z
+    .number()
+    .optional()
+    .describe('Unique line identifier within a correction document'),
+  invalidRecordId: z
+    .number()
+    .optional()
+    .describe('Before-entry recordId corrected by this after-entry')
 });
 
 export let createTransaction = SlateTool.create(spec, {
@@ -19,7 +31,7 @@ export let createTransaction = SlateTool.create(spec, {
   key: 'create_transaction',
   description: `Create a financial transaction (invoice, pro forma, receipt, bill) in Firmao. Supports line items with products, pricing, VAT, and customer linkage. Both sales and purchase modes are available.`,
   instructions: [
-    'Transaction number must be unique. Use the numbering series endpoint to get the next available number if needed.',
+    'Transaction number must be unique. Call list_numbering_series and get_next_document_number to discover a suggested number.',
     'For correction invoices, use separate before/after entry pairs with baseEntryId linking to original positions.'
   ]
 })
@@ -80,14 +92,16 @@ export let createTransaction = SlateTool.create(spec, {
       mode: ctx.input.mode,
       transactionNumber: ctx.input.transactionNumber,
       transactionEntries: ctx.input.entries.map(e => ({
-        product: e.productId,
+        product: e.productId ?? e.productName,
         productCode: e.productCode,
-        productName: e.productName,
         quantity: e.quantity,
         unit: e.unit,
         unitNettoPrice: e.unitNetPrice,
         vatPercent: e.vatPercent,
-        discount: e.discount
+        discount: e.discount,
+        baseEntryId: e.baseEntryId,
+        recordId: e.recordId,
+        invalidRecordId: e.invalidRecordId
       }))
     };
 
@@ -97,7 +111,7 @@ export let createTransaction = SlateTool.create(spec, {
     if (ctx.input.customerId !== undefined) body.customer = ctx.input.customerId;
     if (ctx.input.customerName) body.customerName = ctx.input.customerName;
     if (ctx.input.createCustomerIfNeeded !== undefined)
-      body.createCustomerIfNeeded = ctx.input.createCustomerIfNeeded;
+      body.createNewCustomerIfNeeded = ctx.input.createCustomerIfNeeded;
     if (ctx.input.nipNumber) body.nipNumber = ctx.input.nipNumber;
     if (ctx.input.currency) body.currency = ctx.input.currency;
     if (ctx.input.paymentType) body.paymentType = ctx.input.paymentType;

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -49,7 +49,9 @@ export let linkContacts = SlateTool.create(spec, {
 
     if (linkType === 'person_company') {
       if (!personId || !companyId)
-        throw new Error('personId and companyId are required for person_company link');
+        throw createApiServiceError(
+          'personId and companyId are required for person_company link'
+        );
       if (action === 'link') {
         await client.linkPersonToCompany(personId, companyId);
       } else {
@@ -57,7 +59,7 @@ export let linkContacts = SlateTool.create(spec, {
       }
     } else if (linkType === 'deal_person') {
       if (!dealId || !personId)
-        throw new Error('dealId and personId are required for deal_person link');
+        throw createApiServiceError('dealId and personId are required for deal_person link');
       if (action === 'link') {
         await client.linkDealToPerson(dealId, personId);
       } else {
@@ -65,7 +67,7 @@ export let linkContacts = SlateTool.create(spec, {
       }
     } else {
       if (!dealId || !companyId)
-        throw new Error('dealId and companyId are required for deal_company link');
+        throw createApiServiceError('dealId and companyId are required for deal_company link');
       if (action === 'link') {
         await client.linkDealToCompany(dealId, companyId);
       } else {

@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { isIP } from 'node:net';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface IpEnrichCompany {
   enrichmentId: string;
@@ -27,20 +28,34 @@ export class IpEnrichClient {
   private http;
 
   constructor(apiKey: string) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.lf-discover.com',
-      headers: {
-        'X-API-KEY': apiKey
-      }
+      authHeader: { name: 'X-API-KEY', value: apiKey },
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Leadfeeder IP-Enrich',
+          reason: 'leadfeeder_ip_enrich_api_error'
+        })
     });
   }
 
   async enrichIp(ipAddress: string): Promise<IpEnrichCompany> {
+    if (!isIP(ipAddress)) {
+      throw createApiServiceError(
+        'ipAddress must be a valid IPv4 or IPv6 address without brackets.'
+      );
+    }
     let response = await this.http.get('/companies', {
       params: { ip: ipAddress }
     });
 
     let data = response.data;
+    if (!data || typeof data !== 'object') {
+      throw createApiServiceError(
+        'IP-Enrich returned a response without company information.'
+      );
+    }
     let company = data.company ?? {};
     let location = data.location ?? {};
     let revenue = company.revenue ?? {};
@@ -55,10 +70,10 @@ export class IpEnrichClient {
       companyName: company.name ?? '',
       companyDomain: company.domain ?? '',
       logoUrl: company.logo_url ?? '',
-      revenueYear: revenue.year ?? null,
-      revenueAmount: revenue.amount ?? null,
-      employeesMin: employeesRange.min ?? null,
-      employeesMax: employeesRange.max ?? null,
+      revenueYear: parseNumericValue(revenue.year),
+      revenueAmount: parseNumericValue(revenue.amount),
+      employeesMin: parseNumericValue(employeesRange.min),
+      employeesMax: parseNumericValue(employeesRange.max),
       industryName: industries.name ?? '',
       sicCodes: (industries.sic ?? []).map((s: any) => String(s)),
       naicsCodes: (industries.naics ?? []).map((n: any) => String(n)),
@@ -76,3 +91,9 @@ export class IpEnrichClient {
     };
   }
 }
+
+let parseNumericValue = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  let parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};

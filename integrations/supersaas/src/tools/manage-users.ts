@@ -19,7 +19,8 @@ let userSchema = z.object({
   superField: z.string().optional().describe('Super custom field'),
   credit: z.number().optional().describe('Credit balance'),
   role: z.number().optional().describe('User role: 3=regular, 4=superuser, -1=blocked'),
-  createdOn: z.string().optional().describe('UTC creation timestamp')
+  createdOn: z.string().optional().describe('UTC creation timestamp'),
+  formData: z.any().optional().describe('Attached custom form data when requested')
 });
 
 export let listUsersTool = SlateTool.create(spec, {
@@ -262,6 +263,7 @@ let mapUserResponse = (data: any): any => {
     superField: data.super_field ?? undefined,
     credit: data.credit != null ? Number(data.credit) : undefined,
     role: data.role != null ? Number(data.role) : undefined,
-    createdOn: data.created_on ?? undefined
+    createdOn: data.created_on ?? undefined,
+    formData: data.form ?? data.forms ?? undefined
   };
 };

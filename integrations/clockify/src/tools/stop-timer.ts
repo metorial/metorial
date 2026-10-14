@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let stopTimer = SlateTool.create(spec, {
   name: 'Stop Timer',
   key: 'stop_timer',
-  description: `Stop the currently running timer for a user. If no userId is provided, stops the timer for the authenticated user. Optionally specify a custom end time.`,
+  description: `Stop the currently running timer for a user. If no userId is provided, stops the timer for the authenticated user. Optionally specify a custom end time. Call get_workspaces to discover the workspace ID.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let stopTimer = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       userId: z
         .string()
         .optional()
@@ -33,11 +35,7 @@ export let stopTimer = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let userId = ctx.input.userId;
     if (!userId) {

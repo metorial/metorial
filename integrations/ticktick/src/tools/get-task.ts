@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { mapTask, taskOutputSchema } from '../lib/schemas';
+import { mapTask, projectIdSchema, taskOutputSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getTask = SlateTool.create(spec, {
@@ -16,7 +16,7 @@ export let getTask = SlateTool.create(spec, {
   .input(
     z.object({
       taskId: z.string().describe('ID of the task to retrieve'),
-      projectId: z.string().describe('ID of the project the task belongs to')
+      projectId: projectIdSchema
     })
   )
   .output(taskOutputSchema)

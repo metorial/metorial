@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let addressSchema = z.object({
@@ -24,6 +25,7 @@ export let updateContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       contactId: z.string().describe('The unique ID of the contact to update.'),
       company: z.string().optional().describe('Updated company name.'),
       firstName: z.string().optional().describe('Updated first name.'),
@@ -53,7 +55,7 @@ export let updateContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.input.organizationId ?? ctx.config.organizationId
     });
 
     let body: any = {};
@@ -64,8 +66,27 @@ export let updateContact = SlateTool.create(spec, {
     if (ctx.input.isClient !== undefined) body.is_client = ctx.input.isClient;
     if (ctx.input.isSupplier !== undefined) body.is_supplier = ctx.input.isSupplier;
     if (ctx.input.vatNumber !== undefined) body.vat_number = ctx.input.vatNumber;
-    if (ctx.input.email !== undefined) body.email = ctx.input.email;
-    if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
+    if (ctx.input.email !== undefined || ctx.input.phone !== undefined) {
+      let current = await client.getContact(ctx.input.contactId);
+      let updatePrimary = (
+        records: Record<string, unknown>[] | undefined,
+        key: string,
+        value: string
+      ) => {
+        if (!value) return [];
+        let existing = records ?? [];
+        if (!existing.length) return [{ [key]: value, primary: true }];
+        let primaryIndex = existing.findIndex(record => record.primary === true);
+        if (primaryIndex < 0) primaryIndex = 0;
+        return existing.map((record, index) =>
+          index === primaryIndex ? { ...record, [key]: value, primary: true } : record
+        );
+      };
+      if (ctx.input.email !== undefined)
+        body.email = updatePrimary(current.email, 'email', ctx.input.email);
+      if (ctx.input.phone !== undefined)
+        body.phones = updatePrimary(current.phones, 'number', ctx.input.phone);
+    }
     if (ctx.input.profession !== undefined) body.profession = ctx.input.profession;
     if (ctx.input.customId !== undefined) body.custom_id = ctx.input.customId;
     if (ctx.input.addresses) {
@@ -78,7 +99,7 @@ export let updateContact = SlateTool.create(spec, {
       }));
     }
 
-    let contact = await client.updateContact(ctx.input.contactId, body, true);
+    let contact = await client.updateContact(ctx.input.contactId, body);
 
     let name =
       contact.display_name || contact.company || `${contact.first_name} ${contact.last_name}`;

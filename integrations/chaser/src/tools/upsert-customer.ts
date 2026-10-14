@@ -14,6 +14,7 @@ let mapCustomerOutput = (data: any) => ({
   phoneNumber: data.phoneNumber ?? null,
   mobileNumber: data.mobileNumber ?? null,
   status: data.status,
+  chasing: data.chasing,
   groups: data.groups,
   addresses: data.addresses,
   paymentPortalLink: data.paymentPortalLink ?? null,

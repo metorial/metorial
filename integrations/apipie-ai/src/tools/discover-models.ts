@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/client';
+import { createClient, parseCost } from '../lib/client';
 import { spec } from '../spec';
 
 export let discoverModels = SlateTool.create(spec, {
@@ -74,6 +74,11 @@ export let discoverModels = SlateTool.create(spec, {
               .boolean()
               .optional()
               .describe('Whether the model is currently available'),
+            voiceId: z
+              .string()
+              .optional()
+              .describe('Provider voice identifier when listing voices'),
+            voiceName: z.string().optional().describe('Voice name to pass to text_to_speech'),
             enabled: z
               .number()
               .optional()
@@ -105,11 +110,13 @@ export let discoverModels = SlateTool.create(spec, {
       description: m.description,
       maxTokens: m.max_tokens,
       maxResponseTokens: m.max_response_tokens,
-      requestPrice: m.req_price,
-      responsePrice: m.res_price,
+      requestPrice: parseCost(m.req_price),
+      responsePrice: parseCost(m.res_price),
       priceType: m.price_type,
       available: m.available,
-      enabled: m.enabled
+      enabled: m.enabled,
+      voiceId: m.voice_id,
+      voiceName: m.name
     }));
 
     let filterDesc = [

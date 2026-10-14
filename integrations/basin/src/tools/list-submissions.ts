@@ -66,9 +66,9 @@ export let listSubmissions = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let items = Array.isArray(data) ? data : (data?.items ?? data?.submissions ?? []);
+    let items = data;
 
-    let submissions = items.map((s: any) => ({
+    let submissions = items.map(s => ({
       submissionId: s.id,
       formId: s.form_id,
       email: s.email ?? null,

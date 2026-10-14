@@ -44,7 +44,15 @@ Combine channel metadata retrieval with video listing in a single tool.`,
       videoIds: z
         .array(z.string())
         .optional()
-        .describe('List of video IDs from the channel (when includeVideos is true)')
+        .describe('List of regular video IDs from the channel (when includeVideos is true)'),
+      shortIds: z
+        .array(z.string())
+        .optional()
+        .describe('Shorts IDs when includeVideos is true'),
+      liveIds: z
+        .array(z.string())
+        .optional()
+        .describe('Live video IDs when includeVideos is true')
     })
   )
   .handleInvocation(async ctx => {
@@ -53,12 +61,16 @@ Combine channel metadata retrieval with video listing in a single tool.`,
     let channel = await client.getYouTubeChannel({ url: ctx.input.url });
 
     let videoIds: string[] | undefined;
+    let shortIds: string[] | undefined;
+    let liveIds: string[] | undefined;
     if (ctx.input.includeVideos) {
       let videosResult = await client.getYouTubeChannelVideos({
         url: ctx.input.url,
         type: ctx.input.videoType,
         limit: ctx.input.videoLimit
       });
+      shortIds = videosResult.shortIds;
+      liveIds = videosResult.liveIds;
       videoIds = videosResult.videoIds ?? videosResult.videos ?? videosResult;
       if (!Array.isArray(videoIds)) {
         videoIds = [];
@@ -75,7 +87,9 @@ Combine channel metadata retrieval with video listing in a single tool.`,
         viewCount: channel.viewCount,
         thumbnail: channel.thumbnail ?? channel.avatar,
         createdAt: channel.createdAt ?? channel.publishedAt,
-        videoIds
+        videoIds,
+        shortIds,
+        liveIds
       },
       message: `Channel **${channel.name ?? channel.channelName ?? 'unknown'}** — ${channel.subscriberCount ?? channel.subscribers ?? 0} subscribers${videoIds ? `, ${videoIds.length} video IDs retrieved` : ''}.`
     };

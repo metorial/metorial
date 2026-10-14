@@ -22,7 +22,11 @@ let aiConfigSchema = z
       .describe(
         'Controls randomness of responses (0-2). Higher values make output more random.'
       ),
-    maxTokens: z.number().optional().describe('Maximum number of tokens in the response'),
+    maxTokens: z
+      .number()
+      .refine(value => Number.isSafeInteger(value) && value > 0, 'Use a positive whole number')
+      .optional()
+      .describe('Maximum number of tokens in the response'),
     topP: z.number().min(0).max(1).optional().describe('Nucleus sampling parameter (0-1)'),
     presencePenalty: z
       .number()
@@ -45,15 +49,12 @@ let aiConfigSchema = z
 export let createBot = SlateTool.create(spec, {
   name: 'Create Bot',
   key: 'create_bot',
-  description: `Creates a new AI chatbot in your Sendbird application. Configure the bot's identity, AI backend, model, system message, and LLM parameters. Up to 10 AI chatbots can be created per application by default.`,
+  description: `Creates a new bot in your Sendbird application. Configure the bot's identity and callback behavior, or provide AI settings for applications with compatible AI chatbot access.`,
   instructions: [
     'For AI chatbots, provide the "ai" configuration object with at least a backend and model.',
     'If the "ai" object is specified, the botCallbackUrl is optional.'
   ],
-  constraints: [
-    'Default limit of 10 AI chatbots per application.',
-    'The botUserId must be unique within the application.'
-  ],
+  constraints: ['The botUserId must be unique within the application.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -61,15 +62,17 @@ export let createBot = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      botUserId: z.string().describe('Unique user ID for the bot'),
-      botNickname: z.string().describe('Display nickname for the bot'),
-      botProfileUrl: z.string().optional().describe('URL of the bot profile image'),
+      botUserId: z.string().min(1).max(80).describe('Unique user ID for the bot'),
+      botNickname: z.string().min(1).max(80).describe('Display nickname for the bot'),
+      botProfileUrl: z.string().max(2048).optional().describe('URL of the bot profile image'),
       botCallbackUrl: z
         .string()
+        .max(1024)
         .optional()
         .describe('URL where Sendbird sends event callbacks when a user messages the bot'),
       botType: z
         .string()
+        .max(128)
         .optional()
         .describe('Category or type of the bot (e.g., "AI assistant", "marketer")'),
       isPrivacyMode: z
@@ -88,6 +91,7 @@ export let createBot = SlateTool.create(spec, {
         .describe('Whether to include member info in callback payloads'),
       channelInvitationPreference: z
         .number()
+        .refine(value => value === 0 || value === 1, 'Use 0 or 1')
         .optional()
         .describe('Channel invitation preference (0 or 1)'),
       ai: aiConfigSchema
@@ -95,10 +99,10 @@ export let createBot = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      botUserId: z.string().describe('Unique user ID of the created bot'),
-      botNickname: z.string().describe('Display nickname of the bot'),
-      botProfileUrl: z.string().optional().describe('Profile image URL'),
-      botType: z.string().optional().describe('Category of the bot'),
+      botUserId: z.string().min(1).max(80).describe('Unique user ID of the created bot'),
+      botNickname: z.string().min(1).max(80).describe('Display nickname of the bot'),
+      botProfileUrl: z.string().max(2048).optional().describe('Profile image URL'),
+      botType: z.string().max(128).optional().describe('Category of the bot'),
       botToken: z.string().optional().describe('Bot token for authentication'),
       botCallbackUrl: z.string().optional().describe('Callback URL for the bot'),
       isPrivacyMode: z.boolean().optional().describe('Whether privacy mode is enabled'),
@@ -108,7 +112,7 @@ export let createBot = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     let result = await client.createBot(ctx.input);

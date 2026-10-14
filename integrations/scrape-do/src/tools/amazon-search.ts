@@ -1,16 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ScrapeDoClient } from '../lib/client';
+import { ScrapeDoClient, validateWholeNumber } from '../lib/client';
 import { spec } from '../spec';
 
 export let amazonSearch = SlateTool.create(spec, {
   name: 'Amazon Search',
   key: 'amazon_search',
-  description: `Search Amazon and get structured JSON results with product listings and rankings. Returns product details including ASIN, title, price, rating, review count, Prime eligibility, and sponsored status. Supports 21 international Amazon marketplaces with pagination and ZIP code-based location targeting.`,
+  description: `Search Amazon and get structured JSON results with product listings and rankings. Returns product details including ASIN, title, price, rating, review count, Prime eligibility, and sponsored status. Supports international Amazon marketplaces with pagination and ZIP code-based location targeting.`,
   instructions: [
     'Use geocode to specify the Amazon marketplace (e.g., "us", "gb", "de").',
     'Use page for pagination (starts at 1).',
-    'The keyword must be URL-encoded if it contains special characters.'
+    'Pass keyword as plain text; special characters are encoded automatically.'
   ],
   constraints: ['The Amazon Scraper API has a concurrency limit of 1 request per token.'],
   tags: {
@@ -25,6 +25,14 @@ export let amazonSearch = SlateTool.create(spec, {
         .describe('Amazon marketplace country code (e.g., "us", "gb", "de", "fr", "jp")'),
       zipcode: z.string().optional().describe('Postal/ZIP code for location-specific results'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
+      countryName: z
+        .string()
+        .optional()
+        .describe('Country-level delivery destination; use instead of zipcode'),
+      currency: z
+        .string()
+        .optional()
+        .describe('ISO 4217 display currency, such as USD or EUR'),
       language: z
         .string()
         .optional()
@@ -51,26 +59,33 @@ export let amazonSearch = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ScrapeDoClient(ctx.auth.token);
     let input = ctx.input;
+    if (input.zipcode && input.countryName) {
+      throw createApiServiceError('Choose either zipcode or countryName, not both.');
+    }
 
+    validateWholeNumber('page', input.page, 1);
     let results = await client.amazonSearch({
       keyword: input.keyword,
       geocode: input.geocode,
       zipcode: input.zipcode,
+      countryName: input.countryName,
+      currency: input.currency,
       page: input.page,
       language: input.language,
       includeHtml: input.includeHtml,
       super: input.super
     });
 
-    let products = results.products as unknown[] | undefined;
-    let totalResults = results.totalResults as string | undefined;
+    let products = Array.isArray(results.products) ? results.products : undefined;
+    let totalResults =
+      typeof results.totalResults === 'string' ? results.totalResults : undefined;
 
     return {
       output: {
-        keyword: (results.keyword as string) || input.keyword,
-        page: (results.page as number) || input.page || 1,
+        keyword: typeof results.keyword === 'string' ? results.keyword : input.keyword,
+        page: typeof results.page === 'number' ? results.page : (input.page ?? 1),
         totalResults: totalResults,
-        products: (products as unknown[]) || [],
+        products: products ?? [],
         rawResponse: results
       },
       message: `Amazon search for **"${input.keyword}"** on **${input.geocode}** returned **${products?.length || 0}** products${totalResults ? ` (${totalResults} total)` : ''}.`

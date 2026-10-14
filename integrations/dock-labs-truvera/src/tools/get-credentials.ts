@@ -20,7 +20,15 @@ export let getCredentials = SlateTool.create(spec, {
         .describe('Credential ID to retrieve. Omit to list all credentials'),
       password: z.string().optional().describe('Password to decrypt a persisted credential'),
       offset: z.number().optional().describe('Pagination offset for listing'),
-      limit: z.number().optional().describe('Maximum number of results for listing')
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum number of results for listing, from 1 to 100'),
+      filter: z
+        .string()
+        .optional()
+        .describe('Search credential metadata by ID, subject, issuer, type, or date'),
+      subjectId: z.string().optional().describe('Filter by the exact holder DID')
     })
   )
   .output(
@@ -28,7 +36,9 @@ export let getCredentials = SlateTool.create(spec, {
       credential: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('The retrieved credential document'),
+        .describe(
+          'Credential metadata, including decrypted credential contents when available'
+        ),
       credentials: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -53,7 +63,9 @@ export let getCredentials = SlateTool.create(spec, {
 
     let results = await client.listCredentials({
       offset: ctx.input.offset,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      filter: ctx.input.filter,
+      subjectId: ctx.input.subjectId
     });
     return {
       output: { credentials: results },

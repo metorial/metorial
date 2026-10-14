@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -124,9 +124,11 @@ export let manageOrganization = SlateTool.create(spec, {
     }
 
     if (operation === 'create_sub_org') {
-      if (!name) throw new Error('name is required for create_sub_org');
-      if (!contactEmail) throw new Error('contactEmail is required for create_sub_org');
-      if (!statsEndpoint) throw new Error('statsEndpoint is required for create_sub_org');
+      if (!name) throw createApiServiceError('name is required for create_sub_org');
+      if (!contactEmail)
+        throw createApiServiceError('contactEmail is required for create_sub_org');
+      if (!statsEndpoint)
+        throw createApiServiceError('statsEndpoint is required for create_sub_org');
 
       let subOrg = await client.createSubOrganization({
         name,

@@ -82,13 +82,13 @@ Supports filtering to live technologies only, excluding metadata or PII, and fil
         .string()
         .optional()
         .describe(
-          'Only return technologies first detected after this date (Unix timestamp in ms)'
+          'Only return technologies first detected since this date (YYYY-MM-DD or Unix timestamp in ms); also accepts a YYYY-MM-DD|YYYY-MM-DD range'
         ),
       lastDetectedSince: z
         .string()
         .optional()
         .describe(
-          'Only return technologies last detected after this date (Unix timestamp in ms)'
+          'Only return technologies last detected since this date (YYYY-MM-DD or Unix timestamp in ms); also accepts a YYYY-MM-DD|YYYY-MM-DD range'
         )
     })
   )
@@ -118,7 +118,7 @@ Supports filtering to live technologies only, excluding metadata or PII, and fil
 
     let techCount = 0;
     for (let result of results) {
-      for (let path of result?.Paths ?? []) {
+      for (let path of result?.Result?.Paths ?? result?.Paths ?? []) {
         techCount += (path?.Technologies ?? []).length;
       }
     }

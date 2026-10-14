@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let getActivity = SlateTool.create(spec, {
   description: `Retrieve email activity for a domain within a specified date range. Filter by event types such as sent, delivered, bounced, opened, clicked, etc.
 Returns detailed activity records including recipient info, timestamps, and event details.`,
   constraints: [
-    'Maximum 7-day timeframe between dateFrom and dateTo.',
+    'The date range is limited by the account plan data retention (1-30 days).',
     'Both dateFrom and dateTo are required as Unix timestamps (UTC).'
   ],
   tags: {
@@ -22,7 +22,7 @@ Returns detailed activity records including recipient info, timestamps, and even
       dateFrom: z.number().describe('Start of date range as Unix timestamp (UTC).'),
       dateTo: z
         .number()
-        .describe('End of date range as Unix timestamp (UTC). Max 7 days after dateFrom.'),
+        .describe('End of date range as Unix timestamp (UTC), after dateFrom.'),
       events: z
         .array(
           z.enum([
@@ -33,11 +33,14 @@ Returns detailed activity records including recipient info, timestamps, and even
             'hard_bounced',
             'deferred',
             'opened',
+            'opened_unique',
             'clicked',
+            'clicked_unique',
             'unsubscribed',
             'spam_complaints',
             'survey_opened',
-            'survey_submitted'
+            'survey_submitted',
+            'suppressed'
           ])
         )
         .optional()
@@ -56,10 +59,25 @@ Returns detailed activity records including recipient info, timestamps, and even
       activities: z
         .array(z.record(z.string(), z.unknown()))
         .describe('List of activity records with event details.'),
-      total: z.number().describe('Total number of matching activities.')
+      total: z
+        .number()
+        .describe(
+          'Provider total when available; otherwise the number of entries on this page.'
+        ),
+      pagination: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider pagination metadata.'),
+      links: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider links to adjacent result pages.')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.dateFrom >= ctx.input.dateTo) {
+      throw createApiServiceError('dateFrom must be earlier than dateTo.');
+    }
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listActivity(ctx.input.domainId, {
       dateFrom: ctx.input.dateFrom,
@@ -76,7 +94,9 @@ Returns detailed activity records including recipient info, timestamps, and even
     return {
       output: {
         activities: result.data || [],
-        total
+        total,
+        pagination: result.meta,
+        links: result.links
       },
       message: `Found **${total}** activity records for domain \`${ctx.input.domainId}\`.`
     };

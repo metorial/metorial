@@ -27,7 +27,17 @@ export let reverseDnsLookup = SlateTool.create(spec, {
         .describe(
           'The value to search for (e.g. IP address, nameserver hostname, mail server)'
         ),
-      page: z.number().optional().describe('Page number for paginated results')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Page number must be a safe integer.')
+        .min(1)
+        .optional()
+        .describe('Page number for paginated results'),
+      exact: z
+        .boolean()
+        .optional()
+        .describe('Set false to allow wildcard matching for supported DNS record values'),
+      sort: z.enum(['asc', 'desc']).optional().describe('Sort by last-seen/query time')
     })
   )
   .output(
@@ -40,7 +50,9 @@ export let reverseDnsLookup = SlateTool.create(spec, {
     let result = await client.reverseDnsLookup(
       ctx.input.recordType,
       ctx.input.searchValue,
-      ctx.input.page
+      ctx.input.page,
+      ctx.input.exact,
+      ctx.input.sort
     );
 
     return {

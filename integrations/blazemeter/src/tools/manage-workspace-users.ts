@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BlazeMeterClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,7 +46,8 @@ export let manageWorkspaceUsers = SlateTool.create(spec, {
     let client = new BlazeMeterClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     if (ctx.input.action === 'list') {
@@ -64,7 +65,8 @@ export let manageWorkspaceUsers = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'invite') {
-      if (!ctx.input.email) throw new Error('email is required for inviting a user');
+      if (!ctx.input.email)
+        throw createApiServiceError('email is required for inviting a user');
       await client.inviteUser(ctx.input.workspaceId, ctx.input.email, ctx.input.role);
       return {
         output: { invited: true, email: ctx.input.email },
@@ -72,6 +74,6 @@ export let manageWorkspaceUsers = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

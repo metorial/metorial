@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -60,23 +60,23 @@ export let manageCases = SlateTool.create(spec, {
       return {
         output: {
           caseId: result.id,
-          name: result.name,
-          status: result.status,
-          priority: result.priority,
-          type: result.type,
-          accountId: result.accountId,
-          accountName: result.accountName,
-          contactId: result.contactId,
-          contactName: result.contactName,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          status: result.status ?? undefined,
+          priority: result.priority ?? undefined,
+          type: result.type ?? undefined,
+          accountId: result.accountId ?? undefined,
+          accountName: result.accountName ?? undefined,
+          contactId: result.contactId ?? undefined,
+          contactName: result.contactName ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Case **${result.name || ''}** created successfully.`
       };
     }
 
     if (action === 'update') {
-      if (!caseId) throw new Error('caseId is required for update');
+      if (!caseId) throw createApiServiceError('caseId is required for update');
       let data: Record<string, any> = { ...fields, ...customFields };
       Object.keys(data).forEach(key => {
         if (data[key] === undefined) delete data[key];
@@ -85,23 +85,23 @@ export let manageCases = SlateTool.create(spec, {
       return {
         output: {
           caseId: result.id,
-          name: result.name,
-          status: result.status,
-          priority: result.priority,
-          type: result.type,
-          accountId: result.accountId,
-          accountName: result.accountName,
-          contactId: result.contactId,
-          contactName: result.contactName,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          status: result.status ?? undefined,
+          priority: result.priority ?? undefined,
+          type: result.type ?? undefined,
+          accountId: result.accountId ?? undefined,
+          accountName: result.accountName ?? undefined,
+          contactId: result.contactId ?? undefined,
+          contactName: result.contactName ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Case **${result.name || ''}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      if (!caseId) throw new Error('caseId is required for delete');
+      if (!caseId) throw createApiServiceError('caseId is required for delete');
       await client.deleteRecord('Case', caseId);
       return {
         output: {
@@ -111,6 +111,6 @@ export let manageCases = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

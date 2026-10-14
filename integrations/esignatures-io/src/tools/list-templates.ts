@@ -30,7 +30,7 @@ export let listTemplates = SlateTool.create(spec, {
 
     let result = await client.listTemplates();
 
-    let templates = (result?.data || result || []).map((t: any) => ({
+    let templates = result.data.map(t => ({
       templateId: t.templateId,
       title: t.title
     }));

@@ -1,6 +1,10 @@
-# <img src="logo.png" height="20"> Jigsawstack
+# <img src="logo.png" height="20"> JigsawStack
 
-Scrape websites using natural language prompts to extract structured data. Perform AI-powered web search and deep research on topics. Analyze text sentiment, summarize content, translate text across 160+ languages, and check spelling. Convert natural language to SQL queries. Extract structured data from images using vision OCR (e.g., receipts, documents). Transcribe audio and video files to text with speaker diarization and language detection. Generate images from text prompts using multiple model backends. Convert HTML to PDF or images. Detect NSFW content, profanity, and spam. Classify text into custom categories. Upload, retrieve, and delete files in cloud storage. Search for addresses and places with geocoding. Generate text embeddings for semantic search.
+Search and scrape websites, translate and summarize text, analyze sentiment, extract data from images and PDFs, transcribe audio, detect unsafe content, and generate SQL and time-series forecasts. Classify text or images using custom labels, generate configurable embedding v2 vectors, and retrieve web search suggestions.
+
+Generate downloadable images, PDFs, and annotated object detections. Retrieve and delete stored files by their existing storage keys. Generated results keep their original provider URL fields; stored downloads use the connection's API key.
+
+Connect with a JigsawStack API key. A secret key supports all APIs; public keys can have API and domain restrictions. The provider documents image generation as deprecated and retains embedding v1, spell checking, and spam checking in its archive. Those existing tools remain available for compatibility. Use `generate_embedding_v2` for the current embedding API.
 
 ## License
 

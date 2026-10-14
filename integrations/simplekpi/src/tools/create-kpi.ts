@@ -8,7 +8,8 @@ export let createKpi = SlateTool.create(spec, {
   key: 'create_kpi',
   description: `Create a new KPI in SimpleKPI. Configure the KPI with a name, category, unit, frequency, target, value direction, and aggregation method.`,
   instructions: [
-    'Use the "List KPI Configuration" tool to get valid unit IDs, frequency IDs, icon IDs, and category IDs before creating a KPI.'
+    'Use the "List KPI Configuration" tool to get valid unit IDs, frequency IDs, and icon IDs before creating a KPI.',
+    'Use the "List KPI Categories" tool to discover category IDs.'
   ]
 })
   .input(
@@ -49,7 +50,7 @@ export let createKpi = SlateTool.create(spec, {
       frequency_id: ctx.input.frequencyId,
       icon_id: ctx.input.iconId,
       description: ctx.input.description,
-      target_default: ctx.input.targetDefault ?? undefined,
+      target_default: ctx.input.targetDefault,
       value_direction: ctx.input.valueDirection,
       aggregate_function: ctx.input.aggregateFunction,
       sort_order: ctx.input.sortOrder,

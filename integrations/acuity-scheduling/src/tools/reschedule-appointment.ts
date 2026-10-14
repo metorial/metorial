@@ -18,7 +18,16 @@ export let rescheduleAppointment = SlateTool.create(spec, {
     z.object({
       appointmentId: z.number().describe('The ID of the appointment to reschedule'),
       datetime: z.string().describe('New date and time (e.g. "2024-03-20 10:00")'),
-      calendarId: z.number().optional().describe('New calendar ID (optional)')
+      calendarId: z.number().optional().describe('New calendar ID (optional)'),
+      timezone: z.string().optional().describe('Client timezone, such as America/New_York'),
+      admin: z
+        .boolean()
+        .optional()
+        .describe('Reschedule as an administrator, bypassing availability validation'),
+      noEmail: z
+        .boolean()
+        .optional()
+        .describe('Suppress rescheduling email and SMS notifications')
     })
   )
   .output(
@@ -40,7 +49,10 @@ export let rescheduleAppointment = SlateTool.create(spec, {
 
     let a = await client.rescheduleAppointment(ctx.input.appointmentId, {
       datetime: ctx.input.datetime,
-      calendarID: ctx.input.calendarId
+      calendarID: ctx.input.calendarId,
+      timezone: ctx.input.timezone,
+      admin: ctx.input.admin,
+      noEmail: ctx.input.noEmail
     });
 
     return {

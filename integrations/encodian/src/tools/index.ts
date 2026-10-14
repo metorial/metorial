@@ -8,6 +8,7 @@ export * from './barcode-read';
 export * from './convert-document';
 export * from './email-process';
 export * from './excel-operations';
+export * from './get-operation-status';
 export * from './image-metadata';
 export * from './image-process';
 export * from './ocr-document';

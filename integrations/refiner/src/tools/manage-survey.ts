@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageSurvey = SlateTool.create(spec, {
   name: 'Manage Survey',
   key: 'manage_survey',
-  description: `Perform management actions on a survey: publish, unpublish, duplicate, or delete. Specify the survey UUID and the action to perform.`,
+  description: `Perform management actions on a survey: publish, unpublish, duplicate, or archive. The delete action archives the survey, which remains discoverable with list_surveys using archived status. Specify the survey UUID and the action to perform.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -17,7 +17,7 @@ export let manageSurvey = SlateTool.create(spec, {
       surveyUuid: z.string().describe('UUID of the survey to manage'),
       action: z
         .enum(['publish', 'unpublish', 'duplicate', 'delete'])
-        .describe('Action to perform on the survey'),
+        .describe('Action to perform on the survey. The delete action archives the survey.'),
       duplicateName: z
         .string()
         .optional()
@@ -58,7 +58,7 @@ export let manageSurvey = SlateTool.create(spec, {
       }
       case 'delete': {
         await client.deleteForm(ctx.input.surveyUuid);
-        message = `Deleted survey **${ctx.input.surveyUuid}**.`;
+        message = `Archived survey **${ctx.input.surveyUuid}**.`;
         break;
       }
     }

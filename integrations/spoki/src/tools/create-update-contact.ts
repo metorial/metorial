@@ -85,10 +85,10 @@ You can set basic contact info, custom fields, tags, and list memberships in a s
     return {
       output: {
         contactId: contactId ? String(contactId) : undefined,
-        phone: result?.phone || ctx.input.phone,
-        firstName: result?.first_name || ctx.input.firstName,
-        lastName: result?.last_name || ctx.input.lastName,
-        email: result?.email || ctx.input.email,
+        phone: result?.phone ?? ctx.input.phone,
+        firstName: result?.first_name ?? ctx.input.firstName,
+        lastName: result?.last_name ?? ctx.input.lastName,
+        email: result?.email ?? ctx.input.email,
         raw: result
       },
       message: ctx.input.contactId

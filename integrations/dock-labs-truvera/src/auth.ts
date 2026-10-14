@@ -15,7 +15,7 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Dock Certs API key. Generate one in the Developer section of the Dock Certs dashboard.'
+          'Truvera API key. Generate one in the API Keys section of Truvera Workspace.'
         )
     }),
     getOutput: async ctx => {

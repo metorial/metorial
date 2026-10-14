@@ -17,7 +17,12 @@ export let listTags = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Retrieve a specific tag by ID. If omitted, lists all tags.'),
-      limit: z.number().optional().describe('Max results per page (1-100, default 100)'),
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results per page (1-100, default 100)'),
       startCursor: z.string().optional().describe('Pagination cursor')
     })
   )
@@ -28,10 +33,10 @@ export let listTags = SlateTool.create(spec, {
           tagId: z.string(),
           title: z.string(),
           color: z.string().nullable().optional(),
-          highlightCount: z.number(),
+          highlightCount: z.number().optional(),
           authorId: z.string().nullable().optional(),
           createdAt: z.string(),
-          updatedAt: z.string()
+          updatedAt: z.string().optional()
         })
       ),
       totalCount: z.number().optional(),
@@ -58,7 +63,7 @@ export let listTags = SlateTool.create(spec, {
             }
           ]
         },
-        message: `Retrieved tag **${tag.title}** with **${tag.highlight_count}** highlights.`
+        message: `Retrieved tag **${tag.title}**.`
       };
     }
 

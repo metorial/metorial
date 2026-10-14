@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listMaps = SlateTool.create(spec, {
   name: 'List Maps',
   key: 'list_maps',
-  description: `Retrieve all maps in your NiftyImages account, or get details and search locations for a specific map. Useful for finding map IDs before managing locations.`,
+  description: `Retrieve all maps in your NiftyImages account, or get details and search locations for a specific map. Use a returned map URL as mapId when managing locations.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -18,7 +18,7 @@ export let listMaps = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'If provided, retrieves detailed information for this specific map. Otherwise lists all maps.'
+          'Numeric map image ID or map URL returned by List Maps. If provided, retrieves this map; otherwise lists all maps.'
         ),
       searchLatitude: z
         .number()
@@ -31,11 +31,13 @@ export let listMaps = SlateTool.create(spec, {
       searchRadius: z
         .number()
         .optional()
-        .describe('Search radius for nearest-location detection (requires mapId).'),
+        .describe(
+          'Legacy per-search radius option (requires mapId and both coordinates). The public v1 reference does not confirm that this option changes search results.'
+        ),
       searchQuery: z
         .string()
         .optional()
-        .describe('Search query to find locations by name or address (requires mapId).')
+        .describe('Address text to match when searching locations (requires mapId).')
     })
   )
   .output(
@@ -56,6 +58,34 @@ export let listMaps = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    let hasSearchParams =
+      ctx.input.searchLatitude !== undefined ||
+      ctx.input.searchLongitude !== undefined ||
+      ctx.input.searchRadius !== undefined ||
+      ctx.input.searchQuery !== undefined;
+    if (hasSearchParams && !ctx.input.mapId) {
+      throw createApiServiceError(
+        'Provide mapId when searching map locations. Call List Maps to find the map URL.'
+      );
+    }
+    if (
+      (ctx.input.searchLatitude === undefined) !==
+      (ctx.input.searchLongitude === undefined)
+    ) {
+      throw createApiServiceError(
+        'Provide both searchLatitude and searchLongitude for a coordinate search.'
+      );
+    }
+    if (ctx.input.searchQuery !== undefined && ctx.input.searchLatitude !== undefined) {
+      throw createApiServiceError(
+        'Use either searchQuery or a latitude/longitude pair for a location search.'
+      );
+    }
+    if (ctx.input.searchRadius !== undefined && ctx.input.searchLatitude === undefined) {
+      throw createApiServiceError(
+        'Provide searchLatitude and searchLongitude when supplying searchRadius.'
+      );
+    }
 
     if (!ctx.input.mapId) {
       let maps = await client.getAllMaps();
@@ -64,11 +94,6 @@ export let listMaps = SlateTool.create(spec, {
         message: `Retrieved **${Array.isArray(maps) ? maps.length : 0}** map(s).`
       };
     }
-
-    let hasSearchParams =
-      ctx.input.searchLatitude !== undefined ||
-      ctx.input.searchLongitude !== undefined ||
-      ctx.input.searchQuery !== undefined;
 
     if (hasSearchParams) {
       let locations = await client.searchMapLocations(ctx.input.mapId, {

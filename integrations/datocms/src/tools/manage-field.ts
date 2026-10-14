@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -49,6 +49,12 @@ export let manageField = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      job: z
+        .any()
+        .optional()
+        .describe(
+          'Asynchronous job object, when the operation is queued. Use get_job_result with its id.'
+        ),
       field: z.any().describe('The field object')
     })
   )
@@ -59,12 +65,18 @@ export let manageField = SlateTool.create(spec, {
     });
 
     let { action, modelId, fieldId, label, apiKey, fieldType, ...rest } = ctx.input;
+    if (
+      rest.position !== undefined &&
+      (!Number.isInteger(rest.position) || rest.position < 0)
+    ) {
+      throw createApiServiceError('position must be a non-negative whole number.');
+    }
 
     if (action === 'create') {
-      if (!modelId) throw new Error('modelId is required for create action');
-      if (!label) throw new Error('label is required for create action');
-      if (!apiKey) throw new Error('apiKey is required for create action');
-      if (!fieldType) throw new Error('fieldType is required for create action');
+      if (!modelId) throw createApiServiceError('modelId is required for create action');
+      if (!label) throw createApiServiceError('label is required for create action');
+      if (!apiKey) throw createApiServiceError('apiKey is required for create action');
+      if (!fieldType) throw createApiServiceError('fieldType is required for create action');
 
       let attributes: Record<string, any> = {
         label,
@@ -75,18 +87,21 @@ export let manageField = SlateTool.create(spec, {
       if (rest.validators) attributes.validators = rest.validators;
       if (rest.appearance) attributes.appearance = rest.appearance;
       if (rest.defaultValue !== undefined) attributes.default_value = rest.defaultValue;
-      if (rest.hint) attributes.hint = rest.hint;
+      if (rest.hint !== undefined) attributes.hint = rest.hint;
       if (rest.position !== undefined) attributes.position = rest.position;
 
       let field = await client.createField(modelId, attributes);
       return {
-        output: { field },
-        message: `Created field **${field.label}** (type: ${field.field_type}) on model ${modelId}.`
+        output: { field, ...(field?.type === 'job' ? { job: field } : {}) },
+        message:
+          field?.type === 'job'
+            ? `Queued operation as job **${field.id}**. Use get_job_result to check completion.`
+            : `Created field **${field.label}** (type: ${field.field_type}) on model ${modelId}.`
       };
     }
 
     if (action === 'update') {
-      if (!fieldId) throw new Error('fieldId is required for update action');
+      if (!fieldId) throw createApiServiceError('fieldId is required for update action');
       let attributes: Record<string, any> = {};
       if (label) attributes.label = label;
       if (apiKey) attributes.api_key = apiKey;
@@ -95,25 +110,31 @@ export let manageField = SlateTool.create(spec, {
       if (rest.validators) attributes.validators = rest.validators;
       if (rest.appearance) attributes.appearance = rest.appearance;
       if (rest.defaultValue !== undefined) attributes.default_value = rest.defaultValue;
-      if (rest.hint) attributes.hint = rest.hint;
+      if (rest.hint !== undefined) attributes.hint = rest.hint;
       if (rest.position !== undefined) attributes.position = rest.position;
 
       let field = await client.updateField(fieldId, attributes);
       return {
-        output: { field },
-        message: `Updated field **${field.label}** (ID: ${field.id}).`
+        output: { field, ...(field?.type === 'job' ? { job: field } : {}) },
+        message:
+          field?.type === 'job'
+            ? `Queued operation as job **${field.id}**. Use get_job_result to check completion.`
+            : `Updated field **${field.label}** (ID: ${field.id}).`
       };
     }
 
     if (action === 'delete') {
-      if (!fieldId) throw new Error('fieldId is required for delete action');
+      if (!fieldId) throw createApiServiceError('fieldId is required for delete action');
       let field = await client.deleteField(fieldId);
       return {
-        output: { field },
-        message: `Deleted field with ID **${fieldId}**.`
+        output: { field, ...(field?.type === 'job' ? { job: field } : {}) },
+        message:
+          field?.type === 'job'
+            ? `Queued operation as job **${field.id}**. Use get_job_result to check completion.`
+            : `Deleted field with ID **${fieldId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

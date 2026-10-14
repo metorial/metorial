@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listBuildProfiles = SlateTool.create(spec, {
@@ -23,11 +23,11 @@ export let listBuildProfiles = SlateTool.create(spec, {
       z
         .object({
           profileId: z.string().optional(),
-          name: z.string().optional(),
+          name: z.string().nullish(),
           pinned: z.boolean().optional(),
           repositoryConnected: z.boolean().optional(),
           platformType: z.string().optional(),
-          lastBuildDate: z.string().optional()
+          lastBuildDate: z.string().nullish()
         })
         .passthrough()
     )
@@ -40,10 +40,13 @@ export let listBuildProfiles = SlateTool.create(spec, {
       size: ctx.input.size
     });
 
-    let items = Array.isArray(profiles) ? profiles : [];
+    let items = getAppcircleList(profiles, 'list');
 
     return {
-      output: items,
+      output: items.map(item => ({
+        ...item,
+        platformType: item.platformType == null ? undefined : String(item.platformType)
+      })),
       message: `Found **${items.length}** build profile(s).`
     };
   })

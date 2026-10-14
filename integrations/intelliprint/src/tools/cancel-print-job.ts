@@ -30,15 +30,20 @@ export let cancelPrintJob = SlateTool.create(spec, {
 
     let output = {
       printJobId: ctx.input.printJobId,
-      cancelled: true,
-      message: result?.confirmed
-        ? 'Confirmed print job cancelled. Letters with waiting_to_print status have been cancelled and refunded.'
-        : 'Draft print job deleted.'
+      cancelled:
+        result?.deleted === true ||
+        result?.letters?.some(
+          (letter: { status: string }) => letter.status === 'cancelled'
+        ) === true,
+      message:
+        result?.deleted === true
+          ? 'Draft print job deleted.'
+          : 'Cancellation processed. Eligible mail items were cancelled and refunded; items already in production or sent remain unchanged.'
     };
 
     return {
       output,
-      message: `Print job **${ctx.input.printJobId}** has been cancelled/deleted.`
+      message: `Print job **${ctx.input.printJobId}**: ${output.message}`
     };
   })
   .build();

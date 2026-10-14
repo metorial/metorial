@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -14,7 +14,7 @@ Provide the address either as a single string or as individual components (stree
     'Use the country parameter to force lookup in a specific country when the address is ambiguous.'
   ],
   constraints: [
-    'Returns up to 100 results per query by default. Use the limit parameter to restrict.'
+    'Use limit to restrict results; 0 or an omitted limit leaves results unrestricted.'
   ],
   tags: {
     readOnly: true
@@ -24,14 +24,15 @@ Provide the address either as a single string or as individual components (stree
     z.object({
       address: z
         .string()
+        .trim()
         .optional()
         .describe(
           'Full address as a single string, e.g. "1109 N Highland St, Arlington, VA 22201"'
         ),
-      street: z.string().optional().describe('Street address component'),
-      city: z.string().optional().describe('City name'),
-      state: z.string().optional().describe('State or province'),
-      postalCode: z.string().optional().describe('ZIP or postal code'),
+      street: z.string().trim().optional().describe('Street address component'),
+      city: z.string().trim().optional().describe('City name'),
+      state: z.string().trim().optional().describe('State or province'),
+      postalCode: z.string().trim().optional().describe('ZIP or postal code'),
       country: z
         .string()
         .optional()
@@ -40,7 +41,12 @@ Provide the address either as a single string or as individual components (stree
         .array(z.string())
         .optional()
         .describe('Data enrichment fields to append, e.g. ["timezone", "census", "cd"]'),
-      limit: z.number().optional().describe('Maximum number of results to return')
+      limit: z
+        .number()
+        .min(0)
+        .refine(Number.isSafeInteger, 'Use a whole number')
+        .optional()
+        .describe('Maximum number of results to return; 0 means no limit')
     })
   )
   .output(
@@ -80,6 +86,18 @@ Provide the address either as a single string or as individual components (stree
     })
   )
   .handleInvocation(async ctx => {
+    let hasAddress = Boolean(ctx.input.address?.trim());
+    let hasComponents = [
+      ctx.input.street,
+      ctx.input.city,
+      ctx.input.state,
+      ctx.input.postalCode
+    ].some(value => Boolean(value?.trim()));
+    if (hasAddress === hasComponents) {
+      throw createApiServiceError(
+        'Provide either a full address or address components, not both.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let response = await client.geocodeForward({

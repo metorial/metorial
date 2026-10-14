@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AhaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,13 +46,14 @@ export let manageInitiative = SlateTool.create(spec, {
   )
   .output(initiativeOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new AhaClient(ctx.config.subdomain, ctx.auth.token);
+    let client = AhaClient.fromContext(ctx);
     let { action } = ctx.input;
 
     if (action === 'create') {
       if (!ctx.input.productId)
-        throw new Error('productId is required to create an initiative');
-      if (!ctx.input.name) throw new Error('name is required to create an initiative');
+        throw createApiServiceError('productId is required to create an initiative');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required to create an initiative');
 
       let initiative = await client.createInitiative(ctx.input.productId, {
         name: ctx.input.name,
@@ -75,7 +76,8 @@ export let manageInitiative = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.initiativeId) throw new Error('initiativeId is required for this action');
+    if (!ctx.input.initiativeId)
+      throw createApiServiceError('initiativeId is required for this action');
 
     if (action === 'delete') {
       await client.deleteInitiative(ctx.input.initiativeId);

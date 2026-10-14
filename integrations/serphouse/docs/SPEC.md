@@ -1,6 +1,4 @@
-Let me get more details on the API documentation to understand the full feature set and authentication details.Now I have enough information to write the specification.
-
-# Slates Specification for Serphouse
+# Serphouse API Capabilities
 
 ## Overview
 
@@ -40,6 +38,7 @@ Access specialized Google search verticals beyond standard web results.
 - **Google Jobs API**: Retrieve job listing results from Google.
 - **Google Videos API**: Extract video search results.
 - **Google Short Videos API**: Get short-form video results.
+- **Google Autocomplete API**: Retrieve keyword suggestions with optional language, location, and client targeting.
 
 ### Google Trends
 

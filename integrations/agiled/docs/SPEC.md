@@ -1,123 +1,67 @@
-Now let me look at the actual Agiled API documentation and how authentication works:Let me get more details on the Agiled API and its webhook capabilities:Now let me fetch the Agiled API key help page to get more details on authentication:Now I have enough information to write the specification. Let me compile everything I've learned:
+# Agiled API integration
 
-# Slates Specification for Agiled
+## Connections
 
-## Overview
+**API Key & Brand** preserves the existing API connection: requests use
+`https://my.agiled.app/api/v1`, the `api_token` query parameter, and the `Brand`
+header. Its input and saved credential values are unchanged. Profile validation
+lists users, while the connection profile identifies the configured brand; the
+first user in a list is not treated as the authenticated user.
 
-Agiled is a business management platform designed to streamline operations like CRM, project management, finances, and more. It comes with built-in CRM, HRM, Financial Management, Project Management and Time Tracking. Users can manage all of their business in one place and provide a client portal access to their customers.
+**Public API Key** uses the bearer token and API base URL shown in Settings → API.
+Enter either the HTTPS API origin or its full `/public/v1` base URL. The base URL
+and token are stored with this connection. No brand or workspace ID is required.
+This connection exposes the three public API tools below; existing API tools
+remain associated with API Key & Brand.
 
-## Authentication
+## Public API tools
 
-Agiled uses **API key** authentication combined with a **Brand** identifier.
+| Tool | Request | Output |
+| --- | --- | --- |
+| `get_current_user` | `GET /public/v1/me` | Raw authenticated token context, including organization ID, token ID, and abilities where returned. |
+| `get_accounts` | `GET /public/v1/accounts` | Account records and provider pagination metadata. Supports name/email filters, sorting, and includes. |
+| `get_time_entries` | `GET /public/v1/time-entries` | Time-entry records and provider pagination metadata. Supports project/task/user/date filters, sorting, and includes. |
 
-To authenticate API requests, two values are required:
+List tools send `page`, `per_page`, `sort_by`, `sort_direction`, and `include`
+where supplied. The public API defaults to page 1 and 25 records, with at most
+100 records per page. Records retain all provider fields, including identifiers,
+timestamps, and included relationships.
 
-1. **API Key (`api_token`)**: Found in your Agiled account under the **API Settings** tab in your profile settings. Go to the API Settings tab and copy the API-key. The API key works with all accounts, including both the main and additional domains. The API is available to paid account users only. The API key is passed as a query parameter named `api_token`.
+## Existing API coverage
 
-2. **Brand (Domain)**: Your Agiled account domain/brand name, which identifies which account (workspace) the request targets. This is passed as a custom HTTP header named `Brand`. You can find this in the browser address bar when logged in, or under Profile → Brands for additional accounts.
+All 27 existing tool keys and their input/output fields are preserved. They
+create/list/get contacts, projects, tasks, invoices, estimates, contracts,
+employees, tickets, products, and deals; update contacts/projects/tasks; delete
+contacts; and create expenses/time entries. Resource IDs are encoded as single
+URL path segments. A task update with `markComplete: true` now also submits its
+other supplied updates.
 
-**Example request:**
+The existing API's detailed reference at
+[the developer portal](https://my.agiled.app/developers) could not be read without
+authentication. Current public API documentation describes a different API,
+including different credential and field conventions, and does not establish
+that the existing API was removed. Existing endpoint and payload conventions
+therefore remain intact rather than being inferred from the newer API.
 
-```
-GET https://my.agiled.app/api/v1/users?api_token=YOUR_API_KEY
-Headers:
-  Accept: application/json
-  Brand: your-brand-name
-```
+In particular, the existing completion request still uses `board_column_id: 2`;
+the meaning of that legacy column ID could not be verified from current public
+documentation. No write operation or actual task-completion result was verified.
 
-The API base URL is `https://my.agiled.app/api/v1/`. API documentation is available at `https://my.agiled.app/developers` (requires login).
+## Errors and verification
 
-## Features
+Both clients translate provider failures into service errors while retaining
+HTTP status, provider messages, and field validation details. Calls use a
+30-second timeout. Invalid response envelopes produce clear errors instead of
+unhandled property access failures.
 
-### Contact & Lead Management
+Verification is local build, formatting, registration, and schema review.
+Provider calls, live E2E, evals, and webhook behavior were not run or changed.
 
-Through its API, you can automate various aspects of business management by creating, updating, and retrieving data on leads, customers, projects, tasks, invoices, and payments. Manage contacts (clients, leads, prospects), accounts, and companies. Supported operations include creating contacts, updating them, and managing associated data.
+## Official references
 
-### CRM & Sales Pipeline
-
-Manage and track deals easily in one place. Create custom pipeline stages to track deals according to your business. Includes managing CRM sources, statuses, stages, and sales agents.
-
-### Project Management
-
-Create and manage projects, including updating project details and associating them with contacts or teams. Project management capabilities allow organizations to handle tasks, project details, and team members using customizable templates.
-
-### Task Management
-
-Create, update, and complete tasks. Tasks can be marked as complete and assigned to projects or team members. Tasks can be organized by categories.
-
-### Financial Management — Invoices & Estimates
-
-Administrators can create and send invoices and estimates, track expenses, and accept payments via a centralized dashboard. The API supports creating and updating invoices, estimates, expenses, and products.
-
-### Contracts & Proposals
-
-Create contracts effortlessly. Share documents directly with recipients. Collect e-signatures seamlessly for easy approval. The API allows creating and updating contracts with associated contract types.
-
-### Employee & HR Management
-
-Manage employees, including creating employee records and associating them with departments and designations. Track attendance, leave, time entries, holidays, and productivity.
-
-### Support Tickets
-
-Keep track of support tickets and reply to tickets with reply templates. Assign tickets to teammates. The API supports creating and updating tickets with assigned agents.
-
-### Time Tracking
-
-Time tracking endpoints are available in the public API. Log and manage time entries against projects and tasks.
-
-### Products
-
-Create and save products. Create packages from products. The API supports creating and updating product records.
-
-### Users
-
-Retrieve and manage user accounts within the Agiled workspace.
-
-## Events
-
-Agiled supports **custom webhooks** for integration with third-party services. You have access to custom webhooks and API. Based on available integration platform triggers, the following event categories can be listened to:
-
-### Contact/Account Events
-
-- Triggers when a new account is created.
-
-### Contract Events
-
-- Triggers when a contract is created inside app or through API call.
-
-### Estimate Events
-
-- Triggers when an estimate is created inside app or through API call.
-
-### Invoice Events
-
-- Triggers when an invoice is created inside app or through API call.
-
-### Project Events
-
-- Triggers when a project is created inside app or through API call.
-
-### Task Events
-
-- Triggers when a task is created inside app or through API call.
-
-### Employee Events
-
-- Triggers when an employee is created inside app or through API call.
-
-### Ticket Events
-
-- Triggers when a ticket is created inside app or through API call.
-
-### Product Events
-
-- Triggers when a product is created inside app or through API call.
-
-### CRM Events
-
-- Triggers when a new CRM source is created.
-- Triggers when a new CRM status is created.
-- Triggers when a new CRM stage is created.
-- Triggers when a new sales agent is created.
-
-Note: The detailed webhook configuration mechanism and the exact payload format are not publicly documented outside the Agiled developer portal (which requires authentication). The events listed above are based on triggers available through integration platforms such as Zapier.
+- [Authentication](https://docs.agiled.app/docs/developers/authentication/)
+- [Base URLs](https://docs.agiled.app/docs/developers/base-urls/)
+- [Pagination and filtering](https://docs.agiled.app/docs/developers/pagination-filtering/)
+- [Token context](https://docs.agiled.app/docs/api/core/getPublicApiMe/)
+- [Accounts](https://docs.agiled.app/docs/api/accounts/listAccounts/)
+- [Time entries](https://docs.agiled.app/docs/api/time-entries/listTimeEntries/)

@@ -2,8 +2,11 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createCheckout,
+  getCheckout,
+  getCurrentUser,
   getPayment,
   getUser,
+  listAccounts,
   listInvoices,
   listMembers,
   listMemberships,
@@ -19,6 +22,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    listAccounts,
+    getCurrentUser,
+    getCheckout,
     listProducts,
     manageProduct,
     listPlans,

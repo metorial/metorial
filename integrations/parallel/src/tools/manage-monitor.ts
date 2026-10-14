@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -72,7 +72,15 @@ Use the monitor ID from the **Create Monitor** tool.`,
             eventGroupId: z.string().describe('Event group ID'),
             output: z.unknown().describe('Event output'),
             eventDate: z.string().describe('Event date'),
-            sourceUrls: z.array(z.string()).describe('Source URLs')
+            sourceUrls: z.array(z.string()).describe('Source URLs'),
+            executionId: z
+              .string()
+              .optional()
+              .describe('Execution identifier for completion or error events'),
+            result: z
+              .unknown()
+              .optional()
+              .describe('Original structured provider event result, when available')
           })
         )
         .nullable()
@@ -105,7 +113,7 @@ Use the monitor ID from the **Create Monitor** tool.`,
     }
 
     if (!monitorId) {
-      throw new Error('monitorId is required for this action');
+      throw createApiServiceError(`monitorId is required for the ${action} action.`);
     }
 
     if (action === 'get') {
@@ -179,6 +187,6 @@ Use the monitor ID from the **Create Monitor** tool.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unsupported monitor action: ${action}.`);
   })
   .build();

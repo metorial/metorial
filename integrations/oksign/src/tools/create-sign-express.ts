@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createSignExpress = SlateTool.create(spec, {
   name: 'Create SignExpress',
   key: 'create_sign_express',
-  description: `Create an embedded "Sign now" signing flow for face-to-face signing scenarios. Generates a time-limited signing URL for a specific signer and set of documents that can be embedded in your application. Default validity is 90 days.`,
+  description: `Create an embedded "Sign now" signing flow for face-to-face signing scenarios. Generates a time-limited signing URL for a specific signer and set of documents that can be embedded in your application. Default validity is 90 days. Configure each document form first and use a signer ID present in its form descriptor.`,
   tags: {
     destructive: false,
     readOnly: false

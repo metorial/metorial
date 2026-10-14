@@ -37,7 +37,7 @@ export let listContacts = SlateTool.create(spec, {
       email: ctx.input.email,
       cid: ctx.input.contactId,
       id: ctx.input.externalId,
-      creationdate: ctx.input.creationDate
+      creationdateall: ctx.input.creationDate
     });
 
     let contacts = Array.isArray(result) ? result : [result];

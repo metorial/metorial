@@ -36,17 +36,17 @@ export let createContact = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.firstName) body.firstname = ctx.input.firstName;
-    if (ctx.input.surName) body.surname = ctx.input.surName;
-    if (ctx.input.email) body.email = ctx.input.email;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
-    if (ctx.input.city) body.city = ctx.input.city;
-    if (ctx.input.country) body.country = ctx.input.country;
-    if (ctx.input.street) body.street = ctx.input.street;
-    if (ctx.input.postalCode) body.postal_code = ctx.input.postalCode;
-    if (ctx.input.vatCode) body.vat_code = ctx.input.vatCode;
-    if (ctx.input.tags) body.tags = ctx.input.tags;
-    if (ctx.input.memo) body.memo = ctx.input.memo;
+    if (ctx.input.firstName !== undefined) body.firstname = ctx.input.firstName;
+    if (ctx.input.surName !== undefined) body.surname = ctx.input.surName;
+    if (ctx.input.email !== undefined) body.email_1 = ctx.input.email;
+    if (ctx.input.phone !== undefined) body.phone_1 = ctx.input.phone;
+    if (ctx.input.city !== undefined) body.visit_city = ctx.input.city;
+    if (ctx.input.country !== undefined) body.country = ctx.input.country;
+    if (ctx.input.street !== undefined) body.visit_street = ctx.input.street;
+    if (ctx.input.postalCode !== undefined) body.visit_postalcode = ctx.input.postalCode;
+    if (ctx.input.vatCode !== undefined) body.VAT_code = ctx.input.vatCode;
+    if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
+    if (ctx.input.memo !== undefined) body.memo = ctx.input.memo;
 
     let result = await client.create('contacts', body);
     let c = result.data as any;
@@ -55,7 +55,7 @@ export let createContact = SlateTool.create(spec, {
       output: {
         contactId: c.id,
         name: c.name,
-        createdAt: c.created
+        createdAt: c.created ?? undefined
       },
       message: `Created contact **${c.name}** (ID: ${c.id}).`
     };
@@ -99,13 +99,13 @@ export let updateContact = SlateTool.create(spec, {
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.firstName !== undefined) body.firstname = ctx.input.firstName;
     if (ctx.input.surName !== undefined) body.surname = ctx.input.surName;
-    if (ctx.input.email !== undefined) body.email = ctx.input.email;
-    if (ctx.input.phone !== undefined) body.phone = ctx.input.phone;
-    if (ctx.input.city !== undefined) body.city = ctx.input.city;
+    if (ctx.input.email !== undefined) body.email_1 = ctx.input.email;
+    if (ctx.input.phone !== undefined) body.phone_1 = ctx.input.phone;
+    if (ctx.input.city !== undefined) body.visit_city = ctx.input.city;
     if (ctx.input.country !== undefined) body.country = ctx.input.country;
-    if (ctx.input.street !== undefined) body.street = ctx.input.street;
-    if (ctx.input.postalCode !== undefined) body.postal_code = ctx.input.postalCode;
-    if (ctx.input.vatCode !== undefined) body.vat_code = ctx.input.vatCode;
+    if (ctx.input.street !== undefined) body.visit_street = ctx.input.street;
+    if (ctx.input.postalCode !== undefined) body.visit_postalcode = ctx.input.postalCode;
+    if (ctx.input.vatCode !== undefined) body.VAT_code = ctx.input.vatCode;
     if (ctx.input.tags !== undefined) body.tags = ctx.input.tags;
     if (ctx.input.memo !== undefined) body.memo = ctx.input.memo;
 
@@ -116,7 +116,7 @@ export let updateContact = SlateTool.create(spec, {
       output: {
         contactId: c.id,
         name: c.name,
-        updatedAt: c.modified
+        updatedAt: c.modified ?? undefined
       },
       message: `Updated contact **${c.name}** (ID: ${c.id}).`
     };

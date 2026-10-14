@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Scrapingbee
 
-Scrape web pages and extract structured data using headless browsers, proxy rotation, and CAPTCHA solving. Render JavaScript-heavy pages, capture screenshots, and extract data using CSS selectors, XPath, or AI-powered natural language queries. Search and retrieve structured JSON results from Google (search, news, maps, images, shopping), Amazon (product search and lookup), Walmart (product search and details), and YouTube (search, metadata, transcripts). Execute JavaScript scenarios on pages (click, scroll, wait) and check account usage.
+Scrape web pages and extract structured data using headless browsers, proxy rotation, and CAPTCHA solving. Render JavaScript-heavy pages, capture downloadable PNG screenshots, retrieve page text or Markdown, and extract data using CSS selectors, XPath, or AI-powered natural language queries. Search and retrieve structured JSON results from Google (search, news, maps, images, shopping), Amazon (product search, lookup, and offer pricing), Walmart (product search and details), and YouTube (search, metadata, transcripts). Execute JavaScript scenarios on pages (click, scroll, wait) and check account usage.
 
 ## License
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BugherdClient } from '../lib/client';
+import { positiveIntegerSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let memberSchema = z.object({
@@ -19,7 +20,7 @@ export let getProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The ID of the project to retrieve')
+      projectId: positiveIntegerSchema.describe('The ID of the project to retrieve')
     })
   )
   .output(

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type SessionCreateParams } from '../lib/client';
 import { spec } from '../spec';
 
 export let createSession = SlateTool.create(spec, {
@@ -30,7 +30,7 @@ export let createSession = SlateTool.create(spec, {
       maxDurationMinutes: z
         .number()
         .optional()
-        .describe('Maximum session duration in minutes (default: 20)'),
+        .describe('Maximum session duration in minutes (default: 180)'),
       idleTimeoutMinutes: z
         .number()
         .optional()
@@ -74,19 +74,24 @@ export let createSession = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let input = ctx.input;
 
-    let params: Record<string, unknown> = {};
-    let session: Record<string, unknown> = {};
-    let browser: Record<string, unknown> = {};
+    let params: SessionCreateParams = {};
+    let session: NonNullable<SessionCreateParams['session']> = {};
+    let browser: NonNullable<SessionCreateParams['browser']> = {};
 
     if (input.initialUrl) session.initial_url = input.initialUrl;
     if (input.tags) session.tags = input.tags;
     if (input.enableRecording !== undefined)
       session.recording = { active: input.enableRecording };
-    if (input.proxyCountry) session.proxy = { type: 'anchor', country: input.proxyCountry };
-    if (input.maxDurationMinutes || input.idleTimeoutMinutes) {
+    if (input.proxyCountry)
+      session.proxy = { active: true, country_code: input.proxyCountry.toLowerCase() };
+    if (input.maxDurationMinutes !== undefined || input.idleTimeoutMinutes !== undefined) {
       session.timeout = {
-        ...(input.maxDurationMinutes ? { max_duration: input.maxDurationMinutes } : {}),
-        ...(input.idleTimeoutMinutes ? { idle_timeout: input.idleTimeoutMinutes } : {})
+        ...(input.maxDurationMinutes !== undefined
+          ? { max_duration: input.maxDurationMinutes }
+          : {}),
+        ...(input.idleTimeoutMinutes !== undefined
+          ? { idle_timeout: input.idleTimeoutMinutes }
+          : {})
       };
     }
     if (input.readOnlyLiveView !== undefined)
@@ -117,7 +122,7 @@ export let createSession = SlateTool.create(spec, {
     if (Object.keys(session).length > 0) params.session = session;
     if (Object.keys(browser).length > 0) params.browser = browser;
 
-    let result = await client.createSession(params as any);
+    let result = await client.createSession(params);
 
     return {
       output: {

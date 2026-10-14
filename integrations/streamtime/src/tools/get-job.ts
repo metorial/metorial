@@ -50,7 +50,7 @@ export let getJob = SlateTool.create(spec, {
     let output: Record<string, any> = {
       jobId: job.id,
       name: job.name,
-      number: job.number,
+      number: job.number ?? undefined,
       raw: job
     };
 

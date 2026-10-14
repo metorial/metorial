@@ -53,16 +53,16 @@ export let getInvoice = SlateTool.create(spec, {
       invoiceId: i.id,
       number: i.number,
       subject: i.subject,
-      contact: i.contact,
-      project: i.project,
-      date: i.date,
-      dueDate: i.due_date,
-      totalExclVat: i.total_excl_vat,
-      totalInclVat: i.total_incl_vat,
+      contact: i.contact ?? undefined,
+      project: i.project ?? undefined,
+      date: i.date ?? undefined,
+      dueDate: i.expiration ?? i.due_date ?? undefined,
+      totalExclVat: i.price ?? i.total_excl_vat,
+      totalInclVat: i.price_invat ?? i.total_incl_vat,
       status: i.status,
-      paymentDate: i.payment_date,
-      createdAt: i.created,
-      updatedAt: i.modified
+      paymentDate: i.payment_date ?? undefined,
+      createdAt: i.created ?? undefined,
+      updatedAt: i.modified ?? undefined
     };
 
     if (ctx.input.includeLines) {

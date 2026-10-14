@@ -1,6 +1,4 @@
-Now let me check the LinkedIn campaigns and scrapper sections, and the email providers section for more details.Now let me check the webhook creation details and the scrapper webhook to understand events better.Now I have enough information to write the specification. Let me compile it.
-
-# Slates Specification for Emelia
+# Emelia API integration specification
 
 ## Overview
 
@@ -12,7 +10,7 @@ Emelia uses API key authentication. The API key must be passed in the `Authoriza
 
 - **Type:** API Key
 - **Header:** `Authorization`
-- **Obtaining the key:** The API key can be found in your Emelia account settings at `https://app.emelia.io/settings/api`.
+- **Obtaining the key:** The API key can be found in your Emelia account settings at `https://v3.emelia.io/settings/api`.
 
 Example header:
 
@@ -38,11 +36,11 @@ Advanced campaigns support multi-channel workflows combining email and LinkedIn 
 
 ### Email Finding and Verification
 
-Find the professional email address of a single contact by submitting a job, then retrieve the result. You need the prospect's full name, company name, website, and country to find verified emails. Email verification is also available as a separate tool to validate existing email addresses. These operations are asynchronous (job-based); you submit a request and poll for the result. Uses credit-based billing — credits are only consumed when an email is found.
+Find the professional email address of a single contact by submitting a job, then retrieve the result. Email finding submits fullname, companyName, country and optional companyWebsite. Phone finding submits the prospect's LinkedIn profile URL. These tools also accept an existing job ID without resubmitting prospect details. Email verification is also available as a separate tool to validate existing email addresses. These operations are asynchronous (job-based); you submit a request and poll for the result. Uses credit-based billing — credits are only consumed when an email is found.
 
 ### Phone Number Finding
 
-Find the phone number of a single contact by submitting a job and retrieving the result asynchronously. This also uses the credit-based system.
+Find the phone number of a single contact from a LinkedIn profile URL by submitting a job and retrieving the result asynchronously. This also uses the credit-based system.
 
 ### Email Provider Management
 
@@ -63,3 +61,17 @@ Webhooks can be created to watch activity for a specific campaign. Supported eve
 ### LinkedIn Scraper Webhooks
 
 Webhooks can be added to a LinkedIn scraper, with "FINISHED" and "ERROR" events available. The webhook is called via POST with the scraper name, ID, event type, and error details if applicable. Webhooks can be added to or removed from individual scrapers.
+
+## Current multichannel workflows
+
+`manage_advanced_campaign` supports reading and changing campaign state in addition to creation, listing, and manual tasks. Use `update_advanced_campaign` to configure a sequence tree, sender identities, settings, and recipient lists. Settings are merged with the current schedule before submission. Use `manage_lists` to discover list IDs, manage list lifecycle, and retrieve paginated contacts.
+
+Campaign contact listing accepts zero-based `page` and `perPage`, and returns the matching count. Contact removals and custom-field updates require campaign context; legacy email and LinkedIn contact IDs are resolved to the native email/profile selector without changing their meaning.
+
+Scraper downloads accept format 1 (with emails), 2 (without emails), or 3 (all contacts, default), and return a downloadable CSV. Enrichment requires a country code. Scraper splitting detaches already collected contacts; the provider decides the split.
+
+## Official API reference
+
+- [API routes](https://docs.emelia.io/docs/all-endpoints)
+- [Authentication](https://docs.emelia.io/docs/authentication)
+- [OpenAPI specification](https://docs.emelia.io/openapi/emelia.json)

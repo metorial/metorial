@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WakaTimeClient } from '../lib/client';
 import { spec } from '../spec';
@@ -76,7 +76,25 @@ export let getOrganizations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
+
+    if (ctx.input.dashboardId && !ctx.input.organizationId) {
+      throw createApiServiceError(
+        'Provide organizationId with dashboardId. Call get_organizations without inputs to discover organizations.'
+      );
+    }
+    if (ctx.input.summaryStartDate || ctx.input.summaryEndDate) {
+      if (
+        !ctx.input.organizationId ||
+        !ctx.input.dashboardId ||
+        !ctx.input.summaryStartDate ||
+        !ctx.input.summaryEndDate
+      ) {
+        throw createApiServiceError(
+          'Dashboard summaries require organizationId, dashboardId, summaryStartDate, and summaryEndDate together.'
+        );
+      }
+    }
 
     // If we have summaryStartDate and summaryEndDate with org and dashboard, get summaries
     if (
@@ -105,10 +123,17 @@ export let getOrganizations = SlateTool.create(spec, {
       );
 
       let mapped = (members || []).map((m: any) => ({
-        userId: m.user?.id || m.id,
-        displayName: m.user?.display_name || m.display_name,
-        email: m.user?.email || m.email,
-        photoUrl: m.user?.photo || m.photo
+        userId: m.user?.id || m.id || undefined,
+        displayName:
+          m.user?.display_name ||
+          m.display_name ||
+          m.user?.full_name ||
+          m.full_name ||
+          m.user?.username ||
+          m.username ||
+          undefined,
+        email: m.user?.email || m.email || undefined,
+        photoUrl: m.user?.photo || m.photo || undefined
       }));
 
       return {
@@ -124,7 +149,7 @@ export let getOrganizations = SlateTool.create(spec, {
       let mapped = (dashboards || []).map((d: any) => ({
         dashboardId: d.id ?? '',
         name: d.name ?? '',
-        createdAt: d.created_at
+        createdAt: d.created_at ?? undefined
       }));
 
       return {
@@ -139,8 +164,8 @@ export let getOrganizations = SlateTool.create(spec, {
     let mapped = (orgs || []).map((o: any) => ({
       organizationId: o.id ?? '',
       name: o.name ?? '',
-      timeout: o.timeout,
-      createdAt: o.created_at
+      timeout: o.timeout ?? undefined,
+      createdAt: o.created_at ?? undefined
     }));
 
     return {

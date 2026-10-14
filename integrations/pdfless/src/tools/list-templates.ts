@@ -8,7 +8,7 @@ export let listTemplates = SlateTool.create(spec, {
   key: 'list_templates',
   description: `Retrieve a paginated list of document templates available in the workspace. Use this to discover template IDs before generating PDFs.`,
   constraints: [
-    'Returns at most 100 templates. If more exist, paginate through results using the page parameter.'
+    'Use positive whole numbers for page and pageSize; increment page to retrieve more templates.'
   ],
   tags: {
     destructive: false,
@@ -27,7 +27,11 @@ export let listTemplates = SlateTool.create(spec, {
         .array(
           z.object({
             templateId: z.string().describe('Unique identifier of the template'),
-            title: z.string().describe('Title of the template')
+            title: z
+              .string()
+              .describe('Title of the template; empty if the provider has no name'),
+            createdAt: z.string().optional().describe('Template creation timestamp'),
+            modifiedAt: z.string().optional().describe('Template modification timestamp')
           })
         )
         .describe('List of document templates'),
@@ -52,7 +56,7 @@ export let listTemplates = SlateTool.create(spec, {
     });
 
     let templateList = result.templates
-      .map(t => `- **${t.title}** (\`${t.templateId}\`)`)
+      .map(t => `- **${t.title || 'Untitled template'}** (\`${t.templateId}\`)`)
       .join('\n');
 
     return {

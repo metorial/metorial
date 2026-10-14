@@ -20,7 +20,7 @@ export let listSenderIds = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
 
     ctx.info('Listing sender IDs');
     let result = await client.listSenderIds();
@@ -28,7 +28,7 @@ export let listSenderIds = SlateTool.create(spec, {
     return {
       output: {
         status: result.status || 'unknown',
-        description: result.description || result
+        description: result.description ?? result
       },
       message: `Retrieved sender IDs for the account`
     };

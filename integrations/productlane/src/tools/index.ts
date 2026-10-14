@@ -1,6 +1,7 @@
 export * from './create-changelog';
 export * from './create-company';
 export * from './create-contact';
+export * from './create-portal-feedback';
 export * from './create-thread';
 export * from './delete-changelog';
 export * from './delete-company';

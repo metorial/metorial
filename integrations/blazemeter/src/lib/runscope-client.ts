@@ -1,15 +1,20 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class RunscopeClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(params: { token: string }) {
-    this.axios = createAxios({
+    if (!params.token) {
+      throw createApiServiceError('An API Monitoring OAuth connection is required.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.runscope.com',
-      headers: {
-        Authorization: `Bearer ${params.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${params.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'BlazeMeter API Monitoring',
+          reason: 'blazemeter_monitoring_api_error'
+        })
     });
   }
 
@@ -33,7 +38,9 @@ export class RunscopeClient {
   }
 
   async createBucket(params: { name: string; teamUuid?: string }): Promise<any> {
-    let response = await this.axios.post('/buckets', params);
+    let response = await this.axios.post('/buckets', undefined, {
+      params: { name: params.name, team_uuid: params.teamUuid }
+    });
     return response.data?.data;
   }
 

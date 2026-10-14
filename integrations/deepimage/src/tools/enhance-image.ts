@@ -16,7 +16,7 @@ Optionally apply a preset profile (e.g. e-commerce, real estate) instead of manu
     'Use a preset to apply pre-configured enhancement profiles instead of manual configuration.'
   ],
   constraints: [
-    'Maximum upscale factor is 4x of the original resolution.',
+    'AI upscaling supports up to 4x; larger dimensions use traditional bicubic upscaling.',
     'Generative upscale generates at max 2048x2048 then uses standard AI upscaling beyond that.'
   ],
   tags: {
@@ -166,7 +166,9 @@ Optionally apply a preset profile (e.g. e-commerce, real estate) instead of manu
             }
           : undefined,
       faceEnhanceParameters:
-        ctx.input.faceEnhanceType || ctx.input.faceEnhanceLevel !== undefined
+        ctx.input.faceEnhanceType ||
+        ctx.input.faceEnhanceLevel !== undefined ||
+        ctx.input.faceEnhanceSmoothingLevel !== undefined
           ? {
               type: ctx.input.faceEnhanceType,
               level: ctx.input.faceEnhanceLevel,
@@ -179,6 +181,10 @@ Optionally apply a preset profile (e.g. e-commerce, real estate) instead of manu
       outputQuality: ctx.input.outputQuality,
       preset: ctx.input.preset
     });
+
+    if (result.status === 'complete' && result.resultUrl) {
+      await ctx.addAttachment({ type: 'url', url: result.resultUrl });
+    }
 
     let message =
       result.status === 'complete'

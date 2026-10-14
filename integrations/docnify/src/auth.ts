@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { normalizeCredentials } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,12 +20,8 @@ export let auth = SlateAuth.create()
         .describe('Your Docnify instance URL (e.g., https://your-instance.docnify.com)')
     }),
     getOutput: async ctx => {
-      let instanceUrl = ctx.input.instanceUrl.replace(/\/+$/, '');
       return {
-        output: {
-          token: ctx.input.token,
-          instanceUrl
-        }
+        output: normalizeCredentials(ctx.input)
       };
     }
   });

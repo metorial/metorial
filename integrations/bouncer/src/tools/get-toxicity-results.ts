@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getToxicityResults = SlateTool.create(spec, {
   name: 'Get Toxicity Results',
   key: 'get_toxicity_results',
-  description: `Download the results of a completed toxicity check job. Returns toxicity scores for each email address on a scale of 1–5. Higher scores indicate higher probability of the address being a spam trap or otherwise harmful.`,
+  description: `Download the results of a completed toxicity check job. Returns toxicity scores for each email address on a scale of 0–5. Higher scores indicate higher probability of the address being a spam trap or otherwise harmful.`,
   instructions: [
     'The toxicity job must be in **completed** status before results can be downloaded.',
     'Use the **Get Toxicity Status** tool to check if the job is ready.'
@@ -38,6 +38,12 @@ export let getToxicityResults = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let results = await client.getToxicityResults(ctx.input.jobId);
+    await ctx.addAttachment({
+      type: 'url',
+      url: client.getToxicityDownloadUrl(ctx.input.jobId),
+      mimeType: 'application/json',
+      headers: { 'x-api-key': ctx.auth.token }
+    });
 
     let toxicCount = results.filter(r => r.toxicity >= 3).length;
 

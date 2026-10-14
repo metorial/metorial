@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listDistributionProfiles = SlateTool.create(spec, {
@@ -23,7 +23,7 @@ export let listDistributionProfiles = SlateTool.create(spec, {
       z
         .object({
           profileId: z.string().optional(),
-          name: z.string().optional()
+          name: z.string().nullish()
         })
         .passthrough()
     )
@@ -36,7 +36,7 @@ export let listDistributionProfiles = SlateTool.create(spec, {
       size: ctx.input.size
     });
 
-    let items = Array.isArray(profiles) ? profiles : [];
+    let items = getAppcircleList(profiles, 'list');
 
     return {
       output: items,

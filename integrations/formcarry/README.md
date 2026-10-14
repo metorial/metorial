@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Formcarry
 
-Manage form backends and collect form submissions without server-side code. Create, update, and delete forms programmatically. Retrieve and filter submissions by date range, spam status, attachments, and custom field values with sorting and pagination. Export submissions in CSV or JSON format. Configure email notifications, auto-responses, and webhooks for new submissions. Supports file uploads, spam protection, field validations, Stripe payment collection, and integrations with 1500+ apps via Zapier.
+Create and delete Formcarry forms, configure notification emails and redirects during creation, and retrieve submissions with filtering, sorting, and pagination. Submit named text fields to a form endpoint; submissions follow the form’s validation and spam protection rules and can trigger its configured notifications and integrations.
+
+The published management API documentation does not specify form listing, updates, profile retrieval, or export endpoints. File uploads and dashboard exports are outside this integration’s tools.
 
 ## License
 

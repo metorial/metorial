@@ -61,7 +61,7 @@ export let manageUser = SlateTool.create(spec, {
       });
       return {
         output: {
-          userId: user.user_id,
+          userId: user.user_id ?? ctx.input.userId,
           uuid: user.uuid,
           email: user.email,
           firstName: user.first_name,
@@ -78,7 +78,7 @@ export let manageUser = SlateTool.create(spec, {
       let user = await client.getUser(ctx.input.userId);
       return {
         output: {
-          userId: user.user_id,
+          userId: user.user_id ?? ctx.input.userId,
           uuid: user.uuid,
           email: user.email,
           firstName: user.first_name,
@@ -100,7 +100,7 @@ export let manageUser = SlateTool.create(spec, {
       });
       return {
         output: {
-          userId: user.user_id,
+          userId: user.user_id ?? ctx.input.userId,
           uuid: user.uuid,
           email: user.email,
           firstName: user.first_name,

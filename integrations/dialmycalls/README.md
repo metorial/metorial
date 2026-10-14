@@ -1,6 +1,12 @@
-# Dialmycalls
+# DialMyCalls
 
-Send mass voice call broadcasts, SMS/MMS text message broadcasts, and email notifications to groups of contacts. Manage contacts and contact groups, create audio recordings via text-to-speech, URL upload, or phone, and configure caller IDs and vanity numbers. Schedule or immediately send broadcasts with options like answering machine detection, push-to-talk, telephone polling, and opt-out handling. Retrieve broadcast delivery statuses, manage inbound text messages, handle do-not-contact lists, and create sub-accounts. Supports US and Canada.
+Send voice and text broadcasts, with optional email notifications. Manage contacts, groups, recordings, caller IDs, and access accounts. Inspect broadcast delivery statuses, incoming texts, keywords, shortcodes, vanity numbers, and do-not-contact entries. Create recordings using text-to-speech, an MP3/WAV URL, or a phone call; ready recordings are available to download.
+
+Use `list_contacts` and `get_contact` to inspect recipients and their group membership, `list_keywords` and `list_shortcodes` to discover text-broadcast sender IDs, and `list_incoming_texts` before deleting a received message with `delete_incoming_text`.
+
+API list requests return up to 100 records per page. Supply `range` in the form `records=1-100`, then request the next range as needed. The `get_account` tool returns account information and available credits. Authentication uses your account's API key.
+
+See the [official API documentation](https://www.dialmycalls.com/api-documentation) for provider requirements.
 
 ## License
 

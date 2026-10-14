@@ -19,6 +19,7 @@ export let listContacts = SlateTool.create(spec, {
         .number()
         .min(1)
         .max(100)
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
         .optional()
         .describe('Number of contacts to return (1-100). Defaults to 10.'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
@@ -28,7 +29,7 @@ export let listContacts = SlateTool.create(spec, {
     z.object({
       hasMore: z.boolean().describe('Whether more contacts exist beyond this page'),
       cursor: z.string().describe('Cursor for fetching the next page'),
-      total: z.number().describe('Total number of contacts'),
+      total: z.number().optional().describe('Total count, only when supplied by BigMailer'),
       contacts: z.array(
         z.object({
           contactId: z.string().describe('Contact unique identifier'),
@@ -93,7 +94,7 @@ export let listContacts = SlateTool.create(spec, {
         total: result.total,
         contacts
       },
-      message: `Found **${result.total}** contact(s). Returned **${contacts.length}** contact(s)${result.has_more ? ' (more available)' : ''}.`
+      message: `Returned **${contacts.length}** contact(s)${result.has_more ? ' (more available)' : ''}.`
     };
   })
   .build();

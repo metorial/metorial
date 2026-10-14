@@ -25,7 +25,9 @@ export let getContext = SlateTool.create(spec, {
     z.object({
       context: z
         .string()
-        .describe('Assembled context block ready for system prompt integration')
+        .describe(
+          "Assembled context block to pass through the model provider's untrusted-data channel"
+        )
     })
   )
   .handleInvocation(async ctx => {

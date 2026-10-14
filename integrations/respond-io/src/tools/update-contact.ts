@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, contactOutput } from '../lib/client';
 import { spec } from '../spec';
 
 export let updateContact = SlateTool.create(spec, {
@@ -51,7 +51,11 @@ export let updateContact = SlateTool.create(spec, {
     if (ctx.input.language !== undefined) fields.language = ctx.input.language;
     if (ctx.input.countryCode !== undefined) fields.countryCode = ctx.input.countryCode;
     if (ctx.input.profilePicUrl !== undefined) fields.profilePic = ctx.input.profilePicUrl;
-    if (ctx.input.customFields !== undefined) fields.custom_fields = ctx.input.customFields;
+    if (ctx.input.customFields !== undefined)
+      fields.custom_fields = Object.entries(ctx.input.customFields).map(([name, value]) => ({
+        name,
+        value
+      }));
 
     let result = await client.updateContact(
       ctx.input.identifierType,
@@ -61,13 +65,7 @@ export let updateContact = SlateTool.create(spec, {
     let contact = result?.data || result;
 
     return {
-      output: {
-        contactId: String(contact.id || ''),
-        firstName: contact.firstName,
-        lastName: contact.lastName,
-        email: contact.email,
-        phone: contact.phone
-      },
+      output: contactOutput(contact),
       message: `Updated contact **${contact.firstName || ''} ${contact.lastName || ''}** (${ctx.input.identifierType}: ${ctx.input.identifierValue}).`
     };
   })

@@ -3,6 +3,8 @@ export * from './find-profile-url';
 export * from './get-bulk-search-results';
 export * from './get-search-result';
 export * from './get-subscription';
+export * from './list-bulk-searches';
+export * from './reverse-email-lookup';
 export * from './scan-domain';
 export * from './scrape-company';
 export * from './scrape-profile';

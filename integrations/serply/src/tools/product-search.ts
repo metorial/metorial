@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { normalizeProductResult, searchResultArray } from '../lib/responses';
 import { spec } from '../spec';
 
 let productResultSchema = z.object({
@@ -75,7 +76,7 @@ export let productSearch = SlateTool.create(spec, {
       deviceType: ctx.input.deviceType
     });
 
-    let products = data.products || [];
+    let products = searchResultArray(data.products).map(normalizeProductResult);
 
     return {
       output: {

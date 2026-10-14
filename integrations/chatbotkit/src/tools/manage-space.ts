@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTimestamp } from '../lib/output';
 import { spec } from '../spec';
 
 export let manageSpaceTool = SlateTool.create(spec, {
@@ -42,30 +43,30 @@ export let manageSpaceTool = SlateTool.create(spec, {
       return {
         output: {
           spaceId: result.id,
-          name: result.name,
-          description: result.description,
-          createdAt: result.createdAt
+          name: result.name ?? name,
+          description: result.description ?? description,
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Space **${result.name || result.id}** created.`
       };
     }
 
     if (action === 'fetch') {
-      if (!spaceId) throw new Error('spaceId is required for fetch');
+      if (!spaceId) throw createApiServiceError('spaceId is required for fetch');
       let result = await client.fetchSpace(spaceId);
       return {
         output: {
           spaceId: result.id,
           name: result.name,
           description: result.description,
-          createdAt: result.createdAt
+          createdAt: formatTimestamp(result.createdAt)
         },
         message: `Fetched space **${result.name || result.id}**.`
       };
     }
 
     if (action === 'update') {
-      if (!spaceId) throw new Error('spaceId is required for update');
+      if (!spaceId) throw createApiServiceError('spaceId is required for update');
       let updateData: Record<string, any> = {};
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description;
@@ -78,7 +79,7 @@ export let manageSpaceTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!spaceId) throw new Error('spaceId is required for delete');
+      if (!spaceId) throw createApiServiceError('spaceId is required for delete');
       await client.deleteSpace(spaceId);
       return {
         output: { spaceId },
@@ -86,6 +87,6 @@ export let manageSpaceTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

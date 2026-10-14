@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 let recipientSchema = z
@@ -13,6 +13,7 @@ let recipientSchema = z
     city: z.string().optional().describe('City'),
     state: z.string().optional().describe('State or county'),
     zipcode: z.string().optional().describe('Postal/zip code'),
+    postcode: z.string().optional().describe('Postal code for UK/EU addresses'),
     country: z
       .string()
       .optional()
@@ -35,7 +36,9 @@ export let sendPostcard = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      size: z.enum(['4x6', '6x9', '6x11']).describe('Postcard size'),
+      size: z
+        .enum(['4x6', '6x9', '6x11', 'A6', 'A5', 'A5-ENV', 'A5-PORT'])
+        .describe('Postcard size. US: 4x6, 6x9, 6x11. UK/EU: A6, A5, A5-ENV, A5-PORT'),
       recipientId: z.number().optional().describe('Existing recipient ID to send to'),
       recipient: recipientSchema.optional(),
       front: z
@@ -74,17 +77,25 @@ export let sendPostcard = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
-    let recipientValue: number | Record<string, any>;
-    if (ctx.input.recipientId) {
+    if ((ctx.input.recipientId !== undefined) === (ctx.input.recipient !== undefined)) {
+      throw createApiServiceError(
+        'Provide either recipientId or inline recipient details, not both.'
+      );
+    }
+    let recipientValue: number | Record<string, unknown>;
+    if (ctx.input.recipientId !== undefined) {
       recipientValue = ctx.input.recipientId;
     } else if (ctx.input.recipient) {
       recipientValue = ctx.input.recipient;
     } else {
-      throw new Error('Either recipientId or recipient details must be provided');
+      throw createApiServiceError('Provide recipientId or inline recipient details.');
     }
 
+    if (ctx.input.templateId === undefined && !ctx.input.front?.trim()) {
+      throw createApiServiceError('Provide templateId or front artwork for the postcard.');
+    }
     let result = await client.createPostcard({
       size: ctx.input.size,
       front: ctx.input.front,
@@ -98,17 +109,24 @@ export let sendPostcard = SlateTool.create(spec, {
       postUnverified: ctx.input.postUnverified
     });
 
+    if (typeof result.pdf === 'string' && result.pdf) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: result.pdf,
+        mimeType: 'application/pdf'
+      });
+    }
     return {
       output: {
         mailpieceId: String(result.id),
-        pdfUrl: result.pdf,
-        status: result.status,
-        cost: result.cost,
-        format: result.format,
-        created: result.created
+        pdfUrl: result.pdf ?? undefined,
+        status: result.status ?? undefined,
+        cost: result.cost != null ? String(result.cost) : undefined,
+        format: result.format ?? undefined,
+        created: result.created ?? undefined
       },
       message: ctx.input.test
-        ? `Test postcard generated (${ctx.input.size}). PDF available at: ${result.pdf}`
+        ? `Test postcard generated (${ctx.input.size}). The PDF is ready for download.`
         : `Postcard (${ctx.input.size}) created with ID **${result.id}**. Status: ${result.status}`
     };
   })

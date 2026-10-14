@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let generateImage = SlateTool.create(spec, {
   key: 'generate_image',
   description: `Generate images from text prompts using 70+ image models including Flux, DALL-E, Stable Diffusion, Imagen, and more.
 Supports configurable resolution, aspect ratio, negative prompts, guidance scale, and seed for reproducibility.
-Returns URLs to the generated images.`,
+Returns generated images as downloadable files and preserves their provider URLs.`,
   instructions: [
     'Use model IDs like "flux/schnell", "openai/gpt-image-1", "google/imagen-3.0-generate-002", "stability-ai/stable-diffusion-3".',
     'Not all parameters are supported by all models. Size, aspect ratio, and negative prompt availability depend on the chosen model.'
@@ -63,6 +63,16 @@ Returns URLs to the generated images.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.n !== undefined && !Number.isInteger(ctx.input.n)) {
+      throw createApiServiceError('The number of images must be a whole number.');
+    }
+    if (
+      ['flux/schnell', 'flux/dev', 'flux-pro', 'flux-pro/v1.1'].includes(ctx.input.model) &&
+      ctx.input.n !== undefined &&
+      ctx.input.n > 4
+    ) {
+      throw createApiServiceError('This Flux model supports at most 4 images per request.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       baseUrl: ctx.config.baseUrl
@@ -80,10 +90,28 @@ Returns URLs to the generated images.`,
       enhancePrompt: ctx.input.enhancePrompt
     });
 
-    let images = (result.data ?? []).map(img => ({
+    let generatedImages = result.data ?? result.images ?? [];
+    if (generatedImages.length === 0) {
+      throw createApiServiceError(
+        'AI/ML API returned no generated images. Try another image model.'
+      );
+    }
+    let images = generatedImages.map(img => ({
       url: img.url ?? img.b64_json,
       revisedPrompt: img.revised_prompt
     }));
+
+    for (let img of generatedImages) {
+      if (img.url) {
+        await ctx.addAttachment({ type: 'url', url: img.url, mimeType: img.content_type });
+      } else if (img.b64_json) {
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(Buffer.from(img.b64_json, 'base64')),
+          mimeType: img.content_type
+        });
+      }
+    }
 
     return {
       output: {

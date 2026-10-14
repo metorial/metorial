@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Blazemeter
 
-Create, configure, and run performance and API monitoring tests. Manage test results, schedule test runs, and simulate virtual users for load testing websites and APIs. Create and deploy mock/virtual services from transactions, HAR files, or Swagger/WSDL definitions. Generate and manage dynamic test data models for parameterized testing. Monitor API performance from global locations with webhook notifications on test completion. Organize tests across accounts, workspaces, and projects. Upload and manage shared test artifacts such as JMX scripts and CSV data files. Configure usage alerts for test events including start, end, pass, and fail.
+Create, configure, and run performance tests; inspect their results and manage cron schedules. Organize tests across accounts, workspaces, and projects. Manage API monitoring buckets, tests, environments, and test runs with an API Monitoring OAuth connection. Retrieve the current user and monitoring team identifiers. Virtual service and mock transaction operations use a BlazeMeter API key connection.
+
+Performance schedules return a string `scheduleKey` for deletion. API Monitoring bucket creation requires a `teamUuid`, available from `get_current_user`. Reauthorize existing API Monitoring connections to grant the test and bucket scopes used by these tools.
 
 ## License
 

@@ -1,9 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { paginationFields } from '../lib/schemas';
 import { spec } from '../spec';
 
 let invoiceItemSchema = z.object({
+  type: z
+    .enum(['title', 'description', 'item', 'subtotal', 'page-break', 'separator'])
+    .optional()
+    .describe('Line item type; defaults to item.'),
   title: z.string().describe('Line item title'),
   description: z.string().optional().describe('Line item description'),
   quantity: z.number().optional().describe('Quantity'),
@@ -14,6 +19,21 @@ let invoiceItemSchema = z.object({
 
 let invoiceOutputSchema = z.object({
   invoiceId: z.number().describe('Invoice ID'),
+  customerId: z.number().optional().describe('Customer company ID'),
+  projectId: z.number().optional().describe('Associated project ID'),
+  offerId: z.number().optional().describe('Associated offer ID'),
+  items: z
+    .array(z.unknown())
+    .optional()
+    .describe('Invoice line items, available in invoice details'),
+  payments: z
+    .array(z.unknown())
+    .optional()
+    .describe('Recorded payments, available in invoice details'),
+  reminders: z
+    .array(z.unknown())
+    .optional()
+    .describe('Invoice reminders, available in invoice details'),
   title: z.string().optional().describe('Invoice title'),
   identifier: z.string().optional().describe('Invoice number/identifier'),
   status: z.string().optional().describe('Invoice status'),
@@ -34,17 +54,23 @@ let invoiceOutputSchema = z.object({
 
 let mapInvoice = (i: any) => ({
   invoiceId: i.id,
+  customerId: i.customer_id,
+  projectId: i.project_id ?? undefined,
+  offerId: i.offer_id ?? undefined,
+  items: i.items,
+  payments: i.payments,
+  reminders: i.reminders,
   title: i.title,
-  identifier: i.identifier,
+  identifier: i.identifier ?? undefined,
   status: i.status,
   date: i.date,
-  dueDate: i.due_date,
+  dueDate: i.due_date ?? undefined,
   currency: i.currency,
   netTotal: i.net_total,
-  tax: i.tax,
-  grossTotal: i.gross_total,
+  tax: i.tax ?? undefined,
+  grossTotal: i.gross_total ?? undefined,
   paidTotal: i.paid_total,
-  recipientAddress: i.recipient_address,
+  recipientAddress: i.recipient_address ?? undefined,
   tags: i.tags,
   customer: i.customer,
   project: i.project,
@@ -62,6 +88,7 @@ export let listInvoices = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      ...paginationFields,
       status: z
         .enum(['draft', 'created', 'sent', 'partially_paid', 'paid', 'overdue', 'ignored'])
         .optional()
@@ -84,6 +111,8 @@ export let listInvoices = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
     let params: Record<string, any> = {};
+    if (ctx.input.page !== undefined) params.page = ctx.input.page;
+    if (ctx.input.perPage !== undefined) params.per_page = ctx.input.perPage;
     if (ctx.input.status) params.status = ctx.input.status;
     if (ctx.input.companyId) params.company_id = ctx.input.companyId;
     if (ctx.input.projectId) params.project_id = ctx.input.projectId;
@@ -143,7 +172,20 @@ export let createInvoice = SlateTool.create(spec, {
       date: z.string().describe('Invoice date (YYYY-MM-DD)'),
       dueDate: z.string().describe('Payment due date (YYYY-MM-DD)'),
       title: z.string().describe('Invoice title'),
-      tax: z.number().describe('Tax percentage (e.g., 19.0)'),
+      tax: z
+        .number()
+        .optional()
+        .describe(
+          'Tax percentage matching an active sales VAT code. Use vatCodeId for explicit selection.'
+        ),
+      vatCodeId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Active sales VAT code ID from your account tax settings; takes precedence over tax.'
+        ),
       currency: z.string().describe('Currency code (e.g., "EUR")'),
       items: z.array(invoiceItemSchema).describe('Invoice line items'),
       projectId: z.number().optional().describe('Associated project ID'),
@@ -159,6 +201,13 @@ export let createInvoice = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
 
+    if (ctx.input.tax === undefined && ctx.input.vatCodeId === undefined) {
+      throw createApiServiceError('Provide tax or vatCodeId to select the sales VAT code.');
+    }
+    if (ctx.input.items.length === 0) {
+      throw createApiServiceError('Provide at least one line item.');
+    }
+
     let data: Record<string, any> = {
       customer_id: ctx.input.customerId,
       recipient_address: ctx.input.recipientAddress,
@@ -166,8 +215,10 @@ export let createInvoice = SlateTool.create(spec, {
       due_date: ctx.input.dueDate,
       title: ctx.input.title,
       tax: ctx.input.tax,
+      vat_code_id: ctx.input.vatCodeId,
       currency: ctx.input.currency,
       items: ctx.input.items.map(item => ({
+        type: item.type ?? 'item',
         title: item.title,
         description: item.description,
         quantity: item.quantity,
@@ -227,7 +278,11 @@ export let deleteInvoice = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      invoiceId: z.number().describe('The ID of the invoice to delete')
+      invoiceId: z.number().describe('The ID of the invoice to delete'),
+      reason: z
+        .string()
+        .optional()
+        .describe('Deletion reason; required for non-draft invoices and optional for drafts.')
     })
   )
   .output(
@@ -237,7 +292,7 @@ export let deleteInvoice = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, domain: ctx.auth.domain });
-    await client.deleteInvoice(ctx.input.invoiceId);
+    await client.deleteInvoice(ctx.input.invoiceId, ctx.input.reason);
 
     return {
       output: { success: true },

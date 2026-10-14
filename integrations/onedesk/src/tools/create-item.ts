@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getCreatedId, validatePriority } from '../lib/client';
 import { spec } from '../spec';
 
 export let createItem = SlateTool.create(spec, {
@@ -21,7 +21,7 @@ Supports setting priority, description, type, and associating the item with a pr
         .string()
         .optional()
         .describe(
-          'Item type identifier (e.g. ticket type or task type). Use "Get Organization Info" to list available item types.'
+          'Item type name, such as ticket or task. Call get_organization and use an itemTypes label.'
         ),
       description: z
         .string()
@@ -41,7 +41,11 @@ Supports setting priority, description, type, and associating the item with a pr
   )
   .output(
     z.object({
-      itemId: z.string().describe('ID of the newly created work item.')
+      itemId: z
+        .string()
+        .describe(
+          'External ID of the newly created work item. Pass it as externalId to get_item.'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -49,6 +53,8 @@ Supports setting priority, description, type, and associating the item with a pr
       token: ctx.auth.token,
       authMethod: ctx.auth.authMethod
     });
+
+    validatePriority(ctx.input.priority);
 
     let result = await client.createItem({
       name: ctx.input.name,
@@ -58,8 +64,7 @@ Supports setting priority, description, type, and associating the item with a pr
       priority: ctx.input.priority
     });
 
-    let itemId =
-      typeof result === 'string' ? result : result?.id || result?.externalId || String(result);
+    let itemId = getCreatedId(result);
 
     return {
       output: {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -60,7 +60,7 @@ export let getRoutes = SlateTool.create(spec, {
           routes: [
             {
               routeId: r.route_id,
-              routeName: r.route_name,
+              routeName: r.route_name ?? r.parameters?.route_name ?? undefined,
               optimizationProblemId: r.optimization_problem_id,
               tripDistance: r.trip_distance,
               routeDurationSec: r.route_duration_sec,
@@ -73,7 +73,7 @@ export let getRoutes = SlateTool.create(spec, {
             }
           ]
         },
-        message: `Retrieved route **${r.route_id}** "${r.route_name || ''}" with ${r.addresses?.length || 0} stops.`
+        message: `Retrieved route **${r.route_id}** "${r.route_name ?? r.parameters?.route_name ?? ''}" with ${r.addresses?.length || 0} stops.`
       };
     }
 
@@ -84,7 +84,7 @@ export let getRoutes = SlateTool.create(spec, {
       output: {
         routes: items.map((r: any) => ({
           routeId: r.route_id,
-          routeName: r.route_name,
+          routeName: r.route_name ?? r.parameters?.route_name ?? undefined,
           optimizationProblemId: r.optimization_problem_id,
           tripDistance: r.trip_distance,
           routeDurationSec: r.route_duration_sec,
@@ -101,7 +101,7 @@ export let getRoutes = SlateTool.create(spec, {
 export let updateRoute = SlateTool.create(spec, {
   name: 'Update Route',
   key: 'update_route',
-  description: `Update a route's properties, resequence stops, add addresses, or remove an address. Combines multiple route editing operations into one tool.`,
+  description: `Update a route's properties, resequence stops, add addresses, or remove an address. Choose one type of edit per call. Route name, member, and vehicle properties can be updated together.`,
   tags: {
     destructive: false
   }
@@ -151,7 +151,25 @@ export let updateRoute = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let { routeId } = ctx.input;
 
-    if (ctx.input.removeDestinationId) {
+    let body = pickDefined({
+      route_name: ctx.input.routeName,
+      member_id: ctx.input.memberId,
+      vehicle_id: ctx.input.vehicleId
+    });
+    let editCount = [
+      ctx.input.removeDestinationId !== undefined,
+      ctx.input.resequence !== undefined,
+      ctx.input.addAddresses !== undefined,
+      Object.keys(body).length > 0
+    ].filter(Boolean).length;
+    if (editCount !== 1) {
+      throw createApiServiceError(
+        'Choose one edit: route properties, resequence stops, add addresses, or remove a destination.',
+        { reason: 'invalid_route_update' }
+      );
+    }
+
+    if (ctx.input.removeDestinationId !== undefined) {
       await client.removeRouteAddress(routeId, ctx.input.removeDestinationId);
       return {
         output: { routeId, success: true },
@@ -160,6 +178,11 @@ export let updateRoute = SlateTool.create(spec, {
     }
 
     if (ctx.input.resequence) {
+      if (ctx.input.resequence.length === 0) {
+        throw createApiServiceError('Provide at least one stop to resequence.', {
+          reason: 'invalid_route_update'
+        });
+      }
       let addresses = ctx.input.resequence.map(a => ({
         route_destination_id: a.routeDestinationId,
         sequence_no: a.sequenceNo
@@ -172,6 +195,11 @@ export let updateRoute = SlateTool.create(spec, {
     }
 
     if (ctx.input.addAddresses) {
+      if (ctx.input.addAddresses.length === 0) {
+        throw createApiServiceError('Provide at least one address to add.', {
+          reason: 'invalid_route_update'
+        });
+      }
       let addresses = ctx.input.addAddresses.map(a => ({
         address: a.address,
         lat: a.lat,
@@ -186,18 +214,13 @@ export let updateRoute = SlateTool.create(spec, {
       };
     }
 
-    let body: Record<string, any> = {};
-    if (ctx.input.routeName) body.route_name = ctx.input.routeName;
-    if (ctx.input.memberId) body.member_id = ctx.input.memberId;
-    if (ctx.input.vehicleId) body.vehicle_id = ctx.input.vehicleId;
-
     let result = await client.updateRoute(routeId, body);
 
     return {
       output: {
         routeId: result.route_id || routeId,
         success: true,
-        routeName: result.route_name,
+        routeName: result.route_name ?? result.parameters?.route_name ?? undefined,
         addressCount: result.addresses?.length
       },
       message: `Updated route **${routeId}**.`
@@ -260,9 +283,15 @@ export let duplicateRoute = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.duplicateRoute(ctx.input.routeId);
+    let routeId = result.route_id || result.route_ids?.[0];
+    if (typeof routeId !== 'string' || !routeId) {
+      throw createApiServiceError('Route4Me did not return the duplicated route ID.', {
+        reason: 'invalid_duplicate_response'
+      });
+    }
     return {
       output: {
-        routeId: result.route_id || result.route_ids?.[0] || '',
+        routeId,
         optimizationProblemId: result.optimization_problem_id,
         success: true
       },

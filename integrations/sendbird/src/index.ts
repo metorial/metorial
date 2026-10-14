@@ -8,6 +8,8 @@ import {
   deleteGroupChannel,
   deleteMessage,
   deleteUser,
+  getGroupChannel,
+  getMessage,
   getUser,
   listGroupChannels,
   listMessages,
@@ -18,6 +20,7 @@ import {
   searchMessages,
   sendMessage,
   updateGroupChannel,
+  updateMessage,
   updateUser
 } from './tools';
 export let provider = Slate.create({
@@ -29,6 +32,7 @@ export let provider = Slate.create({
     deleteUser,
     listUsers,
     createGroupChannel,
+    getGroupChannel,
     updateGroupChannel,
     listGroupChannels,
     deleteGroupChannel,
@@ -36,6 +40,8 @@ export let provider = Slate.create({
     createOpenChannel,
     listOpenChannels,
     sendMessage,
+    getMessage,
+    updateMessage,
     listMessages,
     searchMessages,
     deleteMessage,

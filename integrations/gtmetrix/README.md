@@ -1,6 +1,6 @@
 # Gtmetrix
 
-Run web page speed tests and retrieve detailed performance reports. Analyze any URL using Lighthouse or legacy PageSpeed/YSlow engines from multiple global server locations and browsers. Configure tests with connection throttling, ad blocking, custom cookies, HTTP authentication, and simulated devices. Retrieve Core Web Vitals, timing metrics, GTmetrix grades, and optimization recommendations. Download report artifacts including HAR files, screenshots, filmstrips, videos, PDF reports, and Lighthouse JSON. Manage pages, view historical reports, retest pages, and query available test locations, browsers, and simulated devices. Check API credit balance and account status.
+Run web page speed tests and retrieve performance reports. Configure location, browser, connection throttling, ad blocking, cookies, HTTP authentication, custom DNS, and simulated devices. Check test status without waiting, list recent tests, or wait for a completed report. Reports include performance metrics and available authenticated resource URLs. List pages, retrieve their latest reports or paginated history, retest pages and reports, and delete saved resources. Discover locations, browsers, and simulated devices, and check API credit balance and account status. The account identifier is a non-secret fingerprint of the connected API key.
 
 ## License
 

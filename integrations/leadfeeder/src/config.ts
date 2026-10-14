@@ -7,7 +7,7 @@ export let config = SlateConfig.create(
       .string()
       .optional()
       .describe(
-        'Leadfeeder account ID. If not provided, the first available account will be used.'
+        'Optional default account ID. Call get_accounts to discover accessible accounts. If omitted, the first accessible account is used.'
       )
   })
 );

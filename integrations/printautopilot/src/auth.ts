@@ -4,7 +4,7 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string().min(1)
     })
   )
   .addTokenAuth({
@@ -14,8 +14,10 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .trim()
+        .min(1)
         .describe(
-          'Bearer token from your PrintAutopilot account dashboard, used for general API access such as retrieving print jobs.'
+          'Connection token from your PrintAutopilot dashboard for retrieving queued documents, registering printers, and recording print results. Queue API tokens are supplied separately when submitting documents.'
         )
     }),
     getOutput: async ctx => {

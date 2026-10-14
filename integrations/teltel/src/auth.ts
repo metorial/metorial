@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { TelTelClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -22,22 +23,13 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.teltel.io/v2',
-        headers: {
-          'X-API-KEY': ctx.output.token
-        }
-      });
-
-      let response = await client.get('/users');
-      let users = response.data;
-
-      let firstUser = Array.isArray(users) && users.length > 0 ? users[0] : null;
+      let users = await new TelTelClient(ctx.output.token).listUsers();
+      let user = users.find(user => user.api_key === ctx.output.token);
 
       return {
         profile: {
-          id: firstUser?.id?.toString(),
-          name: firstUser?.name
+          id: user?.id?.toString(),
+          name: user?.display_name ?? user?.realname ?? user?.name
         }
       };
     }

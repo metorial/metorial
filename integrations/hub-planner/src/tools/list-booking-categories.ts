@@ -8,6 +8,7 @@ export let listBookingCategories = SlateTool.create(spec, {
   key: 'list_booking_categories',
   description: `List all booking categories and category groups in Hub Planner. Booking categories are used to classify different types of bookings.
 Optionally retrieve a specific category by ID.`,
+  constraints: ['Custom category groups require the Booking Category Groups extension.'],
   tags: {
     readOnly: true
   }
@@ -51,18 +52,20 @@ Optionally retrieve a specific category by ID.`,
 
     if (ctx.input.categoryId) {
       let cat = await client.getBookingCategory(ctx.input.categoryId);
+      let groups = ctx.input.includeGroups ? await client.getCategoryGroups() : undefined;
       return {
         output: {
           categories: [
             {
               categoryId: cat._id,
-              name: cat.name,
-              gridColor: cat.gridColor,
-              type: cat.type,
-              categoryGroupId: cat.categoryGroupId,
-              categoryGroupName: cat.categoryGroupName
+              name: cat.name ?? undefined,
+              gridColor: cat.gridColor ?? undefined,
+              type: cat.type ?? undefined,
+              categoryGroupId: cat.categoryGroupId ?? undefined,
+              categoryGroupName: cat.categoryGroupName ?? undefined
             }
-          ]
+          ],
+          groups: groups?.map((g: any) => ({ groupId: g._id, name: g.name ?? undefined }))
         },
         message: `Retrieved booking category **${cat.name}**.`
       };
@@ -78,15 +81,15 @@ Optionally retrieve a specific category by ID.`,
       output: {
         categories: categories.map((c: any) => ({
           categoryId: c._id,
-          name: c.name,
-          gridColor: c.gridColor,
-          type: c.type,
-          categoryGroupId: c.categoryGroupId,
-          categoryGroupName: c.categoryGroupName
+          name: c.name ?? undefined,
+          gridColor: c.gridColor ?? undefined,
+          type: c.type ?? undefined,
+          categoryGroupId: c.categoryGroupId ?? undefined,
+          categoryGroupName: c.categoryGroupName ?? undefined
         })),
         groups: groups?.map((g: any) => ({
           groupId: g._id,
-          name: g.name
+          name: g.name ?? undefined
         }))
       },
       message: `Retrieved **${categories.length}** booking categories${groups ? ` and **${groups.length}** category groups` : ''}.`

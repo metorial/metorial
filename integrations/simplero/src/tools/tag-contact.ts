@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SimpleroClient } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,7 @@ export let tagContact = SlateTool.create(spec, {
     }
 
     if (!ctx.input.tagName) {
-      throw new Error('Either tagName or tagId must be provided.');
+      throw createApiServiceError('Either tagName or tagId must be provided.');
     }
 
     if (ctx.input.action === 'add') {

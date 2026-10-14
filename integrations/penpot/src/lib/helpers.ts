@@ -1,8 +1,12 @@
 import { Client } from './client';
 
 export let makeClient = (ctx: {
-  config: { baseUrl: string };
-  auth: { token: string };
+  config: Record<string, unknown>;
+  auth: { token: string; baseUrl?: string };
 }): Client => {
-  return new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+  let legacyBaseUrl = typeof ctx.config.baseUrl === 'string' ? ctx.config.baseUrl : undefined;
+  return new Client({
+    baseUrl: ctx.auth.baseUrl ?? legacyBaseUrl ?? 'https://design.penpot.app',
+    token: ctx.auth.token
+  });
 };

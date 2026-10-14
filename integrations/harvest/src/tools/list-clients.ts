@@ -1,19 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listClients = SlateTool.create(spec, {
   name: 'List Clients',
   key: 'list_clients',
-  description: `Retrieve clients with optional filtering by active status. Returns client details including name, address, and currency.`,
+  description: `Retrieve clients with optional filtering by active status. Returns client details including name, address, and currency. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       isActive: z.boolean().optional().describe('Filter by active status'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Cursor returned as nextCursor by the previous call'),
       page: z.number().optional().describe('Page number'),
       perPage: z.number().optional().describe('Results per page (max 2000)')
     })
@@ -33,18 +39,23 @@ export let listClients = SlateTool.create(spec, {
       ),
       totalEntries: z.number().describe('Total clients'),
       totalPages: z.number().describe('Total pages'),
-      page: z.number().describe('Current page')
+      nextCursor: z.string().nullable().describe('Pass this cursor to retrieve the next page'),
+      pageNumberKnown: z
+        .boolean()
+        .describe('Whether the API returned a page number; cursor responses may omit it'),
+      page: z.number().describe('Page number; 1 when pageNumberKnown is false')
     })
   )
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     let result = await client.listClients({
       isActive: ctx.input.isActive,
-      page: ctx.input.page,
+      cursor: ctx.input.cursor,
+      page: ctx.input.cursor ? undefined : ctx.input.page,
       perPage: ctx.input.perPage
     });
 
@@ -63,9 +74,11 @@ export let listClients = SlateTool.create(spec, {
         clients,
         totalEntries: result.totalEntries,
         totalPages: result.totalPages,
+        nextCursor: result.nextCursor,
+        pageNumberKnown: result.pageNumberKnown,
         page: result.page
       },
-      message: `Found **${result.totalEntries}** clients (page ${result.page}/${result.totalPages}).`
+      message: `Found **${result.totalEntries}** clients${result.pageNumberKnown ? ` (page ${result.page}/${result.totalPages})` : ' (cursor page)'}.`
     };
   })
   .build();

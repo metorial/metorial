@@ -29,13 +29,13 @@ export let getProfile = SlateTool.create(spec, {
 
     return {
       output: {
-        userId: user._id || user.id,
+        userId: user._id || user.id || user.vendastaUserId,
         name:
           user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || undefined,
         email: user.email,
         organization: user.organization,
         timezone: user.timezone,
-        photo: user.photo,
+        photo: user.avatar || user.photo,
         raw: user
       },
       message: `Retrieved profile for **${user.name || user.email || 'user'}**.`

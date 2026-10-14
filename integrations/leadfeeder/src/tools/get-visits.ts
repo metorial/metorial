@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LeadfeederClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let visitRouteStepSchema = z.object({
@@ -49,10 +50,7 @@ export let getVisits = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      accountId: z
-        .string()
-        .optional()
-        .describe('Leadfeeder account ID. Falls back to config or first available account.'),
+      accountId: accountIdSchema,
       leadId: z
         .string()
         .optional()
@@ -72,12 +70,7 @@ export let getVisits = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new LeadfeederClient(ctx.auth.token);
 
-    let accountId = ctx.input.accountId ?? ctx.config.accountId;
-    if (!accountId) {
-      let accounts = await client.getAccounts();
-      if (accounts.length === 0) throw new Error('No Leadfeeder accounts found');
-      accountId = accounts[0]!.accountId;
-    }
+    let accountId = await client.resolveAccountId(ctx.input.accountId ?? ctx.config.accountId);
 
     let result = ctx.input.leadId
       ? await client.getVisitsForLead(accountId, ctx.input.leadId, {

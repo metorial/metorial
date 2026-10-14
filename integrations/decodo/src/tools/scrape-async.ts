@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ScrapingClient } from '../lib/scraping-client';
+import { getScreenshotBytes, type ScrapeResult, ScrapingClient } from '../lib/scraping-client';
 import { spec } from '../spec';
 
 export let createScrapeTask = SlateTool.create(spec, {
@@ -100,14 +100,17 @@ export let createScrapeTask = SlateTool.create(spec, {
     z.object({
       taskId: z.string().describe('Async task ID for retrieving results'),
       status: z.string().describe('Current task status'),
-      url: z.string().describe('URL being scraped'),
-      target: z.string().describe('Target template used'),
+      url: z.string().optional().describe('URL being scraped, when the task uses a URL'),
+      target: z
+        .string()
+        .optional()
+        .describe('Target template used, when supplied by the provider'),
       createdAt: z.string().describe('Task creation timestamp'),
       updatedAt: z.string().describe('Task update timestamp')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ScrapingClient(ctx.auth.token);
+    let client = new ScrapingClient(ctx.auth.token, ctx.auth.authMethod);
 
     ctx.info(`Creating async scrape task for target="${ctx.input.target}"`);
 
@@ -153,8 +156,11 @@ export let getScrapeTaskResults = SlateTool.create(spec, {
     z.object({
       taskId: z.string().describe('Task ID'),
       status: z.string().describe('Current task status'),
-      url: z.string().describe('URL being scraped'),
-      target: z.string().describe('Target template used'),
+      url: z.string().optional().describe('URL being scraped, when the task uses a URL'),
+      target: z
+        .string()
+        .optional()
+        .describe('Target template used, when supplied by the provider'),
       createdAt: z.string().describe('Task creation timestamp'),
       updatedAt: z.string().describe('Task update timestamp'),
       results: z
@@ -174,16 +180,26 @@ export let getScrapeTaskResults = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ScrapingClient(ctx.auth.token);
+    let client = new ScrapingClient(ctx.auth.token, ctx.auth.authMethod);
 
     ctx.info(`Fetching results for task ${ctx.input.taskId}`);
 
     let status = await client.getAsyncTaskStatus(ctx.input.taskId);
-    let results: any[] | undefined;
+    let results: ScrapeResult[] | undefined;
 
     if (status.status === 'done') {
       let resultData = await client.getAsyncTaskResults(ctx.input.taskId);
       results = resultData.results;
+      for (let [index, item] of results.entries()) {
+        let screenshot = getScreenshotBytes(item.content);
+        if (screenshot) {
+          await ctx.addAttachment({
+            type: 'content',
+            content: new Response(screenshot, { headers: { 'content-type': 'image/png' } }),
+            filename: `screenshot-${index + 1}.png`
+          });
+        }
+      }
     }
 
     return {

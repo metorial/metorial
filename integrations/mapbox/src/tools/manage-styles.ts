@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -94,7 +94,7 @@ export let manageStylesTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.styleId) throw new Error('styleId is required for get');
+      if (!ctx.input.styleId) throw createApiServiceError('styleId is required for get');
       let s = await client.getStyle(ctx.input.styleId, { draft: ctx.input.draft });
       return {
         output: {
@@ -145,7 +145,7 @@ export let manageStylesTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.styleId) throw new Error('styleId is required for update');
+      if (!ctx.input.styleId) throw createApiServiceError('styleId is required for update');
       let updateBody: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateBody.name = ctx.input.name;
       if (ctx.input.layers !== undefined) updateBody.layers = ctx.input.layers;
@@ -170,7 +170,7 @@ export let manageStylesTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.styleId) throw new Error('styleId is required for delete');
+      if (!ctx.input.styleId) throw createApiServiceError('styleId is required for delete');
       await client.deleteStyle(ctx.input.styleId);
       return {
         output: { deleted: true },
@@ -178,5 +178,5 @@ export let manageStylesTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TapfiliateClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,7 +35,7 @@ export let manageMlmParent = SlateTool.create(spec, {
 
     if (ctx.input.action === 'set') {
       if (!ctx.input.parentAffiliateId) {
-        throw new Error('parentAffiliateId is required when action is "set"');
+        throw createApiServiceError('parentAffiliateId is required when action is "set"');
       }
       await client.setMlmParent(ctx.input.affiliateId, ctx.input.parentAffiliateId);
       return {

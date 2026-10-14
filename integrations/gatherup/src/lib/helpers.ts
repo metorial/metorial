@@ -21,7 +21,7 @@ export let parseAggregateList = <T extends Record<string, unknown>>(
   fieldMap: Record<string, string>,
   count?: number
 ): T[] => {
-  let total = count ?? (typeof data.count === 'number' ? data.count : 0);
+  let total = count ?? readOptionalNumber(data.count) ?? 0;
   let results: T[] = [];
 
   for (let i = 1; i <= total; i++) {
@@ -33,4 +33,12 @@ export let parseAggregateList = <T extends Record<string, unknown>>(
   }
 
   return results;
+};
+
+/** GatherUp serializes several numeric identifiers and metrics as strings. */
+export let readOptionalNumber = (value: unknown): number | undefined => {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+  let number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
 };

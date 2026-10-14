@@ -1,6 +1,14 @@
 # <img src="logo.png" height="20"> Gatherup
 
-Manage customer feedback and online reviews across multiple platforms. Create and manage business locations, customers, and feedback requests via email or SMS. Retrieve and respond to first-party feedback and third-party reviews from Google, Facebook, and other sources. Send NPS surveys, collect star ratings, and retrieve aggregated survey results. Manage review site links, embed review widgets, and access Google Q&A data. Create and manage users, agency clients, and notification settings. Supports bulk customer creation for CRM/POS syncing and automatic feedback request sequences.
+Manage GatherUp business locations, customers, feedback requests, reviews, and
+survey results. Discover business types and agency clients, import customer
+batches, read feedback conversations, reply to feedback or eligible Google
+reviews, and download embeddable review widget HTML.
+
+Connect with a bearer token and Client ID. For global agency credentials, use
+`list_agency_clients` to discover the optional client target. Individual-client
+credentials do not need a target. See [API details](docs/SPEC.md).
+
 
 ## License
 

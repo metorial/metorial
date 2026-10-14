@@ -22,7 +22,7 @@ export let auth = SlateAuth.create()
         .string()
         .optional()
         .describe(
-          'Optional secret hash key for enhanced security. When enabled, all API calls include a timestamp-based HMAC.'
+          'Optional secret hash key for enhanced security. When enabled, all API calls include a timestamp-based MD5 signature.'
         )
     }),
     getOutput: async ctx => {

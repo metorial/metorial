@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/appcues.png" height="20"> Appcues
 
-Manage in-app product adoption experiences including onboarding flows, tooltips, banners, checklists, and NPS surveys. Create, publish, and unpublish web flows, pins, banners, launchpads, checklists, and mobile experiences. Read, update, and delete end-user profiles and group profiles for targeting and personalization. Track custom user events and retrieve event history. Create, update, and manage user segments with bulk user ID uploads. Import user profiles, group profiles, and events in bulk via CSV or JSON. Export event data with flexible filtering by flow, checklist, NPS, segment, or custom attributes. Configure ingestion filtering rules to control which attributes and events are stored. Manage SDK authentication keys for identity verification.
+Manage Appcues in-app experiences, including web flows, Flow 2.0, pins, banners, launchpads, checklists, mobile experiences, NPS surveys, and embeds. Read experience details and publish or unpublish experiences. Read, update, and delete end-user profiles; track custom events and retrieve event history. Read and update group profiles and associate users with groups. Create, inspect, update, and delete user segments; manage segment membership and initiate event or membership exports. Discover recent asynchronous jobs and inspect their progress.
 
 ## Tools
 
@@ -30,7 +30,7 @@ Retrieve an end-user's profile from Appcues. Returns all stored profile properti
 
 ### List Experiences
 
-List all experiences in your Appcues account. Supports filtering by experience type to retrieve flows, pins, banners, launchpads, checklists, mobile experiences, NPS surveys, or embeds. Returns key metadata including publish status, name, and tags.
+List all experiences in your Appcues account. Supports filtering by experience type to retrieve flows (including Flow 2.0), pins, banners, launchpads, checklists, mobile experiences, NPS surveys, or embeds. Returns key metadata including publish status, name, and tags.
 
 ### List Tags
 
@@ -46,7 +46,7 @@ List all user segments in your Appcues account. Segments are used to group users
 
 ### Publish Experience
 
-Publish or unpublish an Appcues experience. Supports all experience types: flows, pins, banners, launchpads, checklists, mobile experiences, NPS surveys, and embeds. Publishing makes the experience visible to users; unpublishing hides it.
+Publish or unpublish an Appcues experience. Supports all experience types: flows (including Flow 2.0), pins, banners, launchpads, checklists, mobile experiences, NPS surveys, and embeds. Publishing makes the experience visible to users; unpublishing hides it.
 
 ### Track User Event
 
@@ -55,6 +55,34 @@ Track a custom event for a user in Appcues. Events are immediately available for
 ### Update User Profile
 
 Update profile properties for an end-user in Appcues. Properties are applied synchronously and immediately available for flow targeting and personalization. Pass key-value pairs to set or update.
+
+### Get Segment
+
+Retrieve a segment's name, description, and creation and update information. Use List Segments to discover segment IDs.
+
+### List Jobs
+
+Discover recent asynchronous jobs and their IDs, names, status, and start time. Use Get Job Status to inspect detailed progress.
+
+### Create Segment
+
+Create a user segment that can be populated using Manage Segment Members.
+
+### Update Segment
+
+Update a segment's name or description.
+
+### Delete Segment
+
+Permanently delete a user segment.
+
+### Manage Segment Members
+
+Add or remove user IDs in bulk, or initiate an asynchronous segment membership export.
+
+### Update Group Profile
+
+Update group properties or associate users with a group.
 
 ## License
 

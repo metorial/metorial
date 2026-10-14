@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type FormDescriptor } from '../lib/client';
 import { spec } from '../spec';
 
 let signingOptionsSchema = z
@@ -19,7 +19,10 @@ let formFieldSchema = z.object({
     .enum(['CanvasSIG', 'Text', 'TextArea', 'Select', 'Date', 'Checkbox'])
     .describe('Type of form field'),
   name: z.string().describe('Field name (e.g. "SIG_FIELD_1", "email_field")'),
-  pageNumber: z.number().optional().describe('Page number where the field is placed'),
+  pageNumber: z
+    .number()
+    .optional()
+    .describe('Zero-based page number where the field is placed'),
   posX: z.number().optional().describe('X coordinate position on the page'),
   posY: z.number().optional().describe('Y coordinate position on the page'),
   width: z
@@ -128,6 +131,27 @@ export let configureForm = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (!ctx.input.fields.length || !ctx.input.signers.length) {
+      throw createApiServiceError('Provide at least one field and signer.');
+    }
+    for (let field of ctx.input.fields) {
+      if (
+        field.pageNumber !== undefined &&
+        (!Number.isInteger(field.pageNumber) || field.pageNumber < 0)
+      ) {
+        throw createApiServiceError(
+          'pageNumber must be a non-negative whole number (zero-based).'
+        );
+      }
+    }
+    if (
+      ctx.input.workflow?.some(step => !Number.isInteger(step.sequence) || step.sequence < 0)
+    ) {
+      throw createApiServiceError(
+        'Workflow sequence values must be non-negative whole numbers.'
+      );
+    }
+
     let fields = ctx.input.fields.map(f => ({
       signerid: f.signerId,
       inputtype: f.fieldType,
@@ -138,7 +162,13 @@ export let configureForm = SlateTool.create(spec, {
       width: f.width,
       height: f.height,
       required: f.required,
-      signingoptions: f.signingOptions,
+      signingoptions: f.signingOptions
+        ? Object.fromEntries(
+            Object.entries(f.signingOptions)
+              .filter(([, enabled]) => enabled)
+              .map(([key]) => [key, {}])
+          )
+        : undefined,
       marker: f.marker,
       fnname: f.validationFunction,
       value: f.prefillValue,
@@ -154,7 +184,7 @@ export let configureForm = SlateTool.create(spec, {
       actingas: s.actingAs
     }));
 
-    let formDescriptor: any = {
+    let formDescriptor: FormDescriptor = {
       fields,
       signersinfo,
       reusable: ctx.input.reusable,
@@ -163,8 +193,8 @@ export let configureForm = SlateTool.create(spec, {
       sendtomeemail: ctx.input.sendToMeEmail,
       assignto: ctx.input.assignTo,
       filename: ctx.input.filename,
-      workflow: ctx.input.workflow
-        ? ctx.input.workflow.map(w => ({ id: w.signerId, sequence: w.sequence }))
+      notifications: ctx.input.workflow
+        ? { workflow: ctx.input.workflow.map(w => ({ id: w.signerId, sequence: w.sequence })) }
         : undefined
     };
 

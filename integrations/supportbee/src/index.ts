@@ -6,8 +6,11 @@ import {
   createTicket,
   getReports,
   getTicket,
+  getTicketAudit,
+  getUser,
   listAgents,
   listComments,
+  listEmails,
   listReplies,
   listTickets,
   manageLabels,
@@ -32,7 +35,10 @@ export let provider = Slate.create({
     manageLabels,
     listAgents,
     manageSnippets,
-    getReports
+    getReports,
+    getUser,
+    listEmails,
+    getTicketAudit
   ],
   triggers: []
 });

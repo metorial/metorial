@@ -55,7 +55,7 @@ export let addCommentTool = SlateTool.create(spec, {
 export let getCommentsTool = SlateTool.create(spec, {
   name: 'Get Comments',
   key: 'get_comments',
-  description: `Retrieve all comments on a Doodle poll. Returns comments in chronological order with author names and timestamps.`,
+  description: `Retrieve comments on a Doodle poll with author names and available timestamps.`,
   tags: {
     destructive: false,
     readOnly: true

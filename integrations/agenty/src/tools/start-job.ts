@@ -35,7 +35,7 @@ export let startJob = SlateTool.create(spec, {
 
     return {
       output: {
-        jobId: result.job_id,
+        jobId: String(result.job_id),
         agentId: result.agent_id || ctx.input.agentId,
         status: result.status,
         createdAt: result.created_at

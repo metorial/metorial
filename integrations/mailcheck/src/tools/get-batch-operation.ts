@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let getBatchOperation = SlateTool.create(spec, {
   key: 'get_batch_operation',
   description: `Retrieve the status and results of a batch email verification operation. Use the operation name returned by the **Create Batch Check** tool.
 
-When the operation is complete, a download URL for the results file is included in the response.`,
+When the operation is complete, the results file is available to download.`,
   tags: {
     readOnly: true
   }
@@ -38,10 +38,28 @@ When the operation is complete, a download URL for the results file is included 
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.operationName.trim()) {
+      throw createApiServiceError(
+        'Provide the operation name from Create Batch Check or List Batch Operations.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let operation = await client.getOperationStatus(ctx.input.operationName);
 
-    let statusText = operation.done ? 'completed' : 'processing';
+    let errorCode = operation.result?.error?.code ?? operation.result?.code;
+    let errorMessage = operation.result?.error?.message ?? operation.result?.message;
+    let failed =
+      operation.result?.error !== undefined ||
+      errorCode !== undefined ||
+      errorMessage !== undefined;
+    let resultUrl = operation.result?.response?.url;
+
+    if (operation.done && !failed && resultUrl) {
+      await ctx.addAttachment({ type: 'url', url: resultUrl });
+    }
+
+    let statusText = failed ? 'failed' : operation.done ? 'completed' : 'processing';
     let progressText = operation.metadata?.totalCount
       ? ` (${operation.metadata.processedCount ?? 0}/${operation.metadata.totalCount} emails processed)`
       : '';
@@ -49,16 +67,16 @@ When the operation is complete, a download URL for the results file is included 
     return {
       output: {
         operationName: operation.name,
-        done: operation.done,
+        done: operation.done ?? false,
         totalCount: operation.metadata?.totalCount,
         processedCount: operation.metadata?.processedCount,
         freeLimitReached: operation.metadata?.freeLimitReached,
         createTime: operation.metadata?.createTime,
-        resultUrl: operation.result?.response?.url,
-        errorCode: operation.result?.code,
-        errorMessage: operation.result?.message
+        resultUrl,
+        errorCode,
+        errorMessage
       },
-      message: `Operation **${operation.name}** is **${statusText}**${progressText}.${operation.result?.response?.url ? ` Results available at: ${operation.result.response.url}` : ''}${operation.result?.message ? ` Error: ${operation.result.message}` : ''}`
+      message: `Operation **${operation.name}** is **${statusText}**${progressText}.${operation.done && !failed && resultUrl ? ' Results are available to download.' : ''}${errorMessage ? ` Error: ${errorMessage}` : ''}`
     };
   })
   .build();

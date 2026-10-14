@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -26,19 +26,20 @@ export let manageCommentsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.text) throw new Error('Text is required to create a comment.');
+      if (!ctx.input.text)
+        throw createApiServiceError('Text is required to create a comment.');
       let comment = await client.createComment(ctx.input.cardId, ctx.input.text);
       return {
         output: {
           commentId: comment?.comment_id,
           text: comment?.text,
-          authorUserId: comment?.author_user_id ?? comment?.user_id,
+          authorUserId:
+            comment?.author?.type === 'internal'
+              ? comment.author.value
+              : (comment?.author_user_id ?? comment?.user_id),
           createdAt: comment?.created_at
         },
         message: `Created comment on card **${ctx.input.cardId}**.`
@@ -46,8 +47,10 @@ export let manageCommentsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.commentId) throw new Error('commentId is required to update a comment.');
-      if (!ctx.input.text) throw new Error('Text is required to update a comment.');
+      if (!ctx.input.commentId)
+        throw createApiServiceError('commentId is required to update a comment.');
+      if (!ctx.input.text)
+        throw createApiServiceError('Text is required to update a comment.');
       let comment = await client.updateComment(
         ctx.input.cardId,
         ctx.input.commentId,
@@ -57,7 +60,10 @@ export let manageCommentsTool = SlateTool.create(spec, {
         output: {
           commentId: comment?.comment_id ?? ctx.input.commentId,
           text: comment?.text,
-          authorUserId: comment?.author_user_id ?? comment?.user_id,
+          authorUserId:
+            comment?.author?.type === 'internal'
+              ? comment.author.value
+              : (comment?.author_user_id ?? comment?.user_id),
           createdAt: comment?.created_at
         },
         message: `Updated comment **${ctx.input.commentId}** on card **${ctx.input.cardId}**.`
@@ -65,7 +71,8 @@ export let manageCommentsTool = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.commentId) throw new Error('commentId is required to delete a comment.');
+    if (!ctx.input.commentId)
+      throw createApiServiceError('commentId is required to delete a comment.');
     await client.deleteComment(ctx.input.cardId, ctx.input.commentId);
     return {
       output: {

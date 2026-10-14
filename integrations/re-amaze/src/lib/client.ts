@@ -8,6 +8,11 @@ export class Client {
     loginEmail: string;
     brandSubdomain: string;
   }) {
+    if (!config.token?.trim() || !config.loginEmail?.trim()) {
+      throw createApiServiceError(
+        'Reconnect Re:amaze with your account login email and a nonempty API token.'
+      );
+    }
     if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(config.brandSubdomain)) {
       throw createApiServiceError(
         'Re:amaze brandSubdomain must be the brand subdomain only, without a URL, path, or port.'
@@ -381,12 +386,14 @@ export class Client {
   }
 
   async createContactIdentity(
-    contactEmail: string,
-    data: { type: string; identifier: string }
+    contactIdentifier: string,
+    data: { type: string; identifier: string },
+    identifierType?: 'mobile' | 'facebook' | 'twitter' | 'instagram'
   ) {
     let response = await this.axios.post(
-      `/contacts/${encodeURIComponent(contactEmail)}/identities`,
-      { identity: data }
+      `/contacts/${encodeURIComponent(contactIdentifier)}/identities`,
+      { identity: data },
+      { params: { identifier_type: identifierType } }
     );
     return response.data;
   }

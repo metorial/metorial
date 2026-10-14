@@ -34,7 +34,7 @@ export let listSubgraphs = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     let subgraphs = await client.listSubgraphs(
@@ -43,9 +43,9 @@ export let listSubgraphs = SlateTool.create(spec, {
       ctx.input.branch
     );
 
-    let mapped = subgraphs.map((s: any) => ({
+    let mapped = subgraphs.map(s => ({
       name: s.name,
-      url: s.url,
+      url: s.url ?? undefined,
       schema: s.schema
     }));
 

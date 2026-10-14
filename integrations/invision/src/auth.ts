@@ -14,6 +14,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .trim()
+        .min(1)
         .describe(
           'The DSM API authentication key generated from the API setup page in DSM design system settings'
         )
@@ -33,6 +35,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .trim()
+        .min(1)
         .describe(
           'The SCIM provisioning bearer token generated when enabling SCIM for an Enterprise account'
         )

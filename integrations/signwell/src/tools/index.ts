@@ -4,6 +4,7 @@ export * from './create-template';
 export * from './delete-document';
 export * from './delete-template';
 export * from './get-completed-pdf';
+export { getCurrentUser } from './get-current-user';
 export * from './get-document';
 export * from './get-template';
 export * from './send-document';

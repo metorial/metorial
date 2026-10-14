@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SignPathClient } from '../lib/client';
+import { createSignPathClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getSigningRequest = SlateTool.create(spec, {
@@ -44,11 +44,7 @@ export let getSigningRequest = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SignPathClient({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createSignPathClient(ctx);
 
     let data = await client.getSigningRequest(ctx.input.signingRequestId);
 

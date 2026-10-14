@@ -1,24 +1,62 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  isApiErrorRecord
+} from 'slates';
 
 export type Region = 'us' | 'uk';
 
 let getBaseUrl = (region: Region): string => {
   if (region === 'uk') {
-    return 'https://dash.stannp.com/api/v1/';
+    return 'https://api-eu1.stannp.com/v1/';
   }
   return 'https://api-us1.stannp.com/v1/';
 };
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; region: Region }) {
-    this.axios = createAxios({
+    if (typeof config.token !== 'string' || !config.token.trim()) {
+      throw createApiServiceError('A Stannp API key is required. Reconnect with a valid key.');
+    }
+    this.axios = createAuthenticatedAxios({
+      contentType: 'application/x-www-form-urlencoded',
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Stannp',
+          reason: 'stannp_api_error',
+          extractStatus: (error, response, helpers) => {
+            let data =
+              helpers.isRecord(error) && helpers.isRecord(error.data) ? error.data : undefined;
+            let upstream = helpers.isRecord(data?.upstream) ? data.upstream : undefined;
+            let status =
+              response?.status ?? data?.upstreamStatus ?? upstream?.status ?? data?.status;
+            return typeof status === 'number' || typeof status === 'string'
+              ? status
+              : undefined;
+          }
+        }),
       baseURL: getBaseUrl(config.region),
       auth: {
         username: config.token,
         password: ''
       }
+    });
+    this.axios.interceptors.response.use(response => {
+      if (isApiErrorRecord(response.data) && response.data.success === false) {
+        throw createApiServiceError(
+          `Stannp API request failed: ${extractApiErrorMessage({ response })}`,
+          {
+            reason: 'stannp_api_error',
+            upstreamStatus: response.status
+          }
+        );
+      }
+      return response;
     });
   }
 
@@ -92,6 +130,11 @@ export class Client {
 
     if (data.customFields) {
       for (let [key, value] of Object.entries(data.customFields)) {
+        if (key in payload) {
+          throw createApiServiceError(
+            `Custom field ${key} conflicts with a standard recipient field.`
+          );
+        }
         payload[key] = value;
       }
     }
@@ -299,9 +342,17 @@ export class Client {
     size?: string;
     addons?: string;
   }): Promise<any> {
+    if ((data.file || data.front || data.back) && !data.size) {
+      throw createApiServiceError('size is required when using campaign artwork files.');
+    }
+    let type = data.type;
+    if (type === 'postcard') {
+      let size = data.size?.toLowerCase();
+      type = size === 'a5' ? 'a5-postcard' : 'a6-postcard';
+    }
     let response = await this.axios.post('/campaigns/create', {
       name: data.name,
-      type: data.type,
+      type,
       group_id: data.groupId,
       template_id: data.templateId,
       file: data.file,
@@ -359,7 +410,15 @@ export class Client {
 
   async getReportingSummary(startDate: string, endDate: string): Promise<any> {
     let response = await this.axios.get(`/reporting/summary/${startDate}/${endDate}`);
-    return response.data?.data;
+    let result = response.data?.data;
+    if (isApiErrorRecord(result) && result.success === false) {
+      throw createApiServiceError(
+        `Stannp reporting failed: ${extractApiErrorMessage({ response: { data: result } })}`
+      );
+    }
+    return isApiErrorRecord(result) && 'success' in result && 'data' in result
+      ? result.data
+      : result;
   }
 
   async getReportingList(
@@ -370,13 +429,26 @@ export class Client {
   ): Promise<any> {
     let path = `/reporting/list/${startDate}/${endDate}`;
     if (status) {
-      path += `/${status}`;
+      path += `/${encodeURIComponent(status)}`;
+    }
+    if (tag && !status) {
+      throw createApiServiceError(
+        'Provide status when filtering mailpieces by tag. The API places the tag after the status path segment.'
+      );
     }
     if (tag) {
-      path += `/${tag}`;
+      path += `/${encodeURIComponent(tag)}`;
     }
     let response = await this.axios.get(path);
-    return response.data?.data;
+    let result = response.data?.data;
+    if (isApiErrorRecord(result) && result.success === false) {
+      throw createApiServiceError(
+        `Stannp reporting failed: ${extractApiErrorMessage({ response: { data: result } })}`
+      );
+    }
+    if (isApiErrorRecord(result) && 'success' in result && 'data' in result)
+      result = result.data;
+    return isApiErrorRecord(result) ? result.singles : result;
   }
 
   // ---- Address Validation ----
@@ -390,6 +462,11 @@ export class Client {
     zipcode?: string;
     country?: string;
   }): Promise<any> {
+    if (!data.address1?.trim() || (!data.city?.trim() && !data.zipcode?.trim())) {
+      throw createApiServiceError(
+        'Provide address1 and at least one of city or zipcode to validate an address.'
+      );
+    }
     let response = await this.axios.post('/addresses/validate', data);
     return response.data?.data;
   }
@@ -403,6 +480,9 @@ export class Client {
     country?: string;
     test?: boolean;
   }): Promise<any> {
+    if ((data.phoneNumber !== undefined) === (data.recipientId !== undefined)) {
+      throw createApiServiceError('Provide either phoneNumber or recipientId, not both.');
+    }
     let response = await this.axios.post('/sms/create', {
       message: data.message,
       phone_number: data.phoneNumber,
@@ -461,3 +541,12 @@ export class Client {
     return response.data?.data;
   }
 }
+
+export let createClient = (
+  auth: { token: string; region?: Region },
+  legacyConfig?: unknown
+) => {
+  let legacyRegion = isApiErrorRecord(legacyConfig) ? legacyConfig.region : undefined;
+  let region = auth.region ?? (legacyRegion === 'uk' ? 'uk' : 'us');
+  return new Client({ token: auth.token, region });
+};

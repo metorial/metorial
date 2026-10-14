@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FingertipClient } from '../lib/client';
 import { spec } from '../spec';
@@ -159,7 +159,10 @@ export let manageBooking = SlateTool.create(spec, {
         break;
       case 'reschedule':
         if (!ctx.input.newStartTime || !ctx.input.newEndTime) {
-          throw new Error('newStartTime and newEndTime are required for reschedule action');
+          throw createApiServiceError(
+            'newStartTime and newEndTime are required for reschedule action.',
+            { reason: 'fingertip_invalid_booking_input' }
+          );
         }
         result = await client.rescheduleBooking(
           bookingId,

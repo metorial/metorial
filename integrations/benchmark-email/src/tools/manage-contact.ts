@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -48,20 +48,22 @@ export let manageContact = SlateTool.create(spec, {
     let message = '';
 
     let buildData = () => {
-      let data: Record<string, any> = {};
-      if (ctx.input.email) data.Email = ctx.input.email;
-      if (ctx.input.firstName) data.FirstName = ctx.input.firstName;
-      if (ctx.input.lastName) data.LastName = ctx.input.lastName;
-      if (ctx.input.middleName) data.MiddleName = ctx.input.middleName;
+      let data: Record<string, unknown> = {};
+      if (ctx.input.email !== undefined) data.Email = ctx.input.email;
+      if (ctx.input.firstName !== undefined) data.FirstName = ctx.input.firstName;
+      if (ctx.input.lastName !== undefined) data.LastName = ctx.input.lastName;
+      if (ctx.input.middleName !== undefined) data.MiddleName = ctx.input.middleName;
       if (ctx.input.emailPermission !== undefined)
         data.EmailPerm = ctx.input.emailPermission ? '1' : '0';
 
       if (ctx.input.customFields) {
         for (let [key, value] of Object.entries(ctx.input.customFields)) {
           let match = key.match(/^field(\d+)$/i);
-          if (match) {
-            data[`Field${match[1]}`] = value;
+          let number = Number(match?.[1]);
+          if (!match || number < 1 || number > 24) {
+            throw createApiServiceError('Custom field keys must be field1 through field24.');
           }
+          data[`Field${number}`] = value;
         }
       }
 
@@ -70,22 +72,31 @@ export let manageContact = SlateTool.create(spec, {
 
     switch (action) {
       case 'add': {
-        if (!ctx.input.email) throw new Error('email is required when adding a contact');
+        if (!ctx.input.email)
+          throw createApiServiceError('email is required when adding a contact');
+        if (ctx.input.emailPermission === false) {
+          throw createApiServiceError(
+            'Adding a contact requires permission to receive email. Set emailPermission to true only for opted-in contacts.'
+          );
+        }
         let data = buildData();
         if (!data.EmailPerm) data.EmailPerm = '1';
         let result = await client.addContact(listId, data);
-        success = result?.Status === 1;
-        resultContactId = String(result?.Data ?? '');
+        success = String(result?.Status) === '1';
+        resultContactId = String(result?.Data?.ID ?? '');
+        if (!resultContactId)
+          throw createApiServiceError('Benchmark Email did not return the created record ID.');
         message = success
           ? `Added contact **${ctx.input.email}** to list \`${listId}\` (contact ID: \`${resultContactId}\`).`
           : `Failed to add contact to list \`${listId}\`.`;
         break;
       }
       case 'update': {
-        if (!contactId) throw new Error('contactId is required when updating a contact');
+        if (!contactId)
+          throw createApiServiceError('contactId is required when updating a contact');
         let data = buildData();
         let result = await client.updateContact(listId, contactId, data);
-        success = result?.Status === 1;
+        success = String(result?.Status) === '1';
         resultContactId = contactId;
         message = success
           ? `Updated contact \`${contactId}\` in list \`${listId}\`.`
@@ -93,9 +104,10 @@ export let manageContact = SlateTool.create(spec, {
         break;
       }
       case 'remove': {
-        if (!contactId) throw new Error('contactId is required when removing a contact');
+        if (!contactId)
+          throw createApiServiceError('contactId is required when removing a contact');
         let result = await client.deleteContact(listId, contactId);
-        success = result?.Status === 1;
+        success = String(result?.Status) === '1';
         message = success
           ? `Removed contact \`${contactId}\` from list \`${listId}\`.`
           : `Failed to remove contact \`${contactId}\`.`;

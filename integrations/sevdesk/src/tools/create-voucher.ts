@@ -1,11 +1,22 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SevdeskClient } from '../lib/client';
+import { SevdeskClient, sevdeskDateToTimestamp } from '../lib/client';
 import { spec } from '../spec';
 
 let voucherPositionSchema = z
   .object({
-    accountingTypeId: z.string().describe('Booking account ID'),
+    accountingTypeId: z
+      .string()
+      .optional()
+      .describe(
+        'Legacy booking account ID for bookkeeping version 1.0. Use accountDatevId for version 2.0.'
+      ),
+    accountDatevId: z
+      .string()
+      .optional()
+      .describe(
+        'DATEV booking account ID for bookkeeping version 2.0. Use get_receipt_guidance to discover valid accounts.'
+      ),
     taxRate: z.number().describe('Tax rate percentage (e.g. 19)'),
     net: z.boolean().optional().describe('Whether the amount is net (true) or gross (false)'),
     sumNet: z.number().optional().describe('Net amount for this position'),
@@ -44,6 +55,11 @@ export let createVoucher = SlateTool.create(spec, {
         .describe('VOU=Voucher (default), RV=Recurring voucher'),
       currency: z.string().optional().describe('Currency code (default: EUR)'),
       taxRuleId: z.string().optional().describe('Tax rule ID (for sevDesk 2.0)'),
+      taxType: z
+        .enum(['default', 'eu', 'noteu', 'custom', 'ss'])
+        .optional()
+        .describe('Tax type for bookkeeping version 1.0; use taxRuleId for version 2.0.'),
+      taxSetId: z.string().optional().describe('Tax set ID. Required when taxType is custom.'),
       positions: z.array(voucherPositionSchema).describe('Voucher positions/line items')
     })
   )
@@ -57,11 +73,40 @@ export let createVoucher = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.taxType === 'custom' && !ctx.input.taxSetId?.trim()) {
+      throw createApiServiceError('taxSetId is required when taxType is custom.');
+    }
+    if (!ctx.input.positions.length) {
+      throw createApiServiceError('Provide at least one voucher position.');
+    }
+    let net = ctx.input.positions[0]?.net ?? true;
+    for (let position of ctx.input.positions) {
+      if (!position.accountingTypeId && !position.accountDatevId) {
+        throw createApiServiceError(
+          'Each voucher position needs accountingTypeId for version 1.0 or accountDatevId for version 2.0.'
+        );
+      }
+      if (position.accountingTypeId && position.accountDatevId) {
+        throw createApiServiceError(
+          'Provide only one of accountingTypeId or accountDatevId for each voucher position.'
+        );
+      }
+      if ((position.net ?? true) !== net) {
+        throw createApiServiceError(
+          'All voucher positions must consistently use net or gross amounts.'
+        );
+      }
+      if (net ? position.sumNet === undefined : position.sumGross === undefined) {
+        throw createApiServiceError(
+          'Provide sumNet for net positions or sumGross for gross positions.'
+        );
+      }
+    }
     let client = new SevdeskClient({ token: ctx.auth.token });
 
     let voucherData: Record<string, any> = {
       objectName: 'Voucher',
-      voucherDate: ctx.input.voucherDate,
+      voucherDate: String(sevdeskDateToTimestamp(ctx.input.voucherDate, 'voucherDate')),
       status: ctx.input.status ?? 50,
       creditDebit: ctx.input.creditDebit ?? 'C',
       voucherType: ctx.input.voucherType ?? 'VOU',
@@ -73,19 +118,25 @@ export let createVoucher = SlateTool.create(spec, {
       voucherData.supplier = { id: ctx.input.supplierContactId, objectName: 'Contact' };
     }
     if (ctx.input.description) voucherData.description = ctx.input.description;
-    if (ctx.input.payDate) voucherData.payDate = ctx.input.payDate;
+    if (ctx.input.payDate)
+      voucherData.payDate = String(sevdeskDateToTimestamp(ctx.input.payDate, 'payDate'));
     if (ctx.input.taxRuleId) {
       voucherData.taxRule = { id: ctx.input.taxRuleId, objectName: 'TaxRule' };
     }
+    if (ctx.input.taxType) voucherData.taxType = ctx.input.taxType;
+    if (ctx.input.taxSetId?.trim())
+      voucherData.taxSet = { id: ctx.input.taxSetId.trim(), objectName: 'TaxSet' };
 
     let positions = ctx.input.positions.map(pos => {
       let posData: Record<string, any> = {
         objectName: 'VoucherPos',
         mapAll: true,
-        accountingType: { id: pos.accountingTypeId, objectName: 'AccountingType' },
         taxRate: pos.taxRate,
         net: pos.net ?? true
       };
+      if (pos.accountDatevId)
+        posData.accountDatev = { id: pos.accountDatevId, objectName: 'AccountDatev' };
+      else posData.accountingType = { id: pos.accountingTypeId, objectName: 'AccountingType' };
       if (pos.sumNet !== undefined) posData.sumNet = pos.sumNet;
       if (pos.sumGross !== undefined) posData.sumGross = pos.sumGross;
       if (pos.comment) posData.comment = pos.comment;
@@ -103,8 +154,8 @@ export let createVoucher = SlateTool.create(spec, {
       output: {
         voucherId: String(voucher.id),
         voucherNumber: voucher.voucherNumber ?? undefined,
-        totalNet: voucher.sumNet ?? undefined,
-        totalGross: voucher.sumGross ?? undefined,
+        totalNet: voucher.sumNet != null ? String(voucher.sumNet) : undefined,
+        totalGross: voucher.sumGross != null ? String(voucher.sumGross) : undefined,
         status: voucher.status != null ? String(voucher.status) : undefined
       },
       message: `Created voucher **${voucher.voucherNumber ?? voucher.id}**.`

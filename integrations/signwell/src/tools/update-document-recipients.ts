@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let updateDocumentRecipients = SlateTool.create(spec, {
   name: 'Update Document Recipients',
   key: 'update_document_recipients',
-  description: `Update recipient details (name or email) on a pending document. Can be used to correct recipient information before they sign.`,
+  description: `Update a recipient's name or email on a sent document before they start signing. Existing values are retained when updating only one detail.`,
   instructions: [
-    'Only works on documents that are still pending and have not been fully completed.'
+    'Retrieve recipient IDs with get_document. The document must be sent, viewed, pending, or bounced, and each edited recipient must not have started signing.'
   ],
   tags: {
     destructive: false,
@@ -55,11 +55,11 @@ export let updateDocumentRecipients = SlateTool.create(spec, {
 
     let output = {
       documentId: result.id || ctx.input.documentId,
-      recipients: result.recipients?.map((r: any) => ({
-        recipientId: r.id,
-        name: r.name,
-        email: r.email,
-        status: r.status
+      recipients: result.recipients?.map(r => ({
+        recipientId: r.id ?? undefined,
+        name: r.name ?? undefined,
+        email: r.email ?? undefined,
+        status: r.status ?? undefined
       }))
     };
 

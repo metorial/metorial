@@ -1,10 +1,12 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { AppVeyorClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      accountName: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -14,35 +16,32 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiToken: z
         .string()
+        .min(1)
         .describe(
-          'AppVeyor API token. Can be found at https://ci.appveyor.com/api-keys. Supports both account-level (v1) and user-level (v2) tokens.'
+          'AppVeyor API token from https://ci.appveyor.com/api-keys. Supports account-level (v1) and user-level (v2) tokens.'
+        ),
+      accountName: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'Account name shown in your AppVeyor account URL. Required for a user-level (v2) API key; omit for an account-level (v1) key.'
         )
     }),
-    getOutput: async ctx => {
-      return {
-        output: {
-          token: ctx.input.apiToken
-        }
-      };
-    },
-    getProfile: async (ctx: { output: { token: string }; input: { apiToken: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://ci.appveyor.com/api',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await axios.get('/users');
-      let users = response.data;
-      let firstUser = Array.isArray(users) && users.length > 0 ? users[0] : null;
-
+    getOutput: async ctx => ({
+      output: { token: ctx.input.apiToken, accountName: ctx.input.accountName }
+    }),
+    getProfile: async (ctx: { output: { token: string; accountName?: string } }) => {
+      let client = new AppVeyorClient(ctx.output);
+      let projects = await client.listProjects();
+      let project = projects[0];
+      let accountName =
+        ctx.output.accountName ??
+        (typeof project?.accountName === 'string' ? project.accountName : undefined);
       return {
         profile: {
-          id: firstUser?.userId?.toString(),
-          name: firstUser?.fullName,
-          email: firstUser?.email
+          id: typeof project?.accountId === 'number' ? String(project.accountId) : accountName,
+          name: accountName ?? 'AppVeyor account'
         }
       };
     }

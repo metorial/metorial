@@ -31,11 +31,22 @@ export let listContent = SlateTool.create(spec, {
             type: z.enum(['flow', 'checklist', 'launcher']).describe('Type of content'),
             draftVersionId: z.string().nullable().describe('ID of the draft version'),
             publishedVersionId: z.string().nullable().describe('ID of the published version'),
+            draftVersion: z
+              .record(z.string(), z.unknown())
+              .nullable()
+              .optional()
+              .describe('Draft version when expanded'),
+            publishedVersion: z
+              .record(z.string(), z.unknown())
+              .nullable()
+              .optional()
+              .describe('Published version when expanded'),
             createdAt: z.string().describe('Timestamp when the content was created')
           })
         )
         .describe('List of content items'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextPageUrl: z.string().nullable().describe('URL for the next page')
     })
   )
   .handleInvocation(async ctx => {
@@ -56,13 +67,16 @@ export let listContent = SlateTool.create(spec, {
       type: c.type,
       draftVersionId: c.draft_version_id,
       publishedVersionId: c.published_version_id,
+      draftVersion: c.draft_version,
+      publishedVersion: c.published_version,
       createdAt: c.created_at
     }));
 
     return {
       output: {
         content,
-        hasMore: result.has_more
+        hasMore: result.has_more,
+        nextPageUrl: result.next_page_url
       },
       message: `Retrieved **${content.length}** content item(s).`
     };

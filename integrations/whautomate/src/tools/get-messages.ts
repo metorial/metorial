@@ -14,6 +14,7 @@ export let getMessages = SlateTool.create(spec, {
   .input(
     z.object({
       contactId: z.string().describe('Contact ID to retrieve messages for'),
+      search: z.string().optional().describe('Search within message text'),
       page: z.number().optional().describe('Page number for pagination'),
       pageSize: z.number().optional().describe('Number of messages per page')
     })
@@ -32,11 +33,12 @@ export let getMessages = SlateTool.create(spec, {
 
     let result = await client.getMessages(ctx.input.contactId, {
       page: ctx.input.page,
-      pageSize: ctx.input.pageSize
+      pageSize: ctx.input.pageSize,
+      search: ctx.input.search
     });
 
     let messages = Array.isArray(result) ? result : result.messages || result.data || [];
-    let totalCount = result.totalCount || result.total || messages.length;
+    let totalCount = result.totalCount ?? result.total ?? messages.length;
 
     return {
       output: {

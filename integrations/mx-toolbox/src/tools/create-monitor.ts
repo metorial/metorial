@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { monitorSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createMonitor = SlateTool.create(spec, {
@@ -26,17 +27,7 @@ export let createMonitor = SlateTool.create(spec, {
       argument: z.string().describe('The domain name or IP address to monitor')
     })
   )
-  .output(
-    z.object({
-      monitorUid: z.string().describe('Unique identifier of the newly created monitor'),
-      actionString: z.string().describe('Monitor type and target'),
-      lastTransition: z.string().describe('Timestamp of the last status change'),
-      lastChecked: z.string().describe('Timestamp of the most recent check'),
-      mxRep: z.string().describe('MX reputation score'),
-      failing: z.array(z.string()).describe('List of currently failing checks'),
-      warnings: z.array(z.string()).describe('List of current warnings')
-    })
-  )
+  .output(monitorSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
     let monitor = await client.createMonitor(ctx.input.command, ctx.input.argument);

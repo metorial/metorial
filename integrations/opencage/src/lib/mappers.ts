@@ -61,6 +61,8 @@ export interface MappedGeocodeResult {
   longitude: number;
   confidence: number;
   components: Record<string, string | number>;
+  iso3166SubdivisionCodes?: string[];
+  distanceFromQueryMeters?: number;
   bounds?: {
     northeast: { lat: number; lng: number };
     southwest: { lat: number; lng: number };
@@ -76,7 +78,8 @@ export let mapAnnotations = (ann: ResultAnnotations): MappedAnnotations => {
           offsetSec: ann.timezone.offset_sec,
           offsetString: ann.timezone.offset_string,
           shortName: ann.timezone.short_name,
-          nowInDst: ann.timezone.now_in_dst === 1
+          nowInDst:
+            ann.timezone.now_in_dst !== undefined ? ann.timezone.now_in_dst === 1 : undefined
         }
       : undefined,
     currency: ann.currency
@@ -115,12 +118,20 @@ export let mapAnnotations = (ann: ResultAnnotations): MappedAnnotations => {
 };
 
 export let mapGeocodeResult = (r: GeocodeResult): MappedGeocodeResult => {
+  let subdivisionCodes = r.components['ISO_3166-2'];
   return {
     formatted: r.formatted,
     latitude: r.geometry.lat,
     longitude: r.geometry.lng,
     confidence: r.confidence,
-    components: r.components,
+    components: Object.fromEntries(
+      Object.entries(r.components).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? value.join(', ') : value
+      ])
+    ),
+    iso3166SubdivisionCodes: Array.isArray(subdivisionCodes) ? subdivisionCodes : undefined,
+    distanceFromQueryMeters: r.distance_from_q?.meters,
     bounds: r.bounds,
     annotations: r.annotations ? mapAnnotations(r.annotations) : undefined
   };

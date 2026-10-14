@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { BrightDataClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -26,20 +27,18 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.brightdata.com',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/status');
-      let data = response.data as { customer?: string; status?: string };
+      let client = new BrightDataClient({ token: ctx.output.token });
+      let data = await client.getAccountStatus();
+      if (!data.customerId) {
+        throw createApiServiceError(
+          'Bright Data did not return a customer ID for this API key.'
+        );
+      }
 
       return {
         profile: {
-          id: data.customer,
-          name: data.customer
+          id: data.customerId,
+          name: data.customerId
         }
       };
     }

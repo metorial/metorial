@@ -1,6 +1,4 @@
-Now let me get the webhook events list to complete the events section:Now I have enough information. Let me compile the specification.
-
-# Slates Specification for Kommo
+# Kommo API Specification
 
 ## Overview
 

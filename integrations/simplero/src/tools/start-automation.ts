@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SimpleroClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,8 +46,8 @@ export let startAutomation = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.automationId) throw new Error('automationId is required.');
-    if (!ctx.input.email) throw new Error('email is required.');
+    if (!ctx.input.automationId) throw createApiServiceError('automationId is required.');
+    if (!ctx.input.email) throw createApiServiceError('email is required.');
 
     let result = await client.startAutomation(ctx.input.automationId, ctx.input.email);
     return {

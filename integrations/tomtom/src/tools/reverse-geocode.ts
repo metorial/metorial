@@ -62,17 +62,27 @@ export let reverseGeocode = SlateTool.create(spec, {
       entityType: ctx.input.entityType
     });
 
-    let addresses = (data.addresses || []).map((a: any) => ({
-      streetNumber: a.address?.streetNumber,
-      streetName: a.address?.streetName,
-      municipality: a.address?.municipality,
-      countrySubdivision: a.address?.countrySubdivision,
-      postalCode: a.address?.postalCode,
-      countryCode: a.address?.countryCode,
-      country: a.address?.country,
-      freeformAddress: a.address?.freeformAddress,
-      position: a.position ? { lat: a.position.lat, lon: a.position.lon } : undefined
-    }));
+    let addresses = (data.addresses || []).map((a: any) => {
+      let position = a.position;
+      if (typeof position === 'string') {
+        let coordinates = position.split(',').map(Number);
+        position =
+          coordinates.length === 2 && coordinates.every(Number.isFinite)
+            ? { lat: coordinates[0], lon: coordinates[1] }
+            : undefined;
+      }
+      return {
+        streetNumber: a.address?.streetNumber,
+        streetName: a.address?.streetName,
+        municipality: a.address?.municipality,
+        countrySubdivision: a.address?.countrySubdivision,
+        postalCode: a.address?.postalCode,
+        countryCode: a.address?.countryCode,
+        country: a.address?.country,
+        freeformAddress: a.address?.freeformAddress,
+        position: position ? { lat: position.lat, lon: position.lon } : undefined
+      };
+    });
 
     let primaryAddress = addresses[0]?.freeformAddress || 'Unknown location';
 

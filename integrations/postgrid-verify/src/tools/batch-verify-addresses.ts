@@ -17,14 +17,14 @@ let addressInputSchema = z
   .describe('Address as either a freeform string or structured components');
 
 let verificationResultSchema = z.object({
-  line1: z.string().describe('Primary address line'),
+  line1: z.string().nullable().describe('Primary address line'),
   line2: z.string().optional().describe('Secondary address line'),
-  city: z.string().describe('City'),
-  provinceOrState: z.string().describe('Province or state'),
-  postalOrZip: z.string().describe('Postal or ZIP code'),
+  city: z.string().nullable().describe('City'),
+  provinceOrState: z.string().nullable().describe('Province or state'),
+  postalOrZip: z.string().nullable().describe('Postal or ZIP code'),
   zipPlus4: z.string().optional().describe('ZIP+4 code (US only)'),
   firmName: z.string().optional().describe('Business/firm name'),
-  country: z.string().describe('Country code'),
+  country: z.string().nullable().describe('Country code'),
   countryName: z.string().optional().describe('Full country name'),
   status: z.enum(['verified', 'corrected', 'failed']).describe('Verification status'),
   errors: z

@@ -4,6 +4,7 @@ import {
   createWebhook,
   deleteUserData,
   deleteWebhook,
+  exportContacts,
   listCampaigns,
   listContacts,
   listWebhooks
@@ -12,6 +13,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     listContacts,
+    exportContacts,
     listCampaigns,
     listWebhooks,
     createWebhook,

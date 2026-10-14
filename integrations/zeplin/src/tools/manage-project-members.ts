@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZeplinClient } from '../lib/client';
 import { spec } from '../spec';
@@ -62,7 +62,7 @@ export let listProjectMembers = SlateTool.create(spec, {
 export let inviteProjectMember = SlateTool.create(spec, {
   name: 'Invite Project Member',
   key: 'invite_project_member',
-  description: `Invite a user to a Zeplin project by their email, username, or user ID. Optionally specify a role.`,
+  description: `Invite a user to a Zeplin project by their email, username, or user ID. Zeplin assigns the membership role; the project invitation API does not accept a role.`,
   tags: {
     destructive: false
   }
@@ -73,7 +73,12 @@ export let inviteProjectMember = SlateTool.create(spec, {
       handle: z
         .string()
         .describe('Email address, username, or user ID of the person to invite'),
-      role: z.string().optional().describe('Role to assign (e.g. "editor", "viewer")')
+      role: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy field; omit it because the project invitation API does not accept a role'
+        )
     })
   )
   .output(
@@ -84,10 +89,12 @@ export let inviteProjectMember = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ZeplinClient(ctx.auth.token);
 
-    await client.inviteProjectMember(ctx.input.projectId, {
-      handle: ctx.input.handle,
-      role: ctx.input.role
-    });
+    if (ctx.input.role !== undefined) {
+      throw createApiServiceError(
+        'Zeplin project invitations do not support assigning a role. Omit role and manage roles in Zeplin.'
+      );
+    }
+    await client.inviteProjectMember(ctx.input.projectId, { handle: ctx.input.handle });
 
     return {
       output: { success: true },

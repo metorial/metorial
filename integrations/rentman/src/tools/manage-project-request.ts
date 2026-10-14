@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,15 +32,21 @@ export let createProjectRequest = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (!ctx.input.start || !ctx.input.end) {
+      throw createApiServiceError('Provide start and end dates to create a project request.');
+    }
+
     let body: Record<string, any> = { name: ctx.input.name };
-    if (ctx.input.contact) body.contact = ctx.input.contact;
-    if (ctx.input.contactPerson) body.linked_contact_person = ctx.input.contactPerson;
-    if (ctx.input.contactEmail) body.contact_email = ctx.input.contactEmail;
-    if (ctx.input.contactPhone) body.contact_phone = ctx.input.contactPhone;
-    if (ctx.input.location) body.location = ctx.input.location;
-    if (ctx.input.start) body.start = ctx.input.start;
-    if (ctx.input.end) body.end = ctx.input.end;
-    if (ctx.input.memo) body.memo = ctx.input.memo;
+    if (ctx.input.contact !== undefined) body.linked_contact = ctx.input.contact;
+    if (ctx.input.contactPerson !== undefined)
+      body.linked_contact_person = ctx.input.contactPerson;
+    if (ctx.input.contactEmail !== undefined)
+      body.contact_person_email = ctx.input.contactEmail;
+    if (ctx.input.contactPhone !== undefined) body.contact_phone = ctx.input.contactPhone;
+    if (ctx.input.location !== undefined) body.location_name = ctx.input.location;
+    if (ctx.input.start !== undefined) body.planperiod_start = ctx.input.start;
+    if (ctx.input.end !== undefined) body.planperiod_end = ctx.input.end;
+    if (ctx.input.memo !== undefined) body.remark = ctx.input.memo;
 
     let result = await client.create('projectrequests', body);
     let r = result.data as any;
@@ -49,7 +55,7 @@ export let createProjectRequest = SlateTool.create(spec, {
       output: {
         requestId: r.id,
         name: r.name,
-        createdAt: r.created
+        createdAt: r.created ?? undefined
       },
       message: `Created project request **${r.name}** (ID: ${r.id}).`
     };
@@ -88,15 +94,22 @@ export let updateProjectRequest = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
-    if (ctx.input.contact !== undefined) body.contact = ctx.input.contact;
+    if (ctx.input.contact !== undefined) body.linked_contact = ctx.input.contact;
     if (ctx.input.contactPerson !== undefined)
       body.linked_contact_person = ctx.input.contactPerson;
-    if (ctx.input.contactEmail !== undefined) body.contact_email = ctx.input.contactEmail;
+    if (ctx.input.contactEmail !== undefined)
+      body.contact_person_email = ctx.input.contactEmail;
     if (ctx.input.contactPhone !== undefined) body.contact_phone = ctx.input.contactPhone;
-    if (ctx.input.location !== undefined) body.location = ctx.input.location;
-    if (ctx.input.start !== undefined) body.start = ctx.input.start;
-    if (ctx.input.end !== undefined) body.end = ctx.input.end;
-    if (ctx.input.memo !== undefined) body.memo = ctx.input.memo;
+    if (ctx.input.location !== undefined) body.location_name = ctx.input.location;
+    if (ctx.input.start !== undefined) body.planperiod_start = ctx.input.start;
+    if (ctx.input.end !== undefined) body.planperiod_end = ctx.input.end;
+    if (ctx.input.memo !== undefined) body.remark = ctx.input.memo;
+
+    if (ctx.input.start === undefined || ctx.input.end === undefined) {
+      let current = await client.get('projectrequests', ctx.input.requestId);
+      body.planperiod_start ??= current.data.planperiod_start;
+      body.planperiod_end ??= current.data.planperiod_end;
+    }
 
     let result = await client.update('projectrequests', ctx.input.requestId, body);
     let r = result.data as any;
@@ -105,7 +118,7 @@ export let updateProjectRequest = SlateTool.create(spec, {
       output: {
         requestId: r.id,
         name: r.name,
-        updatedAt: r.modified
+        updatedAt: r.modified ?? undefined
       },
       message: `Updated project request **${r.name}** (ID: ${r.id}).`
     };

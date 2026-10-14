@@ -1,4 +1,4 @@
-# Slates Specification for Gigasheet
+# Gigasheet API Specification
 
 ## Overview
 

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let promoCodeOutputSchema = z.object({
@@ -56,10 +57,7 @@ Use **action** to specify: \`create\`, \`get\`, \`list\`, or \`delete\`.`,
     z.object({
       action: z.enum(['create', 'get', 'list', 'delete']).describe('Operation to perform'),
       promoCodeId: z.string().optional().describe('Promo code ID (for get, delete)'),
-      companyId: z
-        .string()
-        .optional()
-        .describe('Company ID (for create, list). Uses config companyId if not provided.'),
+      companyId: companyIdSchema,
       code: z.string().optional().describe('The promo code string (for create)'),
       promoType: z.enum(['percentage', 'flat_amount']).optional().describe('Discount type'),
       amountOff: z.number().optional().describe('Discount amount'),
@@ -110,7 +108,8 @@ Use **action** to specify: \`create\`, \`get\`, \`list\`, or \`delete\`.`,
     let { action } = ctx.input;
 
     if (action === 'get') {
-      if (!ctx.input.promoCodeId) throw new Error('promoCodeId is required for get');
+      if (!ctx.input.promoCodeId)
+        throw createApiServiceError('promoCodeId is required for get');
       let p = await client.getPromoCode(ctx.input.promoCodeId);
       return {
         output: { promoCode: mapPromoCode(p), endCursor: null },
@@ -120,13 +119,15 @@ Use **action** to specify: \`create\`, \`get\`, \`list\`, or \`delete\`.`,
 
     if (action === 'list') {
       let companyId = ctx.input.companyId || ctx.config.companyId;
-      if (!companyId) throw new Error('companyId is required for list');
+      if (!companyId) throw createApiServiceError('companyId is required for list');
 
       let result = await client.listPromoCodes({
         companyId,
         productIds: ctx.input.productId ? [ctx.input.productId] : undefined,
         planIds: ctx.input.planIds,
-        status: ctx.input.status
+        status: ctx.input.status,
+        after: ctx.input.cursor,
+        first: ctx.input.limit
       });
 
       let promoCodes = (result.data || []).map(mapPromoCode);
@@ -143,14 +144,16 @@ Use **action** to specify: \`create\`, \`get\`, \`list\`, or \`delete\`.`,
 
     if (action === 'create') {
       let companyId = ctx.input.companyId || ctx.config.companyId;
-      if (!companyId) throw new Error('companyId is required for create');
-      if (!ctx.input.code) throw new Error('code is required for create');
-      if (!ctx.input.promoType) throw new Error('promoType is required for create');
+      if (!companyId) throw createApiServiceError('companyId is required for create');
+      if (!ctx.input.code) throw createApiServiceError('code is required for create');
+      if (!ctx.input.promoType)
+        throw createApiServiceError('promoType is required for create');
       if (ctx.input.amountOff === undefined)
-        throw new Error('amountOff is required for create');
-      if (!ctx.input.baseCurrency) throw new Error('baseCurrency is required for create');
+        throw createApiServiceError('amountOff is required for create');
+      if (!ctx.input.baseCurrency)
+        throw createApiServiceError('baseCurrency is required for create');
       if (ctx.input.promoDurationMonths === undefined)
-        throw new Error('promoDurationMonths is required for create');
+        throw createApiServiceError('promoDurationMonths is required for create');
 
       let p = await client.createPromoCode({
         companyId,
@@ -177,7 +180,8 @@ Use **action** to specify: \`create\`, \`get\`, \`list\`, or \`delete\`.`,
     }
 
     if (action === 'delete') {
-      if (!ctx.input.promoCodeId) throw new Error('promoCodeId is required for delete');
+      if (!ctx.input.promoCodeId)
+        throw createApiServiceError('promoCodeId is required for delete');
       let result = await client.deletePromoCode(ctx.input.promoCodeId);
       return {
         output: { promoCode: null, deleted: !!result, endCursor: null },
@@ -185,6 +189,6 @@ Use **action** to specify: \`create\`, \`get\`, \`list\`, or \`delete\`.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

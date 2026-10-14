@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import type { UniOneTemplate } from '../lib/types';
 import { spec } from '../spec';
 
 let templateBodySchema = z
@@ -34,7 +35,7 @@ export let upsertTemplate = SlateTool.create(spec, {
   name: 'Create or Update Template',
   key: 'upsert_template',
   description: `Create a new email template or update an existing one. Templates store reusable email content including body, subject, sender info, and attachments. When sending emails, reference a template by ID to pre-fill fields.
-To update an existing template, provide its **templateId**. To create a new template, omit the templateId.`,
+To update an existing template, provide its **templateId**. Omitted name and sender values are retrieved from that template. To create a new template, omit templateId and provide name and fromEmail.`,
   constraints: ['Maximum 10,000 templates per project.'],
   tags: {
     destructive: false,
@@ -47,9 +48,19 @@ To update an existing template, provide its **templateId**. To create a new temp
         .string()
         .optional()
         .describe('Template UUID (provide to update existing, omit to create new)'),
-      name: z.string().optional().describe('Template name'),
+      name: z
+        .string()
+        .optional()
+        .describe(
+          'Template name; required for creation and preserved when omitted for updates'
+        ),
       subject: z.string().optional().describe('Email subject line'),
-      fromEmail: z.string().optional().describe('Sender email address'),
+      fromEmail: z
+        .string()
+        .optional()
+        .describe(
+          'Sender email address; required for creation and preserved when omitted for updates'
+        ),
       fromName: z.string().optional().describe('Sender display name'),
       replyTo: z.string().optional().describe('Reply-to email address'),
       replyToName: z.string().optional().describe('Reply-to display name'),
@@ -84,11 +95,11 @@ To update an existing template, provide its **templateId**. To create a new temp
       datacenter: ctx.config.datacenter
     });
 
-    let template: Record<string, unknown> = {};
+    let template: UniOneTemplate = {};
     if (ctx.input.templateId) template.id = ctx.input.templateId;
-    if (ctx.input.name) template.name = ctx.input.name;
+    if (ctx.input.name !== undefined) template.name = ctx.input.name;
     if (ctx.input.subject) template.subject = ctx.input.subject;
-    if (ctx.input.fromEmail) template.from_email = ctx.input.fromEmail;
+    if (ctx.input.fromEmail !== undefined) template.from_email = ctx.input.fromEmail;
     if (ctx.input.fromName) template.from_name = ctx.input.fromName;
     if (ctx.input.replyTo) template.reply_to = ctx.input.replyTo;
     if (ctx.input.replyToName) template.reply_to_name = ctx.input.replyToName;
@@ -105,7 +116,7 @@ To update an existing template, provide its **templateId**. To create a new temp
     if (ctx.input.attachments) template.attachments = ctx.input.attachments;
     if (ctx.input.inlineAttachments) template.inline_attachments = ctx.input.inlineAttachments;
 
-    let result = await client.setTemplate(template as any);
+    let result = await client.setTemplate(template);
     let t = result.template;
 
     let isUpdate = !!ctx.input.templateId;

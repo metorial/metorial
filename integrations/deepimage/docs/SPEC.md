@@ -1,6 +1,4 @@
-Now I have enough information. Let me compile the specification.
-
-# Slates Specification for DeepImage
+# Deep Image API Specification
 
 ## Overview
 
@@ -20,7 +18,7 @@ No OAuth or additional scopes are required. There is a single API key per accoun
 
 ### Image Enhancement & Upscaling
 
-Automatically improve image quality using AI. Enhancements include denoising, deblurring, sharpening, lighting correction, color saturation, and white balance adjustment. Images can be upscaled by specifying target width/height in pixels or as a percentage (up to 4x). The AI adapts improvements based on image content.
+Automatically improve image quality using AI. Enhancements include denoising, deblurring, sharpening, lighting correction, color saturation, and white balance adjustment. Images can be upscaled by specifying target width/height in pixels or as a percentage. AI upscaling supports up to 4x; larger dimensions use traditional bicubic upscaling. The AI adapts improvements based on image content.
 
 - **Parameters:** `enhancements` array (values: `denoise`, `deblur`, `light`, `color`), `width`, `height`, `light_parameters`, `color_parameters`, `white_balance_parameters`.
 - Output format can be set to JPEG, PNG, or WebP with configurable quality and max file size.
@@ -46,6 +44,12 @@ Enhance face details in photos for improved clarity. Face swap allows replacing 
 ### Prompt-Based Image Editing
 
 Edit images using natural language text prompts in a chat-like experience. Supports uploading reference images and selecting from advanced AI models.
+
+- **Tool:** `edit_image` accepts a prompt and one or more publicly accessible context image URLs. It sends `background.generate.adapter_type: "img2img"` with `context_images` and returns the processing status, job ID, and result URL when complete.
+
+### Processing Results
+
+Completed processing tools and `get_job_result` provide a downloadable image alongside the existing result URL. Pending results retain their job ID and can be checked with `get_job_result`; do not resubmit the original operation while it is processing.
 
 ### Inpainting & Outpainting (Uncrop)
 

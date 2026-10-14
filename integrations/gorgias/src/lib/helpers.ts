@@ -1,26 +1,28 @@
+import { createApiServiceError } from 'slates';
 import { Client } from './client';
 
-export let createClient = (
-  config: { subdomain: string },
-  auth: { token: string; subdomain?: string }
-): Client => {
-  let subdomain = auth.subdomain || config.subdomain;
-
-  // If the token contains a colon when decoded from base64, it's likely Basic Auth.
-  // OAuth tokens are opaque strings, while basic auth tokens are base64-encoded "email:apikey".
-  let isBasicAuth = false;
-  try {
-    let decoded = Buffer.from(auth.token, 'base64').toString('utf8');
-    if (decoded.includes(':') && decoded.includes('@')) {
-      isBasicAuth = true;
-    }
-  } catch {
-    // Not base64, so it's a Bearer token
+export let getSubdomain = (configSubdomain?: string, authSubdomain?: string): string => {
+  let subdomain = authSubdomain || configSubdomain;
+  if (!subdomain || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(subdomain)) {
+    throw createApiServiceError('Reconnect Gorgias with a valid account subdomain.');
   }
+  return subdomain;
+};
 
+export let createClient = (
+  config: { subdomain?: string },
+  auth: { token: string; subdomain?: string; authType?: 'bearer' | 'basic' }
+): Client => {
+  let subdomain = getSubdomain(config.subdomain, auth.subdomain);
+  if (!auth.token) {
+    throw createApiServiceError('Reconnect Gorgias to provide an access token or API key.');
+  }
+  // Stored API-key connections predate explicit authType metadata.
+  let decoded = Buffer.from(auth.token, 'base64').toString('utf8');
+  let legacyBasicAuth = decoded.includes(':') && decoded.includes('@');
   return new Client({
     token: auth.token,
     subdomain,
-    authType: isBasicAuth ? 'basic' : 'bearer'
+    authType: auth.authType ?? (legacyBasicAuth ? 'basic' : 'bearer')
   });
 };

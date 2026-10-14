@@ -30,7 +30,7 @@ export let listClients = SlateTool.create(spec, {
 
     let clients = await client.getClients();
 
-    let mapped = (Array.isArray(clients) ? clients : []).map(c => ({
+    let mapped = clients.map(c => ({
       clientId: String(c.client_id),
       name: c.name || '',
       address: c.address || '',

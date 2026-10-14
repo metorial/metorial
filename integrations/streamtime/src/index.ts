@@ -13,10 +13,12 @@ import {
   getExpense,
   getInvoice,
   getJob,
+  getJobItem,
   getOrganisation,
   getQuote,
   getTimeEntry,
   listRoles,
+  listSearchFilters,
   listUsers,
   logTime,
   manageJobPlan,
@@ -36,6 +38,7 @@ export let provider = Slate.create({
   tools: [
     createJob,
     getJob,
+    getJobItem,
     updateJob,
     searchJobs,
     duplicateJob,
@@ -62,6 +65,7 @@ export let provider = Slate.create({
     manageLabels,
     listUsers,
     listRoles,
+    listSearchFilters,
     getOrganisation
   ],
   triggers: []

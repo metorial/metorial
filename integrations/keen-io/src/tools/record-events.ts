@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let recordEvents = SlateTool.create(spec, {
@@ -45,24 +45,38 @@ export let recordEvents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      projectId: ctx.config.projectId,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
+
+    if (ctx.input.batchEvents && (ctx.input.event || ctx.input.collectionName)) {
+      throw createApiServiceError(
+        'Choose batchEvents or collectionName plus event, rather than combining both recording modes.'
+      );
+    }
 
     if (ctx.input.batchEvents) {
-      let result = await client.recordMultipleEvents(ctx.input.batchEvents);
       let collectionNames = Object.keys(ctx.input.batchEvents);
       let totalEvents = Object.values(ctx.input.batchEvents).reduce(
         (sum, arr) => sum + arr.length,
         0
       );
+      if (totalEvents === 0) {
+        throw createApiServiceError('Provide at least one event in batchEvents.');
+      }
+      let result = await client.recordMultipleEvents(ctx.input.batchEvents);
+      let created = Object.entries(ctx.input.batchEvents).every(
+        ([collection, events]) =>
+          Array.isArray(result[collection]) &&
+          result[collection].length === events.length &&
+          result[collection].every((event: { success?: boolean }) => event.success === true)
+      );
       return {
         output: {
-          created: true,
+          created,
           results: result
         },
-        message: `Batch recorded **${totalEvents}** events across **${collectionNames.length}** collection(s): ${collectionNames.join(', ')}.`
+        message: created
+          ? `Batch recorded **${totalEvents}** events across **${collectionNames.length}** collection(s): ${collectionNames.join(', ')}.`
+          : `Keen.io did not confirm every event in the batch. Check results for per-event failures before retrying.`
       };
     }
 
@@ -77,7 +91,7 @@ export let recordEvents = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(
+    throw createApiServiceError(
       'Either provide "collectionName" + "event" for a single event, or "batchEvents" for batch recording.'
     );
   });

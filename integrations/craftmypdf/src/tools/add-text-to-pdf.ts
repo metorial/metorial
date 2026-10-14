@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, downloadGeneratedFile } from '../lib/client';
 import { spec } from '../spec';
 
 export let addTextToPdf = SlateTool.create(spec, {
@@ -46,7 +46,7 @@ Supports template variables like \`{{pageNumber}}\`, \`{{totalPages}}\`, and \`{
                 'bottom-right'
               ])
               .optional()
-              .describe('Position of the text on the page.'),
+              .describe('Position of the text on the page. Defaults to top-left.'),
             offsetX: z
               .number()
               .optional()
@@ -68,6 +68,7 @@ Supports template variables like \`{{pageNumber}}\`, \`{{totalPages}}\`, and \`{
             rotation: z.number().optional().describe('Rotation angle in degrees.')
           })
         )
+        .min(1)
         .describe('List of text overlays to add to the PDF.'),
       expiration: z
         .number()
@@ -105,6 +106,13 @@ Supports template variables like \`{{pageNumber}}\`, \`{{totalPages}}\`, and \`{
         rotation: o.rotation
       })),
       expiration: ctx.input.expiration
+    });
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: await downloadGeneratedFile(result.file),
+      mimeType: 'application/pdf',
+      filename: 'output.pdf'
     });
 
     return {

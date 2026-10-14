@@ -1,8 +1,20 @@
 # <img src="https://provider-logos.metorial-cdn.com/chameleon.png" height="20"> Chameleon
 
-Manage in-app product adoption experiences for SaaS applications. Create and manage product tours, microsurveys, tooltips, launchers (checklists), embeddables, and HelpBar content. Send and update user profiles and company data, track tour interactions and microsurvey responses, manage audience segments for targeting experiences, and configure webhooks for real-time data exchange. Import user data in bulk, manage approved domains and environments, and access delivery and interaction analytics for tours and surveys.
+Manage Chameleon user profiles and companies, publish or unpublish product adoption experiences, retrieve audience segments and interaction data, schedule individual experience deliveries, and configure domains, environments, and outgoing webhooks.
 
 ## Tools
+
+### Get Connected Account
+
+Retrieve the account and administrator associated with the connected API key.
+
+### Create or Update User Profile
+
+Create a user by external UID or update an existing user by profile ID, UID, or email. Send custom properties and associate the user with a company.
+
+### Create or Update Company
+
+Create a company by external UID or update an existing company by ID or UID. Send company properties used for audience targeting.
 
 ### Delete Company
 

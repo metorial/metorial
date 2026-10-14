@@ -1,6 +1,10 @@
 # Parsio.io
 
-Extract structured data from emails, PDFs, images, and documents (HTML, CSV, DOCX, XLSX, XML, TXT, RTF) using template-based, OCR, and GPT-powered parsing. Manage mailboxes for document ingestion, upload files or submit HTML/text content for parsing, retrieve parsed data as JSON, and configure webhooks for real-time notifications on document events. Create and manage parsing templates, search and filter documents by status and date range, export extracted data, and handle bulk operations like re-parsing or skipping documents.
+Manage Parsio mailboxes, submit HTML or text for asynchronous or synchronous parsing, retrieve extracted JSON, and inspect document processing. List, inspect, enable, disable, delete, or clone existing templates between mailboxes. Configure and inspect webhooks, retrieve collected emails, and reprocess or skip documents.
+
+HTML/text submission supports template-based and GPT-powered mailboxes. A synchronous request can return while parsing continues; use the returned document ID with `get_document`. List tools return one page where pagination is supported. Document lists accept a page size of 1–500 and date filters in `YYYY-MM-DD` format.
+
+Authenticate with the API key from your [Parsio account](https://app.parsio.io/account). See the [official API reference](https://help.parsio.io/public-api/parsio-public-api) for parser settings and [text/HTML parsing](https://help.parsio.io/public-api/parse-html-and-text-documents-using-api-1) for parser compatibility.
 
 ## License
 

@@ -50,11 +50,13 @@ Supports standard and AI-enhanced OCR modes with configurable language, quality,
         .optional()
         .describe('Base64-encoded searchable PDF (for PDF OCR)'),
       text: z.string().optional().describe('Extracted text content (for image OCR)'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     if (ctx.input.sourceType === 'pdf') {
       let body: Record<string, any> = {
@@ -76,9 +78,13 @@ Supports standard and AI-enhanced OCR modes with configurable language, quality,
         output: {
           fileName: result.Filename,
           fileContent: result.FileContent,
+          operationStatus: client.operationStatus,
+          statusUrl: client.statusUrl,
           operationId: result.OperationId
         },
-        message: `Successfully applied ${ctx.input.ocrMode === 'ai' ? 'AI' : 'standard'} OCR to PDF. Output: **${result.Filename}**`
+        message: client.message(
+          `Successfully applied ${ctx.input.ocrMode === 'ai' ? 'AI' : 'standard'} OCR to PDF. Output: **${result.Filename}**`
+        )
       };
     } else {
       let body: Record<string, any> = {
@@ -97,9 +103,11 @@ Supports standard and AI-enhanced OCR modes with configurable language, quality,
       return {
         output: {
           text: result.Text || result.text || '',
+          operationStatus: client.operationStatus,
+          statusUrl: client.statusUrl,
           operationId: result.OperationId
         },
-        message: `Successfully extracted text from image using OCR.`
+        message: client.message(`Successfully extracted text from image using OCR.`)
       };
     }
   })

@@ -1,15 +1,32 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export let sevdeskDateToTimestamp = (date: string, field: string) => {
+  let timestamp = Date.parse(`${date}T00:00:00.000Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    !Number.isFinite(timestamp) ||
+    new Date(timestamp).toISOString().slice(0, 10) !== date
+  ) {
+    throw createApiServiceError(`${field} must be a valid date in YYYY-MM-DD format.`);
+  }
+  return timestamp / 1000;
+};
 
 export class SevdeskClient {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('A sevDesk API token is required. Reconnect your account.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://my.sevdesk.de/api/v1',
-      headers: {
-        Authorization: config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'sevDesk',
+          reason: 'sevdesk_api_error'
+        })
     });
   }
 
@@ -34,12 +51,12 @@ export class SevdeskClient {
 
   async createContact(data: Record<string, any>) {
     let response = await this.axios.post('/Contact', data);
-    return response.data?.objects ?? response.data;
+    return response.data?.objects?.[0] ?? response.data?.objects ?? response.data;
   }
 
   async updateContact(contactId: string, data: Record<string, any>) {
     let response = await this.axios.put(`/Contact/${contactId}`, data);
-    return response.data?.objects ?? response.data;
+    return response.data?.objects?.[0] ?? response.data?.objects ?? response.data;
   }
 
   async deleteContact(contactId: string) {
@@ -99,7 +116,7 @@ export class SevdeskClient {
 
   async createCommunicationWay(data: Record<string, any>) {
     let response = await this.axios.post('/CommunicationWay', data);
-    return response.data?.objects ?? response.data;
+    return response.data?.objects?.[0] ?? response.data?.objects ?? response.data;
   }
 
   async updateCommunicationWay(communicationWayId: string, data: Record<string, any>) {
@@ -124,7 +141,17 @@ export class SevdeskClient {
     offset?: number;
     embed?: string;
   }) {
-    let response = await this.axios.get('/Invoice', { params });
+    let response = await this.axios.get('/Invoice', {
+      params: {
+        ...params,
+        startDate: params?.startDate
+          ? sevdeskDateToTimestamp(params.startDate, 'startDate')
+          : undefined,
+        endDate: params?.endDate
+          ? sevdeskDateToTimestamp(params.endDate, 'endDate')
+          : undefined
+      }
+    });
     return response.data?.objects ?? [];
   }
 
@@ -186,12 +213,18 @@ export class SevdeskClient {
       checkAccountTransaction?: { id: string; objectName: string };
     }
   ) {
-    let response = await this.axios.put(`/Invoice/${invoiceId}/bookAmount`, data);
+    let response = await this.axios.put(`/Invoice/${invoiceId}/bookAmount`, {
+      ...data,
+      date: sevdeskDateToTimestamp(data.date, 'date')
+    });
     return response.data?.objects ?? response.data;
   }
 
   async getInvoicePdf(invoiceId: string) {
-    let response = await this.axios.get(`/Invoice/${invoiceId}/getPdf`);
+    let response = await this.axios.get(`/Invoice/${invoiceId}/getPdf`, {
+      params: { download: false, preventSendBy: true },
+      responseType: 'json'
+    });
     return response.data;
   }
 
@@ -281,7 +314,24 @@ export class SevdeskClient {
     offset?: number;
     embed?: string;
   }) {
-    let response = await this.axios.get('/Voucher', { params });
+    let {
+      'supplier[id]': supplierId,
+      'supplier[objectName]': supplierObjectName,
+      ...filters
+    } = params ?? {};
+    let response = await this.axios.get('/Voucher', {
+      params: {
+        ...filters,
+        'contact[id]': supplierId,
+        'contact[objectName]': supplierObjectName,
+        startDate: params?.startDate
+          ? sevdeskDateToTimestamp(params.startDate, 'startDate')
+          : undefined,
+        endDate: params?.endDate
+          ? sevdeskDateToTimestamp(params.endDate, 'endDate')
+          : undefined
+      }
+    });
     return response.data?.objects ?? [];
   }
 
@@ -307,9 +357,13 @@ export class SevdeskClient {
       date: string;
       type: string;
       checkAccount: { id: string; objectName: string };
+      checkAccountTransaction?: { id: string; objectName: string };
     }
   ) {
-    let response = await this.axios.put(`/Voucher/${voucherId}/bookAmount`, data);
+    let response = await this.axios.put(`/Voucher/${voucherId}/bookAmount`, {
+      ...data,
+      date: new Date(sevdeskDateToTimestamp(data.date, 'date') * 1000).toISOString()
+    });
     return response.data?.objects ?? response.data;
   }
 
@@ -319,8 +373,15 @@ export class SevdeskClient {
   }
 
   async getReceiptGuidance(params?: { forExpense?: boolean; forRevenue?: boolean }) {
-    let response = await this.axios.get('/Voucher/Factory/getReceiptGuidance', { params });
-    return response.data?.objects ?? response.data;
+    let paths =
+      params?.forExpense || params?.forRevenue
+        ? [
+            ...(params.forExpense ? ['/ReceiptGuidance/forExpense'] : []),
+            ...(params.forRevenue ? ['/ReceiptGuidance/forRevenue'] : [])
+          ]
+        : ['/ReceiptGuidance/forAllAccounts'];
+    let responses = await Promise.all(paths.map(path => this.axios.get(path)));
+    return responses.flatMap(response => response.data?.objects ?? []);
   }
 
   // ── Voucher Positions ─────────────────────────────────────────────────
@@ -348,7 +409,17 @@ export class SevdeskClient {
     offset?: number;
     embed?: string;
   }) {
-    let response = await this.axios.get('/Order', { params });
+    let response = await this.axios.get('/Order', {
+      params: {
+        ...params,
+        startDate: params?.startDate
+          ? sevdeskDateToTimestamp(params.startDate, 'startDate')
+          : undefined,
+        endDate: params?.endDate
+          ? sevdeskDateToTimestamp(params.endDate, 'endDate')
+          : undefined
+      }
+    });
     return response.data?.objects ?? [];
   }
 
@@ -358,8 +429,13 @@ export class SevdeskClient {
   }
 
   async createOrder(data: Record<string, any>) {
-    let response = await this.axios.post('/Order', data);
-    return response.data?.objects ?? response.data;
+    let response = await this.axios.post('/Order/Factory/saveOrder', {
+      order: data,
+      orderPosSave: [],
+      orderPosDelete: null
+    });
+    let result = response.data?.objects ?? response.data;
+    return result?.order ?? result;
   }
 
   async updateOrder(orderId: string, data: Record<string, any>) {
@@ -418,7 +494,7 @@ export class SevdeskClient {
 
   async createPart(data: Record<string, any>) {
     let response = await this.axios.post('/Part', data);
-    return response.data?.objects ?? response.data;
+    return response.data?.objects?.[0] ?? response.data?.objects ?? response.data;
   }
 
   async updatePart(partId: string, data: Record<string, any>) {
@@ -449,23 +525,33 @@ export class SevdeskClient {
 
   async createAccountingContact(data: Record<string, any>) {
     let response = await this.axios.post('/AccountingContact', data);
-    return response.data?.objects ?? response.data;
+    return response.data?.objects?.[0] ?? response.data?.objects ?? response.data;
   }
 
   async updateAccountingContact(accountingContactId: string, data: Record<string, any>) {
     let response = await this.axios.put(`/AccountingContact/${accountingContactId}`, data);
-    return response.data?.objects ?? response.data;
+    return response.data?.objects?.[0] ?? response.data?.objects ?? response.data;
   }
 
   // ── DATEV Export ──────────────────────────────────────────────────────
 
   async exportDatev(params: {
-    startDate: string;
-    endDate: string;
+    startDate: number;
+    endDate: number;
     scope: string;
-    download?: boolean;
+    Download?: boolean;
+    enshrine?: boolean;
   }) {
-    let response = await this.axios.get('/Export/datevCSV', { params });
+    let response = await this.axios.get('/Export/datevCSV', { params, responseType: 'json' });
+    if (
+      response.data === null ||
+      typeof response.data !== 'object' ||
+      Array.isArray(response.data)
+    ) {
+      throw createApiServiceError(
+        'sevDesk did not return the documented JSON DATEV export response.'
+      );
+    }
     return response.data;
   }
 
@@ -487,6 +573,10 @@ export class SevdeskClient {
 
   async getBookkeepingSystemVersion() {
     let response = await this.axios.get('/Tools/bookkeepingSystemVersion');
-    return response.data;
+    let version = response.data?.objects?.version;
+    if (typeof version !== 'string' || !version) {
+      throw createApiServiceError('sevDesk did not return a bookkeeping system version.');
+    }
+    return version;
   }
 }

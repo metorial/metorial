@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+import { z } from 'zod';
 import type {
   DocupilotContentBlock,
   DocupilotDocumentMergeLink,
@@ -10,20 +11,55 @@ import type {
   DocupilotPaginatedList,
   DocupilotTemplate,
   DocupilotTemplateDelivery,
-  DocupilotTemplateSchema
+  DocupilotTemplateSchema,
+  DocupilotUser
 } from './types';
 
+let fileMetadataSchema = z.object({
+  file_url: z.string().nullable().optional(),
+  file_name: z.string().nullable().optional()
+});
+let generateResponseSchema = fileMetadataSchema.extend({
+  status: z.string().optional(),
+  data: fileMetadataSchema.nullable().optional()
+});
+let userSchema = z.object({
+  id: z.union([z.string(), z.number()]).nullable().optional(),
+  email: z.string().nullable().optional(),
+  first_name: z.string().nullable().optional(),
+  last_name: z.string().nullable().optional()
+});
+
+let docupilotApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Docupilot',
+    reason: 'docupilot_api_error',
+    operation,
+    extractStatus: (error, response, helpers) => {
+      let data =
+        helpers.isRecord(error) && helpers.isRecord(error.data) ? error.data : undefined;
+      let status = response?.status ?? data?.upstreamStatus;
+      return typeof status === 'number' || typeof status === 'string' ? status : undefined;
+    }
+  });
+
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private token: string;
 
   constructor(credentials: { token: string; workspaceId: string }) {
-    this.axios = createAxios({
+    if (!credentials.token || !credentials.workspaceId) {
+      throw createApiServiceError(
+        'Reconnect Docupilot with an API key, secret, and workspace ID.'
+      );
+    }
+    this.token = credentials.token;
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.docupilot.app',
-      headers: {
-        Authorization: `Bearer ${credentials.token}`,
-        'X-Workspace': credentials.workspaceId,
-        'Content-Type': 'application/json'
-      }
+      timeout: 60000,
+      authHeader: { value: `Bearer ${credentials.token}` },
+      headers: { 'X-Workspace': credentials.workspaceId },
+      errorAdapter: error => docupilotApiError(error)
     });
   }
 
@@ -164,7 +200,7 @@ export class Client {
       outputType?: string;
     }
   ): Promise<DocupilotGenerateResponse> {
-    let response = await this.axios.post(
+    let response = await this.axios.post<DocupilotGenerateResponse>(
       `/dashboard/api/v2/templates/${templateId}/generate/`,
       mergeData,
       {
@@ -175,7 +211,49 @@ export class Client {
         }
       }
     );
-    return response.data;
+    let result = generateResponseSchema.safeParse(response.data);
+    if (!result.success) {
+      throw createApiServiceError(
+        'Docupilot returned an invalid document generation response.'
+      );
+    }
+    if (result.data.status !== undefined && result.data.status !== 'success') {
+      throw createApiServiceError(
+        'Docupilot did not successfully generate the document. Check the template and merge data.'
+      );
+    }
+    // Document generation can return a success envelope around the file metadata.
+    return result.data.data === undefined ? result.data : (result.data.data ?? {});
+  }
+
+  async downloadGeneratedDocument(url: string) {
+    if (!URL.canParse(url) || new URL(url).protocol !== 'https:') {
+      throw createApiServiceError('Docupilot returned an invalid document download URL.');
+    }
+    // Signed storage URLs authenticate themselves; never forward the API credential.
+    let download = createAuthenticatedAxios({
+      contentType: false,
+      timeout: 60000,
+      errorAdapter: error => docupilotApiError(error, 'document download')
+    });
+    return download.get<ArrayBuffer>(url, { responseType: 'arraybuffer' });
+  }
+
+  async getCurrentUser(): Promise<DocupilotUser> {
+    let account = createAuthenticatedAxios({
+      baseURL: 'https://api-us1.docupilot.app',
+      timeout: 60000,
+      authHeader: { value: `Bearer ${this.token}` },
+      errorAdapter: error => docupilotApiError(error, 'current user')
+    });
+    let response = await account.get<DocupilotUser>('/accounts/user/me/');
+    let user = userSchema.safeParse(response.data);
+    if (!user.success || (user.data.id == null && !user.data.email)) {
+      throw createApiServiceError(
+        'Docupilot did not return a user identity. Verify your API credentials.'
+      );
+    }
+    return user.data;
   }
 
   async getTemplateTestData(templateId: number): Promise<Record<string, unknown>> {

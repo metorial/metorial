@@ -2,11 +2,13 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   aiExtract,
+  amazonPricing,
   amazonSearch,
   captureScreenshot,
   checkUsage,
   extractData,
   googleSearch,
+  pageContent,
   runJsScenario,
   scrapeWebpage,
   walmartSearch,
@@ -24,6 +26,8 @@ export let provider = Slate.create({
     runJsScenario,
     googleSearch,
     amazonSearch,
+    amazonPricing,
+    pageContent,
     youtubeSearch,
     youtubeVideo,
     walmartSearch,

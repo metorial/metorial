@@ -33,7 +33,10 @@ export let auth = SlateAuth.create()
       password: z.string().describe('Ascora account password')
     }),
     getOutput: async ctx => {
-      let encoded = btoa(`${ctx.input.username}:${ctx.input.password}`);
+      let encoded = Buffer.from(
+        `${ctx.input.username}:${ctx.input.password}`,
+        'utf8'
+      ).toString('base64');
       return {
         output: {
           token: encoded,

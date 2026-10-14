@@ -8,9 +8,7 @@ export let addComment = SlateTool.create(spec, {
   name: 'Add Comment',
   key: 'add_comment',
   description: `Add an internal comment to a ticket. Comments are only visible to agents, not customers. Useful for internal collaboration and notes on tickets.`,
-  instructions: [
-    'Provide either contentText or contentHtml (or both). At least one is required.'
-  ]
+  instructions: ['Provide contentText, contentHtml, or at least one uploaded attachment ID.']
 })
   .input(
     z.object({

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -92,7 +92,7 @@ export let manageProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     let { action, accountName, projectSlug } = ctx.input;
@@ -100,7 +100,7 @@ export let manageProject = SlateTool.create(spec, {
     switch (action) {
       case 'create': {
         if (!ctx.input.repositoryProvider || !ctx.input.repositoryName) {
-          throw new Error(
+          throw createApiServiceError(
             'repositoryProvider and repositoryName are required for creating a project'
           );
         }
@@ -116,7 +116,7 @@ export let manageProject = SlateTool.create(spec, {
 
       case 'update': {
         if (!ctx.input.projectSettings) {
-          throw new Error('projectSettings is required for updating a project');
+          throw createApiServiceError('projectSettings is required for updating a project');
         }
         await client.updateProject(ctx.input.projectSettings);
         return {
@@ -127,7 +127,7 @@ export let manageProject = SlateTool.create(spec, {
 
       case 'updateYaml': {
         if (!accountName || !projectSlug || !ctx.input.yamlConfig) {
-          throw new Error(
+          throw createApiServiceError(
             'accountName, projectSlug, and yamlConfig are required for updateYaml'
           );
         }
@@ -140,7 +140,7 @@ export let manageProject = SlateTool.create(spec, {
 
       case 'updateEnvVars': {
         if (!accountName || !projectSlug || !ctx.input.environmentVariables) {
-          throw new Error(
+          throw createApiServiceError(
             'accountName, projectSlug, and environmentVariables are required for updateEnvVars'
           );
         }
@@ -157,7 +157,7 @@ export let manageProject = SlateTool.create(spec, {
 
       case 'updateBuildNumber': {
         if (!accountName || !projectSlug || ctx.input.nextBuildNumber === undefined) {
-          throw new Error(
+          throw createApiServiceError(
             'accountName, projectSlug, and nextBuildNumber are required for updateBuildNumber'
           );
         }
@@ -174,7 +174,9 @@ export let manageProject = SlateTool.create(spec, {
 
       case 'clearCache': {
         if (!accountName || !projectSlug) {
-          throw new Error('accountName and projectSlug are required for clearCache');
+          throw createApiServiceError(
+            'accountName and projectSlug are required for clearCache'
+          );
         }
         await client.deleteProjectBuildCache(accountName, projectSlug);
         return {
@@ -185,7 +187,7 @@ export let manageProject = SlateTool.create(spec, {
 
       case 'delete': {
         if (!accountName || !projectSlug) {
-          throw new Error('accountName and projectSlug are required for delete');
+          throw createApiServiceError('accountName and projectSlug are required for delete');
         }
         await client.deleteProject(accountName, projectSlug);
         return {
@@ -195,7 +197,7 @@ export let manageProject = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw createApiServiceError(`Unknown action: ${action}`);
     }
   })
   .build();

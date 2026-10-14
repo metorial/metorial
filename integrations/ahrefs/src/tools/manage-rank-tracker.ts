@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -62,8 +62,9 @@ Management endpoints are free (no API unit cost).`,
         break;
       case 'create-project':
         if (!ctx.input.projectName)
-          throw new Error('projectName is required for create-project');
-        if (!ctx.input.target) throw new Error('target is required for create-project');
+          throw createApiServiceError('projectName is required for create-project');
+        if (!ctx.input.target)
+          throw createApiServiceError('target is required for create-project');
         result = await client.createRankTrackerProject({
           name: ctx.input.projectName,
           target: ctx.input.target,
@@ -71,26 +72,30 @@ Management endpoints are free (no API unit cost).`,
         });
         break;
       case 'delete-project':
-        if (!ctx.input.projectId) throw new Error('projectId is required for delete-project');
+        if (!ctx.input.projectId)
+          throw createApiServiceError('projectId is required for delete-project');
         result = await client.deleteRankTrackerProject({ projectId: ctx.input.projectId });
         break;
       case 'list-keywords':
-        if (!ctx.input.projectId) throw new Error('projectId is required for list-keywords');
+        if (!ctx.input.projectId)
+          throw createApiServiceError('projectId is required for list-keywords');
         result = await client.listRankTrackerKeywords({ projectId: ctx.input.projectId });
         break;
       case 'add-keywords':
-        if (!ctx.input.projectId) throw new Error('projectId is required for add-keywords');
+        if (!ctx.input.projectId)
+          throw createApiServiceError('projectId is required for add-keywords');
         if (!ctx.input.keywords || ctx.input.keywords.length === 0)
-          throw new Error('keywords are required for add-keywords');
+          throw createApiServiceError('keywords are required for add-keywords');
         result = await client.addRankTrackerKeywords({
           projectId: ctx.input.projectId,
           keywords: ctx.input.keywords
         });
         break;
       case 'remove-keywords':
-        if (!ctx.input.projectId) throw new Error('projectId is required for remove-keywords');
+        if (!ctx.input.projectId)
+          throw createApiServiceError('projectId is required for remove-keywords');
         if (!ctx.input.keywords || ctx.input.keywords.length === 0)
-          throw new Error('keywords are required for remove-keywords');
+          throw createApiServiceError('keywords are required for remove-keywords');
         result = await client.removeRankTrackerKeywords({
           projectId: ctx.input.projectId,
           keywords: ctx.input.keywords

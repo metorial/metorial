@@ -13,7 +13,12 @@ export let getCourse = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      courseId: z.string().describe('The ID of the course to retrieve')
+      courseId: z.string().describe('The ID of the course to retrieve'),
+      identifier: z.string().optional().describe('Scope the course lookup to this user'),
+      clientIdentifier: z
+        .string()
+        .optional()
+        .describe('Scope the course lookup to this client')
     })
   )
   .output(
@@ -28,7 +33,10 @@ export let getCourse = SlateTool.create(spec, {
       authScheme: ctx.auth.authScheme
     });
 
-    let course = await client.getCourse(ctx.input.courseId);
+    let course = await client.getCourse(ctx.input.courseId, {
+      identifier: ctx.input.identifier,
+      clientIdentifier: ctx.input.clientIdentifier
+    });
 
     return {
       output: { course },

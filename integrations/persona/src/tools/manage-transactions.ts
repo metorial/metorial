@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PersonaClient } from '../lib/client';
 import { normalizeResource } from '../lib/helpers';
@@ -13,7 +13,18 @@ export let createTransaction = SlateTool.create(spec, {
   .input(
     z.object({
       referenceId: z.string().optional().describe('Your internal reference ID'),
-      transactionTemplateId: z.string().optional().describe('Transaction template ID'),
+      transactionTemplateId: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy transaction type identifier (starts with txntp_). Prefer transactionTypeId.'
+        ),
+      transactionTypeId: z
+        .string()
+        .optional()
+        .describe(
+          'Transaction type ID (starts with txntp_). Provide this or the legacy transactionTemplateId field.'
+        ),
       accountId: z.string().optional().describe('Persona account ID to associate with'),
       fields: z
         .record(z.string(), z.any())
@@ -32,12 +43,22 @@ export let createTransaction = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let transactionTypeId = ctx.input.transactionTypeId ?? ctx.input.transactionTemplateId;
+    if (!transactionTypeId?.trim()) {
+      throw createApiServiceError('Provide transactionTypeId (starts with txntp_).');
+    }
+    if (
+      ctx.input.transactionTypeId !== undefined &&
+      ctx.input.transactionTemplateId !== undefined &&
+      ctx.input.transactionTypeId !== ctx.input.transactionTemplateId
+    ) {
+      throw createApiServiceError('Provide only one transaction type ID.');
+    }
     let client = new PersonaClient({ token: ctx.auth.token });
 
     let attrs: Record<string, any> = {};
     if (ctx.input.referenceId) attrs['reference-id'] = ctx.input.referenceId;
-    if (ctx.input.transactionTemplateId)
-      attrs['transaction-template-id'] = ctx.input.transactionTemplateId;
+    attrs['transaction-type-id'] = transactionTypeId;
     if (ctx.input.accountId) attrs['account-id'] = ctx.input.accountId;
     if (ctx.input.fields) attrs.fields = ctx.input.fields;
 
@@ -88,8 +109,8 @@ export let getTransaction = SlateTool.create(spec, {
       output: {
         transactionId: result.data?.id,
         status: n.status,
-        referenceId: n['reference-id'] || n.reference_id,
-        createdAt: n['created-at'] || n.created_at,
+        referenceId: n['reference-id'] ?? n.reference_id ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined,
         attributes: n,
         included: result.included
       },
@@ -141,8 +162,8 @@ export let listTransactions = SlateTool.create(spec, {
       return {
         transactionId: item.id,
         status: n.status,
-        referenceId: n['reference-id'] || n.reference_id,
-        createdAt: n['created-at'] || n.created_at
+        referenceId: n['reference-id'] ?? n.reference_id ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined
       };
     });
 

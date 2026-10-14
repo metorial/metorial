@@ -6,6 +6,7 @@ import {
   calculateRoute,
   clusterLocations,
   geocode,
+  getOptimizationSolution,
   matchGpsTrace,
   optimizeRoutes
 } from './tools';
@@ -15,6 +16,7 @@ export let provider = Slate.create({
   tools: [
     calculateRoute,
     optimizeRoutes,
+    getOptimizationSolution,
     calculateMatrix,
     geocode,
     calculateIsochrone,

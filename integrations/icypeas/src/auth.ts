@@ -16,6 +16,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z
         .string()
+        .trim()
+        .min(1)
         .describe('Your Icypeas API key, found in the API section of your dashboard'),
       apiSecret: z
         .string()

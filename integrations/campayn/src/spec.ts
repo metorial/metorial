@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'campayn',
   name: 'Campayn',
   description:
-    'Create, send, and track email marketing campaigns and newsletters. Manage contact lists, subscribers, reports, and web sign-up forms.',
+    'Manage email marketing contacts and subscribers, inspect email campaigns and reports, and retrieve web sign-up forms.',
   metadata: {},
   config,
   auth

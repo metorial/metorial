@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -56,6 +56,16 @@ Use this to track changes, investigate issues, or maintain compliance records.`,
     })
   )
   .handleInvocation(async ctx => {
+    for (let [field, value] of Object.entries({
+      limit: ctx.input.limit,
+      skip: ctx.input.skip
+    })) {
+      if (!Number.isInteger(value) || value < 0) {
+        throw createApiServiceError(`${field} must be a nonnegative whole number.`, {
+          reason: 'invalid_input'
+        });
+      }
+    }
     let client = new KaleidoClient({
       token: ctx.auth.token,
       region: ctx.config.region
@@ -68,15 +78,17 @@ Use this to track changes, investigate issues, or maintain compliance records.`,
     });
 
     let mapped = (Array.isArray(logs) ? logs : []).map((l: any) => ({
-      auditLogId: l._id || undefined,
-      action: l.action || undefined,
-      resourceType: l.resource_type || l.type || undefined,
-      resourceId: l.resource_id || undefined,
-      consortiumId: l.consortium_id || undefined,
-      userId: l.user_id || undefined,
-      orgId: l.org_id || undefined,
-      timestamp: l.created_at || l.timestamp || undefined,
-      message: l.message || undefined
+      auditLogId: l._id ?? undefined,
+      action: l.action ?? undefined,
+      resourceType: l.objectType ?? l.resource_type ?? l.type ?? undefined,
+      resourceId: l.data?._id ?? l.resource_id ?? undefined,
+      consortiumId: l.consortia_id ?? l.consortium_id ?? undefined,
+      userId: l.user_id ?? undefined,
+      orgId: l.org_id ?? undefined,
+      timestamp:
+        l.created_at ??
+        (l.timestamp === undefined || l.timestamp === null ? undefined : String(l.timestamp)),
+      message: l.message ?? undefined
     }));
 
     return {

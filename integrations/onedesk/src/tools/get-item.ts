@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -18,12 +18,14 @@ Returns full details of the item including name, description, status, priority, 
       itemId: z
         .string()
         .optional()
-        .describe('Internal ID of the work item (shown in the OneDesk UI).'),
+        .describe(
+          'Numeric internal ID of the work item shown in OneDesk. create_item returns an external ID instead.'
+        ),
       externalId: z
         .string()
         .optional()
         .describe(
-          'External ID of the work item. Use this if integrating with external systems.'
+          'External ID of the work item, such as the value returned by create_item. Requires an API key connection.'
         )
     })
   )
@@ -43,7 +45,10 @@ Returns full details of the item including name, description, status, priority, 
     });
 
     if (!ctx.input.itemId && !ctx.input.externalId) {
-      throw new Error('Either itemId or externalId must be provided.');
+      throw createApiServiceError(
+        'Provide itemId or externalId. Use externalId for IDs returned by create_item.',
+        { reason: 'invalid_input' }
+      );
     }
 
     let item: any;

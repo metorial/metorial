@@ -44,8 +44,8 @@ export let generateReport = SlateTool.create(spec, {
 
     let params: Record<string, any> = {};
     if (ctx.input.campaignId) params.campaign_id = ctx.input.campaignId;
-    if (ctx.input.dateFrom) params.date_from = ctx.input.dateFrom;
-    if (ctx.input.dateTo) params.date_to = ctx.input.dateTo;
+    if (ctx.input.dateFrom) params.from = ctx.input.dateFrom;
+    if (ctx.input.dateTo) params.to = ctx.input.dateTo;
 
     let result = await client.requestReport(ctx.input.reportName, params);
 

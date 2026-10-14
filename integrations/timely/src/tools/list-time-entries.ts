@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let durationSchema = z
@@ -47,11 +48,12 @@ let timeEntrySchema = z.object({
 export let listTimeEntries = SlateTool.create(spec, {
   name: 'List Time Entries',
   key: 'list_time_entries',
-  description: `Retrieve time entries (events) from Timely. Filter by date range, specific date, user, or project. Supports pagination for large result sets.`,
+  description: `Call list_accounts to choose a workspace when needed. Retrieve time entries (events) from Timely. Filter by date range, specific date, user, or project. Supports pagination for large result sets.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       since: z.string().optional().describe('Start date filter (YYYY-MM-DD)'),
       upto: z
         .string()
@@ -60,7 +62,9 @@ export let listTimeEntries = SlateTool.create(spec, {
       day: z
         .string()
         .optional()
-        .describe('Specific date filter (YYYY-MM-DD). Overrides since/upto'),
+        .describe(
+          'Specific date filter (YYYY-MM-DD). Ignored when both since and upto are provided'
+        ),
       userId: z.string().optional().describe('Filter entries by user ID'),
       projectId: z.string().optional().describe('Filter entries by project ID'),
       page: z.number().optional().describe('Page number (1-based)'),
@@ -76,10 +80,7 @@ export let listTimeEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let events = await client.listEvents({
       since: ctx.input.since,

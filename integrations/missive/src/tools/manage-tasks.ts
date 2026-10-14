@@ -1,24 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapTask, taskOutputSchema } from '../lib/tasks';
 import { spec } from '../spec';
-
-let taskOutputSchema = z.object({
-  taskId: z.string().describe('Task ID'),
-  state: z.string().optional().describe('Task state: todo, in_progress, or closed'),
-  dueAt: z.number().optional().describe('Due date as Unix timestamp'),
-  conversationId: z.string().optional().describe('Parent conversation ID'),
-  teamId: z.string().optional().describe('Team ID'),
-  assignees: z
-    .array(
-      z.object({
-        userId: z.string(),
-        name: z.string().optional()
-      })
-    )
-    .optional(),
-  createdAt: z.number().optional().describe('Creation timestamp')
-});
 
 export let manageTasks = SlateTool.create(spec, {
   name: 'Manage Tasks',
@@ -35,6 +19,12 @@ export let manageTasks = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['create', 'update']).describe('Action to perform'),
+      title: z
+        .string()
+        .max(1000)
+        .optional()
+        .describe('Task title, required when creating a task'),
+      description: z.string().max(10000).optional().describe('Task description'),
       taskId: z.string().optional().describe('Task ID (required for update)'),
       organizationId: z
         .string()
@@ -65,50 +55,59 @@ export let manageTasks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.action === 'create') {
+      if (!ctx.input.title?.trim())
+        throw createApiServiceError('title is required for creating a task.');
+      if (ctx.input.subtask && !ctx.input.conversationId && !ctx.input.references?.length) {
+        throw createApiServiceError(
+          'Provide conversationId or references when creating a subtask.'
+        );
+      }
+      if (!ctx.input.subtask && !ctx.input.teamId && !ctx.input.assignees?.length) {
+        throw createApiServiceError('Provide teamId or assignees for a standalone task.');
+      }
+      if (
+        (ctx.input.teamId || ctx.input.assignees?.length || ctx.input.addUsers?.length) &&
+        !ctx.input.organizationId
+      ) {
+        throw createApiServiceError(
+          'organizationId is required when assigning a new task to users or a team.'
+        );
+      }
+    }
     let fields: Record<string, any> = {};
+    if (ctx.input.title !== undefined) fields.title = ctx.input.title;
+    if (ctx.input.description !== undefined) fields.description = ctx.input.description;
     if (ctx.input.organizationId) fields.organization = ctx.input.organizationId;
     if (ctx.input.teamId) fields.team = ctx.input.teamId;
     if (ctx.input.assignees) fields.assignees = ctx.input.assignees;
-    if (ctx.input.dueAt) fields.due_at = ctx.input.dueAt;
+    if (ctx.input.dueAt !== undefined) fields.due_at = ctx.input.dueAt;
     if (ctx.input.state) fields.state = ctx.input.state;
     if (ctx.input.subtask !== undefined) fields.subtask = ctx.input.subtask;
     if (ctx.input.conversationId) fields.conversation = ctx.input.conversationId;
     if (ctx.input.references) fields.references = ctx.input.references;
-    if (ctx.input.subject) fields.subject = ctx.input.subject;
+    if (ctx.input.subject) fields.conversation_subject = ctx.input.subject;
     if (ctx.input.addUsers) fields.add_users = ctx.input.addUsers;
     if (ctx.input.addToInbox !== undefined) fields.add_to_inbox = ctx.input.addToInbox;
 
     if (ctx.input.action === 'create') {
       let data = await client.createTask(fields);
       let t = data.tasks;
+      if (!t?.id) throw createApiServiceError('Missive did not return the created task.');
       return {
-        output: {
-          taskId: t.id,
-          state: t.state,
-          dueAt: t.due_at,
-          conversationId: t.conversation?.id,
-          teamId: t.team?.id,
-          assignees: t.assignees?.map((a: any) => ({ userId: a.id, name: a.name })),
-          createdAt: t.created_at
-        },
+        output: mapTask(t),
         message: `Created task **${t.id}**.`
       };
     }
 
     // update
-    if (!ctx.input.taskId) throw new Error('taskId is required for updating tasks');
+    if (!ctx.input.taskId)
+      throw createApiServiceError('taskId is required for updating tasks');
     let data = await client.updateTask(ctx.input.taskId, fields);
     let t = data.tasks;
+    if (!t?.id) throw createApiServiceError('Missive did not return the task.');
     return {
-      output: {
-        taskId: t.id,
-        state: t.state,
-        dueAt: t.due_at,
-        conversationId: t.conversation?.id,
-        teamId: t.team?.id,
-        assignees: t.assignees?.map((a: any) => ({ userId: a.id, name: a.name })),
-        createdAt: t.created_at
-      },
+      output: mapTask(t),
       message: `Updated task **${ctx.input.taskId}**.`
     };
   })

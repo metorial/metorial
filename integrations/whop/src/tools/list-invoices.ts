@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let invoiceSchema = z.object({
@@ -24,12 +25,9 @@ export let listInvoices = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      companyId: z
-        .string()
-        .optional()
-        .describe('Company ID. Uses config companyId if not provided.'),
+      companyId: companyIdSchema,
       statuses: z
-        .array(z.enum(['draft', 'open', 'paid', 'past_due', 'void']))
+        .array(z.enum(['draft', 'open', 'paid', 'past_due', 'uncollectible', 'void']))
         .optional()
         .describe('Filter by invoice status'),
       productIds: z.array(z.string()).optional().describe('Filter by product IDs'),
@@ -48,7 +46,7 @@ export let listInvoices = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let companyId = ctx.input.companyId || ctx.config.companyId;
-    if (!companyId) throw new Error('companyId is required');
+    if (!companyId) throw createApiServiceError('companyId is required');
 
     let client = new WhopClient(ctx.auth.token);
     let result = await client.listInvoices({

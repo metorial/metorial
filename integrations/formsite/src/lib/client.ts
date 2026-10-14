@@ -1,4 +1,62 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  pickDefined
+} from 'slates';
+
+interface ApiForm {
+  directory: string;
+  name: string;
+  description?: string | null;
+  state: string;
+  publish?: { link?: string; embed_code?: string };
+  stats?: {
+    filesSize?: number;
+    resultsCount?: number;
+    files_size?: number;
+    results_count?: number;
+  };
+}
+
+interface ApiItem {
+  id: string;
+  position?: number;
+  label?: string;
+  children?: Array<string | ApiItem>;
+}
+
+interface ApiResult {
+  id: string | number;
+  date_start?: string;
+  date_finish?: string;
+  date_update?: string;
+  result_status?: string;
+  user_ip?: string;
+  user_browser?: string;
+  user_device?: string;
+  user_referrer?: string;
+  login_username?: string | null;
+  login_email?: string | null;
+  payment_status?: string | null;
+  payment_amount?: string | number | null;
+  user?: { ip?: string; browser?: string; device?: string; referrer?: string };
+  login?: { username?: string; email?: string };
+  payment?: { status?: string; amount?: string | number };
+  items?: Array<{
+    id: string;
+    position?: number;
+    value?: string;
+    values?: FormsiteChoice[];
+  }>;
+}
+
+interface ApiWebhook {
+  url: string;
+  event: string;
+  handshake_key?: string | null;
+}
 
 export interface FormsiteForm {
   formDir: string;
@@ -16,6 +74,13 @@ export interface FormsiteItem {
   position: number;
   label: string;
   children?: FormsiteItem[];
+  childItemIds?: string[];
+}
+
+export interface FormsiteChoice {
+  value: string;
+  position?: number;
+  other?: string;
 }
 
 export interface FormsiteResult {
@@ -32,7 +97,12 @@ export interface FormsiteResult {
   loginEmail?: string;
   paymentStatus?: string;
   paymentAmount?: string;
-  items: Array<{ itemId: string; value: string }>;
+  items: Array<{
+    itemId: string;
+    value: string;
+    position?: number;
+    values?: FormsiteChoice[];
+  }>;
 }
 
 export interface FormsiteWebhook {
@@ -66,32 +136,45 @@ export interface PaginationInfo {
 }
 
 export class FormsiteClient {
-  private axios: ReturnType<typeof createAxios>;
-  private userDir: string;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; server: string; userDir: string }) {
-    this.userDir = config.userDir;
-    this.axios = createAxios({
-      baseURL: `https://${config.server}.formsite.com/api/v2/${config.userDir}`,
-      headers: {
-        Authorization: `bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+    let server = config.server.trim();
+    let userDir = config.userDir.trim();
+    if (!/^fs\d+$/.test(server) || !userDir || !config.token.trim()) {
+      throw createApiServiceError(
+        'Provide an API token, account directory, and Formsite server prefix such as fs1.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
+      baseURL: `https://${server}.formsite.com/api/v2/${encodeURIComponent(userDir)}`,
+      timeout: 30_000,
+      authHeader: { value: `bearer ${config.token.trim()}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Formsite',
+          reason: 'formsite_api_request_failed'
+        })
     });
   }
 
   // ---- Forms ----
 
   async listForms(): Promise<FormsiteForm[]> {
-    let response = await this.axios.get('/forms');
+    let response = await this.axios.get<{ forms: ApiForm[] }>('/forms');
     let forms = response.data.forms || [];
-    return forms.map((f: any) => this.normalizeForm(f));
+    return forms.map(form => this.normalizeForm(form));
   }
 
   async getForm(formDir: string): Promise<FormsiteForm> {
-    let response = await this.axios.get(`/forms/${formDir}`);
+    let response = await this.axios.get<{ forms: ApiForm[] }>(this.formPath(formDir));
     let forms = response.data.forms || [];
-    return this.normalizeForm(forms[0] || response.data);
+    if (!forms[0]) {
+      throw createApiServiceError('The requested Formsite form was not found.', {
+        upstreamStatus: 404
+      });
+    }
+    return this.normalizeForm(forms[0]);
   }
 
   // ---- Items ----
@@ -100,9 +183,12 @@ export class FormsiteClient {
     let params: Record<string, string> = {};
     if (resultsLabels) params.results_labels = resultsLabels;
 
-    let response = await this.axios.get(`/forms/${formDir}/items`, { params });
+    let response = await this.axios.get<{ items: ApiItem[] }>(
+      `${this.formPath(formDir)}/items`,
+      { params }
+    );
     let items = response.data.items || [];
-    return items.map((item: any) => this.normalizeItem(item));
+    return items.map(item => this.normalizeItem(item));
   }
 
   // ---- Results ----
@@ -114,6 +200,20 @@ export class FormsiteClient {
     results: FormsiteResult[];
     pagination: PaginationInfo;
   }> {
+    if (
+      queryParams?.limit !== undefined &&
+      (!Number.isInteger(queryParams.limit) ||
+        queryParams.limit < 1 ||
+        queryParams.limit > 500)
+    ) {
+      throw createApiServiceError('limit must be a whole number between 1 and 500.');
+    }
+    if (
+      queryParams?.page !== undefined &&
+      (!Number.isInteger(queryParams.page) || queryParams.page < 1)
+    ) {
+      throw createApiServiceError('page must be a positive whole number.');
+    }
     let params: Record<string, string> = {};
 
     if (queryParams?.afterDate) params.after_date = queryParams.afterDate;
@@ -148,35 +248,57 @@ export class FormsiteClient {
       }
     }
 
-    let response = await this.axios.get(`/forms/${formDir}/results`, { params });
+    let response = await this.axios.get<{ results: ApiResult[] }>(
+      `${this.formPath(formDir)}/results`,
+      { params }
+    );
 
-    let headers = response.headers || {};
-    let getHeaderValue = (name: string, fallback: string): string => {
-      let value = headers[name];
-      if (typeof value === 'string') return value;
-      if (typeof value === 'number') return String(value);
-      if (Array.isArray(value)) return value[0] || fallback;
-      return fallback;
+    let paginationValue = (name: string, fallback: number): number => {
+      let value = Number(getResponseHeaderValue(response.headers, name));
+      return Number.isInteger(value) && value > 0 ? value : fallback;
     };
     let pagination: PaginationInfo = {
-      limit: Number.parseInt(getHeaderValue('pagination-limit', '100'), 10),
-      pageCurrent: Number.parseInt(getHeaderValue('pagination-page-current', '1'), 10),
-      pageLast: Number.parseInt(getHeaderValue('pagination-page-last', '1'), 10)
+      limit: paginationValue('pagination-limit', queryParams?.limit ?? 100),
+      pageCurrent: paginationValue('pagination-page-current', queryParams?.page ?? 1),
+      pageLast: paginationValue('pagination-page-last', queryParams?.page ?? 1)
     };
 
     let results = response.data.results || [];
     return {
-      results: results.map((r: any) => this.normalizeResult(r)),
+      results: results.map(result => this.normalizeResult(result)),
       pagination
     };
+  }
+
+  async getFormResult(
+    formDir: string,
+    resultId: string,
+    resultsView?: string
+  ): Promise<FormsiteResult> {
+    if (!resultId.trim()) {
+      throw createApiServiceError('resultId is required.');
+    }
+    let { results } = await this.getFormResults(formDir, {
+      searchEquals: { result_id: resultId },
+      limit: 1,
+      resultsView
+    });
+    if (!results[0]) {
+      throw createApiServiceError('The requested Formsite result was not found.', {
+        upstreamStatus: 404
+      });
+    }
+    return results[0];
   }
 
   // ---- Webhooks ----
 
   async listWebhooks(formDir: string): Promise<FormsiteWebhook[]> {
-    let response = await this.axios.get(`/forms/${formDir}/webhooks`);
+    let response = await this.axios.get<{ webhooks: ApiWebhook[] }>(
+      `${this.formPath(formDir)}/webhooks`
+    );
     let webhooks = response.data.webhooks || [];
-    return webhooks.map((w: any) => this.normalizeWebhook(w));
+    return webhooks.map(webhook => this.normalizeWebhook(webhook));
   }
 
   async createOrUpdateWebhook(
@@ -187,26 +309,40 @@ export class FormsiteClient {
       handshakeKey?: string;
     }
   ): Promise<FormsiteWebhook> {
-    let body: Record<string, string> = {
+    let query = pickDefined({
       url: params.url,
-      event: params.event || 'result_completed'
-    };
-    if (params.handshakeKey) body.handshake_key = params.handshakeKey;
+      event: params.event || 'result_completed',
+      handshake_key: params.handshakeKey
+    });
 
-    let response = await this.axios.post(`/forms/${formDir}/webhooks`, body);
-    let webhook = response.data.webhook || response.data;
+    let response = await this.axios.post<{ webhook: ApiWebhook }>(
+      `${this.formPath(formDir)}/webhooks`,
+      undefined,
+      { params: query }
+    );
+    let webhook = response.data.webhook;
+    if (!webhook) {
+      throw createApiServiceError('Formsite did not return the created or updated webhook.');
+    }
     return this.normalizeWebhook(webhook);
   }
 
   async deleteWebhook(formDir: string, url: string): Promise<void> {
-    await this.axios.delete(`/forms/${formDir}/webhooks`, {
-      data: { url }
+    await this.axios.delete(`${this.formPath(formDir)}/webhooks`, {
+      params: { url }
     });
   }
 
-  // ---- Normalizers ----
+  private formPath(formDir: string): string {
+    if (!formDir.trim()) {
+      throw createApiServiceError(
+        'formDir is required. Call list_forms to discover form directories.'
+      );
+    }
+    return `/forms/${encodeURIComponent(formDir)}`;
+  }
 
-  private normalizeForm(data: any): FormsiteForm {
+  private normalizeForm(data: ApiForm): FormsiteForm {
     return {
       formDir: data.directory || '',
       name: data.name || '',
@@ -214,55 +350,63 @@ export class FormsiteClient {
       state: data.state || '',
       publishUrl: data.publish?.link || '',
       embedCode: data.publish?.embed_code || '',
-      filesSize: data.stats?.files_size || 0,
-      resultsCount: data.stats?.results_count || 0
+      filesSize: data.stats?.filesSize ?? data.stats?.files_size ?? 0,
+      resultsCount: data.stats?.resultsCount ?? data.stats?.results_count ?? 0
     };
   }
 
-  private normalizeItem(data: any): FormsiteItem {
+  private normalizeItem(data: ApiItem): FormsiteItem {
     let item: FormsiteItem = {
       itemId: data.id || '',
       position: data.position || 0,
       label: data.label || ''
     };
     if (data.children && Array.isArray(data.children)) {
-      item.children = data.children.map((c: any) => this.normalizeItem(c));
+      item.childItemIds = data.children.map(child =>
+        typeof child === 'string' ? child : child.id
+      );
+      item.children = data.children.map(child =>
+        this.normalizeItem(typeof child === 'string' ? { id: child } : child)
+      );
     }
     return item;
   }
 
-  private normalizeResult(data: any): FormsiteResult {
-    let items: Array<{ itemId: string; value: string }> = [];
+  private normalizeResult(data: ApiResult): FormsiteResult {
+    let paymentAmount = data.payment_amount ?? data.payment?.amount;
+    let items: FormsiteResult['items'] = [];
     if (data.items && Array.isArray(data.items)) {
-      items = data.items.map((item: any) => ({
+      items = data.items.map(item => ({
         itemId: item.id || '',
-        value: item.value || ''
+        value: item.value ?? item.values?.map(choice => choice.value).join(', ') ?? '',
+        position: item.position,
+        values: item.values
       }));
     }
 
     return {
-      resultId: data.id ? String(data.id) : '',
+      resultId: String(data.id),
       dateStart: data.date_start || '',
       dateFinish: data.date_finish || '',
       dateUpdate: data.date_update || '',
-      userIp: data.user?.ip || '',
-      userBrowser: data.user?.browser || '',
-      userDevice: data.user?.device || '',
-      userReferrer: data.user?.referrer || '',
+      userIp: data.user_ip ?? data.user?.ip ?? '',
+      userBrowser: data.user_browser ?? data.user?.browser ?? '',
+      userDevice: data.user_device ?? data.user?.device ?? '',
+      userReferrer: data.user_referrer ?? data.user?.referrer ?? '',
       resultStatus: data.result_status || '',
-      loginUsername: data.login?.username,
-      loginEmail: data.login?.email,
-      paymentStatus: data.payment?.status,
-      paymentAmount: data.payment?.amount,
+      loginUsername: data.login_username ?? data.login?.username,
+      loginEmail: data.login_email ?? data.login?.email,
+      paymentStatus: data.payment_status ?? data.payment?.status,
+      paymentAmount: paymentAmount != null ? String(paymentAmount) : undefined,
       items
     };
   }
 
-  private normalizeWebhook(data: any): FormsiteWebhook {
+  private normalizeWebhook(data: ApiWebhook): FormsiteWebhook {
     return {
       url: data.url || '',
       event: data.event || '',
-      handshakeKey: data.handshake_key
+      handshakeKey: data.handshake_key ?? undefined
     };
   }
 }

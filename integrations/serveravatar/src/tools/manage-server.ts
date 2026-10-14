@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageServer = SlateTool.create(spec, {
   name: 'Manage Server',
   key: 'manage_server',
   description: `Perform management actions on a server: restart, destroy, update general settings, or update security settings.
-Choose an action and provide the required parameters for that action.`,
+Choose an action and provide the required parameters for that action.
+${organizationScopeGuidance}`,
   instructions: [
     'For "updateGeneral": name, hostname, and timezone are required.',
     'For "updateSecurity": redisPassword, sshPort, permitRootLogin, and rootPasswordAuthentication are required.',
@@ -20,7 +22,7 @@ Choose an action and provide the required parameters for that action.`,
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       action: z
         .enum(['restart', 'destroy', 'updateGeneral', 'updateSecurity'])
@@ -70,7 +72,8 @@ Choose an action and provide the required parameters for that action.`,
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId, action } = ctx.input;
 
@@ -101,7 +104,7 @@ Choose an action and provide the required parameters for that action.`,
 
     if (action === 'updateGeneral') {
       if (!ctx.input.generalSettings)
-        throw new Error('generalSettings is required for updateGeneral action');
+        throw createApiServiceError('generalSettings is required for updateGeneral action');
       let settings = ctx.input.generalSettings;
       let result = await client.updateServerGeneralSettings(orgId, serverId, {
         name: settings.name,
@@ -123,7 +126,7 @@ Choose an action and provide the required parameters for that action.`,
 
     if (action === 'updateSecurity') {
       if (!ctx.input.securitySettings)
-        throw new Error('securitySettings is required for updateSecurity action');
+        throw createApiServiceError('securitySettings is required for updateSecurity action');
       let settings = ctx.input.securitySettings;
       let result = await client.updateServerSecuritySettings(orgId, serverId, {
         redisPassword: settings.redisPassword,
@@ -145,6 +148,6 @@ Choose an action and provide the required parameters for that action.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

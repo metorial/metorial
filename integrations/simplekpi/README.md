@@ -1,6 +1,6 @@
-# Simplekpi
+# SimpleKPI
 
-Track and manage key performance indicators (KPIs) for business performance management. Create, update, and delete KPIs with configurable frequencies, units, icons, and aggregation methods. Record actual and target values over time, organize KPIs into categories, and assign KPIs to users. Manage users, groups, and organizational structures. Query aggregated KPI data for reporting, filtered by date range, users, KPIs, and group items. Supports KPI data entry with options to set or increment values, and configure measurement units and tracking frequencies.
+Connect to the SimpleKPI Classic Developer API to track and manage key performance indicators (KPIs) for business performance management. Create, update, and delete KPIs with configurable frequencies, units, icons, and aggregation methods. Record actual and target values over time, organize KPIs into categories, and assign KPIs to users. Manage users, groups, and organizational structures. Query aggregated KPI data for reporting, filtered by date range, users, KPIs, and group items. Read individual users and KPI entries, and update user-specific KPI targets without removing assignments. Supports KPI data entry with options to set or increment values, and configure measurement units and tracking frequencies.
 
 ## License
 

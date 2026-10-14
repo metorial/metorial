@@ -3,6 +3,8 @@ import { spec } from './spec';
 import {
   checkStatus,
   deleteTemplate,
+  downloadDocument,
+  downloadTemplate,
   listCategoriesAndTags,
   listTemplates,
   renderDocument,
@@ -16,6 +18,8 @@ export let provider = Slate.create({
     listTemplates,
     updateTemplate,
     deleteTemplate,
+    downloadTemplate,
+    downloadDocument,
     renderDocument,
     checkStatus,
     listCategoriesAndTags

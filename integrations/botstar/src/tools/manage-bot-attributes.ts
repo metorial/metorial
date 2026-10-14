@@ -1,16 +1,18 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { BotstarClient } from '../lib/client';
+import { botIdSchema, botScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageBotAttributes = SlateTool.create(spec, {
   name: 'Manage Bot Attributes',
   key: 'manage_bot_attributes',
-  description: `List, create, update, or delete bot-level attributes (variables). Bot attributes store global data for a bot and support multiple data types. Use "list" to view all attributes, "create" to add one, "update" to modify an existing attribute's value or description, or "delete" to remove one.`
+  tags: { destructive: true },
+  description: `List, create, update, or delete bot-level attributes (variables). Bot attributes store global data for a bot and support multiple data types. Use "list" to view all attributes, "create" to add one, "update" to modify an existing attribute's value or description, or "delete" to remove one. ${botScopeGuidance}`
 })
   .input(
     z.object({
-      botId: z.string().describe('ID of the bot'),
+      botId: botIdSchema,
       action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform'),
       attributeId: z
         .string()
@@ -23,7 +25,10 @@ export let manageBotAttributes = SlateTool.create(spec, {
         .describe('Data type (required for create)'),
       description: z.string().optional().describe('Description of the attribute'),
       value: z.string().optional().describe('Value of the attribute'),
-      env: z.enum(['draft', 'live']).optional().describe('Environment (draft or live)')
+      env: z
+        .enum(['draft', 'live'])
+        .optional()
+        .describe('Environment to list; mutations with live update both draft and live')
     })
   )
   .output(
@@ -52,9 +57,9 @@ export let manageBotAttributes = SlateTool.create(spec, {
       let attrs = await client.listBotAttributes(botId, env);
       let mapped = (Array.isArray(attrs) ? attrs : []).map((attr: any) => ({
         attributeId: attr.id || attr._id || '',
-        name: attr.name,
-        dataType: attr.data_type,
-        description: attr.desc,
+        name: attr.name ?? undefined,
+        dataType: attr.data_type ?? undefined,
+        description: attr.desc ?? undefined,
         value: attr.value
       }));
       return {
@@ -64,8 +69,9 @@ export let manageBotAttributes = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating an attribute.');
-      if (!dataType) throw new Error('Data type is required when creating an attribute.');
+      if (!name) throw createApiServiceError('Name is required when creating an attribute.');
+      if (!dataType)
+        throw createApiServiceError('Data type is required when creating an attribute.');
       let result = await client.createBotAttribute(
         botId,
         { name, dataType, desc: description, value },
@@ -81,10 +87,14 @@ export let manageBotAttributes = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!attributeId) throw new Error('Attribute ID is required for updating.');
+      if (!attributeId) throw createApiServiceError('Attribute ID is required for updating.');
       let updates: { desc?: string; value?: string } = {};
       if (description !== undefined) updates.desc = description;
       if (value !== undefined) updates.value = value;
+      if (Object.keys(updates).length === 0)
+        throw createApiServiceError(
+          'Provide a description or value when updating an attribute.'
+        );
       await client.updateBotAttribute(botId, attributeId, updates, env);
       return {
         output: { attributeId, success: true },
@@ -93,7 +103,7 @@ export let manageBotAttributes = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!attributeId) throw new Error('Attribute ID is required for deleting.');
+      if (!attributeId) throw createApiServiceError('Attribute ID is required for deleting.');
       await client.deleteBotAttribute(botId, attributeId, env);
       return {
         output: { attributeId, success: true },
@@ -101,6 +111,6 @@ export let manageBotAttributes = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

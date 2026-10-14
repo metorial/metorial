@@ -43,9 +43,9 @@ export let listForms = SlateTool.create(spec, {
       query: ctx.input.query
     });
 
-    let items = Array.isArray(data) ? data : (data?.items ?? data?.forms ?? []);
+    let items = data;
 
-    let forms = items.map((f: any) => ({
+    let forms = items.map(f => ({
       formId: f.id,
       uuid: f.uuid ?? '',
       name: f.name ?? '',

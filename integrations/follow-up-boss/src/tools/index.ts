@@ -13,3 +13,4 @@ export * from './manage-task';
 export * from './search-contacts';
 export * from './send-event';
 export * from './send-text-message';
+export * from './who-am-i';

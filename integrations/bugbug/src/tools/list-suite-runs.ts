@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, durationMilliseconds } from '../lib/client';
 import { spec } from '../spec';
 
 export let listSuiteRuns = SlateTool.create(spec, {
@@ -13,6 +13,23 @@ export let listSuiteRuns = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      suiteId: z.string().optional().describe('Filter runs by a suite ID from list_suites'),
+      status: z
+        .enum([
+          'passed',
+          'failed',
+          'running',
+          'queued',
+          'error',
+          'stopped',
+          'initialized',
+          'auto_retrying',
+          'paused',
+          'recording',
+          'skipped'
+        ])
+        .optional()
+        .describe('Filter by current run status'),
       startedAfter: z
         .string()
         .optional()
@@ -32,7 +49,7 @@ export let listSuiteRuns = SlateTool.create(spec, {
       suiteRuns: z.array(
         z.object({
           suiteRunId: z.string().describe('Unique identifier of the suite run'),
-          suiteId: z.string().describe('ID of the suite'),
+          suiteId: z.string().nullable().describe('ID of the suite'),
           suiteName: z.string().describe('Name of the suite'),
           status: z.string().describe('Final or current status'),
           started: z.string().nullable().describe('ISO timestamp when the run started'),
@@ -51,6 +68,8 @@ export let listSuiteRuns = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.listSuiteRuns({
+      suiteId: ctx.input.suiteId,
+      status: ctx.input.status,
       startedAfter: ctx.input.startedAfter,
       startedBefore: ctx.input.startedBefore,
       page: ctx.input.page,
@@ -61,22 +80,22 @@ export let listSuiteRuns = SlateTool.create(spec, {
     let suiteRuns = result.results.map(r => ({
       suiteRunId: r.id,
       suiteId: r.suiteId,
-      suiteName: r.suiteName,
+      suiteName: r.name,
       status: r.status,
       started: r.started,
-      finished: r.finished,
-      duration: r.duration,
-      runProfileName: r.runProfileName,
-      testRunsCount: r.testRunsCount,
-      passedTestRunsCount: r.passedTestRunsCount,
-      failedTestRunsCount: r.failedTestRunsCount
+      finished: r.ended,
+      duration: durationMilliseconds(r),
+      runProfileName: r.profileName,
+      testRunsCount: r.testRuns.length,
+      passedTestRunsCount: r.testRuns.filter(test => test.status === 'passed').length,
+      failedTestRunsCount: r.testRuns.filter(test => test.status === 'failed').length
     }));
 
     return {
       output: {
         totalCount: result.count,
         suiteRuns,
-        hasMore: result.next !== null
+        hasMore: Boolean(result.next)
       },
       message: `Found **${result.count}** suite run(s). Returned ${suiteRuns.length} on this page.`
     };

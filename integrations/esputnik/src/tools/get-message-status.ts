@@ -37,9 +37,20 @@ export let getMessageStatus = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getMessageStatus(ctx.input.requestIds);
 
-    let results = Array.isArray(result.results)
-      ? result.results
-      : [result.results].filter(Boolean);
+    let envelopes = Array.isArray(result) ? result : [result];
+    let results = envelopes
+      .flatMap(envelope =>
+        Array.isArray(envelope.results)
+          ? envelope.results
+          : envelope.results
+            ? [envelope.results]
+            : []
+      )
+      .map(status => ({
+        ...status,
+        delivered: status.delivered == null ? undefined : String(status.delivered),
+        failed: status.failed == null ? undefined : String(status.failed)
+      }));
 
     return {
       output: { results },

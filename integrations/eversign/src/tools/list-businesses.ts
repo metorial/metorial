@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { asOptionalString, createClient, isEnabled } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listBusinesses = SlateTool.create(spec, {
@@ -37,9 +37,9 @@ export let listBusinesses = SlateTool.create(spec, {
       businessId: b.business_id,
       businessName: b.business_name || '',
       businessIdentifier: b.business_identifier || undefined,
-      businessStatus: b.business_status || undefined,
-      isPrimary: b.is_primary === 1 || b.is_primary === true,
-      createdAt: b.creation_time_stamp ?? undefined
+      businessStatus: asOptionalString(b.business_status),
+      isPrimary: isEnabled(b.is_primary),
+      createdAt: asOptionalString(b.creation_time_stamp)
     }));
 
     return {

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listAssets = SlateTool.create(spec, {
   name: 'List Assets',
   key: 'list_assets',
-  description: `Lists assets from MaintainX with optional filtering by location. Supports cursor-based pagination. Returns a summary of each asset.`,
+  description: `Lists assets from MaintainX with optional filtering by location. Supports cursor-based pagination. Returns a summary of each asset. For multi-organization keys, call list_organizations and pass organizationId.`,
   constraints: ['Maximum 200 results per page. Use cursor for pagination.'],
   tags: {
     destructive: false,
@@ -15,8 +16,15 @@ export let listAssets = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       locationId: z.number().optional().describe('Filter by location ID'),
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -41,27 +49,25 @@ export let listAssets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listAssets({
       locationId: ctx.input.locationId,
+      expand: ['manufacturer', 'model'],
       limit: ctx.input.limit,
       cursor: ctx.input.cursor
     });
 
     let assets = (result.assets ?? []).map((a: any) => ({
-      assetId: a.id,
-      name: a.name,
-      description: a.description,
-      serialNumber: a.serialNumber,
-      manufacturer: a.manufacturer,
-      model: a.model,
-      locationId: a.locationId,
-      createdAt: a.createdAt,
-      updatedAt: a.updatedAt
+      assetId: a.id ?? undefined,
+      name: a.name ?? undefined,
+      description: a.description ?? undefined,
+      serialNumber: a.serialNumber ?? undefined,
+      manufacturer: a.manufacturer ?? undefined,
+      model: a.model ?? undefined,
+      locationId: a.locationId ?? undefined,
+      createdAt: a.createdAt ?? undefined,
+      updatedAt: a.updatedAt ?? undefined
     }));
 
     return {

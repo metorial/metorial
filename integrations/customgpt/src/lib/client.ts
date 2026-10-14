@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage,
+  isApiErrorRecord
+} from 'slates';
 
 export interface PaginatedResponse<T> {
   currentPage: number;
@@ -67,15 +73,48 @@ export interface Page {
 }
 
 export class CustomGPTClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A CustomGPT API key is required. Reconnect with a valid key.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://app.customgpt.ai/api/v1',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        Accept: 'application/json'
+      timeout: 60000,
+      authHeader: { value: `Bearer ${config.token}` },
+      contentType: false,
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'CustomGPT',
+          reason: 'customgpt_api_error'
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.status === 'error') {
+        let details = isApiErrorRecord(response.data.data)
+          ? response.data.data
+          : response.data;
+        throw createApiServiceError(
+          `CustomGPT API request failed: ${extractApiErrorMessage(response.data, {
+            response: { data: response.data },
+            nestedKeys: ['data', 'errors'],
+            fallbackMessage: 'CustomGPT request failed.'
+          })}`,
+          {
+            reason: 'customgpt_api_error',
+            upstreamStatus: response.status,
+            upstreamCode:
+              typeof details.code === 'string' || typeof details.code === 'number'
+                ? String(details.code)
+                : undefined
+          }
+        );
       }
+      return response;
     });
   }
 
@@ -95,13 +134,15 @@ export class CustomGPTClient {
 
     let response = await this.axios.get('/projects', { params: queryParams });
     let data = response.data?.data;
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned an invalid paginated response.');
 
     return {
-      currentPage: data.current_page,
-      perPage: data.per_page,
-      total: data.total,
-      lastPage: data.last_page,
-      items: (data.data as Record<string, unknown>[]).map(p => this.normalizeAgent(p))
+      currentPage: typeof data.current_page === 'number' ? data.current_page : 1,
+      perPage: typeof data.per_page === 'number' ? data.per_page : 20,
+      total: typeof data.total === 'number' ? data.total : this.readItems(data).length,
+      lastPage: typeof data.last_page === 'number' ? data.last_page : 1,
+      items: this.readItems(data).map(p => this.normalizeAgent(p))
     };
   }
 
@@ -120,7 +161,7 @@ export class CustomGPTClient {
     formData.append('project_name', params.projectName);
     if (params.sitemapPath !== undefined) formData.append('sitemap_path', params.sitemapPath);
     if (params.isOcrEnabled !== undefined)
-      formData.append('is_ocr_enabled', String(params.isOcrEnabled));
+      formData.append('is_ocr_enabled', params.isOcrEnabled ? '1' : '0');
     if (params.isVisionEnabled !== undefined)
       formData.append('is_vision_enabled', String(params.isVisionEnabled));
 
@@ -145,7 +186,7 @@ export class CustomGPTClient {
     if (params.sitemapPath !== undefined) formData.append('sitemap_path', params.sitemapPath);
     if (params.isShared !== undefined) formData.append('is_shared', String(params.isShared));
     if (params.isOcrEnabled !== undefined)
-      formData.append('is_ocr_enabled', String(params.isOcrEnabled));
+      formData.append('is_ocr_enabled', params.isOcrEnabled ? '1' : '0');
     if (params.areLicensesAllowed !== undefined)
       formData.append('are_licenses_allowed', String(params.areLicensesAllowed));
 
@@ -188,13 +229,15 @@ export class CustomGPTClient {
       params: queryParams
     });
     let data = response.data?.data;
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned an invalid paginated response.');
 
     return {
-      currentPage: data.current_page,
-      perPage: data.per_page,
-      total: data.total,
-      lastPage: data.last_page,
-      items: (data.data as Record<string, unknown>[]).map(c => this.normalizeConversation(c))
+      currentPage: typeof data.current_page === 'number' ? data.current_page : 1,
+      perPage: typeof data.per_page === 'number' ? data.per_page : 20,
+      total: typeof data.total === 'number' ? data.total : this.readItems(data).length,
+      lastPage: typeof data.last_page === 'number' ? data.last_page : 1,
+      items: this.readItems(data).map(c => this.normalizeConversation(c))
     };
   }
 
@@ -222,24 +265,16 @@ export class CustomGPTClient {
     if (params.name !== undefined) body.name = params.name;
 
     let response = await this.axios.put(
-      `/projects/${projectId}/conversations/${sessionId}`,
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}`,
       body
     );
     return this.normalizeConversation(response.data?.data);
   }
 
   async deleteConversation(projectId: number, sessionId: string): Promise<void> {
-    await this.axios.delete(`/projects/${projectId}/conversations/${sessionId}`);
-  }
-
-  async exportConversation(
-    projectId: number,
-    sessionId: string
-  ): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(
-      `/projects/${projectId}/conversations/${sessionId}/export`
+    await this.axios.delete(
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}`
     );
-    return response.data?.data;
   }
 
   // ---- Messages ----
@@ -257,17 +292,19 @@ export class CustomGPTClient {
     if (params?.order !== undefined) queryParams.order = params.order;
 
     let response = await this.axios.get(
-      `/projects/${projectId}/conversations/${sessionId}/messages`,
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}/messages`,
       { params: queryParams }
     );
-    let data = response.data?.data;
+    let data = response.data?.messages ?? response.data?.data?.messages ?? response.data?.data;
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned an invalid paginated response.');
 
     return {
-      currentPage: data.current_page ?? 1,
-      perPage: data.per_page ?? 20,
-      total: data.total ?? 0,
-      lastPage: data.last_page ?? 1,
-      items: (data.data as Record<string, unknown>[]).map(m => this.normalizeMessage(m))
+      currentPage: typeof data.current_page === 'number' ? data.current_page : 1,
+      perPage: typeof data.per_page === 'number' ? data.per_page : 20,
+      total: typeof data.total === 'number' ? data.total : this.readItems(data).length,
+      lastPage: typeof data.last_page === 'number' ? data.last_page : 1,
+      items: this.readItems(data).map(m => this.normalizeMessage(m))
     };
   }
 
@@ -284,13 +321,14 @@ export class CustomGPTClient {
     let body: Record<string, unknown> = {
       prompt: params.message
     };
-    if (params.lang !== undefined) body.lang = params.lang;
+    let query = { stream: false, lang: params.lang };
     if (params.labels !== undefined) body.labels = params.labels;
     if (params.labelsExclusive !== undefined) body.labels_exclusive = params.labelsExclusive;
 
     let response = await this.axios.post(
-      `/projects/${projectId}/conversations/${sessionId}/messages`,
-      body
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}/messages`,
+      body,
+      { params: query }
     );
     return this.normalizeMessage(response.data?.data);
   }
@@ -298,12 +336,17 @@ export class CustomGPTClient {
   async getMessageDetails(
     projectId: number,
     sessionId: string,
-    promptId: number
+    promptId: number,
+    includeInsights?: boolean
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/projects/${projectId}/conversations/${sessionId}/messages/${promptId}`
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}/messages/${promptId}`,
+      { params: { includeInsights } }
     );
-    return response.data?.data;
+    if (!isApiErrorRecord(response.data?.data)) {
+      throw createApiServiceError('CustomGPT returned invalid message details.');
+    }
+    return response.data.data;
   }
 
   async submitMessageFeedback(
@@ -312,10 +355,17 @@ export class CustomGPTClient {
     promptId: number,
     feedback: string
   ): Promise<void> {
+    let reaction =
+      feedback === 'thumbs_up' ? 'liked' : feedback === 'thumbs_down' ? 'disliked' : feedback;
+    if (!['neutral', 'liked', 'disliked'].includes(reaction)) {
+      throw createApiServiceError(
+        'feedback must be liked, disliked, neutral, thumbs_up, or thumbs_down.'
+      );
+    }
     await this.axios.put(
-      `/projects/${projectId}/conversations/${sessionId}/messages/${promptId}/feedback`,
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}/messages/${promptId}/feedback`,
       {
-        feedback
+        reaction
       }
     );
   }
@@ -326,9 +376,9 @@ export class CustomGPTClient {
     promptId: number
   ): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(
-      `/projects/${projectId}/conversations/${sessionId}/messages/${promptId}/claims`
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}/messages/${promptId}/claims`
     );
-    return response.data?.data ?? [];
+    return this.readItems(response.data?.data);
   }
 
   async getMessageTrustScore(
@@ -337,7 +387,7 @@ export class CustomGPTClient {
     promptId: number
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.get(
-      `/projects/${projectId}/conversations/${sessionId}/messages/${promptId}/trust-score`
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}/messages/${promptId}/trust-score`
     );
     return response.data?.data;
   }
@@ -348,7 +398,7 @@ export class CustomGPTClient {
     promptId: number
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.post(
-      `/projects/${projectId}/conversations/${sessionId}/messages/${promptId}/verify`
+      `/projects/${projectId}/conversations/${encodeURIComponent(sessionId)}/messages/${promptId}/verify`
     );
     return response.data?.data;
   }
@@ -357,8 +407,20 @@ export class CustomGPTClient {
 
   async listSources(projectId: number): Promise<Source[]> {
     let response = await this.axios.get(`/projects/${projectId}/sources`);
-    let items = response.data?.data?.data ?? response.data?.data ?? [];
-    return (items as Record<string, unknown>[]).map(s => this.normalizeSource(s));
+    let data = response.data?.data;
+    let items: Record<string, unknown>[];
+    if (Array.isArray(data) || Array.isArray(data?.data)) {
+      items = this.readItems(data);
+    } else if (isApiErrorRecord(data)) {
+      items = Object.values(data).flatMap(group => {
+        if (Array.isArray(group)) return this.readItems(group);
+        if (isApiErrorRecord(group) && typeof group.id === 'number') return [group];
+        return [];
+      });
+    } else {
+      throw createApiServiceError('CustomGPT returned an invalid source list.');
+    }
+    return items.map(source => this.normalizeSource(source));
   }
 
   async addSource(
@@ -372,11 +434,13 @@ export class CustomGPTClient {
     }
   ): Promise<Source> {
     let formData = new FormData();
-    formData.append('source_type', params.sourceType);
+    if (!params.sourceUrl) {
+      throw createApiServiceError('sourceUrl is required to add a URL or sitemap source.');
+    }
     if (params.sourceName !== undefined) formData.append('source_name', params.sourceName);
-    if (params.sourceUrl !== undefined) formData.append('source_url', params.sourceUrl);
+    if (params.sourceUrl !== undefined) formData.append('sitemap_path', params.sourceUrl);
     if (params.isOcrEnabled !== undefined)
-      formData.append('is_ocr_enabled', String(params.isOcrEnabled));
+      formData.append('is_ocr_enabled', params.isOcrEnabled ? '1' : '0');
     if (params.isVisionEnabled !== undefined)
       formData.append('is_vision_enabled', String(params.isVisionEnabled));
 
@@ -411,6 +475,7 @@ export class CustomGPTClient {
       page?: number;
       limit?: number;
       order?: string;
+      search?: string;
       crawlStatus?: string;
       indexStatus?: string;
     }
@@ -419,6 +484,7 @@ export class CustomGPTClient {
     if (params?.page !== undefined) queryParams.page = String(params.page);
     if (params?.limit !== undefined) queryParams.limit = String(params.limit);
     if (params?.order !== undefined) queryParams.order = params.order;
+    if (params?.search !== undefined) queryParams.search = params.search;
     if (params?.crawlStatus !== undefined) queryParams.crawl_status = params.crawlStatus;
     if (params?.indexStatus !== undefined) queryParams.index_status = params.indexStatus;
 
@@ -426,13 +492,15 @@ export class CustomGPTClient {
       params: queryParams
     });
     let data = response.data?.data?.pages ?? response.data?.data;
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned an invalid document list.');
 
     return {
-      currentPage: data.current_page ?? 1,
-      perPage: data.per_page ?? 20,
-      total: data.total ?? 0,
-      lastPage: data.last_page ?? 1,
-      items: (data.data as Record<string, unknown>[]).map(p => this.normalizePage(p))
+      currentPage: typeof data.current_page === 'number' ? data.current_page : 1,
+      perPage: typeof data.per_page === 'number' ? data.per_page : 20,
+      total: typeof data.total === 'number' ? data.total : this.readItems(data).length,
+      lastPage: typeof data.last_page === 'number' ? data.last_page : 1,
+      items: this.readItems(data).map(p => this.normalizePage(p))
     };
   }
 
@@ -463,7 +531,7 @@ export class CustomGPTClient {
 
   async getPageLabels(projectId: number, pageId: number): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(`/projects/${projectId}/pages/${pageId}/labels`);
-    return response.data?.data ?? [];
+    return this.readItems(response.data?.data);
   }
 
   async setPageLabels(projectId: number, pageId: number, labelIds: number[]): Promise<void> {
@@ -489,20 +557,21 @@ export class CustomGPTClient {
 
   async listPersonaVersions(projectId: number): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(`/projects/${projectId}/settings/personas`);
-    return response.data?.data ?? [];
+    return this.readItems(response.data?.data);
   }
 
   async getPersonaVersion(
     projectId: number,
-    params?: { version?: number }
+    params: { version: number }
   ): Promise<Record<string, unknown>> {
-    let queryParams: Record<string, string> = {};
-    if (params?.version !== undefined) queryParams.version = String(params.version);
-
-    let response = await this.axios.get(`/projects/${projectId}/settings/persona-version`, {
-      params: queryParams
-    });
-    return response.data?.data;
+    let response = await this.axios.get(
+      `/projects/${projectId}/settings/persona/${params.version}`
+    );
+    let persona = response.data?.persona ?? response.data?.data;
+    if (!isApiErrorRecord(persona)) {
+      throw createApiServiceError('CustomGPT returned invalid persona version data.');
+    }
+    return persona;
   }
 
   async restorePersonaVersion(
@@ -510,10 +579,7 @@ export class CustomGPTClient {
     version: number
   ): Promise<Record<string, unknown>> {
     let response = await this.axios.put(
-      `/projects/${projectId}/settings/persona-activate-version`,
-      {
-        version
-      }
+      `/projects/${projectId}/settings/persona-activate/${version}`
     );
     return response.data?.data;
   }
@@ -522,12 +588,25 @@ export class CustomGPTClient {
 
   async listLabels(projectId: number): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get(`/projects/${projectId}/labels`);
-    return response.data?.data ?? [];
+    return this.readItems(response.data?.data);
   }
 
   async createLabel(projectId: number, name: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.post(`/projects/${projectId}/labels`, { name });
-    return response.data?.data;
+    if (!name.trim() || name.length > 20 || /^\d/.test(name)) {
+      throw createApiServiceError(
+        'Label names must be non-empty, no more than 20 characters, and must not start with a digit.'
+      );
+    }
+    let response = await this.axios.post(`/projects/${projectId}/labels`, { names: [name] });
+    let data = response.data?.data;
+    if (Array.isArray(data) || Array.isArray(data?.data)) {
+      let label = this.readItems(data).find(item => item.name === name);
+      if (!label) throw createApiServiceError('CustomGPT did not return the created label.');
+      return label;
+    }
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned an invalid created label.');
+    return data;
   }
 
   async renameLabel(
@@ -535,6 +614,11 @@ export class CustomGPTClient {
     labelId: number,
     name: string
   ): Promise<Record<string, unknown>> {
+    if (!name.trim() || name.length > 20 || /^\d/.test(name)) {
+      throw createApiServiceError(
+        'Label names must be non-empty, no more than 20 characters, and must not start with a digit.'
+      );
+    }
     let response = await this.axios.put(`/projects/${projectId}/labels/${labelId}`, { name });
     return response.data?.data;
   }
@@ -546,7 +630,9 @@ export class CustomGPTClient {
   // ---- Citations ----
 
   async getCitation(projectId: number, citationId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/projects/${projectId}/citations/${citationId}`);
+    let response = await this.axios.get(
+      `/projects/${projectId}/citations/${encodeURIComponent(citationId)}`
+    );
     return response.data?.data;
   }
 
@@ -567,7 +653,10 @@ export class CustomGPTClient {
 
   async getUser(): Promise<Record<string, unknown>> {
     let response = await this.axios.get('/user');
-    return response.data?.data;
+    if (!isApiErrorRecord(response.data?.data)) {
+      throw createApiServiceError('CustomGPT returned invalid user profile data.');
+    }
+    return response.data.data;
   }
 
   // ---- Account Limits ----
@@ -577,9 +666,20 @@ export class CustomGPTClient {
     return response.data?.data;
   }
 
+  // CustomGPT returns either a collection array or a paginated data envelope.
+  private readItems(data: unknown): Record<string, unknown>[] {
+    let items = Array.isArray(data) ? data : isApiErrorRecord(data) ? data.data : undefined;
+    if (!Array.isArray(items) || !items.every(isApiErrorRecord)) {
+      throw createApiServiceError('CustomGPT returned an invalid collection response.');
+    }
+    return items;
+  }
+
   // ---- Normalizers ----
 
   private normalizeAgent(data: Record<string, unknown>): Agent {
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned invalid agent data.');
     return {
       projectId: data.id as number,
       projectName: data.project_name as string,
@@ -600,6 +700,8 @@ export class CustomGPTClient {
   }
 
   private normalizeConversation(data: Record<string, unknown>): Conversation {
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned invalid conversation data.');
     return {
       sessionId: data.session_id as string,
       name: (data.name as string) ?? null,
@@ -609,22 +711,43 @@ export class CustomGPTClient {
   }
 
   private normalizeMessage(data: Record<string, unknown>): Message {
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned invalid message data.');
     return {
       promptId: (data.id as number) ?? (data.prompt_id as number),
       userQuery: (data.user_query as string) ?? (data.prompt as string) ?? '',
       openaiResponse: (data.openai_response as string) ?? (data.response as string) ?? '',
-      citations: (data.citations as Record<string, unknown>[]) ?? [],
+      citations: Array.isArray(data.citations)
+        ? data.citations.map(citation => {
+            if (isApiErrorRecord(citation)) return citation;
+            if (typeof citation === 'string' || typeof citation === 'number') {
+              return { citationId: String(citation) };
+            }
+            throw createApiServiceError('CustomGPT returned an invalid citation reference.');
+          })
+        : [],
       createdAt: data.created_at as string,
       updatedAt: (data.updated_at as string) ?? (data.created_at as string)
     };
   }
 
   private normalizeSource(data: Record<string, unknown>): Source {
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned invalid source data.');
+    let settings = isApiErrorRecord(data.settings) ? data.settings : {};
     return {
       sourceId: data.id as number,
-      sourceName: (data.source_name as string) ?? (data.name as string) ?? '',
+      sourceName:
+        (data.source_name as string) ??
+        (data.name as string) ??
+        (settings.sitemap_path as string) ??
+        '',
       sourceType: (data.source_type as string) ?? (data.type as string) ?? '',
-      sourceUrl: (data.source_url as string) ?? (data.url as string) ?? null,
+      sourceUrl:
+        (data.source_url as string) ??
+        (data.url as string) ??
+        (settings.sitemap_path as string) ??
+        null,
       crawlStatus: (data.crawl_status as string) ?? '',
       indexStatus: (data.index_status as string) ?? '',
       createdAt: data.created_at as string,
@@ -633,6 +756,8 @@ export class CustomGPTClient {
   }
 
   private normalizePage(data: Record<string, unknown>): Page {
+    if (!isApiErrorRecord(data))
+      throw createApiServiceError('CustomGPT returned invalid page data.');
     return {
       pageId: data.id as number,
       pageUrl: data.page_url as string,

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -36,7 +36,12 @@ export let manageAgentInput = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Column/field name to use as URL source from the list or agent output.'),
-      collection: z.number().optional().describe('Collection index. Defaults to 1.')
+      collection: z
+        .number()
+        .min(1)
+        .refine(Number.isInteger, 'Use a whole-number collection index.')
+        .optional()
+        .describe('Collection index. Defaults to 1.')
     })
   )
   .output(
@@ -45,7 +50,13 @@ export let manageAgentInput = SlateTool.create(spec, {
       urls: z.array(z.string()).optional().nullable().describe('Array of input URLs.'),
       sourceId: z.string().optional().nullable().describe('Linked list or agent ID.'),
       field: z.string().optional().nullable().describe('Field used as URL source.'),
-      collection: z.number().optional().nullable().describe('Collection index.'),
+      collection: z
+        .number()
+        .min(1)
+        .refine(Number.isInteger, 'Use a whole-number collection index.')
+        .optional()
+        .nullable()
+        .describe('Collection index.'),
       message: z.string().optional().describe('Status message for update operations.')
     })
   )
@@ -59,7 +70,7 @@ export let manageAgentInput = SlateTool.create(spec, {
         output: {
           type: result.type,
           urls: result.data,
-          sourceId: result.id,
+          sourceId: result.id == null ? result.id : String(result.id),
           field: result.field,
           collection: result.collection
         },
@@ -67,7 +78,33 @@ export let manageAgentInput = SlateTool.create(spec, {
       };
     }
 
-    let inputPayload: any = {
+    if (!ctx.input.inputType) {
+      throw createApiServiceError('inputType is required when updating agent input.');
+    }
+    if (ctx.input.inputType === 'manual' && ctx.input.urls === undefined) {
+      throw createApiServiceError(
+        'Provide urls for manual input. Use an empty array to clear manual URLs.'
+      );
+    }
+    if (
+      ctx.input.inputType !== 'manual' &&
+      (!ctx.input.sourceId?.trim() || !ctx.input.field?.trim())
+    ) {
+      throw createApiServiceError('sourceId and field are required for list or agent input.');
+    }
+    if ((ctx.input.urls?.length ?? 0) > 25000) {
+      throw createApiServiceError(
+        'Manual input accepts at most 25,000 URLs. Use a list for larger inputs.'
+      );
+    }
+
+    let inputPayload: {
+      type: string;
+      collection: number;
+      data?: string[];
+      id?: string;
+      field?: string;
+    } = {
       type: ctx.input.inputType,
       collection: ctx.input.collection ?? 1
     };

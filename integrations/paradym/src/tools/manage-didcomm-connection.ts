@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageDidcommConnection = SlateTool.create(spec, {
@@ -8,6 +9,7 @@ export let manageDidcommConnection = SlateTool.create(spec, {
   key: 'manage_didcomm_connection',
   description: `Create DIDComm invitations, receive invitations, or update existing connections. DIDComm connections enable secure messaging and credential exchange between parties. Invitations can be single-use or reusable.`,
   instructions: [
+    'Call list_projects to choose the projectId for this operation.',
     'Use action "create_invitation" to create a new invitation URI/QR code.',
     'Use action "receive_invitation" to accept an invitation from another party.',
     'Use action "update" to update the display name of an existing connection.'
@@ -15,6 +17,7 @@ export let manageDidcommConnection = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       action: z
         .enum(['create_invitation', 'receive_invitation', 'update'])
         .describe('Action to perform'),
@@ -27,6 +30,10 @@ export let manageDidcommConnection = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Goal description for the invitation (create_invitation)'),
+      goalCode: z
+        .string()
+        .optional()
+        .describe('Machine-readable goal code for create_invitation, e.g. p2p-messaging'),
       invitationUri: z
         .string()
         .optional()
@@ -52,14 +59,34 @@ export let manageDidcommConnection = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
+    if (ctx.input.action === 'receive_invitation' && !ctx.input.invitationUri?.trim()) {
+      throw createApiServiceError('invitationUri is required to receive an invitation.');
+    }
+    if (
+      ctx.input.action === 'update' &&
+      (!ctx.input.connectionId?.trim() || !ctx.input.displayName?.trim())
+    ) {
+      throw createApiServiceError(
+        'connectionId and displayName are required to update a connection.'
+      );
+    }
+    if (
+      ctx.input.action === 'create_invitation' &&
+      ctx.input.goalCode &&
+      !ctx.input.goal?.trim()
+    ) {
+      throw createApiServiceError('goal is required when supplying goalCode.');
+    }
     if (ctx.input.action === 'create_invitation') {
       let result = await client.createDidcommInvitation({
         reusable: ctx.input.reusable,
         did: ctx.input.did,
         goal: ctx.input.goal
+          ? { description: ctx.input.goal, code: ctx.input.goalCode }
+          : undefined
       });
       let data = result.data ?? result;
       return {
@@ -77,16 +104,17 @@ export let manageDidcommConnection = SlateTool.create(spec, {
         didcommInvitation: ctx.input.invitationUri!,
         displayName: ctx.input.displayName
       });
-      let data = result.data ?? result;
+      let data =
+        result.didcommConnection ?? result.data?.didcommConnection ?? result.data ?? result;
       return {
         output: {
           connectionId: data.id ?? data.connectionId,
           status: data.status,
-          displayName: data.displayName,
+          displayName: data.displayName ?? undefined,
           ourDid: data.ourDid,
           theirDid: data.theirDid
         },
-        message: `Received DIDComm invitation. Connection status: **${data.status}**.`
+        message: `Received DIDComm invitation. Connection ID: \`${data.id}\`.`
       };
     }
 
@@ -98,7 +126,7 @@ export let manageDidcommConnection = SlateTool.create(spec, {
     return {
       output: {
         connectionId: data.id,
-        displayName: data.displayName,
+        displayName: data.displayName ?? undefined,
         ourDid: data.ourDid,
         theirDid: data.theirDid
       },

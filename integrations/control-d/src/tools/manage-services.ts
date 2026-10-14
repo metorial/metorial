@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { actionDescription, createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -94,7 +94,7 @@ export let manageServices = SlateTool.create(spec, {
     }
 
     if (operation === 'list_category') {
-      if (!categoryId) throw new Error('categoryId is required for list_category');
+      if (!categoryId) throw createApiServiceError('categoryId is required for list_category');
       let services = await client.listServicesInCategory(categoryId);
       return {
         output: {
@@ -109,12 +109,12 @@ export let manageServices = SlateTool.create(spec, {
       };
     }
 
-    if (!profileId) throw new Error('profileId is required for this operation');
+    if (!profileId) throw createApiServiceError('profileId is required for this operation');
 
     if (operation === 'update') {
-      if (!serviceId) throw new Error('serviceId is required for update');
-      if (action === undefined) throw new Error('action is required for update');
-      if (enabled === undefined) throw new Error('enabled is required for update');
+      if (!serviceId) throw createApiServiceError('serviceId is required for update');
+      if (action === undefined) throw createApiServiceError('action is required for update');
+      if (enabled === undefined) throw createApiServiceError('enabled is required for update');
 
       await client.modifyProfileService(profileId, serviceId, {
         action,

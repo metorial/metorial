@@ -1,6 +1,10 @@
-# Craftmypdf
+# CraftMyPDF
 
-Generate PDF documents and images (JPEG/PNG) from reusable templates and JSON data. Create PDFs synchronously or asynchronously with webhook callbacks. Merge multiple templates or PDF URLs into a single document. Add watermarks to existing PDFs. Manage PDF templates programmatically—list, create, update, and delete templates. Generate fillable PDF forms with text boxes, checkboxes, dropdowns, radio buttons, and signature fields. Configure output options including password protection, CMYK color profiles, PDF standards (PDF/A), and cloud storage integration. Create embeddable editor sessions for white-label template editing. Retrieve account details and transaction history.
+Generate downloadable PDF documents and JPEG/PNG images from reusable templates and JSON data. Submit asynchronous PDF jobs with webhook callbacks, merge templates or existing PDFs, add text and watermarks, and fill PDF form fields. Manage templates and inspect their available versions. Create and deactivate embedded editor sessions. Retrieve account quota information, PDF metadata, and transaction history.
+
+Connect an API key from the API Integration page and select the region where your account's files should be processed. Generated file URLs expire; synchronous file tools also provide a downloadable copy. Asynchronous generation delivers its result to the webhook URL you supply.
+
+See the [official API reference](https://craftmypdf.com/docs/) for provider limits and supported options.
 
 ## License
 

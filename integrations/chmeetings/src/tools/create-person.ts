@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -36,16 +36,30 @@ export let createPerson = SlateTool.create(spec, {
       baptismDate: z.string().optional().describe('Baptism date (YYYY-MM-DD)'),
       doNotText: z.boolean().optional().describe('Opt out of text messages'),
       doNotEmail: z.boolean().optional().describe('Opt out of emails'),
-      envelopeNumber: z.number().optional().describe('Envelope number for contributions'),
+      envelopeNumber: z
+        .number()
+        .optional()
+        .describe(
+          'Legacy field; the People API does not support changing contribution envelope numbers'
+        ),
       address: addressSchema
     })
   )
   .output(
     z.object({
-      person: z.record(z.string(), z.unknown()).describe('Created person record')
+      person: z
+        .record(z.string(), z.unknown())
+        .describe(
+          'Created person record when returned by ChMeetings; otherwise creation confirmation'
+        )
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.envelopeNumber !== undefined) {
+      throw createApiServiceError(
+        'The People API does not support setting envelope numbers. Set the envelope number in ChMeetings instead.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.createPerson({
@@ -63,14 +77,13 @@ export let createPerson = SlateTool.create(spec, {
       baptism_date: ctx.input.baptismDate,
       do_not_text: ctx.input.doNotText,
       do_not_email: ctx.input.doNotEmail,
-      envelope_number: ctx.input.envelopeNumber,
       address: ctx.input.address
         ? {
             country: ctx.input.address.country,
             city: ctx.input.address.city,
             address_line: ctx.input.address.addressLine,
             zip_code: ctx.input.address.zipCode,
-            building_no: ctx.input.address.buildingNo,
+            building: ctx.input.address.buildingNo,
             state: ctx.input.address.state
           }
         : undefined

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { PlatformClient } from '../lib/client';
 import { spec } from '../spec';
@@ -59,6 +59,9 @@ export let sendWhatsAppTemplateTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.blockId !== undefined && ctx.input.botId === undefined) {
+      throw createApiServiceError('Provide botId when specifying blockId.');
+    }
     let client = new PlatformClient(ctx.auth.token);
 
     let templateParams: any;

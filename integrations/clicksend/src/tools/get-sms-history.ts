@@ -22,7 +22,17 @@ export let getSmsHistoryTool = SlateTool.create(spec, {
       dateTo: z
         .number()
         .optional()
-        .describe('Unix timestamp to filter messages sent before this time')
+        .describe('Unix timestamp to filter messages sent before this time'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Filter in field:value format, for example status:Failed or to:+61411111111'
+        ),
+      orderBy: z
+        .string()
+        .optional()
+        .describe('Sort in field:asc or field:desc format, for example date:desc')
     })
   )
   .output(
@@ -56,7 +66,9 @@ export let getSmsHistoryTool = SlateTool.create(spec, {
       page: ctx.input.page,
       limit: ctx.input.limit,
       dateFrom: ctx.input.dateFrom,
-      dateTo: ctx.input.dateTo
+      dateTo: ctx.input.dateTo,
+      query: ctx.input.query,
+      orderBy: ctx.input.orderBy
     });
 
     let messages = (result.data?.data || []).map((msg: any) => ({

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { CodemagicClient } from '../lib/client';
+import { type ApplicationResponse, CodemagicClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let addApplication = SlateTool.create(spec, {
@@ -41,7 +41,7 @@ export let addApplication = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new CodemagicClient({ token: ctx.auth.token });
-    let app: any;
+    let app: ApplicationResponse;
 
     if (ctx.input.sshKey) {
       app = await client.addPrivateApplication({

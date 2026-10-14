@@ -1,5 +1,7 @@
 export * from './check-status';
 export * from './delete-template';
+export * from './download-document';
+export * from './download-template';
 export * from './list-categories-and-tags';
 export * from './list-templates';
 export * from './render-document';

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MoceanClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,10 +51,10 @@ export let manageWhatsAppTemplates = SlateTool.create(spec, {
     'Use action "create" to submit a new template for approval',
     'Use action "edit" to modify an existing template (approved templates limited to 1 edit/day, 10/month)',
     'Use action "delete" to remove a template by name and ID',
-    'This tool requires API Key & Secret authentication (Basic Auth is used for template management)'
+    'Supports API Token authentication or API Key & Secret authentication'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -71,7 +71,7 @@ export let manageWhatsAppTemplates = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Template name (required for "create", "edit", "delete"; optional filter for "list")'
+          'Template name (required for "create" and "delete"; optional filter for "list" or label for "edit")'
         ),
       language: z
         .string()
@@ -131,16 +131,21 @@ export let manageWhatsAppTemplates = SlateTool.create(spec, {
         limit: input.limit
       });
 
-      let templates = Array.isArray(result) ? result.map(mapTemplate) : [];
+      let data = Array.isArray(result) ? result : result.data;
+      if (!Array.isArray(data)) {
+        throw createApiServiceError('Mocean returned an invalid template list response.');
+      }
+      let templates = data.map(mapTemplate);
 
       return {
-        output: { templates },
+        output: { templates, rawResponse: result },
         message: `Found **${templates.length}** WhatsApp template(s).`
       };
     }
 
     if (input.action === 'get') {
-      if (!input.templateId) throw new Error('templateId is required for "get" action');
+      if (!input.templateId)
+        throw createApiServiceError('templateId is required for "get" action');
 
       let result = await client.getTemplate(input.templateId);
       let template = mapTemplate(result);
@@ -152,10 +157,13 @@ export let manageWhatsAppTemplates = SlateTool.create(spec, {
     }
 
     if (input.action === 'create') {
-      if (!input.name) throw new Error('name is required for "create" action');
-      if (!input.language) throw new Error('language is required for "create" action');
-      if (!input.category) throw new Error('category is required for "create" action');
-      if (!input.components) throw new Error('components is required for "create" action');
+      if (!input.name) throw createApiServiceError('name is required for "create" action');
+      if (!input.language)
+        throw createApiServiceError('language is required for "create" action');
+      if (!input.category)
+        throw createApiServiceError('category is required for "create" action');
+      if (!input.components)
+        throw createApiServiceError('components is required for "create" action');
 
       let result = await client.createTemplate({
         name: input.name,
@@ -171,11 +179,13 @@ export let manageWhatsAppTemplates = SlateTool.create(spec, {
     }
 
     if (input.action === 'edit') {
-      if (!input.name) throw new Error('name is required for "edit" action');
-      if (!input.templateId) throw new Error('templateId is required for "edit" action');
+      if (!input.templateId)
+        throw createApiServiceError('templateId is required for "edit" action');
+      if (!input.components && !input.category) {
+        throw createApiServiceError('Provide components or category for "edit" action.');
+      }
 
       let result = await client.editTemplate({
-        name: input.name,
         templateId: input.templateId,
         components: input.components,
         category: input.category
@@ -183,18 +193,23 @@ export let manageWhatsAppTemplates = SlateTool.create(spec, {
 
       return {
         output: { rawResponse: result },
-        message: `Template **${input.name}** updated successfully.`
+        message: `Template **${input.name || input.templateId}** updated successfully.`
       };
     }
 
     if (input.action === 'delete') {
-      if (!input.name) throw new Error('name is required for "delete" action');
-      if (!input.templateId) throw new Error('templateId is required for "delete" action');
+      if (!input.name) throw createApiServiceError('name is required for "delete" action');
+      if (!input.templateId)
+        throw createApiServiceError('templateId is required for "delete" action');
 
-      await client.deleteTemplate({
+      let result = await client.deleteTemplate({
         name: input.name,
         templateId: input.templateId
       });
+
+      if (result.success !== true && result.success !== 'true') {
+        throw createApiServiceError('Mocean did not confirm that the template was deleted.');
+      }
 
       return {
         output: { deleted: true },
@@ -202,6 +217,6 @@ export let manageWhatsAppTemplates = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type NotificationPayload } from '../lib/client';
 import { spec } from '../spec';
 
 let languageEnum = z
@@ -38,12 +38,20 @@ export let sendNotification = SlateTool.create(spec, {
           subject: z.string().describe('Email subject line'),
           body: z.string().optional().describe('HTML email body content'),
           language: languageEnum,
-          delayMinutes: z.number().optional().describe('Delay in minutes before sending'),
+          delayMinutes: z
+            .number()
+            .optional()
+            .describe(
+              'Delay in minutes before sending; must be a non-negative multiple of 60'
+            ),
           reminderRepeatCount: z
             .number()
             .optional()
-            .describe('Number of reminder repetitions'),
-          reminderIntervalDays: z.number().optional().describe('Days between reminders'),
+            .describe('Number of reminder repetitions, a whole number from 0 to 3'),
+          reminderIntervalDays: z
+            .number()
+            .optional()
+            .describe('Days between reminders, a whole number from 0 to 10'),
           attachmentIds: z
             .array(z.string())
             .optional()
@@ -56,12 +64,20 @@ export let sendNotification = SlateTool.create(spec, {
           toSignerIds: z.array(z.string()).describe('Array of signer IDs to send SMS to'),
           message: z.string().describe('SMS message text'),
           language: languageEnum,
-          delayMinutes: z.number().optional().describe('Delay in minutes before sending'),
+          delayMinutes: z
+            .number()
+            .optional()
+            .describe(
+              'Delay in minutes before sending; must be a non-negative multiple of 60'
+            ),
           reminderRepeatCount: z
             .number()
             .optional()
-            .describe('Number of reminder repetitions'),
-          reminderIntervalDays: z.number().optional().describe('Days between reminders')
+            .describe('Number of reminder repetitions, a whole number from 0 to 3'),
+          reminderIntervalDays: z
+            .number()
+            .optional()
+            .describe('Days between reminders, a whole number from 0 to 10')
         })
         .optional()
         .describe('SMS notification configuration'),
@@ -95,7 +111,54 @@ export let sendNotification = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let payload: any = {
+    if (!ctx.input.email && !ctx.input.sms) {
+      throw createApiServiceError('Provide an email or SMS notification.');
+    }
+    for (let channel of [ctx.input.email, ctx.input.sms]) {
+      if (!channel) continue;
+      if (!channel.toSignerIds.length)
+        throw createApiServiceError('Provide at least one recipient signer ID.');
+      if (
+        channel.delayMinutes !== undefined &&
+        (channel.delayMinutes < 0 || !Number.isInteger(channel.delayMinutes / 60))
+      ) {
+        throw createApiServiceError(
+          'delayMinutes must be a non-negative multiple of 60 because OKSign schedules in whole hours.'
+        );
+      }
+      let repeatCount = channel.reminderRepeatCount;
+      if (
+        repeatCount !== undefined &&
+        (!Number.isInteger(repeatCount) || repeatCount < 0 || repeatCount > 3)
+      ) {
+        throw createApiServiceError(
+          'reminderRepeatCount must be a whole number between 0 and 3.'
+        );
+      }
+      let intervalDays = channel.reminderIntervalDays;
+      if (
+        intervalDays !== undefined &&
+        (!Number.isInteger(intervalDays) || intervalDays < 0 || intervalDays > 10)
+      ) {
+        throw createApiServiceError(
+          'reminderIntervalDays must be a whole number between 0 and 10.'
+        );
+      }
+    }
+    if (ctx.input.email && !ctx.input.email.body?.trim()) {
+      throw createApiServiceError(
+        'Provide an email body. OKSign requires HTML body content for email notifications.'
+      );
+    }
+    if (
+      ctx.input.workflow?.some(step => !Number.isInteger(step.sequence) || step.sequence < 0)
+    ) {
+      throw createApiServiceError(
+        'Workflow sequence values must be non-negative whole numbers.'
+      );
+    }
+
+    let payload: NotificationPayload = {
       notifications: {}
     };
 
@@ -107,7 +170,10 @@ export let sendNotification = SlateTool.create(spec, {
         replyto: ctx.input.email.replyTo,
         subject: ctx.input.email.subject,
         body: ctx.input.email.body,
-        delay: ctx.input.email.delayMinutes,
+        delay:
+          ctx.input.email.delayMinutes === undefined
+            ? undefined
+            : ctx.input.email.delayMinutes / 60,
         repeat: ctx.input.email.reminderRepeatCount,
         reminder_days: ctx.input.email.reminderIntervalDays,
         language: ctx.input.email.language,
@@ -119,7 +185,10 @@ export let sendNotification = SlateTool.create(spec, {
       payload.notifications.sms = {
         to: ctx.input.sms.toSignerIds,
         subject: ctx.input.sms.message,
-        delay: ctx.input.sms.delayMinutes,
+        delay:
+          ctx.input.sms.delayMinutes === undefined
+            ? undefined
+            : ctx.input.sms.delayMinutes / 60,
         repeat: ctx.input.sms.reminderRepeatCount,
         reminder_days: ctx.input.sms.reminderIntervalDays,
         language: ctx.input.sms.language
@@ -136,7 +205,7 @@ export let sendNotification = SlateTool.create(spec, {
     }
 
     if (ctx.input.workflow) {
-      payload.workflow = ctx.input.workflow.map(w => ({
+      payload.notifications.workflow = ctx.input.workflow.map(w => ({
         id: w.signerId,
         sequence: w.sequence
       }));

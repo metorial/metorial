@@ -21,13 +21,24 @@ Useful for understanding booking ownership, looking up user IDs for filtering bo
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Number of users to return (1-100, default 10)'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe integer.')
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Number of users to return (1-100, default 10)'),
       cursor: z.string().optional().describe('Cursor for pagination')
     })
   )
   .output(
     z.object({
-      count: z.number().describe('Total number of users'),
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextCursor: z
+        .string()
+        .nullable()
+        .describe('Pass this ID as cursor to fetch the next page'),
+      count: z.number().describe('Number of users returned in this page'),
       users: z.array(userSchema).describe('List of users')
     })
   )
@@ -41,16 +52,18 @@ Useful for understanding booking ownership, looking up user IDs for filtering bo
 
     let users = (result.data || []).map(u => ({
       userId: u.id,
-      name: u.name,
+      name: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.name || u.email,
       email: u.email
     }));
 
     return {
       output: {
         count: result.count,
+        hasMore: result.has_more,
+        nextCursor: result.has_more ? (result.data.at(-1)?.id ?? null) : null,
         users
       },
-      message: `Found **${result.count}** user(s). Returned **${users.length}** in this page.`
+      message: `Returned **${users.length}** user(s) in this page.`
     };
   })
   .build();

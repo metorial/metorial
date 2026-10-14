@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, timeCampCreatedId } from '../lib/client';
 import { spec } from '../spec';
 
 export let createTask = SlateTool.create(spec, {
@@ -49,7 +49,7 @@ export let createTask = SlateTool.create(spec, {
       userIds: ctx.input.userIds
     });
 
-    let taskId = String(result?.task_id || '');
+    let taskId = timeCampCreatedId(result, ['task_id'], 'task');
 
     return {
       output: {

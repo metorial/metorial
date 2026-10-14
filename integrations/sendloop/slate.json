@@ -1,18 +1,18 @@
 {
   "name": "@metorial/sendloop",
-  "description": "Manage email marketing campaigns, subscriber lists, and transactional emails. Create and send one-time or scheduled email campaigns with A/B testing. Add, update, search, and segment subscribers across lists with custom attributes. Track campaign performance with real-time reporting on opens, clicks, bounces, unsubscribes, and forwards. Send transactional emails for signups, password resets, and order confirmations. Set up automated email workflows triggered by customer behaviors. Configure RSS-to-email campaigns and manage sub-user accounts with granular permissions.",
+  "description": "Manage Sendloop subscriber lists, custom fields, audience segments, campaigns, and suppression entries. Add or update subscribers, import contacts in bulk, send or schedule campaigns, and inspect campaign and list performance reports.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
-    "send email campaigns",
     "manage subscriber lists",
-    "segment audiences",
-    "track campaign performance",
-    "send transactional emails",
-    "automate email workflows",
+    "add and update subscribers",
     "import subscribers in bulk",
-    "manage suppression lists",
-    "A/B test campaigns",
-    "configure webhooks"
+    "manage custom fields",
+    "segment audiences",
+    "create email campaigns",
+    "send and schedule campaigns",
+    "track campaign performance",
+    "track list performance",
+    "manage suppression lists"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/sendloop.png"
 }

@@ -12,6 +12,7 @@ export let createProduct = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       name: z.string().describe('Product name'),

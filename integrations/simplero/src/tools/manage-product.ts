@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SimpleroClient } from '../lib/client';
 import { spec } from '../spec';
@@ -45,8 +45,11 @@ export let manageProduct = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter purchases created before this date (ISO 8601)'),
-      page: z.number().optional().describe('Page number for pagination'),
-      perPage: z.number().optional().describe('Results per page')
+      page: z
+        .number()
+        .optional()
+        .describe('Page number: 0-indexed for products, 1-indexed for purchase searches'),
+      perPage: z.number().optional().describe('Results per page, from 1 to 100')
     })
   )
   .output(
@@ -81,7 +84,7 @@ export let manageProduct = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.productId) throw new Error('productId is required.');
+      if (!ctx.input.productId) throw createApiServiceError('productId is required.');
       let product = await client.getProduct(ctx.input.productId);
       return {
         output: { product },
@@ -90,8 +93,8 @@ export let manageProduct = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create_purchase') {
-      if (!ctx.input.productId) throw new Error('productId is required.');
-      if (!ctx.input.email) throw new Error('email is required.');
+      if (!ctx.input.productId) throw createApiServiceError('productId is required.');
+      if (!ctx.input.email) throw createApiServiceError('email is required.');
       let purchase = await client.createFreePurchase(ctx.input.productId, {
         email: ctx.input.email,
         firstName: ctx.input.firstName,
@@ -105,7 +108,7 @@ export let manageProduct = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'find_purchase') {
-      if (!ctx.input.productId) throw new Error('productId is required.');
+      if (!ctx.input.productId) throw createApiServiceError('productId is required.');
       let result = await client.findPurchase(ctx.input.productId, {
         email: ctx.input.email,
         purchaseId: ctx.input.purchaseId,
@@ -118,7 +121,7 @@ export let manageProduct = SlateTool.create(spec, {
           : { purchase: result as Record<string, unknown> },
         message: isArray
           ? `Found **${(result as unknown[]).length}** purchase(s).`
-          : `Found purchase (ID: ${(result as Record<string, unknown>).purchase_id}).`
+          : `Found purchase (ID: ${(result as Record<string, unknown>).id ?? (result as Record<string, unknown>).purchase_id}).`
       };
     }
 
@@ -137,6 +140,6 @@ export let manageProduct = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

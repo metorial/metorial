@@ -1,4 +1,26 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
+
+export let addressfinderError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Addressfinder',
+    reason: 'addressfinder_api_error',
+    operation,
+    extractStatus: (_error, response) => {
+      let status = response?.status;
+      return typeof status === 'string' && /^\d{3}$/.test(status) ? Number(status) : status;
+    },
+    extractUpstreamCode: (_error, response) => {
+      let data = response?.data;
+      if (!isApiErrorRecord(data)) return undefined;
+      let code = data.error_code ?? data.error;
+      return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
+    }
+  });
 
 export interface ClientConfig {
   token: string;
@@ -7,12 +29,20 @@ export interface ClientConfig {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private token: string;
   private secret?: string;
   private authMethod: 'api_key' | 'oauth2';
 
   constructor(config: ClientConfig) {
+    if (!config.token.trim() || (config.authMethod === 'api_key' && !config.secret?.trim())) {
+      throw createApiServiceError(
+        'Reconnect with a valid API key and secret or OAuth token.',
+        {
+          reason: 'addressfinder_missing_auth'
+        }
+      );
+    }
     this.token = config.token;
     this.secret = config.secret;
     this.authMethod = config.authMethod;
@@ -24,20 +54,53 @@ export class Client {
       headers.Authorization = this.secret;
     }
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.addressfinder.io/api',
-      headers
+      headers,
+      errorAdapter: error => addressfinderError(error)
+    });
+
+    this.axios.interceptors.response.use(response => {
+      if (!isApiErrorRecord(response.data)) {
+        throw createApiServiceError('Addressfinder returned an invalid response.', {
+          reason: 'addressfinder_invalid_response',
+          upstreamStatus: response.status
+        });
+      }
+      if (response.data.success === false || response.data.error_code || response.data.error) {
+        throw addressfinderError({ response }, response.config.url);
+      }
+      return response;
     });
   }
 
   private buildParams(
-    extra: Record<string, string | number | undefined> = {}
-  ): Record<string, string | number> {
-    let params: Record<string, string | number> = { format: 'json' };
+    extra: Record<string, string | number | boolean | undefined> = {}
+  ): Record<string, string | number | boolean> {
+    let params: Record<string, string | number | boolean> = { format: 'json' };
     if (this.authMethod === 'api_key') {
       params.key = this.token;
     }
     for (let [k, v] of Object.entries(extra)) {
+      if (
+        typeof v === 'number' &&
+        (!Number.isFinite(v) ||
+          (['max', 'census', 'strict'].includes(k) && !Number.isInteger(v)))
+      ) {
+        throw createApiServiceError(`${k} must be a finite whole number.`, {
+          reason: 'addressfinder_invalid_input'
+        });
+      }
+      if (k === 'max' && typeof v === 'number' && (v < 1 || v > 100)) {
+        throw createApiServiceError('maxResults must be between 1 and 100.', {
+          reason: 'addressfinder_invalid_input'
+        });
+      }
+      if (k === 'q' && typeof v === 'string' && !v.trim()) {
+        throw createApiServiceError('Enter a non-empty search query.', {
+          reason: 'addressfinder_invalid_input'
+        });
+      }
       if (v !== undefined && v !== null && v !== '') {
         params[k] = v;
       }
@@ -92,12 +155,25 @@ export class Client {
   }
 
   async intAddressAutocomplete(options: { country: string; query: string; max?: number }) {
-    let response = await this.axios.get(`/${options.country}/address/v2/autocomplete`, {
-      params: this.buildParams({
-        q: options.query,
-        max: options.max
-      })
-    });
+    if (options.max !== undefined && options.max > 15) {
+      throw createApiServiceError('International maxResults cannot exceed 15.', {
+        reason: 'addressfinder_invalid_input'
+      });
+    }
+    if (options.query.length > 200) {
+      throw createApiServiceError('International queries cannot exceed 200 characters.', {
+        reason: 'addressfinder_invalid_input'
+      });
+    }
+    let response = await this.axios.get(
+      `/${this.internationalCountry(options.country)}/address/v2/autocomplete`,
+      {
+        params: this.buildParams({
+          q: options.query,
+          max: options.max
+        })
+      }
+    );
     return response.data;
   }
 
@@ -111,6 +187,14 @@ export class Client {
     gps?: string;
     census?: number;
   }) {
+    if (![options.addressId, options.gnafId, options.dpid].some(value => value?.trim())) {
+      throw createApiServiceError(
+        'Provide addressId, gnafId, or dpid for AU address metadata.',
+        {
+          reason: 'addressfinder_invalid_input'
+        }
+      );
+    }
     let response = await this.axios.get('/au/address/metadata', {
       params: this.buildParams({
         id: options.addressId,
@@ -125,6 +209,11 @@ export class Client {
   }
 
   async nzAddressMetadata(options: { pxid?: string; dpid?: string; census?: number }) {
+    if (![options.pxid, options.dpid].some(value => value?.trim())) {
+      throw createApiServiceError('Provide pxid or dpid for NZ address metadata.', {
+        reason: 'addressfinder_invalid_input'
+      });
+    }
     let response = await this.axios.get('/nz/address/metadata', {
       params: this.buildParams({
         pxid: options.pxid,
@@ -136,12 +225,23 @@ export class Client {
   }
 
   async intAddressMetadata(options: { country: string; addressId: string; gps?: string }) {
-    let response = await this.axios.get(`/${options.country}/address/v2/metadata`, {
-      params: this.buildParams({
-        id: options.addressId,
-        gps: options.gps
-      })
-    });
+    if (!options.addressId?.trim()) {
+      throw createApiServiceError(
+        'Provide addressId from address_autocomplete for international metadata.',
+        {
+          reason: 'addressfinder_invalid_input'
+        }
+      );
+    }
+    let response = await this.axios.get(
+      `/${this.internationalCountry(options.country)}/address/v2/metadata`,
+      {
+        params: this.buildParams({
+          id: options.addressId,
+          gps: options.gps
+        })
+      }
+    );
     return response.data;
   }
 
@@ -256,6 +356,23 @@ export class Client {
   // ---- Reverse Geocoding (NZ only) ----
 
   async nzReverseGeocode(options: { longitude: string; latitude: string; max?: number }) {
+    let longitude = Number(options.longitude);
+    let latitude = Number(options.latitude);
+    if (
+      !options.longitude.trim() ||
+      !options.latitude.trim() ||
+      !Number.isFinite(longitude) ||
+      !Number.isFinite(latitude) ||
+      Math.abs(longitude) > 180 ||
+      Math.abs(latitude) > 90
+    ) {
+      throw createApiServiceError(
+        'Provide valid WGS84 longitude (-180 to 180) and latitude (-90 to 90).',
+        {
+          reason: 'addressfinder_invalid_input'
+        }
+      );
+    }
     let response = await this.axios.get('/nz/address/reverse_geocode', {
       params: this.buildParams({
         x: options.longitude,
@@ -286,17 +403,49 @@ export class Client {
     mobileOnly?: boolean;
     timeout?: number;
     allowedCountryCodes?: string;
+    verifyFormatOnly?: boolean;
   }) {
     let response = await this.axios.get('/phone/v1/verification', {
       params: this.buildParams({
         phone_number: options.phoneNumber,
         default_country_code: options.defaultCountryCode,
-        mobile_only:
-          options.mobileOnly !== undefined ? (options.mobileOnly ? '1' : '0') : undefined,
+        mobile_only: options.mobileOnly,
+        verify_format_only: options.verifyFormatOnly,
         timeout: options.timeout,
         allowed_country_codes: options.allowedCountryCodes
       })
     });
     return response.data;
+  }
+
+  async nzPoiAutocomplete(options: { query: string; max?: number }) {
+    let response = await this.axios.get('/nz/points_of_interest/autocomplete', {
+      params: this.buildParams({ q: options.query, max: options.max })
+    });
+    return response.data;
+  }
+
+  async nzPoiMetadata(options: { id: string }) {
+    if (!options.id.trim()) {
+      throw createApiServiceError('Provide a POI identifier from poi_autocomplete.', {
+        reason: 'addressfinder_invalid_input'
+      });
+    }
+    let response = await this.axios.get('/nz/points_of_interest/metadata', {
+      params: this.buildParams({ id: options.id })
+    });
+    return response.data;
+  }
+
+  private internationalCountry(country: string) {
+    if (!/^[a-z]{2}$/i.test(country)) {
+      throw createApiServiceError(
+        'internationalCountryCode must be a two-letter ISO country code.',
+        {
+          reason: 'addressfinder_invalid_input'
+        }
+      );
+    }
+    return country.toLowerCase();
   }
 }

@@ -46,6 +46,7 @@ export let createAgreement = SlateTool.create(spec, {
     });
 
     let body: Record<string, any> = {
+      type: 'AGREEMENT',
       number: ctx.input.number,
       mode: ctx.input.mode
     };
@@ -57,9 +58,8 @@ export let createAgreement = SlateTool.create(spec, {
     if (ctx.input.nipNumber) body.nipNumber = ctx.input.nipNumber;
     if (ctx.input.entries) {
       body.entries = ctx.input.entries.map(e => ({
-        product: e.productId,
+        product: e.productId ?? e.productName,
         productCode: e.productCode,
-        productName: e.productName,
         quantity: e.quantity,
         unit: e.unit,
         unitNettoPrice: e.unitNetPrice,

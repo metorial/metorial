@@ -16,7 +16,7 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Bonsai API Key generated from Settings → Integrations at https://app.hellobonsai.com/settings/integrations'
+          'Bonsai access token from Settings → Integrations → API → New access token. Legacy Zapier actions may require the key generated under Zapier.'
         )
     }),
 

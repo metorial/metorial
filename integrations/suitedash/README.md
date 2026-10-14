@@ -1,6 +1,6 @@
 # Suitedash
 
-Create, retrieve, update, and list contacts and companies in the CRM with full custom field support. Manage projects and tasks, including creation, updates, and search. Subscribe contacts to marketing audiences for email campaigns. Retrieve metadata schemas for custom fields and marketing audiences to enable two-way data sync.
+Create, update, list, and find SuiteDash CRM contacts and companies. Discover contact and company metadata, supply contact custom fields, and subscribe contacts to marketing audiences using their emails or UIDs. Marketing results retain the outcome of each submitted subscriber.
 
 ## License
 

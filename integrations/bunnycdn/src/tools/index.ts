@@ -1,5 +1,7 @@
 export { getBilling } from './get-billing';
 export { getStatistics } from './get-statistics';
+export { getStorageStatistics } from './get-storage-statistics';
+export { listDnsRecords } from './list-dns-records';
 export { manageCollection } from './manage-collection';
 export { manageDnsRecord } from './manage-dns-record';
 export { manageDnsZone } from './manage-dns-zone';

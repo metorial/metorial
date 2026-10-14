@@ -4,6 +4,7 @@ export * from './cancel-document';
 export * from './count-documents';
 export * from './create-document';
 export * from './delete-document';
+export * from './get-current-user';
 export * from './get-document';
 export * from './get-report';
 export * from './list-documents';

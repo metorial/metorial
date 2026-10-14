@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MopinionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,8 +13,18 @@ export let getFields = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      reportId: z.number().optional().describe('Report ID to retrieve fields from'),
-      datasetId: z.number().optional().describe('Dataset ID to retrieve fields from')
+      reportId: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .positive()
+        .optional()
+        .describe('Report ID to retrieve fields from'),
+      datasetId: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe whole number')
+        .positive()
+        .optional()
+        .describe('Dataset ID to retrieve fields from')
     })
   )
   .output(
@@ -44,8 +54,8 @@ export let getFields = SlateTool.create(spec, {
       signatureToken: ctx.auth.signatureToken
     });
 
-    if (!ctx.input.reportId && !ctx.input.datasetId) {
-      throw new Error('Either reportId or datasetId must be provided');
+    if ((ctx.input.reportId === undefined) === (ctx.input.datasetId === undefined)) {
+      throw createApiServiceError('Provide exactly one of reportId or datasetId.');
     }
 
     let result: any;

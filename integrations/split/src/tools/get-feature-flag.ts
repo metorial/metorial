@@ -1,41 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { flagDefinitionSchema, mapFlagDefinition } from '../lib/flag-definition';
 import { spec } from '../spec';
-
-let treatmentSchema = z.object({
-  treatmentName: z.string(),
-  description: z.string().optional(),
-  configurations: z.string().optional(),
-  keys: z.array(z.string()).optional(),
-  segments: z.array(z.string()).optional()
-});
-
-let bucketSchema = z.object({
-  treatment: z.string(),
-  size: z.number()
-});
-
-let matcherSchema = z.object({
-  negate: z.boolean().optional(),
-  type: z.string(),
-  attribute: z.string().optional(),
-  string: z.string().optional(),
-  bool: z.boolean().optional(),
-  strings: z.array(z.string()).optional(),
-  number: z.number().optional(),
-  date: z.number().optional(),
-  between: z.object({ from: z.number(), to: z.number() }).optional(),
-  depends: z.object({ splitName: z.string(), treatment: z.string() }).optional()
-});
-
-let ruleSchema = z.object({
-  buckets: z.array(bucketSchema),
-  condition: z.object({
-    combiner: z.string(),
-    matchers: z.array(matcherSchema)
-  })
-});
 
 export let getFeatureFlag = SlateTool.create(spec, {
   name: 'Get Feature Flag',
@@ -50,13 +17,15 @@ export let getFeatureFlag = SlateTool.create(spec, {
       workspaceId: z
         .string()
         .optional()
-        .describe('Workspace ID. Falls back to the configured default.'),
+        .describe(
+          'Workspace ID. Call list_workspaces to discover IDs. Falls back to the configured default.'
+        ),
       flagName: z.string().describe('Name of the feature flag.'),
       environmentIdOrName: z
         .string()
         .optional()
         .describe(
-          'Environment ID or name to fetch the flag definition for. If omitted, only metadata is returned.'
+          'Environment ID or name to fetch the flag definition for. Falls back to the configured default; without either, only metadata is returned.'
         )
     })
   )
@@ -70,66 +39,36 @@ export let getFeatureFlag = SlateTool.create(spec, {
       creationTime: z.number(),
       tags: z.array(z.string()),
       rolloutStatus: z.string().nullable().optional(),
-      definition: z
-        .object({
-          environmentName: z.string(),
-          environmentId: z.string(),
-          killed: z.boolean(),
-          treatments: z.array(treatmentSchema),
-          defaultTreatment: z.string(),
-          baselineTreatment: z.string().optional(),
-          trafficAllocation: z.number(),
-          rules: z.array(ruleSchema),
-          defaultRule: z.array(bucketSchema),
-          lastUpdateTime: z.number(),
-          impressionsDisabled: z.boolean().optional()
-        })
-        .optional()
+      definition: flagDefinitionSchema.optional()
     })
   )
   .handleInvocation(async ctx => {
     let wsId = ctx.input.workspaceId ?? ctx.config.workspaceId;
     if (!wsId) {
-      throw new Error('workspaceId is required. Set it in config or pass it as input.');
+      throw createApiServiceError(
+        'workspaceId is required. Call list_workspaces to discover IDs, then pass the ID or set the default workspace.'
+      );
     }
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let flag = await client.getFeatureFlag(wsId, ctx.input.flagName);
 
-    let definition: any;
+    let definition: z.infer<typeof flagDefinitionSchema> | undefined;
     let envId = ctx.input.environmentIdOrName ?? ctx.config.environmentId;
     if (envId) {
       let def = await client.getFlagDefinition(wsId, ctx.input.flagName, envId);
-      definition = {
-        environmentName: def.environment.name,
-        environmentId: def.environment.id,
-        killed: def.killed,
-        treatments: def.treatments.map(t => ({
-          treatmentName: t.name,
-          description: t.description,
-          configurations: t.configurations,
-          keys: t.keys,
-          segments: t.segments
-        })),
-        defaultTreatment: def.defaultTreatment,
-        baselineTreatment: def.baselineTreatment,
-        trafficAllocation: def.trafficAllocation,
-        rules: def.rules,
-        defaultRule: def.defaultRule,
-        lastUpdateTime: def.lastUpdateTime,
-        impressionsDisabled: def.impressionsDisabled
-      };
+      definition = mapFlagDefinition(def);
     }
 
     return {
       output: {
         flagId: flag.id,
         flagName: flag.name,
-        description: flag.description,
+        description: flag.description ?? null,
         trafficTypeName: flag.trafficType.name,
         trafficTypeId: flag.trafficType.id,
         creationTime: flag.creationTime,
-        tags: flag.tags.map(t => t.name),
+        tags: (flag.tags ?? []).map(t => t.name),
         rolloutStatus: flag.rolloutStatus?.name ?? null,
         definition
       },

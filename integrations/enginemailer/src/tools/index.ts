@@ -4,6 +4,7 @@ export * from './deactivate-subscriber';
 export * from './delete-campaign';
 export * from './delete-subscriber';
 export * from './find-subscriber';
+export * from './get-campaign-delivery-status';
 export * from './list-campaigns';
 export * from './list-custom-fields';
 export * from './list-subcategories';

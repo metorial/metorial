@@ -62,9 +62,8 @@ export let createOffer = SlateTool.create(spec, {
       mode: ctx.input.mode,
       number: ctx.input.number,
       entries: ctx.input.entries.map(e => ({
-        product: e.productId,
+        product: e.productId ?? e.productName,
         productCode: e.productCode,
-        productName: e.productName,
         quantity: e.quantity,
         unit: e.unit,
         unitNettoPrice: e.unitNetPrice,

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let requestCreditCheck = SlateTool.create(spec, {
   name: 'Request Credit Check',
   key: 'request_credit_check',
-  description: `Requests a credit check for an individual, which can include a full credit report, credit score, or credit risk alert depending on the check type selected. Results are returned asynchronously when the credit bureau completes processing.`,
+  description: `Legacy IdentityCheck tool. Requires an IdentityCheck API Key connection. Requests a credit check for an individual, which can include a full credit report, credit score, or credit risk alert depending on the check type selected. Results are returned asynchronously when the credit bureau completes processing.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -44,7 +44,7 @@ export let requestCreditCheck = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new IdentityCheckClient(ctx.auth.token);
+    let client = new IdentityCheckClient(ctx.auth);
 
     let result = await client.createCreditCheck({
       email: ctx.input.email,

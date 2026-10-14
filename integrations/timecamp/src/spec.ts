@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'timecamp',
   name: 'TimeCamp',
   description:
-    'Time tracking software for teams and individuals. Track time on tasks and projects, manage attendance, create invoices, and analyze productivity.',
+    'Track time entries and live timers, organize projects and tasks, discover users and groups, review attendance, and manage tags. Existing client and invoice tools are also included; their routes are not described in the current public API reference.',
   metadata: {},
   config,
   auth

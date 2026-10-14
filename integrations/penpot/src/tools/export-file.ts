@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let exportFileTool = SlateTool.create(spec, {
@@ -32,15 +32,30 @@ export let exportFileTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
+    let reference = {
+      fileId: ctx.input.fileId,
+      includeLibraries: ctx.input.includeLibraries ?? false,
+      embedAssets: ctx.input.embedAssets ?? false
+    };
     let result = await client.exportBinfile(
-      ctx.input.fileId,
-      ctx.input.includeLibraries ?? false,
-      ctx.input.embedAssets ?? false
+      reference.fileId,
+      reference.includeLibraries,
+      reference.embedAssets
     );
+    let filename = `${ctx.input.fileId}.penpot`;
+    await ctx.addAttachment({
+      type: 'url',
+      url: result.url,
+      headers: { Authorization: `Token ${ctx.auth.token}` },
+      mimeType: 'application/zip',
+      filename,
+      refreshReference: reference,
+      refreshAt: result.expiresAt
+    });
 
     return {
-      output: { exportResult: result },
+      output: { exportResult: result.rawResponse },
       message: `Exported file \`${ctx.input.fileId}\`.`
     };
   })

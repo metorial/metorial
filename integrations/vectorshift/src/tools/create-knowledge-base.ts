@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createApiClient, createKnowledgeBase } from '../lib/client';
 import { spec } from '../spec';
@@ -37,6 +37,12 @@ export let createKnowledgeBaseTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.chunkSize !== undefined && !Number.isInteger(ctx.input.chunkSize)) ||
+      (ctx.input.chunkOverlap !== undefined && !Number.isInteger(ctx.input.chunkOverlap))
+    ) {
+      throw createApiServiceError('chunkSize and chunkOverlap must be whole numbers.');
+    }
     let api = createApiClient(ctx.auth.token);
     let result = await createKnowledgeBase(api, {
       name: ctx.input.name,

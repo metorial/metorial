@@ -22,7 +22,10 @@ export let deleteClassificationTool = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Deletion status'),
-      deletedAt: z.number().describe('Timestamp of deletion')
+      deletedAt: z
+        .number()
+        .optional()
+        .describe('Timestamp of deletion, when provided by the API')
     })
   )
   .handleInvocation(async ctx => {

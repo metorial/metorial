@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class HereClient {
   private token: string;
@@ -10,11 +10,18 @@ export class HereClient {
   }
 
   private createClient(baseURL: string) {
-    let headers: Record<string, string> = {};
-    if (this.authMethod === 'bearer') {
-      headers.Authorization = `Bearer ${this.token}`;
+    if (!this.token.trim()) {
+      throw createApiServiceError('Provide a HERE API key or bearer access token.');
     }
-    return createAxios({ baseURL, headers });
+    return createAuthenticatedAxios({
+      baseURL,
+      authHeader: this.authMethod === 'bearer' ? { value: `Bearer ${this.token}` } : undefined,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'HERE',
+          reason: 'here_api_error'
+        })
+    });
   }
 
   private authParams(): Record<string, string> {
@@ -22,6 +29,18 @@ export class HereClient {
       return { apiKey: this.token };
     }
     return {};
+  }
+
+  private validateSearchContext(params: { at?: string; inArea?: string }, required: boolean) {
+    let hasAreaCenter = /^(circle|bbox):/.test(params.inArea ?? '');
+    if (params.at && hasAreaCenter) {
+      throw createApiServiceError('Use at or an inArea circle/bounding box, not both.');
+    }
+    if (required && !params.at && !hasAreaCenter) {
+      throw createApiServiceError(
+        'Provide at or an inArea circle/bounding box to center the search.'
+      );
+    }
   }
 
   // ─── Geocoding & Search ───
@@ -34,6 +53,11 @@ export class HereClient {
     limit?: number;
     lang?: string;
   }) {
+    if (!params.query?.trim() && !params.qualifiedQuery?.trim()) {
+      throw createApiServiceError(
+        'Provide query, qualifiedQuery, or both to geocode an address.'
+      );
+    }
     let client = this.createClient('https://geocode.search.hereapi.com');
     let queryParams: Record<string, string | number> = { ...this.authParams() };
     if (params.query) queryParams.q = params.query;
@@ -67,6 +91,7 @@ export class HereClient {
     lang?: string;
     termsLimit?: number;
   }) {
+    this.validateSearchContext(params, true);
     let client = this.createClient('https://autosuggest.search.hereapi.com');
     let queryParams: Record<string, string | number> = {
       ...this.authParams(),
@@ -89,6 +114,7 @@ export class HereClient {
     lang?: string;
     types?: string;
   }) {
+    this.validateSearchContext(params, false);
     let client = this.createClient('https://autocomplete.search.hereapi.com');
     let queryParams: Record<string, string | number> = {
       ...this.authParams(),
@@ -110,6 +136,7 @@ export class HereClient {
     limit?: number;
     lang?: string;
   }) {
+    this.validateSearchContext(params, true);
     let client = this.createClient('https://discover.search.hereapi.com');
     let queryParams: Record<string, string | number> = {
       ...this.authParams(),
@@ -124,7 +151,7 @@ export class HereClient {
   }
 
   async browse(params: {
-    at: string;
+    at?: string;
     categories?: string;
     foodTypes?: string;
     chains?: string;
@@ -133,6 +160,11 @@ export class HereClient {
     limit?: number;
     lang?: string;
   }) {
+    if (!params.at) {
+      throw createApiServiceError(
+        'Provide at to rank browse results by distance from a search center.'
+      );
+    }
     let client = this.createClient('https://browse.search.hereapi.com');
     let queryParams: Record<string, string | number> = {
       ...this.authParams(),
@@ -187,8 +219,11 @@ export class HereClient {
     truckTrailerCount?: number;
     truckShippedHazardousGoods?: string[];
   }) {
+    if (params.departureTime && params.arrivalTime) {
+      throw createApiServiceError('Provide departureTime or arrivalTime, not both.');
+    }
     let client = this.createClient('https://router.hereapi.com');
-    let queryParams: Record<string, string | number> = {
+    let queryParams: Record<string, string | number | string[]> = {
       ...this.authParams(),
       origin: params.origin,
       destination: params.destination,
@@ -199,39 +234,45 @@ export class HereClient {
     if (params.departureTime) queryParams.departureTime = params.departureTime;
     if (params.arrivalTime) queryParams.arrivalTime = params.arrivalTime;
     if (params.avoidFeatures && params.avoidFeatures.length > 0)
-      queryParams['avoid[features]'] = params.avoidFeatures.join(',');
+      queryParams['avoid[features]'] = params.avoidFeatures
+        .map(feature => (feature === 'motorway' ? 'controlledAccessHighway' : feature))
+        .join(',');
     if (params.avoidAreas && params.avoidAreas.length > 0)
       queryParams['avoid[areas]'] = params.avoidAreas.join('|');
     if (params.excludeCountries && params.excludeCountries.length > 0)
-      queryParams.exclude = params.excludeCountries.join(',');
+      queryParams['exclude[countries]'] = params.excludeCountries.join(',');
     if (params.units) queryParams.units = params.units;
     if (params.lang) queryParams.lang = params.lang;
     if (params.spans && params.spans.length > 0) queryParams.spans = params.spans.join(',');
     if (params.alternatives !== undefined) queryParams.alternatives = params.alternatives;
 
     // Truck-specific parameters
-    if (params.truckGrossWeight) queryParams['truck[grossWeight]'] = params.truckGrossWeight;
-    if (params.truckWeight) queryParams['truck[weight]'] = params.truckWeight;
-    if (params.truckAxleCount) queryParams['truck[axleCount]'] = params.truckAxleCount;
-    if (params.truckHeight) queryParams['truck[height]'] = params.truckHeight;
-    if (params.truckWidth) queryParams['truck[width]'] = params.truckWidth;
-    if (params.truckLength) queryParams['truck[length]'] = params.truckLength;
-    if (params.truckType) queryParams['truck[type]'] = params.truckType;
-    if (params.truckTrailerCount)
-      queryParams['truck[trailerCount]'] = params.truckTrailerCount;
+    if (params.truckGrossWeight !== undefined)
+      queryParams['vehicle[grossWeight]'] = params.truckGrossWeight;
+    if (params.truckWeight !== undefined)
+      queryParams['vehicle[currentWeight]'] = params.truckWeight;
+    if (params.truckAxleCount !== undefined)
+      queryParams['vehicle[axleCount]'] = params.truckAxleCount;
+    if (params.truckHeight !== undefined) queryParams['vehicle[height]'] = params.truckHeight;
+    if (params.truckWidth !== undefined) queryParams['vehicle[width]'] = params.truckWidth;
+    if (params.truckLength !== undefined) queryParams['vehicle[length]'] = params.truckLength;
+    if (params.truckType) queryParams['vehicle[type]'] = params.truckType;
+    if (params.truckTrailerCount !== undefined)
+      queryParams['vehicle[trailerCount]'] = params.truckTrailerCount;
     if (params.truckShippedHazardousGoods && params.truckShippedHazardousGoods.length > 0) {
-      queryParams['truck[shippedHazardousGoods]'] =
+      queryParams['vehicle[shippedHazardousGoods]'] =
         params.truckShippedHazardousGoods.join(',');
     }
 
     // Via waypoints
     if (params.via && params.via.length > 0) {
-      params.via.forEach((waypoint, _index) => {
-        queryParams.via = waypoint;
-      });
+      queryParams.via = params.via;
     }
 
-    let response = await client.get('/v8/routes', { params: queryParams });
+    let response = await client.get('/v8/routes', {
+      params: queryParams,
+      paramsSerializer: { indexes: null }
+    });
     return response.data;
   }
 
@@ -241,10 +282,52 @@ export class HereClient {
     transportMode?: string;
     regionType?: string;
     regionMargin?: number;
+    regionCenter?: { lat: number; lng: number };
+    regionRadius?: number;
+    regionBounds?: { west: number; south: number; east: number; north: number };
+    regionOuter?: Array<{ lat: number; lng: number }>;
     matrixAttributes?: string[];
     departureTime?: string;
     avoidFeatures?: string[];
   }) {
+    let regionType = params.regionType ?? 'autoCircle';
+    let regionDefinition: Record<string, unknown> = { type: regionType };
+    if (!params.origins.length || (params.destinations && !params.destinations.length)) {
+      throw createApiServiceError(
+        'Provide at least one origin and, when supplied, one destination.'
+      );
+    }
+    if (regionType === 'autoCircle' && params.regionMargin !== undefined) {
+      regionDefinition.margin = params.regionMargin;
+    } else if (regionType === 'circle') {
+      if (
+        !params.regionCenter ||
+        params.regionRadius === undefined ||
+        params.regionRadius <= 0
+      ) {
+        throw createApiServiceError(
+          'Circle regions require regionCenter and a positive regionRadius in meters.'
+        );
+      }
+      regionDefinition.center = params.regionCenter;
+      regionDefinition.radius = params.regionRadius;
+    } else if (regionType === 'boundingBox') {
+      if (!params.regionBounds) {
+        throw createApiServiceError('Bounding-box regions require regionBounds.');
+      }
+      Object.assign(regionDefinition, params.regionBounds);
+    } else if (regionType === 'polygon') {
+      if (
+        !params.regionOuter ||
+        params.regionOuter.length < 3 ||
+        params.regionOuter.length > 100
+      ) {
+        throw createApiServiceError(
+          'Polygon regions require regionOuter with 3 to 100 vertices.'
+        );
+      }
+      regionDefinition.outer = params.regionOuter;
+    }
     let client = this.createClient('https://matrix.router.hereapi.com');
     let queryParams: Record<string, string> = {
       ...this.authParams(),
@@ -253,10 +336,7 @@ export class HereClient {
 
     let body: Record<string, any> = {
       origins: params.origins,
-      regionDefinition: {
-        type: params.regionType || 'autoCircle',
-        ...(params.regionMargin ? { margin: params.regionMargin } : {})
-      }
+      regionDefinition
     };
 
     if (params.destinations) body.destinations = params.destinations;
@@ -281,6 +361,14 @@ export class HereClient {
     avoidFeatures?: string[];
     shapeMaxPoints?: number;
   }) {
+    if (Boolean(params.origin) === Boolean(params.destination)) {
+      throw createApiServiceError(
+        'Provide exactly one of origin or destination for the isoline center.'
+      );
+    }
+    if (!params.rangeValues.length || params.rangeValues.some(value => value <= 0)) {
+      throw createApiServiceError('Provide at least one positive range value.');
+    }
     let client = this.createClient('https://isoline.router.hereapi.com');
     let queryParams: Record<string, string | number> = {
       ...this.authParams(),
@@ -294,7 +382,9 @@ export class HereClient {
     if (params.routingMode) queryParams.routingMode = params.routingMode;
     if (params.optimizeFor) queryParams.optimizeFor = params.optimizeFor;
     if (params.avoidFeatures && params.avoidFeatures.length > 0)
-      queryParams['avoid[features]'] = params.avoidFeatures.join(',');
+      queryParams['avoid[features]'] = params.avoidFeatures
+        .map(feature => (feature === 'motorway' ? 'controlledAccessHighway' : feature))
+        .join(',');
     if (params.shapeMaxPoints) queryParams['shape[maxPoints]'] = params.shapeMaxPoints;
 
     let response = await client.get('/v8/isolines', { params: queryParams });
@@ -355,6 +445,14 @@ export class HereClient {
     oneObservation?: boolean;
     hourlyDate?: string;
   }) {
+    if (!params.products.length) {
+      throw createApiServiceError('Request at least one weather product.');
+    }
+    if (!params.location && !params.query && !params.zipCode) {
+      throw createApiServiceError(
+        'Provide location, query, or zipCode for the weather report.'
+      );
+    }
     let client = this.createClient('https://weather.hereapi.com');
     let queryParams: Record<string, string> = {
       ...this.authParams(),
@@ -366,7 +464,7 @@ export class HereClient {
     if (params.units) queryParams.units = params.units;
     if (params.lang) queryParams.lang = params.lang;
     if (params.oneObservation !== undefined)
-      queryParams.oneobservation = String(params.oneObservation);
+      queryParams.oneObservation = String(params.oneObservation);
     if (params.hourlyDate) queryParams.hourlyDate = params.hourlyDate;
     let response = await client.get('/v3/report', { params: queryParams });
     return response.data;
@@ -389,6 +487,9 @@ export class HereClient {
     lte?: Array<{ mcc: number; mnc: number; cid: number }>;
     fallback?: string;
   }) {
+    if (!params.wlan?.length && !params.gsm?.length && !params.lte?.length) {
+      throw createApiServiceError('Provide at least one WLAN, GSM, or LTE measurement.');
+    }
     let client = this.createClient('https://positioning.hereapi.com');
     let queryParams: Record<string, string> = { ...this.authParams() };
     if (params.fallback) queryParams.fallback = params.fallback;
@@ -401,6 +502,46 @@ export class HereClient {
     let response = await client.post('/v2/locate', body, {
       params: queryParams,
       headers: { 'Content-Type': 'application/json' }
+    });
+    return response.data;
+  }
+
+  async calculateTransitRoute(params: {
+    origin: string;
+    destination: string;
+    departureTime?: string;
+    arrivalTime?: string;
+    alternatives?: number;
+    changes?: number;
+    modes?: string[];
+    returnFields?: string[];
+    pedestrianSpeed?: number;
+    pedestrianMaxDistance?: number;
+    wheelchairAccessible?: boolean;
+    lang?: string;
+    units?: string;
+  }) {
+    if (params.departureTime && params.arrivalTime) {
+      throw createApiServiceError('Provide departureTime or arrivalTime, not both.');
+    }
+    let client = this.createClient('https://transit.router.hereapi.com');
+    let response = await client.get('/v8/routes', {
+      params: {
+        ...this.authParams(),
+        origin: params.origin,
+        destination: params.destination,
+        departureTime: params.departureTime,
+        arrivalTime: params.arrivalTime,
+        alternatives: params.alternatives,
+        changes: params.changes,
+        modes: params.modes?.join(','),
+        return: params.returnFields?.join(','),
+        'pedestrian[speed]': params.pedestrianSpeed,
+        'pedestrian[maxDistance]': params.pedestrianMaxDistance,
+        accessibility: params.wheelchairAccessible ? 'wheelchair' : undefined,
+        lang: params.lang,
+        units: params.units
+      }
     });
     return response.data;
   }

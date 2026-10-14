@@ -14,8 +14,19 @@ export let searchParties = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().describe('Search term (name, postcode, phone number)'),
-      page: z.number().optional().describe('Page number (default: 1)'),
-      perPage: z.number().optional().describe('Results per page, 1-100 (default: 50)'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .positive()
+        .optional()
+        .describe('Page number (default: 1)'),
+      perPage: z
+        .number()
+        .refine(Number.isSafeInteger)
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page, 1-100 (default: 50)'),
       embed: z
         .array(z.enum(['tags', 'fields', 'organisation', 'missingImportantFields']))
         .optional()
@@ -52,10 +63,10 @@ export let searchParties = SlateTool.create(spec, {
     let parties = (result.parties || []).map((p: any) => ({
       partyId: p.id,
       type: p.type,
-      firstName: p.firstName,
-      lastName: p.lastName,
-      name: p.name,
-      jobTitle: p.jobTitle,
+      firstName: p.firstName ?? undefined,
+      lastName: p.lastName ?? undefined,
+      name: p.name ?? undefined,
+      jobTitle: p.jobTitle ?? undefined,
       emailAddresses: p.emailAddresses,
       phoneNumbers: p.phoneNumbers
     }));

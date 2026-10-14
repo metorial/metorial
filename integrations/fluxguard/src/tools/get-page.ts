@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FluxguardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getPage = SlateTool.create(spec, {
   name: 'Get Page',
   key: 'get_page',
-  description: `Retrieve captured data for a monitored page, including change details. Returns a complete analysis of all changes recorded by Fluxguard such as HTML, text, pixel screenshots, network activity, headers, cookies, and extracted entities.`,
+  description: `Retrieve captured data for a monitored page using its site, session, and page identifiers. Returns the full page response plus available URL, status, capture time, and change metadata.`,
   tags: {
     readOnly: true
   }
@@ -34,6 +34,9 @@ export let getPage = SlateTool.create(spec, {
     let client = new FluxguardClient(ctx.auth.token);
 
     let result = await client.getPage(ctx.input.siteId, ctx.input.sessionId, ctx.input.pageId);
+    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+      throw createApiServiceError('Fluxguard returned invalid page data.');
+    }
 
     return {
       output: {

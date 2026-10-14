@@ -1,6 +1,14 @@
 # <img src="logo.png" height="20"> Pdfless
 
-Generate PDF documents from HTML/CSS templates by passing dynamic JSON data. Supports semantic templating with variable interpolation, conditionals, and array iteration. Add barcodes in multiple formats, set PDF metadata, apply encryption and permission controls, and generate bookmarks from headings. Returns a temporary download URL for the generated PDF.
+Discover workspace templates, inspect the workspace connected to your API key, and generate downloadable PDF documents with dynamic JSON data. Templates support variable interpolation, conditionals, array iteration, barcodes, metadata, and bookmarks. PDF protection and permission controls depend on your subscription.
+
+## Tools
+
+- `list_templates`: Retrieve one page of templates and their IDs for PDF generation.
+- `generate_pdf`: Generate and download a PDF from a template, with optional password protection and permissions. The original provider URL remains available in the result and expires after ten minutes.
+- `get_workspace`: Read the connected workspace's name, active status, and timestamps.
+
+Templates are designed in the [Pdfless dashboard](https://app.pdfless.com). Requests authenticate with the workspace API key in the `apikey` header. PDF generation consumes account quota.
 
 ## License
 

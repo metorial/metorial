@@ -64,8 +64,7 @@ export let listEmailLogs = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let result = await client.listEmailLogs({
@@ -85,11 +84,11 @@ export let listEmailLogs = SlateTool.create(spec, {
     let messages = (Array.isArray(rawMessages) ? rawMessages : []).map((m: any) => ({
       messageId: m.message_id || m.id?.toString() || '',
       status: m.status,
-      subject: m.subject,
+      subject: m.subject ?? undefined,
       from: m.from,
       to: m.to,
       sentAt: m.sent_at,
-      category: m.category,
+      category: m.category ?? undefined,
       sendingStream: m.sending_stream,
       opensCount: m.opens_count,
       clicksCount: m.clicks_count
@@ -99,7 +98,7 @@ export let listEmailLogs = SlateTool.create(spec, {
       output: {
         messages,
         totalCount: result.total_count,
-        nextPageCursor: result.next_page_cursor
+        nextPageCursor: result.next_page_cursor ?? undefined
       },
       message: `Retrieved **${messages.length}** email log entries${result.total_count ? ` out of ${result.total_count} total` : ''}.`
     };

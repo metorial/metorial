@@ -1,7 +1,7 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(authConfig: { token: string; authMethod: 'oauth' | 'basic' }) {
     let authHeader =
@@ -9,12 +9,14 @@ export class Client {
         ? `Bearer ${authConfig.token}`
         : `Basic ${authConfig.token}`;
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://acuityscheduling.com/api/v1',
-      headers: {
-        Authorization: authHeader,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: authHeader },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Acuity Scheduling',
+          reason: 'acuity_api'
+        })
     });
   }
 
@@ -27,6 +29,7 @@ export class Client {
     calendarID?: number;
     appointmentTypeID?: number;
     canceled?: boolean;
+    showall?: boolean;
     firstName?: string;
     lastName?: string;
     email?: string;
@@ -43,22 +46,25 @@ export class Client {
     return response.data;
   }
 
-  async createAppointment(data: {
-    datetime: string;
-    appointmentTypeID: number;
-    firstName: string;
-    lastName: string;
-    email: string;
-    calendarID?: number;
-    phone?: string;
-    timezone?: string;
-    certificate?: string;
-    notes?: string;
-    addonIDs?: number[];
-    fields?: Array<{ id: number; value: string }>;
-    labels?: Array<{ id: number }>;
-  }) {
-    let response = await this.axios.post('/appointments', data);
+  async createAppointment(
+    data: {
+      datetime: string;
+      appointmentTypeID: number;
+      firstName: string;
+      lastName: string;
+      email: string;
+      calendarID?: number;
+      phone?: string;
+      timezone?: string;
+      certificate?: string;
+      notes?: string;
+      addonIDs?: number[];
+      fields?: Array<{ id: number; value: string }>;
+      labels?: Array<{ id: number }>;
+    },
+    options?: { admin?: boolean; noEmail?: boolean }
+  ) {
+    let response = await this.axios.post('/appointments', data, { params: options });
     return response.data;
   }
 
@@ -72,9 +78,13 @@ export class Client {
       notes?: string;
       fields?: Array<{ id: number; value: string }>;
       labels?: Array<{ id: number }>;
-    }
+      certificate?: string;
+    },
+    options?: { admin?: boolean }
   ) {
-    let response = await this.axios.put(`/appointments/${appointmentId}`, data);
+    let response = await this.axios.put(`/appointments/${appointmentId}`, data, {
+      params: options
+    });
     return response.data;
   }
 
@@ -83,9 +93,14 @@ export class Client {
     data?: {
       cancelNote?: string;
       noEmail?: boolean;
+      admin?: boolean;
+      noShow?: boolean;
     }
   ) {
-    let response = await this.axios.put(`/appointments/${appointmentId}/cancel`, data || {});
+    let { admin, noEmail, ...body } = data ?? {};
+    let response = await this.axios.put(`/appointments/${appointmentId}/cancel`, body, {
+      params: { admin, noEmail }
+    });
     return response.data;
   }
 
@@ -94,9 +109,15 @@ export class Client {
     data: {
       datetime: string;
       calendarID?: number;
+      timezone?: string;
+      admin?: boolean;
+      noEmail?: boolean;
     }
   ) {
-    let response = await this.axios.put(`/appointments/${appointmentId}/reschedule`, data);
+    let { admin, noEmail, ...body } = data;
+    let response = await this.axios.put(`/appointments/${appointmentId}/reschedule`, body, {
+      params: { admin, noEmail }
+    });
     return response.data;
   }
 
@@ -112,6 +133,7 @@ export class Client {
     month: string;
     calendarID?: number;
     timezone?: string;
+    addonIDs?: number[];
   }) {
     let response = await this.axios.get('/availability/dates', { params });
     return response.data;
@@ -122,6 +144,8 @@ export class Client {
     date: string;
     calendarID?: number;
     timezone?: string;
+    addonIDs?: number[];
+    ignoreAppointmentIDs?: number[];
   }) {
     let response = await this.axios.get('/availability/times', { params });
     return response.data;
@@ -132,6 +156,10 @@ export class Client {
     month?: string;
     calendarID?: number;
     includeUnavailable?: boolean;
+    includePrivate?: boolean;
+    timezone?: string;
+    minDate?: string;
+    maxDate?: string;
   }) {
     let response = await this.axios.get('/availability/classes', { params });
     return response.data;
@@ -175,8 +203,23 @@ export class Client {
     email?: string;
     phone?: string;
   }) {
-    let response = await this.axios.get('/clients', { params });
-    return response.data;
+    let response = await this.axios.get('/clients', { params: { search: params?.search } });
+    return (
+      response.data as Array<{
+        id?: number;
+        firstName: string;
+        lastName: string;
+        email?: string;
+        phone?: string;
+        notes?: string;
+      }>
+    ).filter(client =>
+      (['firstName', 'lastName', 'email', 'phone'] as const).every(
+        key =>
+          params?.[key] === undefined ||
+          client[key]?.toLowerCase() === params[key]?.toLowerCase()
+      )
+    );
   }
 
   async createClient(data: {
@@ -191,7 +234,7 @@ export class Client {
   }
 
   async updateClient(
-    clientId: number,
+    selector: { firstName: string; lastName: string; phone?: string },
     data: {
       firstName?: string;
       lastName?: string;
@@ -200,12 +243,20 @@ export class Client {
       notes?: string;
     }
   ) {
-    let response = await this.axios.put(`/clients/${clientId}`, data);
+    let response = await this.axios.put(
+      '/clients',
+      {
+        ...data,
+        firstName: data.firstName ?? selector.firstName,
+        lastName: data.lastName ?? selector.lastName
+      },
+      { params: selector }
+    );
     return response.data;
   }
 
-  async deleteClient(clientId: number) {
-    let response = await this.axios.delete(`/clients/${clientId}`);
+  async deleteClient(selector: { firstName: string; lastName: string; phone?: string }) {
+    let response = await this.axios.delete('/clients', { params: selector });
     return response.data;
   }
 
@@ -231,6 +282,16 @@ export class Client {
   }
 
   // ─── Certificates ───
+
+  async listCertificates(params?: {
+    productID?: number;
+    orderID?: number;
+    appointmentTypeID?: number;
+    email?: string;
+  }) {
+    let response = await this.axios.get('/certificates', { params });
+    return response.data;
+  }
 
   async createCertificate(data: {
     productID?: number;

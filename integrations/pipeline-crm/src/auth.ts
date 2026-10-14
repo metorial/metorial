@@ -6,7 +6,7 @@ export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
-      appKey: z.string()
+      appKey: z.string().optional()
     })
   )
   .addCustomAuth({
@@ -15,11 +15,7 @@ export let auth = SlateAuth.create()
     key: 'api_key',
 
     inputSchema: z.object({
-      apiKey: z
-        .string()
-        .describe(
-          'Your Pipeline CRM API Key (user-level). Found in Settings > API > API Keys.'
-        ),
+      apiKey: z.string().describe('Your legacy Pipeline CRM API Key from Admin > API Keys.'),
       appKey: z
         .string()
         .describe(
@@ -36,10 +32,7 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: {
-      output: { token: string; appKey: string };
-      input: { apiKey: string; appKey: string };
-    }) => {
+    getProfile: async (ctx: { output: { token: string; appKey?: string } }) => {
       let profile = await new Client(ctx.output).getProfile();
 
       return {
@@ -50,6 +43,28 @@ export let auth = SlateAuth.create()
             [profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
             profile.email ||
             ''
+        }
+      };
+    }
+  })
+  .addCustomAuth({
+    type: 'auth.custom',
+    name: 'API Token',
+    key: 'api_token',
+    inputSchema: z.object({
+      token: z
+        .string()
+        .describe(
+          'API token created from your Pipeline CRM profile > API tokens. Use a read-write token to create, update, or delete records.'
+        )
+    }),
+    getOutput: async ctx => ({ output: { token: ctx.input.token } }),
+    getProfile: async (ctx: { output: { token: string; appKey?: string } }) => {
+      let profile = await new Client(ctx.output).getProfile();
+      return {
+        profile: {
+          id: String(profile.id),
+          name: [profile.first_name, profile.last_name].filter(Boolean).join(' ')
         }
       };
     }

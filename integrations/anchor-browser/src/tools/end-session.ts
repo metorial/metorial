@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,6 +27,9 @@ export let endSession = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (ctx.input.endAll && ctx.input.sessionId) {
+      throw createApiServiceError('Provide either sessionId or endAll, not both.');
+    }
 
     if (ctx.input.endAll) {
       await client.endAllSessions();
@@ -37,7 +40,7 @@ export let endSession = SlateTool.create(spec, {
     }
 
     if (!ctx.input.sessionId) {
-      throw new Error('Either sessionId or endAll must be provided.');
+      throw createApiServiceError('Either sessionId or endAll must be provided.');
     }
 
     await client.endSession(ctx.input.sessionId);

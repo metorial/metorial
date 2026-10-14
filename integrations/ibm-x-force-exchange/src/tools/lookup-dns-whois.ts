@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { XForceClient } from '../lib/client';
 import { spec } from '../spec';
@@ -83,80 +83,76 @@ DNS results include A, AAAA, MX, TXT, and other record types. WHOIS results incl
     let includeDns = ctx.input.includeDns !== false;
     let includeWhois = ctx.input.includeWhois !== false;
 
+    if (!includeDns && !includeWhois) {
+      throw createApiServiceError('Enable includeDns or includeWhois to perform a lookup.');
+    }
+
     let result: any = { query: ctx.input.query };
     let parts: string[] = [];
 
     if (includeDns) {
       ctx.progress('Resolving DNS records...');
-      try {
-        let dnsData = await client.getDnsRecords(ctx.input.query);
+      let dnsData = await client.getDnsRecords(ctx.input.query);
 
-        let records: any[] = [];
-        if (dnsData.A) {
-          for (let r of dnsData.A) {
-            records.push({ type: 'A', value: typeof r === 'string' ? r : r.record });
-          }
+      let records: any[] = [];
+      if (dnsData.A) {
+        for (let r of dnsData.A) {
+          records.push({ type: 'A', value: typeof r === 'string' ? r : r.record });
         }
-        if (dnsData.AAAA) {
-          for (let r of dnsData.AAAA) {
-            records.push({ type: 'AAAA', value: typeof r === 'string' ? r : r.record });
-          }
-        }
-        if (dnsData.MX) {
-          for (let r of dnsData.MX) {
-            records.push({ type: 'MX', value: typeof r === 'string' ? r : r.exchange });
-          }
-        }
-        if (dnsData.TXT) {
-          for (let r of dnsData.TXT) {
-            records.push({
-              type: 'TXT',
-              value: typeof r === 'string' ? r : Array.isArray(r) ? r.join('') : r.record
-            });
-          }
-        }
-
-        let passive = dnsData.Passive?.records?.map((p: any) => ({
-          value: p.value,
-          type: p.recordType,
-          firstSeen: p.first,
-          lastSeen: p.last
-        }));
-
-        result.dns = { records, passiveDns: passive };
-        parts.push(`${records.length} DNS record(s)`);
-      } catch (e: any) {
-        ctx.warn(`DNS lookup failed: ${e.message}`);
-        result.dns = { records: [] };
       }
+      if (dnsData.AAAA) {
+        for (let r of dnsData.AAAA) {
+          records.push({ type: 'AAAA', value: typeof r === 'string' ? r : r.record });
+        }
+      }
+      if (dnsData.MX) {
+        let mxRecords = Array.isArray(dnsData.MX) ? dnsData.MX : [dnsData.MX];
+        for (let r of mxRecords) {
+          records.push({ type: 'MX', value: typeof r === 'string' ? r : r.exchange });
+        }
+      }
+      if (dnsData.TXT) {
+        for (let r of dnsData.TXT) {
+          records.push({
+            type: 'TXT',
+            value: typeof r === 'string' ? r : Array.isArray(r) ? r.join('') : r.record
+          });
+        }
+      }
+
+      let passive = dnsData.Passive?.records?.map((p: any) => ({
+        value: p.value,
+        type: p.recordType,
+        firstSeen: p.first,
+        lastSeen: p.last
+      }));
+
+      result.dns = { records, passiveDns: passive };
+      parts.push(`${records.length} DNS record(s)`);
     }
 
     if (includeWhois) {
       ctx.progress('Fetching WHOIS data...');
-      try {
-        let whoisData = await client.getWhois(ctx.input.query);
-        let contact = whoisData.contact || [];
-        let registrant = contact.find((c: any) => c.type === 'registrant');
+      let whoisData = await client.getWhois(ctx.input.query);
+      let contact = whoisData.contact || [];
+      let registrant = contact.find((c: any) => c.type === 'registrant');
 
-        result.whois = {
-          registrarName: whoisData.registrarName,
-          createdDate: whoisData.createdDate,
-          updatedDate: whoisData.updatedDate,
-          expiresDate: whoisData.expiresDate,
-          registrant: registrant
-            ? {
-                name: registrant.name,
-                organization: registrant.organization,
-                country: registrant.country
-              }
-            : undefined,
-          nameServers: whoisData.nameServers,
-          status: whoisData.status
-        };
-        parts.push('WHOIS data');
-      } catch (e: any) {
-        ctx.warn(`WHOIS lookup failed: ${e.message}`);
-      }
+      result.whois = {
+        registrarName: whoisData.registrarName,
+        createdDate: whoisData.createdDate,
+        updatedDate: whoisData.updatedDate,
+        expiresDate: whoisData.expiresDate,
+        registrant: registrant
+          ? {
+              name: registrant.name,
+              organization: registrant.organization,
+              country: registrant.country
+            }
+          : undefined,
+        nameServers: whoisData.nameServers,
+        status: whoisData.status
+      };
+      parts.push('WHOIS data');
     }
 
     return {

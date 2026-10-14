@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let completeTask = SlateTool.create(spec, {
@@ -15,13 +16,13 @@ export let completeTask = SlateTool.create(spec, {
   .input(
     z.object({
       taskId: z.string().describe('ID of the task to complete'),
-      projectId: z.string().describe('ID of the project the task belongs to')
+      projectId: projectIdSchema
     })
   )
   .output(
     z.object({
       taskId: z.string().describe('ID of the completed task'),
-      projectId: z.string().describe('ID of the project'),
+      projectId: projectIdSchema,
       completed: z.boolean().describe('Whether the task was successfully completed')
     })
   )

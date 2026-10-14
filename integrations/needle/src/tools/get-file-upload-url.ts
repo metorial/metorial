@@ -9,7 +9,7 @@ export let getFileUploadUrl = SlateTool.create(spec, {
   description: `Generate signed upload URLs for uploading local or private files to Needle. After uploading a file to the signed URL, use the returned reference URL when adding the file to a collection.`,
   instructions: [
     'Specify the MIME content types for the files you want to upload.',
-    'Upload your file to the returned uploadUrl using a PUT request.',
+    'Upload your file immediately to the returned uploadUrl using a PUT request and a Content-Type header matching the requested MIME type. Upload URLs are short-lived.',
     'Then use the returned referenceUrl as the file URL when adding it to a collection.'
   ]
 })

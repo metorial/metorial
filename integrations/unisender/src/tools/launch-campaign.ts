@@ -24,7 +24,9 @@ Use this after creating an email message with the **Create Email Message** tool.
       timezone: z
         .string()
         .optional()
-        .describe('Timezone for the scheduled time (e.g., "America/New_York")'),
+        .describe(
+          'Timezone for the scheduled time. Unisender currently documents UTC; omit to use account settings.'
+        ),
       trackRead: z.boolean().optional().describe('Enable open/read tracking'),
       trackLinks: z.boolean().optional().describe('Enable link click tracking'),
       contacts: z
@@ -38,14 +40,18 @@ Use this after creating an email message with the **Create Email Message** tool.
       paymentCurrency: z
         .string()
         .optional()
-        .describe('Currency for payment limit (e.g., "USD", "EUR", "RUB")')
+        .describe(
+          'Currency for the payment limit. Unisender currently documents USD; omit to use the account currency.'
+        )
     })
   )
   .output(
     z.object({
       campaignId: z.number().describe('ID of the launched campaign'),
       status: z.string().describe('Status of the campaign after launch'),
-      count: z.number().describe('Number of contacts the campaign will be sent to')
+      count: z
+        .number()
+        .describe('Legacy recipient count reported by Unisender; currently always 0')
     })
   )
   .handleInvocation(async ctx => {
@@ -72,7 +78,7 @@ Use this after creating an email message with the **Create Email Message** tool.
         status: result.status,
         count: result.count
       },
-      message: `Launched campaign \`${result.campaign_id}\` for message \`${ctx.input.messageId}\` — **${result.count}** recipients, status: ${result.status}`
+      message: `Launched campaign \`${result.campaign_id}\` for message \`${ctx.input.messageId}\` — status: ${result.status}`
     };
   })
   .build();

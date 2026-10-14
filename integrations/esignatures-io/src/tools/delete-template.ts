@@ -31,7 +31,7 @@ export let deleteTemplate = SlateTool.create(spec, {
 
     return {
       output: {
-        status: result?.status || 'queued'
+        status: result.status
       },
       message: `Template **${ctx.input.templateId}** has been deleted.`
     };

@@ -14,8 +14,19 @@ export let getJobLogs = SlateTool.create(spec, {
   .input(
     z.object({
       jobId: z.string().describe('The unique identifier of the job.'),
-      offset: z.number().optional().describe('Number of log entries to skip. Defaults to 0.'),
-      limit: z.number().optional().describe('Maximum log entries to return.')
+      offset: z
+        .number()
+        .min(0)
+        .refine(Number.isInteger, 'Use a whole-number offset.')
+        .optional()
+        .describe('Number of log entries to skip. Defaults to 0.'),
+      limit: z
+        .number()
+        .min(1)
+        .max(1000)
+        .refine(Number.isInteger, 'Use a whole-number limit.')
+        .optional()
+        .describe('Maximum log entries to return.')
     })
   )
   .output(
@@ -34,7 +45,18 @@ export let getJobLogs = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let logs = Array.isArray(result) ? result : result.result || result.data || [];
+    let logs =
+      typeof result === 'string'
+        ? result
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .map(line => {
+              let [timestamp, level, ...message] = line.split('\t');
+              return { timestamp, level, message: message.join('\t') };
+            })
+        : Array.isArray(result)
+          ? result
+          : result.result || result.data || [];
 
     return {
       output: {

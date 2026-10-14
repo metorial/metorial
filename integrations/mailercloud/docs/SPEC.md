@@ -1,6 +1,4 @@
-Now let me look at the actual API docs to understand the full set of features:Now I have enough information to write a comprehensive specification.
-
-# Slates Specification for Mailercloud
+# Mailercloud Integration Specification
 
 ## Overview
 
@@ -28,7 +26,7 @@ It is recommended to assign a distinct API key for each integration and label it
 
 ### Contact Management
 
-Manage contacts (subscribers) in your Mailercloud account. You can add a new contact to a selected list, create new lists, and update existing contacts. Contacts support standard fields such as name, email, city, state, zip, country, phone, industry, department, job title, organization, and lead source. You can also pass custom fields to Mailercloud.
+Manage contacts (subscribers) in your Mailercloud account. Use get_contact to retrieve full contact details by ID. You can add a new contact to a selected list, create new lists, and update existing contacts. Contacts support standard fields such as name, email, city, state, zip, country, phone, industry, department, job title, organization, and lead source. You can also pass custom fields to Mailercloud.
 
 - Contacts are always associated with a list (list ID is required when creating a contact).
 - Contacts can have a `contact_type` (e.g., "active").
@@ -39,23 +37,25 @@ Lists (also known as recipients) are where you store and manage all of your cont
 
 ### Contact Properties
 
-You can list all the properties of your contacts in your Mailercloud account. Custom properties can be created, updated, and deleted. Editing custom property type via the API is not possible; you can only edit the name and description. If a property is used in a webform, you cannot delete it.
+You can list all the properties of your contacts in your Mailercloud account. Custom properties can be created with create_property, listed with list_properties, updated, and deleted. Editing custom property type via the API is not possible; you can only edit the name and description. If a property is used in a webform, you cannot delete it.
 
 ### Campaign Management
 
-The API allows creating email campaigns. For creating a campaign, HTML or plain text content and a list ID or segment are mandatory. You can create, send, and track email campaigns programmatically.
+The integration creates email campaigns with create_campaign and searches campaigns and their available report summaries with search_campaigns. For creating a campaign, HTML or plain text content and a list ID or segment are mandatory. Creation maps sender details to sender, content to html/plain_text, a list ID to list_ids, and a segment ID to segments. Campaign tags are not supported by the create_campaign endpoint; omit its legacy tags field.
 
-### Email Automation
+### Additional Provider Capabilities (Not Exposed as Tools)
+
+#### Email Automation
 
 Email automation enables sending targeted emails to individual customers, delivering relevant and personalized emails to each customer. Automations can target contacts from lists, segments, or webforms. The API exposes endpoints for managing automations.
 
 - Lists: You can apply automation to up to 150 lists. Segments: You can apply automation to one segmentation list. Webforms: You can apply automation to up to 150 webforms.
 
-### Segmentation
+#### Segmentation
 
 Contact list segmentation lets you deliver more targeted emails by dividing your list into smaller audiences based on certain rules. You can categorise subscribers based on criteria like subscription status, contact rating, campaign tags, gender, age, nationality, department, etc. Segments can be used as targets for campaigns and automations.
 
-### Transactional Email (Email API)
+#### Transactional Email (Email API)
 
 The Email API allows you to send both transactional emails and marketing campaigns. Whether you need to send transactional notifications, manage email campaigns, organize contacts, or monitor email performance, the Email API provides endpoints that integrate with your existing tech stack. SMTP relay is also available as an alternative sending method.
 
@@ -73,7 +73,7 @@ You can retrieve account and plan information via the API (e.g., current subscri
 
 Mailercloud supports webhooks that send real-time HTTP POST notifications to a specified URL when specific email events occur.
 
-Webhooks can be triggered by the following triggered events: send, open, click, fail, spam, unsubscribe and bounce.
+Webhooks can be triggered by the following triggered events: campaign_sent, campaign_opened, campaign_clicked, campaign_error, spam, unsubscribe and hard_bounce. The manage_webhook tool retains the shorter send/open/click/fail/bounce inputs and translates them to the provider event names.
 
 ### Send Event
 
@@ -104,3 +104,18 @@ Triggered when a recipient unsubscribes from the mailing list.
 Triggered when an email bounces (hard or soft bounce), indicating the recipient's mail server rejected the message.
 
 **Configuration:** When creating a webhook, you specify the target URL and which event types to listen for. In the event of a webhook delivery failure, a retry mechanism is activated. The system will automatically attempt to resend the webhook payload up to three times. Retries are triggered when the response is not 200, 201, or 204, or in cases of timeouts. The retry time interval is 10 seconds between each attempt.
+
+
+## API References
+
+- https://apidoc.mailercloud.com/authentication
+- https://apidoc.mailercloud.com/api-reference/contacts/create-contact
+- https://apidoc.mailercloud.com/api-reference/contacts/update-contact
+- https://apidoc.mailercloud.com/api-reference/contacts/get-contact-details
+- https://apidoc.mailercloud.com/api-reference/lists/list-lists
+- https://apidoc.mailercloud.com/api-reference/custom-properties/list-property
+- https://apidoc.mailercloud.com/api-reference/custom-properties/create-property
+- https://apidoc.mailercloud.com/api-reference/campaigns/create-campaign
+- https://apidoc.mailercloud.com/api-reference/campaigns/campaign-list
+- https://apidoc.mailercloud.com/api-reference/webhooks/create-a-new-webhook
+- https://apidoc.mailercloud.com/api-reference/webhooks/search-and-list-webhooks

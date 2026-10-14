@@ -39,12 +39,6 @@ export let getSurveyResults = SlateTool.create(spec, {
       to: ctx.input.to
     });
 
-    if (data.errorCode !== 0) {
-      throw new Error(
-        `Failed to get survey results: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
-
     let questions: Record<string, unknown>[] = [];
     let i = 1;
     while (data[`title${i}`] !== undefined) {

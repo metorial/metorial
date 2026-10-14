@@ -1,14 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageNote = SlateTool.create(spec, {
   name: 'Manage Note',
   key: 'manage_note',
-  description: `Create, update, or delete a research note in Dovetail. Notes capture interview summaries, research observations, and qualitative data. Use this to create new notes with content and fields, update existing note content, or delete notes (moved to trash for 30 days).`,
+  description: `Create, update, or delete a research note in Dovetail. Notes capture interview summaries, research observations, and qualitative data. Create notes with initial content and fields, update titles and custom fields, or delete notes (moved to trash for 30 days).`,
   instructions: [
-    'To create a note, provide title and/or content. At least one of title, content, or fields must be provided.',
+    'To create a note, provide projectId from list_projects and optionally title, initial content, or fields.',
     'To update a note, provide the noteId along with the fields to update.',
     'To delete a note, provide the noteId and set action to "delete".'
   ],
@@ -20,8 +21,14 @@ export let manageNote = SlateTool.create(spec, {
     z.object({
       action: z.enum(['create', 'update', 'delete']).describe('The operation to perform'),
       noteId: z.string().optional().describe('Note ID (required for update and delete)'),
+      projectId: projectIdSchema
+        .optional()
+        .describe('Project ID from list_projects (required for create).'),
       title: z.string().optional().describe('Note title'),
-      content: z.string().optional().describe('Note content body'),
+      content: z
+        .string()
+        .optional()
+        .describe('Initial note content body (create only; the API cannot patch content).'),
       fields: z
         .array(
           z.object({
@@ -46,7 +53,12 @@ export let manageNote = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.projectId)
+        throw createApiServiceError(
+          'projectId from list_projects is required to create a note.'
+        );
       let note = await client.createNote({
+        projectId: ctx.input.projectId,
         title: ctx.input.title,
         content: ctx.input.content,
         fields: ctx.input.fields
@@ -63,13 +75,18 @@ export let manageNote = SlateTool.create(spec, {
     }
 
     if (!ctx.input.noteId) {
-      throw new Error('noteId is required for update and delete actions');
+      throw createApiServiceError('noteId is required for update and delete actions');
     }
 
     if (ctx.input.action === 'update') {
+      if (ctx.input.content !== undefined)
+        throw createApiServiceError(
+          'Dovetail cannot patch note content. Update the title or custom fields, or create a new note with initial content.'
+        );
+      if (ctx.input.title === undefined && !ctx.input.fields?.length)
+        throw createApiServiceError('Provide a title or custom fields to update the note.');
       let note = await client.updateNote(ctx.input.noteId, {
         title: ctx.input.title,
-        content: ctx.input.content,
         fields: ctx.input.fields
       });
       return {

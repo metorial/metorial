@@ -16,7 +16,7 @@ export let updateMailbox = SlateTool.create(spec, {
       mailboxId: z.number().describe('ID of the mailbox to update'),
       name: z.string().optional().describe('New name for the mailbox'),
       aiEngine: z
-        .enum(['DISABLED', 'GCP_AI_1', 'GCP_AI_2', 'GCP_AI_2_5'])
+        .enum(['DISABLED', 'GCP_AI_1', 'GCP_AI_2', 'GCP_AI_2_5', 'GCP_AI_3_TXT'])
         .optional()
         .describe('AI engine to use'),
       processAttachments: z.boolean().optional().describe('Process email attachments'),

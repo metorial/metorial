@@ -1,4 +1,4 @@
-# Slates Specification for Landbot
+# Landbot API Specification
 
 ## Overview
 
@@ -26,7 +26,7 @@ Authorization: Token YOUR_API_TOKEN
 - The token is unique per teammate, and will behave according to the permissions granted to that teammate.
 - Landbot exposes two distinct APIs, each with their own base URL:
   - **Platform API** (`https://api.landbot.io/v1/`): For managing account resources like customers, channels, bots, agents, and tickets.
-  - **Chat API** (`https://chat.landbot.io/v1/`): For sending messages to customers within chat channels. The Chat API uses a channel-specific auth token generated when setting up the Hook URL in a channel's configuration.
+  - **APIchat** (`https://chat.landbot.io/v1/`): For submitting inbound messages from an external messaging surface to a Landbot APIchat channel. It uses the channel token from that channel's configuration, distinct from the account token.
 
 ## Features
 
@@ -37,6 +37,19 @@ Retrieve and manage customer (end-user) data. You can look up customers, update 
 ### Messaging
 
 Send messages to customers programmatically across channels. Supports sending chat text messages, images, and location links to customers. For WhatsApp, you can send pre-approved message templates with dynamic parameters (header, body, buttons) and manage template retrieval.
+
+`send_customer_text` sends outbound text to a customer ID using the account token. WhatsApp free-form messages require an open 24-hour window; use `send_whatsapp_template` outside that window. `send_message` submits an inbound APIchat message by customer token; it can create a customer when that token is unknown. Latitude and longitude inputs remain strings and are converted to numeric coordinates for the API.
+
+`get_customer_messages` returns the complete transcript without pagination. Message types are open-ended and `message_datetime` is a formatted string; Landbot does not guarantee message order.
+
+`list_customers` supports channel, assigned agent, archive, opt-in, and name/email/phone prefix filters. Its `count` output reflects the provider's total matching count. `update_customer.fields` creates or updates each named field individually, inferring its type from the JSON value. Field names use lowercase letters, digits, and underscores; null values are rejected. Creating an existing field falls back to updating it after HTTP 412.
+
+## API references
+
+- [Platform API](https://dev.landbot.io/api-reference/platform)
+- [APIchat API](https://dev.landbot.io/api-reference/apichat-api)
+- [Authentication](https://dev.landbot.io/guides/authentication)
+- [API contracts and conventions](https://dev.landbot.io/guides/for-ai-agents)
 
 ### Channel Management
 

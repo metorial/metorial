@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { parseDatagmaNumber } from '../lib/response';
 import { spec } from '../spec';
 
 export let detectJobChange = SlateTool.create(spec, {
@@ -45,6 +46,15 @@ Useful for CRM hygiene, churn risk detection, and re-engaging warm leads who hav
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.fullName?.trim() &&
+      !(ctx.input.firstName?.trim() && ctx.input.lastName?.trim())
+    ) {
+      throw createApiServiceError('Provide fullName or both firstName and lastName.');
+    }
+    if (!ctx.input.companyName.trim()) {
+      throw createApiServiceError('Provide the last known companyName for the person.');
+    }
     let client = new Client(ctx.auth.token);
 
     let result = await client.detectJobChange({
@@ -63,7 +73,7 @@ Useful for CRM hygiene, churn risk detection, and re-engaging warm leads who hav
         status: result?.status,
         personData: result?.data,
         companyScore: result?.companyScore,
-        creditBurn: result?.creditBurn
+        creditBurn: parseDatagmaNumber(result?.creditBurn, 'creditBurn')
       },
       message: `Job change detection for **${personName}** at **${ctx.input.companyName}**: status is **${result?.status || 'unknown'}** (confidence: ${result?.companyScore ?? 'N/A'}).`
     };

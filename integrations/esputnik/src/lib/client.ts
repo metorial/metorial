@@ -1,177 +1,217 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, isApiErrorRecord } from 'slates';
+
+export type MessageResult = {
+  locator?: string;
+  status: string;
+  requestId?: string;
+  message?: string;
+};
+export type PreparedRecipient = {
+  contactId?: number;
+  externalCustomerId?: string;
+  locator?: string;
+  jsonParam?: string;
+  languageCode?: string;
+  email?: boolean;
+  fromName?: string;
+  externalRequestId?: string;
+};
+export type SegmentContact = { contactId?: number; externalCustomerId?: string };
+
+export let getMessageResults = (response: { results?: MessageResult | MessageResult[] }) =>
+  Array.isArray(response.results)
+    ? response.results
+    : response.results
+      ? [response.results]
+      : [];
+export let getGroupNames = (groups?: Array<string | { name?: string }>) =>
+  groups?.flatMap(group =>
+    typeof group === 'string' ? [group] : group.name ? [group.name] : []
+  );
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    let basicToken = Buffer.from(`x:${config.token}`).toString('base64');
-
-    this.axios = createAxios({
-      baseURL: 'https://api.yespo.io/api',
-      headers: {
-        Authorization: `Basic ${basicToken}`,
-        'Content-Type': 'application/json; charset=UTF-8',
-        Accept: 'application/json'
-      }
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://esputnik.com/api',
+      auth: { username: 'x', password: config.token },
+      contentType: 'application/json; charset=UTF-8',
+      headers: { Accept: 'application/json' },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'eSputnik',
+          reason: 'esputnik_api_error',
+          extractResponse: (failure, helpers) => {
+            let response = helpers.getResponse(failure);
+            if (
+              isApiErrorRecord(failure) &&
+              isApiErrorRecord(failure.data) &&
+              isApiErrorRecord(failure.data.baggage)
+            ) {
+              return { ...response, data: failure.data.baggage.response };
+            }
+            return response;
+          },
+          extractUpstreamCode: (failure, response) => {
+            if (
+              isApiErrorRecord(failure) &&
+              isApiErrorRecord(failure.data) &&
+              isApiErrorRecord(failure.data.upstream) &&
+              typeof failure.data.upstream.code === 'string'
+            ) {
+              return failure.data.upstream.code;
+            }
+            return isApiErrorRecord(response?.data) && typeof response.data.code === 'string'
+              ? response.data.code
+              : undefined;
+          }
+        })
     });
   }
-
-  // ── Account ──────────────────────────────────────────────
 
   async getAccountInfo(): Promise<any> {
-    let response = await this.axios.get('/v1/account/info');
-    return response.data;
+    return (await this.axios.get('/v1/account/info')).data;
   }
-
   async getBalance(): Promise<any> {
-    let response = await this.axios.get('/v1/balance');
-    return response.data;
+    return (await this.axios.get('/v1/balance')).data;
   }
-
-  // ── Contacts ─────────────────────────────────────────────
-
-  async addOrUpdateContact(contact: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/v1/contact', contact);
-    return response.data;
+  async addOrUpdateContact(contact: Record<string, unknown>): Promise<any> {
+    return (await this.axios.post('/v1/contact', contact)).data;
   }
-
-  async updateContact(contactId: number, contact: Record<string, any>): Promise<any> {
-    let response = await this.axios.put(`/v1/contact/${contactId}`, contact);
-    return response.data;
+  async updateContact(contactId: number, contact: Record<string, unknown>): Promise<any> {
+    return (await this.axios.put(`/v1/contact/${contactId}`, contact)).data;
   }
-
   async getContact(contactId: number): Promise<any> {
-    let response = await this.axios.get(`/v1/contact/${contactId}`);
-    return response.data;
+    return (await this.axios.get(`/v1/contact/${contactId}`)).data;
   }
-
-  async searchContacts(params: Record<string, any>): Promise<any[]> {
-    let response = await this.axios.get('/v1/contacts', { params });
-    return response.data;
+  async searchContacts(params: Record<string, unknown>): Promise<any[]> {
+    return (await this.axios.get('/v1/contacts', { params })).data;
   }
-
-  async deleteContact(contactId: number): Promise<void> {
-    await this.axios.delete(`/v1/contact/${contactId}`);
+  async deleteContact(contactId: number, erase?: boolean): Promise<void> {
+    await this.axios.delete(`/v1/contact/${contactId}`, { params: { erase } });
   }
-
-  async deleteContactByExternalId(externalCustomerId: string): Promise<void> {
-    await this.axios.delete('/v1/contact', {
-      params: { externalCustomerId }
-    });
+  async deleteContactByExternalId(externalCustomerId: string, erase?: boolean): Promise<void> {
+    await this.axios.delete('/v1/contact', { params: { externalCustomerId, erase } });
   }
-
-  async bulkAddOrUpdateContacts(payload: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/v1/contacts', payload);
-    return response.data;
+  async bulkAddOrUpdateContacts(payload: Record<string, unknown>): Promise<any> {
+    return (await this.axios.post('/v1/contacts', payload)).data;
   }
-
-  async subscribeContact(payload: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/v1/contact/subscribe', payload);
-    return response.data;
+  async subscribeContact(payload: Record<string, unknown>): Promise<any> {
+    return (await this.axios.post('/v1/contact/subscribe', payload)).data;
   }
-
-  // ── Unsubscribe ──────────────────────────────────────────
-
+  async getContactImportStatus(sessionId: string): Promise<any> {
+    return (await this.axios.get(`/v1/importstatus/${encodeURIComponent(sessionId)}`)).data;
+  }
+  async getAdditionalFields(): Promise<any> {
+    return (await this.axios.get('/v1/additionalfields')).data;
+  }
   async addUnsubscribedEmails(emails: string[]): Promise<void> {
-    await this.axios.post('/v1/emails/unsubscribed', { emails });
+    await this.axios.post('/v1/emails/unsubscribed/add', { emails });
   }
-
   async removeUnsubscribedEmails(emails: string[]): Promise<void> {
     await this.axios.post('/v1/emails/unsubscribed/delete', { emails });
   }
-
-  // ── Segments ─────────────────────────────────────────────
-
-  async getSegments(): Promise<any[]> {
-    let response = await this.axios.get('/v1/groups');
-    return response.data;
+  async getSegments(params: Record<string, unknown> = {}): Promise<any[]> {
+    return (await this.axios.get('/v1/groups', { params })).data;
   }
-
-  async getSegmentContacts(segmentId: number): Promise<any[]> {
-    let response = await this.axios.get(`/v1/group/${segmentId}/contacts`);
-    return response.data;
-  }
-
-  async attachContactsToSegment(
+  async getSegmentContacts(
     segmentId: number,
-    contacts: Array<{ contactId?: number; externalCustomerId?: string }>
-  ): Promise<void> {
-    await this.axios.post(`/v1/group/${segmentId}/contacts/attach`, contacts);
+    params: Record<string, unknown> = {}
+  ): Promise<any[]> {
+    return (await this.axios.get(`/v1/group/${segmentId}/contacts`, { params })).data;
   }
-
+  async attachContactsToSegment(segmentId: number, contacts: SegmentContact[]): Promise<void> {
+    await this.modifySegment(segmentId, 'attach', contacts);
+  }
   async detachContactsFromSegment(
     segmentId: number,
-    contacts: Array<{ contactId?: number; externalCustomerId?: string }>
+    contacts: SegmentContact[]
   ): Promise<void> {
-    await this.axios.post(`/v1/group/${segmentId}/contacts/detach`, contacts);
+    await this.modifySegment(segmentId, 'detach', contacts);
   }
-
-  // ── Messaging ────────────────────────────────────────────
-
-  async sendEmail(payload: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/v1/message/email', payload);
-    return response.data;
+  private async modifySegment(
+    segmentId: number,
+    action: 'attach' | 'detach',
+    contacts: SegmentContact[]
+  ) {
+    let contactIds = contacts.flatMap(contact =>
+      contact.contactId !== undefined ? [contact.contactId] : []
+    );
+    let externalCustomerIds = contacts.flatMap(contact =>
+      contact.contactId === undefined && contact.externalCustomerId
+        ? [contact.externalCustomerId]
+        : []
+    );
+    if (contactIds.length) {
+      await this.axios.post(`/v1/group/${segmentId}/contacts/${action}`, { contactIds });
+    }
+    if (externalCustomerIds.length) {
+      await this.axios.post(`/v1/group/${segmentId}/contacts/${action}`, {
+        externalCustomerIds
+      });
+    }
   }
-
-  async sendSms(payload: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/v1/message/sms', payload);
-    return response.data;
+  async sendEmail(
+    payload: Record<string, unknown>
+  ): Promise<{ results?: MessageResult | MessageResult[] }> {
+    return (await this.axios.post('/v1/message/email', payload)).data;
   }
-
-  async smartSend(messageId: number, recipients: Record<string, any>[]): Promise<any> {
-    let response = await this.axios.post(`/v1/message/${messageId}/smartsend`, { recipients });
-    return response.data;
+  async sendSms(
+    payload: Record<string, unknown>
+  ): Promise<{ results?: MessageResult | MessageResult[] }> {
+    return (await this.axios.post('/v1/message/sms', payload)).data;
   }
-
+  async smartSend(
+    messageId: number,
+    recipients: PreparedRecipient[]
+  ): Promise<{ results: MessageResult[] }> {
+    let groups = new Map<
+      string,
+      {
+        email?: boolean;
+        fromName?: string;
+        recipients: Omit<PreparedRecipient, 'email' | 'fromName'>[];
+        indices: number[];
+      }
+    >();
+    for (let [index, { email, fromName, ...recipient }] of recipients.entries()) {
+      let key = JSON.stringify([email, fromName]);
+      let group = groups.get(key) ?? { email, fromName, recipients: [], indices: [] };
+      group.recipients.push(recipient);
+      group.indices.push(index);
+      groups.set(key, group);
+    }
+    let orderedResults: MessageResult[] = [];
+    for (let { indices, ...payload } of groups.values()) {
+      let response = await this.axios.post(`/v1/message/${messageId}/smartsend`, payload);
+      for (let [index, result] of getMessageResults(response.data).entries()) {
+        orderedResults[indices[index] ?? orderedResults.length] = result;
+      }
+    }
+    return { results: orderedResults.filter(Boolean) };
+  }
   async getMessageStatus(ids: string[]): Promise<any> {
-    let response = await this.axios.get('/v1/message/status', {
-      params: { ids: ids.join(',') }
-    });
-    return response.data;
+    return (await this.axios.get('/v1/message/status', { params: { ids: ids.join(',') } }))
+      .data;
   }
-
-  // ── Events ───────────────────────────────────────────────
-
   async generateEvent(payload: {
     eventTypeKey: string;
     keyValue?: string;
-    params: Record<string, any>;
+    params: Record<string, unknown>;
   }): Promise<any> {
-    let response = await this.axios.post('/v3/event', payload);
-    return response.data;
+    return (await this.axios.post('/v3/event', payload)).data;
   }
-
-  // ── Orders ───────────────────────────────────────────────
-
-  async addOrders(orders: Record<string, any>[]): Promise<any> {
-    let response = await this.axios.post('/v1/orders', { orders });
-    return response.data;
+  async addOrders(orders: Record<string, unknown>[]): Promise<any> {
+    return (await this.axios.post('/v1/orders', { orders })).data;
   }
-
   async deleteOrders(orderIds: string[]): Promise<void> {
-    await this.axios.delete('/v1/orders', {
-      data: { externalOrderIds: orderIds }
-    });
+    for (let externalOrderId of orderIds) {
+      await this.axios.delete('/v1/orders', { params: { externalOrderId } });
+    }
   }
-
-  // ── Promotional Codes ────────────────────────────────────
-
-  async getPromoCodes(promoCodeId: number): Promise<any> {
-    let response = await this.axios.get(`/v1/promocodes/${promoCodeId}`);
-    return response.data;
-  }
-
-  async uploadPromoCodes(promoCodeId: number, codes: string[]): Promise<any> {
-    let response = await this.axios.post(`/v1/promocodes/${promoCodeId}`, {
-      promoCodes: codes
-    });
-    return response.data;
-  }
-
-  // ── Contact Activity ─────────────────────────────────────
-
-  async getContactActivity(params: Record<string, any>): Promise<any> {
-    let response = await this.axios.get('/v1/contacts/activity', { params });
-    return response.data;
+  async getContactActivity(params: Record<string, unknown>): Promise<any> {
+    return (await this.axios.get('/v2/contacts/activity', { params })).data;
   }
 }

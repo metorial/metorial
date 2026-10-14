@@ -121,34 +121,34 @@ export let getSpeedToLeadReports = SlateTool.create(spec, {
     let result = await client.getCallReports(ctx.input);
 
     let calls = (result.endCallPayloadList || []).map((call: any) => ({
-      callId: call.call_id,
-      userId: call.user_id,
-      widgetKey: call.widget_key,
-      widgetName: call.widget_name,
-      callStatus: call.call_status,
-      timeStarted: call.time_started_iso_string,
-      timeAgentAnswered: call.time_agent_answered_iso_string,
-      timeLeadAnswered: call.time_lead_answered_iso_string,
-      timeEnded: call.time_ended_iso_string,
-      answerDurationSec: call.answer_duration_sec,
-      talkDurationSec: call.talk_duration_sec,
-      totalDurationSec: call.total_duration_sec,
-      disconnectedBy: call.disconnected_by,
-      recordingLink: call.recording_link,
+      callId: call.call_id ?? undefined,
+      userId: call.user_id?.toString(),
+      widgetKey: call.widget_key ?? undefined,
+      widgetName: call.widget_name ?? undefined,
+      callStatus: call.call_status ?? undefined,
+      timeStarted: call.time_started_iso_string ?? undefined,
+      timeAgentAnswered: call.time_agent_answered_iso_string ?? undefined,
+      timeLeadAnswered: call.time_lead_answered_iso_string ?? undefined,
+      timeEnded: call.time_ended_iso_string ?? undefined,
+      answerDurationSec: call.answer_duration_sec ?? undefined,
+      talkDurationSec: call.talk_duration_sec ?? undefined,
+      totalDurationSec: call.total_duration_sec ?? undefined,
+      disconnectedBy: call.disconnected_by ?? undefined,
+      recordingLink: call.recording_link ?? undefined,
       agent: call.agent
         ? {
-            agentId: call.agent.id,
-            agentPhone: call.agent.phone,
-            agentName: call.agent.name,
-            agentEmail: call.agent.email
+            agentId: call.agent.id?.toString(),
+            agentPhone: call.agent.phone ?? undefined,
+            agentName: call.agent.name ?? undefined,
+            agentEmail: call.agent.email ?? undefined
           }
         : undefined,
       lead: call.lead
         ? {
-            leadPhone: call.lead.phone,
-            leadId: call.lead.lead_id,
-            source: call.lead.source,
-            country: call.lead.country,
+            leadPhone: call.lead.lead_phone ?? call.lead.phone ?? undefined,
+            leadId: call.lead.lead_id?.toString(),
+            source: call.lead.source ?? undefined,
+            country: call.lead.country ?? undefined,
             customParams: call.lead.custom_params
           }
         : undefined

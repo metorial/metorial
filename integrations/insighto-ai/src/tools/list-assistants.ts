@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListResult, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let listAssistants = SlateTool.create(spec, {
@@ -63,28 +63,28 @@ export let listAssistants = SlateTool.create(spec, {
 
     if (ctx.input.assistantId) {
       let result = await client.getAssistant(ctx.input.assistantId);
-      let data = result.data || result;
+      let data = getObjectResult(result);
       let widgets: any[] | undefined;
       let dataSources: any[] | undefined;
 
       if (ctx.input.includeWidgets) {
         let widgetResult = await client.getAssistantWidgets(ctx.input.assistantId);
-        widgets = widgetResult.data || widgetResult;
+        widgets = getListResult(widgetResult).items;
       }
       if (ctx.input.includeDataSources) {
         let dsResult = await client.getAssistantDataSources(ctx.input.assistantId);
-        dataSources = dsResult.data || dsResult;
+        dataSources = getListResult(dsResult).items;
       }
 
       return {
         output: {
           assistant: {
             assistantId: data.id,
-            name: data.name,
-            description: data.description,
-            assistantType: data.assistant_type,
-            llmModel: data.llm_model,
-            systemPrompt: data.system_prompt,
+            name: data.name ?? undefined,
+            description: data.description ?? undefined,
+            assistantType: data.assistant_type ?? undefined,
+            llmModel: data.llm_model ?? undefined,
+            systemPrompt: data.system_prompt ?? undefined,
             widgets,
             dataSources
           }
@@ -94,19 +94,18 @@ export let listAssistants = SlateTool.create(spec, {
     }
 
     let result = await client.listAssistants({ page: ctx.input.page, size: ctx.input.size });
-    let items = result.data || result.items || result;
-    let list = Array.isArray(items) ? items : [];
+    let { items: list, total } = getListResult(result);
     return {
       output: {
         assistants: list.map((a: any) => ({
           assistantId: a.id,
-          name: a.name,
-          description: a.description,
-          assistantType: a.assistant_type,
-          llmModel: a.llm_model,
-          systemPrompt: a.system_prompt
+          name: a.name ?? undefined,
+          description: a.description ?? undefined,
+          assistantType: a.assistant_type ?? undefined,
+          llmModel: a.llm_model ?? undefined,
+          systemPrompt: a.system_prompt ?? undefined
         })),
-        totalCount: result.total || list.length
+        totalCount: total
       },
       message: `Found **${list.length}** assistant(s).`
     };

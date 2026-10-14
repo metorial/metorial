@@ -1,4 +1,17 @@
-Let me check the API docs for more details on authentication and the data append fields.# Slates Specification for Geocodio
+# Geocodio Specification
+
+## Implemented Tools
+
+The integration exposes forward/reverse and batch geocoding, single-origin
+distance calculations, `calculate_distance_matrix`, and geocoding list creation,
+status, listing, deletion, and CSV download. Downloads include a CSV file and keep
+the existing `csvContent` output for compatibility. List and distance operations
+require the corresponding API-key permissions.
+
+Requests retain API v1.11 to preserve existing address-component names and parsed
+input output. The [official migration guide](https://www.geocod.io/docs/#migrating-to-api-v2)
+states that v1.12 and earlier remain available. Matrix and inline-distance
+contracts follow the [Distance API](https://www.geocod.io/docs/#distance).
 
 ## Overview
 

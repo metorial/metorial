@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let renderDocument = SlateTool.create(spec, {
   name: 'Render Document',
   key: 'render_document',
-  description: `Generate a document by merging data with a pre-uploaded template. Supports output formats including PDF, DOCX, ODT, TXT, HTML, and XHTML.
+  description: `Generate a downloadable document by merging data with a pre-uploaded template. Supports output formats including PDF, DOCX, ODT, RTF, TXT, and HTML.
 Documents can be delivered via email or stored to AWS S3 using the **storeTo** parameter, or returned directly by default.
 Use **devMode** during development to get error highlights in the generated document instead of error codes.`,
   instructions: [
@@ -39,7 +39,7 @@ Use **devMode** during development to get error highlights in the generated docu
         .string()
         .optional()
         .describe(
-          'Override output format (pdf, docx, odt, txt, html, xhtml). If omitted, determined by outputName extension.'
+          'Override output format (pdf, docx, odt, rtf, txt, html). Separate multiple formats with semicolons to generate a ZIP. If omitted, determined by outputName extension.'
         ),
       storeTo: z
         .string()
@@ -107,6 +107,13 @@ Use **devMode** during development to get error highlights in the generated docu
     });
 
     let deliveryMethod = ctx.input.storeTo || 'stream';
+    if (result.file) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: result.file,
+        filename: result.filename
+      });
+    }
     let message = result.succeeded
       ? `Successfully rendered **${ctx.input.outputName}** from template \`${ctx.input.templateName}\`. Pages: ${result.pagesRendered || 'N/A'}. Delivery: ${deliveryMethod}.`
       : `Render failed: ${result.shortMsg || result.longMsg || 'Unknown error'}`;

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import type { UserflowUser } from '../lib/types';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
@@ -14,7 +15,10 @@ export let getUser = SlateTool.create(spec, {
   .input(
     z.object({
       userId: z.string().optional().describe('ID of the user to retrieve'),
-      email: z.string().optional().describe('Email to search for (used with find endpoint)'),
+      email: z
+        .string()
+        .optional()
+        .describe('Email to search for. Use userId if multiple users share this email.'),
       groupId: z.string().optional().describe('Filter by group ID when searching by email'),
       expand: z
         .array(z.string())
@@ -45,17 +49,18 @@ export let getUser = SlateTool.create(spec, {
       apiVersion: ctx.config.apiVersion
     });
 
-    let user: any;
+    let user: UserflowUser;
     if (ctx.input.userId && !ctx.input.email) {
       user = await client.getUser(ctx.input.userId, ctx.input.expand);
     } else if (ctx.input.email) {
       user = await client.findUser({
         userId: ctx.input.userId,
         email: ctx.input.email,
-        groupId: ctx.input.groupId
+        groupId: ctx.input.groupId,
+        expand: ctx.input.expand
       });
     } else {
-      throw new Error('Either userId or email must be provided');
+      throw createApiServiceError('Either userId or email must be provided');
     }
 
     return {
@@ -63,8 +68,8 @@ export let getUser = SlateTool.create(spec, {
         userId: user.id,
         attributes: user.attributes,
         createdAt: user.created_at,
-        groups: user.groups as unknown as Record<string, unknown>[] | null,
-        memberships: user.memberships as unknown as Record<string, unknown>[] | null
+        groups: user.groups,
+        memberships: user.memberships
       },
       message: `Retrieved user **${user.id}**${user.attributes.name ? ` (${user.attributes.name})` : ''}.`
     };

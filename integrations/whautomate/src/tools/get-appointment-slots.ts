@@ -41,11 +41,11 @@ export let getAppointmentSlots = SlateTool.create(spec, {
       timezone: ctx.input.timezone
     });
 
-    let slots = Array.isArray(result) ? result : result.slots || result.data || [];
+    let slots = result;
 
     return {
       output: { slots },
-      message: `Found **${slots.length}** available slot(s) from ${ctx.input.fromDate} to ${ctx.input.toDate}.`
+      message: `Retrieved availability for **${slots.length}** day(s) from ${ctx.input.fromDate} to ${ctx.input.toDate}.`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -35,13 +35,25 @@ export let manageProfile = SlateTool.create(spec, {
     let result: any;
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.profileName?.trim()) {
+        throw createApiServiceError(
+          'Provide profileName when creating an organization profile.'
+        );
+      }
       result = await client.createProfile({
         did: ctx.input.did,
-        name: ctx.input.profileName || '',
+        name: ctx.input.profileName,
         logo: ctx.input.logo,
         description: ctx.input.profileDescription
       });
     } else {
+      if (
+        ctx.input.profileName === undefined &&
+        ctx.input.logo === undefined &&
+        ctx.input.profileDescription === undefined
+      ) {
+        throw createApiServiceError('Provide a profile name, logo, or description to update.');
+      }
       result = await client.updateProfile(ctx.input.did, {
         name: ctx.input.profileName,
         logo: ctx.input.logo,

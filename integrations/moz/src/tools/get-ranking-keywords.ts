@@ -26,9 +26,21 @@ export let getRankingKeywordsTool = SlateTool.create(spec, {
       engine: z
         .enum(['google', 'bing'])
         .optional()
-        .describe('Search engine (default: google)'),
+        .describe('Search engine; ranking data supports Google only (default: google)'),
       locale: z.string().optional().describe('Locale code (default: en-US)'),
-      limit: z.number().optional().describe('Maximum number of keywords to return')
+      limit: z
+        .number()
+        .min(1)
+        .max(500)
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .optional()
+        .describe('Maximum number of keywords to return'),
+      page: z
+        .number()
+        .min(0)
+        .refine(Number.isSafeInteger, 'Must be a whole number')
+        .optional()
+        .describe('Zero-based page number')
     })
   )
   .output(
@@ -43,16 +55,19 @@ export let getRankingKeywordsTool = SlateTool.create(spec, {
       site: ctx.input.site,
       engine: ctx.input.engine,
       locale: ctx.input.locale,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      page: ctx.input.page
     });
 
-    let rankings = (result?.results || result?.keywords || []).map((r: any) => ({
-      keyword: r.keyword,
-      position: r.position || r.rank,
-      volume: r.volume ?? r.keyword_metrics?.volume,
-      difficulty: r.difficulty ?? r.keyword_metrics?.difficulty,
-      ...r
-    }));
+    let rankings = (result?.ranking_keywords ?? result?.results ?? result?.keywords ?? []).map(
+      (r: any) => ({
+        ...r,
+        keyword: r.keyword,
+        position: r.position ?? r.rank ?? r.rank_position,
+        volume: r.volume ?? r.keyword_metrics?.volume ?? undefined,
+        difficulty: r.difficulty ?? r.keyword_metrics?.difficulty ?? undefined
+      })
+    );
 
     return {
       output: { rankings },

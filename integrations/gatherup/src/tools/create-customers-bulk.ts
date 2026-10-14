@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -55,17 +55,21 @@ export let createCustomersBulk = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.customers.length === 0 || ctx.input.customers.length > 1000) {
+      throw createApiServiceError('Provide between 1 and 1000 customers per request.');
+    }
+    for (let [index, customer] of ctx.input.customers.entries()) {
+      if (!customer.email?.trim() && !customer.phone?.trim()) {
+        throw createApiServiceError(
+          `Customer ${index + 1} needs an email address or phone number.`
+        );
+      }
+    }
     let client = createClient(ctx);
     let data = await client.createCustomersBulk({
       businessId: ctx.input.businessId,
       customers: ctx.input.customers
     });
-
-    if (data.errorCode !== 0 && data.errorCode !== undefined) {
-      throw new Error(
-        `Bulk customer creation failed: ${data.errorMessage} (code: ${data.errorCode})`
-      );
-    }
 
     let results: Record<string, unknown>[] = [];
     for (let i = 1; i <= ctx.input.customers.length; i++) {

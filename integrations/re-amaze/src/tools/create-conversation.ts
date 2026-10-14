@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
   conversationStatusDescription,
+  validateConversationStatus,
   validateHoldUntil,
   validateSuppressSurveys
 } from '../lib/conversations';
@@ -78,6 +79,7 @@ export let createConversation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateConversationStatus(ctx.input.status);
     validateHoldUntil(ctx.input.status, ctx.input.holdUntil, { requireStatus: true });
     validateSuppressSurveys(ctx.input.suppressSurveys);
 

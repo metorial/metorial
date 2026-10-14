@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { SmsAlertClient } from '../lib/client';
+import { SmsAlertClient, type SmsAlertResponse } from '../lib/client';
 import { spec } from '../spec';
 
 export let scheduleSms = SlateTool.create(spec, {
@@ -10,10 +10,10 @@ export let scheduleSms = SlateTool.create(spec, {
 Use the **action** field to choose between scheduling a new message, editing an existing schedule, or cancelling one. Cancelled scheduled messages have their credits refunded.`,
   instructions: [
     'Schedule datetime must be in YYYY-MM-DD HH:MM:SS format.',
-    'To edit or cancel, you need the schedule ID from the original scheduling response.'
+    'To edit or cancel, supply the batchid from the original scheduling response in scheduleId.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -50,7 +50,7 @@ Use the **action** field to choose between scheduling a new message, editing an 
         .string()
         .optional()
         .describe(
-          'Schedule ID of an existing scheduled SMS (required for "edit" and "cancel").'
+          'Batch ID (batchid) from the scheduled SMS response (required for "edit" and "cancel").'
         ),
       route: z
         .string()
@@ -67,18 +67,25 @@ Use the **action** field to choose between scheduling a new message, editing an 
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SmsAlertClient({ token: ctx.auth.token });
+    let client = new SmsAlertClient(ctx.auth);
 
-    let result: any;
+    let result: SmsAlertResponse;
+    if (
+      ctx.input.scheduleTime &&
+      !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(ctx.input.scheduleTime)
+    ) {
+      throw createApiServiceError('Schedule time must use YYYY-MM-DD HH:MM:SS format.');
+    }
 
     if (ctx.input.action === 'schedule') {
       let senderId = ctx.input.senderId || ctx.config.senderId;
-      if (!senderId) throw new Error('Sender ID is required for scheduling.');
+      if (!senderId) throw createApiServiceError('Sender ID is required for scheduling.');
       if (!ctx.input.mobileNumbers)
-        throw new Error('Mobile numbers are required for scheduling.');
-      if (!ctx.input.message) throw new Error('Message text is required for scheduling.');
+        throw createApiServiceError('Mobile numbers are required for scheduling.');
+      if (!ctx.input.message)
+        throw createApiServiceError('Message text is required for scheduling.');
       if (!ctx.input.scheduleTime)
-        throw new Error('Schedule time is required for scheduling.');
+        throw createApiServiceError('Schedule time is required for scheduling.');
 
       ctx.info(`Scheduling SMS for ${ctx.input.scheduleTime}`);
       result = await client.scheduleSms({
@@ -92,16 +99,17 @@ Use the **action** field to choose between scheduling a new message, editing an 
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `SMS scheduled for **${ctx.input.scheduleTime}** to **${ctx.input.mobileNumbers}** with status: **${result.status || 'unknown'}**`
       };
     }
 
     if (ctx.input.action === 'edit') {
-      if (!ctx.input.scheduleId) throw new Error('Schedule ID is required for editing.');
+      if (!ctx.input.scheduleId)
+        throw createApiServiceError('Schedule ID is required for editing.');
       if (!ctx.input.scheduleTime)
-        throw new Error('New schedule time is required for editing.');
+        throw createApiServiceError('New schedule time is required for editing.');
 
       ctx.info(`Editing schedule ${ctx.input.scheduleId}`);
       result = await client.editSchedule({
@@ -112,14 +120,15 @@ Use the **action** field to choose between scheduling a new message, editing an 
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `Schedule **${ctx.input.scheduleId}** updated to **${ctx.input.scheduleTime}**`
       };
     }
 
     if (ctx.input.action === 'cancel') {
-      if (!ctx.input.scheduleId) throw new Error('Schedule ID is required for cancellation.');
+      if (!ctx.input.scheduleId)
+        throw createApiServiceError('Schedule ID is required for cancellation.');
 
       ctx.info(`Cancelling schedule ${ctx.input.scheduleId}`);
       result = await client.cancelSchedule({
@@ -129,12 +138,12 @@ Use the **action** field to choose between scheduling a new message, editing an 
       return {
         output: {
           status: result.status || 'unknown',
-          description: result.description || result
+          description: result.description ?? result
         },
         message: `Schedule **${ctx.input.scheduleId}** cancelled. Credits will be refunded.`
       };
     }
 
-    throw new Error(`Invalid action: ${ctx.input.action}`);
+    throw createApiServiceError(`Invalid action: ${ctx.input.action}`);
   })
   .build();

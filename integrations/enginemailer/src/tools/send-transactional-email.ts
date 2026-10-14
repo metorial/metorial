@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, getBase64ByteLength, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,7 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
     'Provide either **htmlContent** (full HTML) or **templateId** (pre-built template) — not both.',
     'The sender email domain must be a verified sending domain in Enginemailer.',
     'Substitution tags in the content should be wrapped in the format used in your template, and each tag must have a matching entry in **substitutionTags**.',
-    'CC emails are limited to 10 comma-separated addresses.'
+    'CC emails are limited to 10 comma-separated addresses; BCC emails are limited to 3. Total attachments must not exceed 5 MB.'
   ],
   tags: {
     destructive: false,
@@ -22,8 +22,11 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
     z.object({
       toEmail: z.string().describe('Recipient email address'),
       senderEmail: z.string().describe('Sender email address (must use a verified domain)'),
-      senderName: z.string().describe('Display name for the sender'),
-      subject: z.string().describe('Email subject line'),
+      senderName: z
+        .string()
+        .optional()
+        .describe('Display name for the sender; templates can supply this'),
+      subject: z.string().optional().describe('Email subject line; templates can supply this'),
       htmlContent: z
         .string()
         .optional()
@@ -31,7 +34,9 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
       templateId: z
         .string()
         .optional()
-        .describe('ID of a pre-built email template to use (use this or htmlContent)'),
+        .describe(
+          'ID of a pre-built email template to use (use this or htmlContent; senderEmail must match the template)'
+        ),
       substitutionTags: z
         .array(
           z.object({
@@ -42,7 +47,7 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
         .optional()
         .describe('Personalization substitution tags'),
       ccEmails: z.string().optional().describe('Comma-separated CC email addresses (max 10)'),
-      bccEmails: z.string().optional().describe('Comma-separated BCC email addresses'),
+      bccEmails: z.string().optional().describe('Comma-separated BCC email addresses (max 3)'),
       attachments: z
         .array(
           z.object({
@@ -58,12 +63,41 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
     z.object({
       status: z.string().describe('Response status'),
       statusCode: z.string().describe('Response status code'),
-      message: z.string().optional().describe('Response message')
+      message: z.string().optional().describe('Response message'),
+      transactionId: z.string().optional().describe('Transaction ID of the submitted email')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (Boolean(ctx.input.htmlContent) === Boolean(ctx.input.templateId)) {
+      throw createApiServiceError('Provide exactly one of htmlContent or templateId.');
+    }
+    for (let [label, emails, maximum] of [
+      ['CC', ctx.input.ccEmails, 10],
+      ['BCC', ctx.input.bccEmails, 3]
+    ] as const) {
+      if (
+        emails &&
+        emails
+          .split(',')
+          .map(email => email.trim())
+          .filter(Boolean).length > maximum
+      ) {
+        throw createApiServiceError(`At most ${maximum} ${label} recipients are allowed.`);
+      }
+    }
+    if (ctx.input.substitutionTags?.some(tag => /[{}[\]]/.test(tag.value))) {
+      throw createApiServiceError('Substitution tag values cannot contain {, }, [, or ].');
+    }
+    let attachmentBytes =
+      ctx.input.attachments?.reduce(
+        (total, attachment) => total + getBase64ByteLength(attachment.contentBase64),
+        0
+      ) ?? 0;
+    if (attachmentBytes > 5 * 1024 * 1024) {
+      throw createApiServiceError('Total attachment size must not exceed 5 MB.');
+    }
     let result = await client.sendTransactionalEmail({
       toEmail: ctx.input.toEmail,
       senderEmail: ctx.input.senderEmail,
@@ -87,9 +121,10 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
       output: {
         status: result.Result?.Status ?? 'Unknown',
         statusCode: result.Result?.StatusCode ?? 'Unknown',
-        message: result.Result?.Message ?? result.Result?.ErrorMessage
+        message: result.Result?.Message ?? result.Result?.ErrorMessage,
+        transactionId: result.Result?.TransactionID
       },
-      message: `Sent transactional email to **${ctx.input.toEmail}** with subject "${ctx.input.subject}".`
+      message: `Submitted transactional email to **${ctx.input.toEmail}**.`
     };
   })
   .build();

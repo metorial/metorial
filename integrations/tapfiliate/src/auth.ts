@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -13,12 +13,12 @@ export let auth = SlateAuth.create()
     key: 'api_key',
 
     inputSchema: z.object({
-      token: z
-        .string()
-        .describe('Your Tapfiliate API key. Found in Profile Settings > API Key.')
+      token: z.string().describe('Your Tapfiliate API key from account settings.')
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('Provide your Tapfiliate API key from account settings.');
       return {
         output: {
           token: ctx.input.token

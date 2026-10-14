@@ -1,6 +1,6 @@
 {
   "name": "@metorial/serply",
-  "description": "Search Google and Bing programmatically and retrieve structured SERP data. Perform web, news, image, video, product, job, and scholar searches with geo-targeting and device emulation. Track domain SERP rankings for SEO monitoring. Retrieve organic results, answer boxes, news articles, product listings, job postings, academic papers, and citation data as structured JSON.",
+  "description": "Search Google and Bing programmatically and retrieve structured results for web, news, images, videos, products, jobs, academic papers, and Maps places. Track domain SERP rankings and discover business locations with place identifiers, coordinates, contact details, and opening hours.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "web-search"],
   "skills": [
     "search web results",
@@ -9,6 +9,7 @@
     "search product listings",
     "search job postings",
     "search academic papers",
+    "search Maps places and businesses",
     "track SERP rankings",
     "geo-targeted search queries",
     "monitor search events via webhooks"

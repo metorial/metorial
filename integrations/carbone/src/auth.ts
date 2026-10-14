@@ -14,6 +14,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .trim()
+        .min(1)
         .describe(
           'Carbone API key. Obtain from https://account.carbone.io/. Can be a Production or Test key.'
         )

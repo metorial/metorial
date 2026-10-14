@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let getFiles = SlateTool.create(spec, {
   name: 'Get Files',
   key: 'get_files',
-  description: `Lists files in a chat room or retrieves details about a specific file including its download URL.`,
+  description: `Lists files in a chat room or prepares a specific file for download. Call list_rooms to discover room IDs.`,
   constraints: [
     'Returns up to 100 files when listing.',
-    'Download URLs are temporary and may expire.'
+    'Download URLs expire after 30 seconds.'
   ],
   tags: {
     readOnly: true
@@ -23,6 +23,12 @@ export let getFiles = SlateTool.create(spec, {
         .optional()
         .describe(
           'Specific file ID to get details and download URL for. Omit to list all files.'
+        ),
+      uploaderAccountId: z
+        .number()
+        .optional()
+        .describe(
+          'Filter the file list by uploader account ID. Applies when fileId is omitted.'
         )
     })
   )
@@ -47,15 +53,25 @@ export let getFiles = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
 
-    if (ctx.input.fileId) {
+    if (ctx.input.fileId !== undefined) {
+      let requestedAt = Date.now();
       let file = await client.getRoomFile(ctx.input.roomId, ctx.input.fileId);
+      if (file.download_url) {
+        await ctx.addAttachment({
+          type: 'url',
+          url: file.download_url,
+          refreshReference: { roomId: ctx.input.roomId, fileId: ctx.input.fileId },
+          // Chatwork URLs expire after 30 seconds; renew with a 10-second margin.
+          refreshAt: new Date(requestedAt + 20_000).toISOString()
+        });
+      }
       return {
         output: {
           files: [
             {
               fileId: file.file_id,
-              fileName: file.file_name,
-              fileSize: file.file_size,
+              fileName: file.filename,
+              fileSize: file.filesize,
               uploaderAccountId: file.account.account_id,
               uploaderName: file.account.name,
               uploadTime: file.upload_time,
@@ -63,16 +79,18 @@ export let getFiles = SlateTool.create(spec, {
             }
           ]
         },
-        message: `Retrieved file **${file.file_name}** (${file.file_size} bytes).`
+        message: file.download_url
+          ? `Prepared file **${file.filename}** (${file.filesize} bytes) for download.`
+          : `Retrieved file **${file.filename}** (${file.filesize} bytes).`
       };
     } else {
-      let files = await client.getRoomFiles(ctx.input.roomId);
+      let files = await client.getRoomFiles(ctx.input.roomId, ctx.input.uploaderAccountId);
       return {
         output: {
           files: files.map(f => ({
             fileId: f.file_id,
-            fileName: f.file_name,
-            fileSize: f.file_size,
+            fileName: f.filename,
+            fileSize: f.filesize,
             uploaderAccountId: f.account.account_id,
             uploaderName: f.account.name,
             uploadTime: f.upload_time

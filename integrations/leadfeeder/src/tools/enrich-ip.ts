@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { IpEnrichClient } from '../lib/ip-enrich-client';
 import { spec } from '../spec';
@@ -50,7 +50,7 @@ export let enrichIp = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.ipEnrichToken) {
-      throw new Error(
+      throw createApiServiceError(
         'IP-Enrich API key is not configured. Please add it in authentication settings.'
       );
     }

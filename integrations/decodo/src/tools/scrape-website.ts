@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ScrapingClient } from '../lib/scraping-client';
+import { getScreenshotBytes, ScrapingClient } from '../lib/scraping-client';
 import { spec } from '../spec';
 
 let browserActionSchema = z.object({
@@ -151,7 +151,19 @@ export let scrapeWebsite = SlateTool.create(spec, {
         .record(z.string(), z.string())
         .optional()
         .describe('Custom request headers to send to the target'),
+      forceHeaders: z
+        .boolean()
+        .optional()
+        .describe(
+          'Forward custom headers to the target (defaults to true when headers are supplied)'
+        ),
       cookies: z.string().optional().describe('Custom cookies for authenticated requests'),
+      forceCookies: z
+        .boolean()
+        .optional()
+        .describe(
+          'Forward custom cookies to the target (defaults to true when cookies are supplied)'
+        ),
       sessionId: z
         .string()
         .optional()
@@ -194,7 +206,7 @@ export let scrapeWebsite = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ScrapingClient(ctx.auth.token);
+    let client = new ScrapingClient(ctx.auth.token, ctx.auth.authMethod);
 
     ctx.info(
       `Scraping with target="${ctx.input.target}" ${ctx.input.url ? `url="${ctx.input.url}"` : ''} ${ctx.input.query ? `query="${ctx.input.query}"` : ''}`
@@ -216,11 +228,24 @@ export let scrapeWebsite = SlateTool.create(spec, {
       httpMethod: ctx.input.httpMethod,
       payload: ctx.input.payload,
       headers: ctx.input.customHeaders,
+      forceHeaders: ctx.input.forceHeaders,
       cookies: ctx.input.cookies,
+      forceCookies: ctx.input.forceCookies,
       sessionId: ctx.input.sessionId,
       successfulStatusCodes: ctx.input.successfulStatusCodes,
       browserActions: ctx.input.browserActions
     });
+
+    for (let [index, item] of result.results.entries()) {
+      let screenshot = getScreenshotBytes(item.content);
+      if (screenshot) {
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(screenshot, { headers: { 'content-type': 'image/png' } }),
+          filename: `screenshot-${index + 1}.png`
+        });
+      }
+    }
 
     let resultCount = result.results.length;
     let statusCodes = result.results.map(r => r.statusCode).join(', ');

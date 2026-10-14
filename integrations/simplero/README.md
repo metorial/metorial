@@ -1,6 +1,6 @@
 # Simplero
 
-Manage contacts, mailing lists, products, purchases, invoices, and account administrators for an all-in-one online course and membership platform. Create and update contacts with custom fields, tags, GDPR consent, and affiliate attribution. Subscribe and unsubscribe contacts to mailing lists individually or in bulk. List products, look up purchases, and add people to products via webhooks. Retrieve invoices filtered by date or number range. Manage account administrators with role assignments.
+Manage contacts, mailing lists, products, purchases, invoices, and account administrators for an all-in-one online course and membership platform. Create and update contacts with custom fields, tags, GDPR consent, and affiliate attribution. Subscribe and unsubscribe contacts individually or in bulk, then check background request results. List products, look up purchases, and create free purchases. Discover segments, create email broadcasts, retrieve engagement reports, and start automations. Retrieve invoices filtered by date or number range and identify the connected account and user.
 
 ## License
 

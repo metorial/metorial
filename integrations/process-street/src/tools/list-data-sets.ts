@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { cursorSchema, getNextCursor, nextCursorSchema } from '../lib/pagination';
 import { spec } from '../spec';
 
 let dataSetFieldSchema = z.object({
@@ -23,15 +24,16 @@ export let listDataSets = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(z.object({ cursor: cursorSchema }))
   .output(
     z.object({
+      nextCursor: nextCursorSchema,
       dataSets: z.array(dataSetSchema).describe('List of data sets')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let data = await client.listDataSets();
+    let data = await client.listDataSets(ctx.input.cursor);
     let dataSets = (data.dataSets || []).map((ds: any) => ({
       dataSetId: ds.id,
       name: ds.name,
@@ -42,7 +44,7 @@ export let listDataSets = SlateTool.create(spec, {
       }))
     }));
     return {
-      output: { dataSets },
+      output: { dataSets, nextCursor: getNextCursor(data) },
       message: `Found **${dataSets.length}** data set(s).`
     };
   })

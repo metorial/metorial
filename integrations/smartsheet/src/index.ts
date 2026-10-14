@@ -10,6 +10,7 @@ import {
   deleteSheet,
   deleteWorkspace,
   getCurrentUser,
+  getRow,
   getSheet,
   getWorkspace,
   listDashboards,
@@ -31,6 +32,7 @@ export let provider = Slate.create({
   tools: [
     listSheets,
     getSheet,
+    getRow,
     createSheet,
     updateSheet,
     deleteSheet,

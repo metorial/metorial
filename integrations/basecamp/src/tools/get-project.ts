@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let dockItemSchema = z.object({
@@ -15,13 +16,14 @@ let dockItemSchema = z.object({
 export let getProjectTool = SlateTool.create(spec, {
   name: 'Get Project',
   key: 'get_project',
-  description: `Get detailed information about a specific Basecamp project, including its dock (available tools like message board, to-do set, schedule, campfire, vault). The dock provides IDs needed for other operations like creating messages or to-do lists.`,
+  description: `Call list_accounts to discover the accountId for this operation. Get detailed information about a specific Basecamp project, including its dock (available tools like message board, to-do set, schedule, campfire, vault). The dock provides IDs needed for other operations like creating messages or to-do lists.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project to retrieve')
     })
   )
@@ -41,7 +43,8 @@ export let getProjectTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let project = await client.getProject(ctx.input.projectId);

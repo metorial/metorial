@@ -1,108 +1,36 @@
-Now let me check the YouTube and Walmart API details briefly:Now I have enough information to write the specification.
-
-# Slates Specification for Scrapingbee
-
-## Overview
-
-ScrapingBee is a web scraping API that handles headless browsers, proxy rotation, CAPTCHA solving, and AI-powered data extraction. The API handles headless browsers, rotates proxies, and offers AI-powered data extraction. It provides dedicated APIs for scraping general web pages, as well as specialized APIs for Google (search, news, maps, images, lens, shopping, AI mode), Amazon (product search and product lookup), YouTube (search, trainability, metadata, and transcripts), and Walmart.
+# ScrapingBee API specification
 
 ## Authentication
 
-All requests are authenticated using a private API key. To get access to an API key, create an account at ScrapingBee and confirm your email address.
+Use an API key from the ScrapingBee dashboard. Requests send the key as a Bearer token in the Authorization header. No OAuth scopes or resource IDs are required.
 
-The API key is passed as a query string parameter named `api_key` on every request. For example:
+## API operations
 
-```
-https://app.scrapingbee.com/api/v1?api_key=YOUR-API-KEY&url=YOUR-URL
-```
+| Tool | Provider endpoint or feature |
+| --- | --- |
+| scrape_webpage | GET /api/v1/; HTML, browser rendering, proxy options, forwarded headers and cookies |
+| page_content | GET /api/v1/ with return_page_text or return_page_markdown |
+| extract_data | GET /api/v1/ with JSON-encoded extract_rules |
+| ai_extract | GET /api/v1/ with either ai_query or JSON-encoded ai_extract_rules |
+| capture_screenshot | GET /api/v1/ with screenshot=true; downloadable PNG and existing base64 result |
+| run_js_scenario | GET /api/v1/ with JSON-encoded js_scenario |
+| google_search | GET /api/v1/google; the existing search type maps to classic |
+| amazon_search | GET /api/v1/amazon/search or /api/v1/amazon/product; product ASIN is sent as query |
+| amazon_pricing | GET /api/v1/amazon/pricing/ with asin |
+| walmart_search | GET /api/v1/walmart/search or /api/v1/walmart/product |
+| youtube_search | GET /api/v1/youtube/search |
+| youtube_video | GET /api/v1/youtube/metadata and optional /api/v1/youtube/subtitles |
+| check_usage | GET /api/v1/usage; credits and concurrency |
 
-There are no OAuth flows, scopes, or additional credentials. The single API endpoint is `https://app.scrapingbee.com/api/v1/` and the API key is included as the `api_key` parameter. Specialized APIs use sub-paths (e.g., `/api/v1/store/google`, `/api/v1/amazon/search`, `/api/v1/walmart/search`, `/api/v1/youtube/search`).
+Webpage timeout input retains seconds and is converted to the provider's milliseconds. Custom headers automatically enable header forwarding. Amazon and Walmart marketplace inputs accept full domains or top-level domains. Existing YouTube upload-date choices map to the documented provider values. Omit Amazon countryCode when it matches the selected marketplace country; that combination is rejected with guidance before requesting the provider.
 
-## Features
+Google extra URL parameters are encoded in extra_params. The provider currently documents filter, fpstate, locale, nfpr, safe, safe_search, tbm, tbs, and udm. Existing language, location, and nbResults fields remain accepted by the tool; provider support for their legacy request parameters is unverified. The optional legacy YouTube trainability operation remains available, but the current documentation does not document its endpoint.
 
-### General Web Scraping (HTML API)
+## Sources
 
-Scrape any web page and retrieve its HTML content. With JavaScript rendering, a simple parameter enables you to scrape any web page, even single-page applications using React, AngularJS, Vue.js, or any other libraries.
-
-- **JavaScript rendering**: Enable or disable rendering via the `render_js` parameter.
-- **Proxy options**: Use rotating proxies by default, or enable premium proxies with `premium_proxy=true` for difficult-to-scrape websites. You can specify a geolocation for the proxy using the `country_code` parameter.
-- **Custom headers and cookies**: Send custom headers and cookies with scraping requests.
-- **Ad and resource blocking**: Block ads (`block_ads`) and images/CSS (`block_resources`) to speed up scraping.
-- **Device emulation**: Control whether the request appears to come from a desktop or mobile device via the `device` parameter.
-- **Own proxy support**: Use ScrapingBee's infrastructure with your own proxy via the `own_proxy` parameter.
-- Scraping under login credentials is strictly prohibited and may result in account suspension.
-
-### Data Extraction
-
-Extract data from pages without parsing HTML on your side by adding extraction rules to API calls.
-
-- **CSS/XPath extraction rules**: Define rules using CSS selectors or XPath to extract specific text, attributes, HTML, or lists of elements, returned as structured JSON.
-- **Output formats**: Extract text, HTML, markdown, or attribute values from matched elements.
-- **Table extraction**: Automatically extract tables as arrays or JSON objects.
-
-### AI-Powered Data Extraction
-
-Extract the right content by just expressing what you need in plain English without using CSS selectors.
-
-- **`ai_query`**: Provide a plain-English question to extract specific information from a page.
-- **`ai_extract_rules`**: Define key-value pairs describing what data to extract using natural language descriptions.
-- **`ai_selector`**: Optionally focus AI extraction on a specific part of the page using a CSS selector.
-
-### JavaScript Scenarios
-
-Click, scroll, wait for elements to appear, or run custom JavaScript code on the target page.
-
-- **Instructions**: Define a sequence of actions such as `click`, `scroll_x`, `scroll_y`, `wait`, `wait_for`, and `evaluate` (for custom JS).
-- Useful for interacting with dynamic pages that require user interaction before data is available.
-
-### Screenshots
-
-Capture screenshots of websites instead of HTML. Full-page and partial screenshots are supported.
-
-- **`screenshot`**: Enable screenshot capture.
-- **`screenshot_full_page`**: Capture the entire page height.
-- **`window_width`**: Specify viewport width for responsive screenshots.
-
-### Google Search API
-
-Get structured JSON for search, news, maps, ads, and more in a single API call.
-
-- Supports Google search, news, maps, images, lens, shopping, and AI mode.
-- Add any extra Google parameters to customize your search (e.g., `gl`, `hl`, `num`, `start`, etc.).
-- Light request mode available for faster, cheaper results without JS rendering.
-
-### Amazon API
-
-Supports Amazon product search and specific product lookup.
-
-- **Search**: Search Amazon products by query with options for sorting, domain, language, country, device, and price filters.
-- **Product**: Look up specific products by ASIN with variant selection support.
-- Light request mode available to reduce cost when JS rendering is not needed.
-
-### Walmart API
-
-Scrape Walmart search results and product details with structured JSON output.
-
-- **Search**: Search Walmart products with options for sorting, price filters, fulfillment type/speed, and domain.
-- **Product**: Look up specific products by product ID with delivery ZIP and store ID options.
-
-### YouTube API
-
-The YouTube API allows you to scrape YouTube search results, video metadata, transcripts, and trainability information in real time.
-
-- **Search**: Search YouTube videos with filters for upload date.
-- **Metadata**: Retrieve video metadata for specific videos.
-- **Transcripts**: Extract video transcripts/subtitles.
-- **Trainability**: Check trainability information for videos.
-
-### ChatGPT API
-
-Collect structured responses from a ChatGPT scraper by sending a prompt with valid API credentials. Enable live search, inject HTML context, and automate intelligent scraper workflows.
-
-### Usage API
-
-Check account usage and remaining API credits programmatically.
-
-## Events
-
-The provider does not support events. ScrapingBee does not support webhooks for event notifications. It is a request-response API where each call returns data synchronously.
+- [HTML, screenshots and usage](https://www.scrapingbee.com/documentation/)
+- [Data extraction](https://www.scrapingbee.com/documentation/data-extraction/)
+- [Google API](https://www.scrapingbee.com/documentation/google-api/)
+- [Amazon API](https://www.scrapingbee.com/documentation/amazon/)
+- [Walmart API](https://www.scrapingbee.com/documentation/walmart/)
+- [YouTube API](https://www.scrapingbee.com/documentation/youtube/)

@@ -54,19 +54,23 @@ export let getJob = SlateTool.create(spec, {
       return {
         output: {
           jobId: j.id,
-          owner: j.owner,
-          status: j.consolidated_status ?? j.status,
+          owner: j.owner_sauce ?? j.owner ?? undefined,
+          status: j.consolidated_status ?? j.status ?? undefined,
           passed: j.passed,
           name: j.name,
           build: j.build,
-          os: j.os,
-          osVersion: j.os_version,
-          deviceName: j.device_name,
-          automationBackend: j.automation_backend,
-          startTime: j.start_time,
-          endTime: j.end_time,
-          duration: j.end_time && j.start_time ? j.end_time - j.start_time : undefined,
-          tags: j.tags,
+          os: j.os ?? undefined,
+          osVersion: j.os_version ?? undefined,
+          deviceName: j.device_name ?? undefined,
+          automationBackend: j.automation_backend ?? undefined,
+          creationTime: j.creation_time == null ? undefined : j.creation_time / 1000,
+          startTime: j.start_time == null ? undefined : j.start_time / 1000,
+          endTime: j.end_time == null ? undefined : j.end_time / 1000,
+          duration:
+            j.end_time != null && j.start_time != null
+              ? (j.end_time - j.start_time) / 1000
+              : undefined,
+          tags: j.tags ?? undefined,
           error: j.error
         },
         message: `Job **${j.name ?? j.id}** on ${j.device_name ?? 'real device'} — status: **${j.consolidated_status ?? j.status}**`
@@ -77,24 +81,24 @@ export let getJob = SlateTool.create(spec, {
     return {
       output: {
         jobId: j.id,
-        owner: j.owner,
+        owner: j.owner ?? undefined,
         status: j.consolidated_status ?? j.status,
         passed: j.passed,
         name: j.name,
         build: j.build,
-        browser: j.browser,
-        browserVersion: j.browser_version,
-        os: j.os,
-        automationBackend: j.automation_backend,
-        creationTime: j.creation_time,
-        startTime: j.start_time,
-        endTime: j.end_time,
-        duration: j.duration,
-        tags: j.tags,
+        browser: j.browser ?? undefined,
+        browserVersion: j.browser_version ?? undefined,
+        os: j.os ?? undefined,
+        automationBackend: j.automation_backend ?? undefined,
+        creationTime: j.creation_time ?? undefined,
+        startTime: j.start_time ?? undefined,
+        endTime: j.end_time ?? undefined,
+        duration: j.duration ?? undefined,
+        tags: j.tags ?? undefined,
         error: j.error,
-        videoUrl: j.video_url,
-        logUrl: j.log_url,
-        customData: j['custom-data']
+        videoUrl: j.video_url ?? undefined,
+        logUrl: j.log_url ?? undefined,
+        customData: j['custom-data'] ?? undefined
       },
       message: `Job **${j.name ?? j.id}** on ${j.browser ?? 'unknown browser'} ${j.browser_version ?? ''} / ${j.os ?? ''} — status: **${j.consolidated_status ?? j.status}**`
     };

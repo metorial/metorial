@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -27,20 +28,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.heyreach.io/api/public',
-        headers: {
-          'X-API-KEY': ctx.output.token
-        }
-      });
-
-      let response = await http.get('/auth/CheckApiKey');
+      let verified = await new Client({ token: ctx.output.token }).checkApiKey();
 
       return {
         profile: {
           id: 'heyreach-user',
           name: 'HeyReach Account',
-          verified: response.data === true || response.data?.data === true
+          verified
         }
       };
     }

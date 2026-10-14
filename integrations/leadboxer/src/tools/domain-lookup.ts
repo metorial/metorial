@@ -1,19 +1,24 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { LeadBoxerClient } from '../lib/client';
+import { leadString, leadStringList } from '../lib/responses';
+import { datasetIdSchema, getLegacyDatasetId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let domainLookup = SlateTool.create(spec, {
   name: 'Domain Lookup',
   key: 'domain_lookup',
-  description: `Enrich a domain name with detailed company firmographic data. Returns company name, industry, employee count, revenue, technologies, location, social links, and more. Ideal for enriching CRM records or scoring ICP fit.`,
+  description: `Enrich a domain name with company firmographics, industry, employee range, address, and LinkedIn information. Useful for enriching CRM records or scoring ICP fit. Call list_datasets to select which dataset is charged, or omit datasetId to use the account default.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      domain: z.string().describe('The domain name to look up, e.g. "example.com"')
+      domain: z
+        .string()
+        .describe('Clean domain name without protocol or www prefix, e.g. "example.com"'),
+      datasetId: datasetIdSchema
     })
   )
   .output(
@@ -47,57 +52,69 @@ export let domainLookup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new LeadBoxerClient({
       token: ctx.auth.token,
-      datasetId: ctx.config.datasetId
+      datasetId: ctx.input.datasetId ?? getLegacyDatasetId(ctx.config)
     });
 
     let result = await client.lookupDomain(ctx.input.domain);
 
-    let technologies = result.technologies || result.organizationTechnologies;
-    let techArray = Array.isArray(technologies)
-      ? technologies
-      : typeof technologies === 'string' && technologies
-        ? technologies.split(',').map((t: string) => t.trim())
-        : undefined;
-
-    let aliases = result.domainAliases || result.organizationDomainAliases;
-    let aliasArray = Array.isArray(aliases)
-      ? aliases
-      : typeof aliases === 'string' && aliases
-        ? aliases.split(',').map((a: string) => a.trim())
-        : undefined;
+    let techArray = leadStringList(result.technologies || result.organizationTechnologies);
+    let aliasArray = leadStringList(result.domainAliases || result.organizationDomainAliases);
+    let address = isApiErrorRecord(result.organizationAddress)
+      ? result.organizationAddress
+      : {};
+    let social = isApiErrorRecord(result.organizationSocialLinks)
+      ? result.organizationSocialLinks
+      : {};
+    let specialties = result.organizationSpecialties || result.specialties;
 
     let output = {
-      companyName: result.organizationName || result.companyName || result.name,
-      domain: result.organizationDomain || result.domain,
+      companyName: leadString(result.organizationName || result.companyName || result.name),
+      domain: leadString(result.organizationDomain || result.domain),
       domainAliases: aliasArray,
-      description:
+      description: leadString(
         result.organizationDescription ||
-        result.organizationDescriptionShort ||
-        result.description,
-      industryName: result.organizationIndustryName || result.industryName,
-      industryGroup: result.organizationIndustryGroup || result.industryGroup,
-      employeeCountRange:
-        result.organizationEmployeeCountRangeName || result.employeeCountRange,
-      revenueRange: result.organizationRevenueRange || result.revenueRange,
-      companyType: result.organizationType || result.type,
-      status: result.organizationStatus || result.status,
-      yearFounded:
-        result.organizationYearFounded != null
-          ? String(result.organizationYearFounded)
-          : undefined,
-      specialties: result.organizationSpecialties || result.specialties,
+          result.organizationDescriptionShort ||
+          result.description
+      ),
+      industryName: leadString(result.organizationIndustryName || result.industryName),
+      industryGroup: leadString(result.organizationIndustryGroup || result.industryGroup),
+      employeeCountRange: leadString(
+        result.organizationEmployeeCountRangeName || result.employeeCountRange
+      ),
+      revenueRange: leadString(result.organizationRevenueRange || result.revenueRange),
+      companyType: leadString(result.organizationType || result.type),
+      status: leadString(result.organizationStatus || result.status),
+      yearFounded: leadString(result.organizationYearFounded ?? result.yearFounded),
+      specialties: Array.isArray(specialties)
+        ? leadStringList(specialties)?.join(', ')
+        : leadString(specialties),
       technologies: techArray,
-      street: result.organizationStreet || result.street,
-      city: result.organizationCity || result.city,
-      state: result.organizationState || result.state,
-      postalCode: result.organizationPostalCode || result.postalCode,
-      country: result.organizationCountry || result.country,
-      phone: result.organizationPhone || result.phone,
-      companyEmail: result.organizationEmail || result.email,
-      linkedinUrl: result.organizationLinkedinUrl || result.linkedinUrl,
-      facebookUrl: result.organizationFacebookUrl || result.facebookUrl,
-      twitterUrl: result.organizationTwitterUrl || result.twitterUrl,
-      source: result.organizationSource || result.source
+      street: leadString(
+        address.organizationStreetName ||
+          result.organizationStreetName ||
+          result.organizationStreet ||
+          result.street
+      ),
+      city: leadString(address.organizationCity || result.organizationCity || result.city),
+      state: leadString(address.organizationState || result.organizationState || result.state),
+      postalCode: leadString(
+        address.organizationPostalCode || result.organizationPostalCode || result.postalCode
+      ),
+      country: leadString(
+        address.organizationCountry || result.organizationCountry || result.country
+      ),
+      phone: leadString(address.organizationPhone || result.organizationPhone || result.phone),
+      companyEmail: leadString(result.organizationEmail || result.email),
+      linkedinUrl: leadString(
+        social.organizationLinkedinUrl || result.organizationLinkedinUrl || result.linkedinUrl
+      ),
+      facebookUrl: leadString(
+        social.organizationFacebookUrl || result.organizationFacebookUrl || result.facebookUrl
+      ),
+      twitterUrl: leadString(
+        social.organizationTwitterUrl || result.organizationTwitterUrl || result.twitterUrl
+      ),
+      source: leadString(result.organizationSource || result.source)
     };
 
     let name = output.companyName || ctx.input.domain;

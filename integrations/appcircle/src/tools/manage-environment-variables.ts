@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageEnvironmentVariables = SlateTool.create(spec, {
@@ -72,11 +72,12 @@ export let manageEnvironmentVariables = SlateTool.create(spec, {
     switch (action) {
       case 'list_groups': {
         let groups = await client.listVariableGroups();
-        let items = Array.isArray(groups) ? groups : [];
+        let items = getAppcircleList(groups, 'list');
         return { output: items, message: `Found **${items.length}** variable group(s).` };
       }
       case 'create_group': {
-        if (!ctx.input.groupName) throw new Error('groupName is required for create_group');
+        if (!ctx.input.groupName)
+          throw createApiServiceError('groupName is required for create_group');
         let group = await client.createVariableGroup({
           name: ctx.input.groupName,
           variables: ctx.input.variables
@@ -88,7 +89,7 @@ export let manageEnvironmentVariables = SlateTool.create(spec, {
       }
       case 'delete_group': {
         if (!ctx.input.variableGroupId)
-          throw new Error('variableGroupId is required for delete_group');
+          throw createApiServiceError('variableGroupId is required for delete_group');
         await client.deleteVariableGroup(ctx.input.variableGroupId);
         return {
           output: { success: true },
@@ -97,7 +98,9 @@ export let manageEnvironmentVariables = SlateTool.create(spec, {
       }
       case 'rename_group': {
         if (!ctx.input.variableGroupId || !ctx.input.groupName)
-          throw new Error('variableGroupId and groupName are required for rename_group');
+          throw createApiServiceError(
+            'variableGroupId and groupName are required for rename_group'
+          );
         let renamed = await client.renameVariableGroup(
           ctx.input.variableGroupId,
           ctx.input.groupName
@@ -109,14 +112,16 @@ export let manageEnvironmentVariables = SlateTool.create(spec, {
       }
       case 'list_variables': {
         if (!ctx.input.variableGroupId)
-          throw new Error('variableGroupId is required for list_variables');
+          throw createApiServiceError('variableGroupId is required for list_variables');
         let vars = await client.listVariables(ctx.input.variableGroupId);
-        let items = Array.isArray(vars) ? vars : [];
+        let items = getAppcircleList(vars, 'list');
         return { output: items, message: `Found **${items.length}** variable(s) in group.` };
       }
       case 'add_variable': {
-        if (!ctx.input.variableGroupId || !ctx.input.key || !ctx.input.value)
-          throw new Error('variableGroupId, key, and value are required for add_variable');
+        if (!ctx.input.variableGroupId || !ctx.input.key || ctx.input.value === undefined)
+          throw createApiServiceError(
+            'variableGroupId, key, and value are required for add_variable'
+          );
         let added = await client.addVariable(ctx.input.variableGroupId, {
           key: ctx.input.key,
           value: ctx.input.value,
@@ -125,8 +130,15 @@ export let manageEnvironmentVariables = SlateTool.create(spec, {
         return { output: added, message: `Added variable **${ctx.input.key}** to group.` };
       }
       case 'update_variable': {
-        if (!ctx.input.variableGroupId || !ctx.input.key || !ctx.input.value)
-          throw new Error('variableGroupId, key, and value are required for update_variable');
+        if (
+          !ctx.input.variableGroupId ||
+          !ctx.input.key ||
+          ctx.input.key.length < 3 ||
+          !ctx.input.value
+        )
+          throw createApiServiceError(
+            'update_variable requires variableGroupId, a key of at least 3 characters, and a nonempty value'
+          );
         let updated = await client.updateVariable(ctx.input.variableGroupId, {
           key: ctx.input.key,
           value: ctx.input.value
@@ -135,7 +147,9 @@ export let manageEnvironmentVariables = SlateTool.create(spec, {
       }
       case 'delete_variables': {
         if (!ctx.input.variableGroupId || !ctx.input.keys?.length)
-          throw new Error('variableGroupId and keys are required for delete_variables');
+          throw createApiServiceError(
+            'variableGroupId and keys are required for delete_variables'
+          );
         await client.deleteVariables(ctx.input.variableGroupId, ctx.input.keys);
         return {
           output: { success: true },

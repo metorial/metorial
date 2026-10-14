@@ -1,19 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KlazifyClient } from '../lib/client';
+import { categorySchema } from '../lib/schemas';
 import { spec } from '../spec';
-
-let categorySchema = z.object({
-  confidence: z.number().describe('Confidence score from 0 to 1'),
-  name: z.string().describe('Category name path'),
-  IAB1: z.string().optional().describe('IAB Tier 1 category'),
-  IAB2: z.string().optional().describe('IAB Tier 2 category'),
-  IAB3: z.string().optional().describe('IAB Tier 3 category'),
-  IAB4: z.string().optional().describe('IAB Tier 4 category'),
-  IAB5: z.string().optional().describe('IAB Tier 5 category'),
-  IAB6: z.string().optional().describe('IAB Tier 6 category'),
-  IAB12: z.string().optional().describe('IAB v1.2 category')
-});
 
 export let categorizeDomain = SlateTool.create(spec, {
   name: 'Categorize Domain',
@@ -55,7 +44,20 @@ export let categorizeDomain = SlateTool.create(spec, {
           stateCode: z.string().nullable().optional(),
           countryCode: z.string().nullable().optional(),
           employeesRange: z.string().nullable().optional(),
-          revenue: z.number().nullable().optional(),
+          revenue: z
+            .number()
+            .nullable()
+            .optional()
+            .describe(
+              'Numeric revenue when supplied by the provider; otherwise null. See revenueRange for textual estimates.'
+            ),
+          revenueRange: z
+            .string()
+            .nullable()
+            .optional()
+            .describe(
+              'Exact estimated annual revenue range supplied by the provider, such as "$1M-$10M"'
+            ),
           raised: z.string().nullable().optional(),
           tags: z.array(z.string()).nullable().optional(),
           tech: z.array(z.string()).nullable().optional()
@@ -112,7 +114,8 @@ export let categorizeDomain = SlateTool.create(spec, {
             stateCode: company.stateCode ?? null,
             countryCode: company.countryCode ?? null,
             employeesRange: company.employeesRange ?? null,
-            revenue: company.revenue ?? null,
+            revenue: typeof company.revenue === 'number' ? company.revenue : null,
+            revenueRange: typeof company.revenue === 'string' ? company.revenue : null,
             raised: company.raised ?? null,
             tags: company.tags ?? null,
             tech: company.tech ?? null
@@ -121,12 +124,19 @@ export let categorizeDomain = SlateTool.create(spec, {
       domainRegistration: registration
         ? {
             domainAgeDate: registration.domain_age_date ?? null,
-            domainAgeDaysAgo: registration.domain_age_days_ago ?? null,
+            domainAgeDaysAgo:
+              registration.domain_age_days_ago == null
+                ? null
+                : String(registration.domain_age_days_ago),
             domainExpirationDate: registration.domain_expiration_date ?? null,
-            domainExpirationDaysLeft: registration.domain_expiration_days_left ?? null
+            domainExpirationDaysLeft:
+              registration.domain_expiration_days_left == null
+                ? null
+                : String(registration.domain_expiration_days_left)
           }
         : null,
-      similarDomains: result.similar_domains ?? null
+      similarDomains:
+        result.similar_domains ?? result.similar ?? domain.similar_domains ?? null
     };
 
     let categoryNames = output.categories.map((c: { name: string }) => c.name).join(', ');

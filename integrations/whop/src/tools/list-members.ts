@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let memberSchema = z.object({
@@ -26,10 +27,7 @@ export let listMembers = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      companyId: z
-        .string()
-        .optional()
-        .describe('Company ID. Uses config companyId if not provided.'),
+      companyId: companyIdSchema,
       query: z.string().optional().describe('Search by name, username, or email'),
       statuses: z
         .array(z.enum(['drafted', 'joined', 'left']))
@@ -58,7 +56,7 @@ export let listMembers = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let companyId = ctx.input.companyId || ctx.config.companyId;
-    if (!companyId) throw new Error('companyId is required');
+    if (!companyId) throw createApiServiceError('companyId is required');
 
     let client = new WhopClient(ctx.auth.token);
     let result = await client.listMembers({

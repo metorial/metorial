@@ -32,10 +32,10 @@ export let getTemplate = SlateTool.create(spec, {
     return {
       output: {
         templateId: tpl._id || tpl.id,
-        name: tpl.name,
-        enabled: tpl.enabled,
-        mailboxId: tpl.mailbox_id || tpl.mailboxId || tpl.mb,
-        fields: tpl.fields
+        name: tpl.name ?? undefined,
+        enabled: tpl.enabled ?? undefined,
+        mailboxId: tpl.mailbox_id || tpl.mailboxId || tpl.mb || undefined,
+        fields: tpl.fields ?? undefined
       },
       message: `Retrieved template **${tpl.name || tpl._id || tpl.id}**.`
     };

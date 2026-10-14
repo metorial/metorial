@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -27,13 +27,13 @@ let contactSchema = z.object({
 export let enrichContacts = SlateTool.create(spec, {
   name: 'Enrich Contacts',
   key: 'enrich_contacts',
-  description: `Start an asynchronous enrichment to find verified work emails, personal emails, and mobile phone numbers for business contacts. Submit up to 100 contacts per request. Each contact requires at minimum a first name, last name, and either a company domain or company name. Providing a LinkedIn URL increases match probability.
+  description: `Start an asynchronous enrichment to find verified work emails, personal emails, and mobile phone numbers for business contacts. Submit up to 100 contacts per request. Each contact requires either a LinkedIn URL or a first name, last name, and company domain or company name. Providing all known identifiers improves matching.
 
 Returns an enrichment ID to track the batch. Use **Get Enrichment Result** to retrieve results, or provide a webhook URL for automatic delivery.
 
 Credits are only consumed when contact data is found (1 credit per email, 3 per personal email, 10 per phone).`,
   instructions: [
-    'Each contact needs at least firstname + lastname + domain or companyName.',
+    'Each contact needs linkedinUrl, or firstname + lastname + domain or companyName.',
     'Providing a linkedinUrl significantly increases the chance of finding results.',
     'Use the enrichFields parameter to control whether to search for emails, phones, or both.'
   ],
@@ -73,6 +73,35 @@ Credits are only consumed when contact data is found (1 credit per email, 3 per 
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    for (let [index, contact] of ctx.input.contacts.entries()) {
+      if (
+        !contact.linkedinUrl?.trim() &&
+        !(
+          contact.firstname?.trim() &&
+          contact.lastname?.trim() &&
+          (contact.domain?.trim() || contact.companyName?.trim())
+        )
+      ) {
+        throw createApiServiceError(
+          `Contact ${index + 1} needs linkedinUrl, or firstname, lastname, and domain or companyName.`
+        );
+      }
+      if (contact.enrichFields?.length === 0) {
+        throw createApiServiceError(
+          `Contact ${index + 1} must request at least one enrichFields value.`
+        );
+      }
+      if (
+        contact.custom &&
+        (Object.keys(contact.custom).length > 10 ||
+          Object.values(contact.custom).some(value => value.length > 100))
+      ) {
+        throw createApiServiceError(
+          `Contact ${index + 1} custom fields allow at most 10 keys and 100 characters per value.`
+        );
+      }
+    }
+
     let datas = ctx.input.contacts.map(contact => ({
       firstname: contact.firstname,
       lastname: contact.lastname,
@@ -80,7 +109,7 @@ Credits are only consumed when contact data is found (1 credit per email, 3 per 
       company_name: contact.companyName,
       linkedin_url: contact.linkedinUrl,
       enrich_fields: contact.enrichFields ?? ['contact.emails', 'contact.phones'],
-      custom: contact.custom as Record<string, string> | undefined
+      custom: contact.custom
     }));
 
     let webhookEvents: { contact_finished?: string } | undefined;

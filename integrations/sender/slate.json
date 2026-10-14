@@ -1,16 +1,15 @@
 {
   "name": "@metorial/sender",
-  "description": "Manage subscribers, groups, and segments for email and SMS marketing. Create and send email campaigns, transactional emails, and SMS campaigns. Build marketing automation workflows with triggers, conditions, and delays. Design subscription forms for lead capture. Track campaign performance including opens, clicks, conversions, and revenue. Send transactional emails with personalization, templates, and attachments via API or SMTP. Configure webhooks for real-time subscriber, campaign, and group event notifications.",
+  "description": "Manage subscribers, subscription statuses, and group memberships. Discover custom fields and automation workflows, create and inspect email campaign drafts, send transactional emails with templates and personalization, and retrieve campaign opens and clicks.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
-    "send email campaigns",
-    "send transactional emails",
     "manage subscribers and groups",
-    "create audience segments",
-    "send SMS campaigns",
-    "build automation workflows",
-    "track campaign analytics",
-    "manage subscription forms",
-    "configure webhooks"
+    "discover subscriber custom fields",
+    "create email campaign drafts",
+    "inspect email campaigns",
+    "send transactional emails",
+    "discover automation workflows",
+    "enroll subscribers in workflows",
+    "track campaign opens and clicks"
   ]
 }

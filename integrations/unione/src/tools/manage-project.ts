@@ -67,7 +67,7 @@ export let createProject = SlateTool.create(spec, {
         sendEnabled: p.send_enabled,
         registeredAt: p.reg_time
       },
-      message: `Project **${p.name}** created with ID **${p.id}**.${p.api_key ? ` API key: ${p.api_key.substring(0, 8)}...` : ''}`
+      message: `Project **${p.name}** created with ID **${p.id}**.`
     };
   })
   .build();
@@ -84,7 +84,9 @@ export let updateProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to update'),
+      projectId: z
+        .string()
+        .describe('Project ID. Call list_projects to discover authorized projects.'),
       name: z.string().optional().describe('New project name'),
       country: z.string().optional().describe('Country code for data handling'),
       sendEnabled: z.boolean().optional().describe('Enable or disable sending'),
@@ -167,14 +169,16 @@ export let listProjects = SlateTool.create(spec, {
 export let deleteProject = SlateTool.create(spec, {
   name: 'Delete Project',
   key: 'delete_project',
-  description: `Delete a project and all its associated data (domains, templates, webhooks, suppression lists). This is permanent. Requires a user-level API key.`,
+  description: `Delete a project and its associated data. UniOne moves the project to its trash before permanent deletion; contact support for restoration. Requires a user-level API key. Call list_projects to discover project IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to delete')
+      projectId: z
+        .string()
+        .describe('Project ID. Call list_projects to discover authorized projects.')
     })
   )
   .output(

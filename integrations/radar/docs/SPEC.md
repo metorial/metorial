@@ -1,6 +1,4 @@
-Now let me get details on the specific event types Radar supports and the fraud/trips features:Let me get the full list of event types from the Radar documentation:Now I have enough information to write the specification. Let me compile it.
-
-# Slates Specification for Radar
+# Radar Specification
 
 ## Overview
 

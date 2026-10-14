@@ -48,6 +48,17 @@ let issuanceSchema = z.object({
   notBefore: z.string().describe('Certificate validity start date (RFC 3339)'),
   notAfter: z.string().describe('Certificate expiration date (RFC 3339)'),
   revoked: z.boolean().nullable().describe('Revocation status; null if unknown'),
+  problemReporting: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Provider instructions for reporting a problematic certificate'),
+  certificateFileName: z
+    .string()
+    .optional()
+    .describe(
+      'Filename of the downloadable DER certificate or precertificate, when requested'
+    ),
   issuer: issuerSchema,
   revocation: revocationSchema,
   pubkey: pubkeySchema
@@ -56,16 +67,17 @@ let issuanceSchema = z.object({
 export let searchCertificates = SlateTool.create(spec, {
   name: 'Search Certificates',
   key: 'search_certificates',
-  description: `Search Certificate Transparency logs for SSL/TLS certificates issued for a domain. Returns all known publicly-trusted certificates matching the query, with deduplication across CT logs.
+  description: `Search Certificate Transparency logs for unexpired SSL/TLS certificates issued for a domain. Returns one page of known publicly-trusted certificate issuances matching the query, with deduplication across CT logs.
 Supports querying subdomains, wildcard matching, pagination for incremental monitoring, and expanding additional certificate fields like issuer and revocation details.`,
   instructions: [
     'Use the **after** parameter with the last issuance ID from a previous query to fetch only new certificates since your last check.',
     'Set **includeSubdomains** to true to get certificates for all subdomains of the specified domain.',
-    'Use **expand** to include additional fields like issuer details, revocation status, and public key info.'
+    'Use **expand** to include additional fields like issuer details, revocation status, and public key info. Request cert_der for downloadable DER certificates.',
+    'Continue using the last issuance ID as after until an empty page is returned.'
   ],
   constraints: [
-    'Unauthenticated access is limited to a small number of queries per day.',
-    'Results are paginated; if you receive a full page, use the last issuance ID with the after parameter to get more.'
+    'API availability and query limits depend on your SSLMate subscription.',
+    'Results are paginated; use the last issuance ID with the after parameter and retain the other query settings to get more.'
   ],
   tags: {
     readOnly: true
@@ -95,6 +107,8 @@ Supports querying subdomains, wildcard matching, pagination for incremental moni
           z.enum([
             'dns_names',
             'issuer',
+            'issuer.website',
+            'issuer.caa_domains',
             'revocation',
             'pubkey',
             'cert_der',
@@ -137,6 +151,8 @@ Supports querying subdomains, wildcard matching, pagination for incremental moni
       notBefore: i.not_before,
       notAfter: i.not_after,
       revoked: i.revoked,
+      problemReporting: i.problem_reporting,
+      certificateFileName: i.cert_der ? `certificate-${i.tbs_sha256}.der` : undefined,
       issuer: i.issuer
         ? {
             friendlyName: i.issuer.friendly_name,
@@ -161,6 +177,17 @@ Supports querying subdomains, wildcard matching, pagination for incremental moni
           }
         : undefined
     }));
+
+    for (let issuance of issuances) {
+      if (issuance.cert_der) {
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(new Uint8Array(Buffer.from(issuance.cert_der, 'base64'))),
+          filename: `certificate-${issuance.tbs_sha256}.der`,
+          mimeType: 'application/pkix-cert'
+        });
+      }
+    }
 
     let lastId = issuances.length > 0 ? issuances[issuances.length - 1]!.id : null;
 

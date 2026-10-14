@@ -8,14 +8,19 @@ export let importFromLinkedIn = SlateTool.create(spec, {
   key: 'import_from_linkedin',
   description: `Import leads from LinkedIn into a La Growth Machine audience. Supports regular LinkedIn search URLs, Sales Navigator search URLs, and LinkedIn post URLs. Extracts contact information from the provided LinkedIn source.`,
   instructions: [
-    'The target audience must already exist in La Growth Machine.',
+    'An audience is created if the supplied name does not match an existing audience.',
+    'The import runs asynchronously. The LinkedIn identity must be connected and its browser extension open while the import runs.',
     'For LinkedIn post URLs, you can filter by engagement type (likes or comments).'
   ]
 })
   .input(
     z.object({
       audience: z.string().describe('Name of the LGM audience to import leads into'),
-      identityId: z.string().describe('ID of the connected identity to use for the import'),
+      identityId: z
+        .string()
+        .describe(
+          'ID of the connected identity to use for the import. Use list_identities to discover available identities.'
+        ),
       linkedinUrl: z
         .string()
         .describe('LinkedIn search URL, Sales Navigator URL, or LinkedIn post URL'),

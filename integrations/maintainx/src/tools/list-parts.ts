@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listParts = SlateTool.create(spec, {
   name: 'List Parts',
   key: 'list_parts',
-  description: `Lists parts from MaintainX inventory. Supports cursor-based pagination. Returns part name, description, stock levels, and costs.`,
+  description: `Lists parts from MaintainX inventory. Supports cursor-based pagination. Returns part name, description, stock levels, and costs. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +15,14 @@ export let listParts = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      organizationId: organizationIdSchema,
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -39,10 +47,7 @@ export let listParts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listParts({
       limit: ctx.input.limit,
@@ -50,15 +55,15 @@ export let listParts = SlateTool.create(spec, {
     });
 
     let parts = (result.parts ?? []).map((p: any) => ({
-      partId: p.id,
-      name: p.name,
-      description: p.description,
-      quantity: p.quantity,
-      unitCost: p.unitCost,
-      minimumQuantity: p.minimumQuantity,
-      barcode: p.barcode,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt
+      partId: p.id ?? undefined,
+      name: p.name ?? undefined,
+      description: p.description ?? undefined,
+      quantity: p.availableQuantity ?? undefined,
+      unitCost: p.unitCost ?? undefined,
+      minimumQuantity: p.minimumQuantity ?? undefined,
+      barcode: p.barcode ?? undefined,
+      createdAt: p.createdAt ?? undefined,
+      updatedAt: p.updatedAt ?? undefined
     }));
 
     return {

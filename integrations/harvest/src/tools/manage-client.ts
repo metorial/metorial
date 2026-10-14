@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageClient = SlateTool.create(spec, {
   name: 'Manage Client',
   key: 'manage_client',
-  description: `Create, update, or delete a client in Harvest. Clients are associated with projects and invoices.`,
+  description: `Create, update, or delete a client in Harvest. Clients are associated with projects and invoices. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +15,7 @@ export let manageClient = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       clientId: z.number().optional().describe('Client ID (required for update/delete)'),
       name: z.string().optional().describe('Client name (required for create)'),
@@ -35,11 +37,11 @@ export let manageClient = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for delete');
+      if (!ctx.input.clientId) throw createApiServiceError('clientId is required for delete');
       await client.deleteClient(ctx.input.clientId);
       return {
         output: { clientId: ctx.input.clientId, deleted: true },
@@ -48,7 +50,7 @@ export let manageClient = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create');
       let c = await client.createClient({
         name: ctx.input.name,
         isActive: ctx.input.isActive,
@@ -68,7 +70,7 @@ export let manageClient = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.clientId) throw new Error('clientId is required for update');
+    if (!ctx.input.clientId) throw createApiServiceError('clientId is required for update');
     let c = await client.updateClient(ctx.input.clientId, {
       name: ctx.input.name,
       isActive: ctx.input.isActive,

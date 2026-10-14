@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listGuests = SlateTool.create(spec, {
   name: 'List Guests',
   key: 'list_guests',
-  description: `List all guest users for a site, including their email, role (viewer or editor), and invitation status. Requires a Sites API key (Enterprise plan).`,
+  description: `List all guest users for a site, including their email, role (viewer or editor), and invitation status. Works with a Stats API key or Sites API key.`,
   tags: {
     readOnly: true
   }

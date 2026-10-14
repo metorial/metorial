@@ -66,6 +66,13 @@ export let getBatchResults = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let results = await client.getBatchResults(ctx.input.batchId, ctx.input.statusFilter);
+    await ctx.addAttachment({
+      type: 'url',
+      url: client.getBatchDownloadUrl(ctx.input.batchId),
+      mimeType: 'application/json',
+      headers: { 'x-api-key': ctx.auth.token },
+      query: { download: ctx.input.statusFilter ?? 'all' }
+    });
 
     return {
       output: { results, total: results.length },

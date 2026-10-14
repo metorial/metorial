@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getFileDownloadUrl = SlateTool.create(spec, {
   name: 'Get File Download URL',
   key: 'get_file_download_url',
-  description: `Generate a signed download URL for a specific file. The URL can be used to download the file's content directly.`,
+  description: `Prepare a downloadable file and return its signed download URL. The URL is short-lived; request a new one if you need to use it later.`,
   tags: {
     readOnly: true
   }
@@ -24,6 +24,13 @@ export let getFileDownloadUrl = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NeedleClient(ctx.auth.token);
     let downloadUrl = await client.getDownloadUrl(ctx.input.fileId);
+
+    await ctx.addAttachment({
+      type: 'url',
+      url: downloadUrl,
+      refreshReference: { fileId: ctx.input.fileId },
+      refreshAt: new Date().toISOString()
+    });
 
     return {
       output: { downloadUrl },

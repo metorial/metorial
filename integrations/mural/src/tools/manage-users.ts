@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,7 @@ export let getCurrentUserTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(userOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let u = await client.getCurrentUser();
 
     return {
@@ -37,7 +37,7 @@ export let getCurrentUserTool = SlateTool.create(spec, {
         role: u.role,
         type: u.type
       },
-      message: `Authenticated as **${u.firstName} ${u.lastName}** (${u.email}).`
+      message: `Authenticated as **${[u.firstName, u.lastName].filter(Boolean).join(' ') || u.email || u.id}**.`
     };
   })
   .build();
@@ -52,17 +52,31 @@ export let listMuralUsersTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      muralId: z.string().describe('ID of the mural to list members from')
+      muralId: z.string().describe('ID of the mural to list members from'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Maximum members per page; keep the same limit for subsequent pages'),
+      nextToken: z
+        .string()
+        .optional()
+        .describe('Pagination token from the previous list_mural_members call')
     })
   )
   .output(
     z.object({
-      users: z.array(userOutputSchema)
+      users: z.array(userOutputSchema),
+      nextToken: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
-    let result = await client.listMuralUsers(ctx.input.muralId);
+    let client = new Client(ctx.auth);
+    let result = await client.listMuralUsers(ctx.input.muralId, {
+      limit: ctx.input.limit,
+      next: ctx.input.nextToken
+    });
 
     let users = result.value.map(u => ({
       userId: u.id,
@@ -75,7 +89,7 @@ export let listMuralUsersTool = SlateTool.create(spec, {
     }));
 
     return {
-      output: { users },
+      output: { users, nextToken: result.next },
       message: `Found **${users.length}** member(s) on the mural.`
     };
   })
@@ -96,7 +110,12 @@ export let inviteUsersTool = SlateTool.create(spec, {
       roomId: z.string().optional().describe('ID of the room to invite users to'),
       workspaceId: z.string().optional().describe('ID of the workspace to invite users to'),
       emails: z.array(z.string()).describe('Email addresses of users to invite'),
-      role: z.string().optional().describe('Role to assign (e.g., "editor", "viewer")'),
+      role: z
+        .string()
+        .optional()
+        .describe(
+          'Mural invitation permission: editor/edit or viewer/view. Omit for room and workspace invitations.'
+        ),
       message: z.string().optional().describe('Custom invitation message')
     })
   )
@@ -108,8 +127,18 @@ export let inviteUsersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { muralId, roomId, workspaceId, emails, role, message } = ctx.input;
+    if ([muralId, roomId, workspaceId].filter(Boolean).length !== 1)
+      throw createApiServiceError('Provide exactly one of muralId, roomId, or workspaceId.');
+    if (!emails.length) throw createApiServiceError('Provide at least one email address.');
+    if (
+      role !== undefined &&
+      (!muralId || !['editor', 'viewer', 'edit', 'view'].includes(role))
+    )
+      throw createApiServiceError(
+        'Role is supported for mural invitations only: editor/edit or viewer/view. Omit role for rooms and workspaces.'
+      );
     let body = { emails, role, message };
 
     let target: string;
@@ -128,7 +157,7 @@ export let inviteUsersTool = SlateTool.create(spec, {
       target = 'workspace';
       targetId = workspaceId;
     } else {
-      throw new Error('One of muralId, roomId, or workspaceId must be provided');
+      throw createApiServiceError('One of muralId, roomId, or workspaceId must be provided');
     }
 
     return {
@@ -161,8 +190,11 @@ export let removeUsersTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let { muralId, roomId, emails } = ctx.input;
+    if ([muralId, roomId].filter(Boolean).length !== 1)
+      throw createApiServiceError('Provide exactly one of muralId or roomId.');
+    if (!emails.length) throw createApiServiceError('Provide at least one email address.');
 
     let target: string;
     let targetId: string;
@@ -176,7 +208,7 @@ export let removeUsersTool = SlateTool.create(spec, {
       target = 'room';
       targetId = roomId;
     } else {
-      throw new Error('Either muralId or roomId must be provided');
+      throw createApiServiceError('Either muralId or roomId must be provided');
     }
 
     return {

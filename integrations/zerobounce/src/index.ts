@@ -5,11 +5,12 @@ import {
   getAccountInfo,
   getActivityData,
   scoreEmail,
+  searchDomain,
   validateEmail
 } from './tools';
 
 export let provider = Slate.create({
   spec,
-  tools: [validateEmail, scoreEmail, findEmail, getActivityData, getAccountInfo],
+  tools: [validateEmail, scoreEmail, findEmail, getActivityData, getAccountInfo, searchDomain],
   triggers: []
 });

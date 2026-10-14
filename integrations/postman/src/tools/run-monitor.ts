@@ -6,19 +6,25 @@ import { spec } from '../spec';
 export let runMonitorTool = SlateTool.create(spec, {
   name: 'Run Monitor',
   key: 'run_monitor',
-  description: `Manually trigger a Postman monitor run and return the results. This executes the monitor's collection synchronously and returns detailed execution info including assertion results, request stats, and any failures.`,
+  description: `Trigger a Postman monitor run. Synchronous runs return assertion results, request statistics, and failures when complete. Asynchronous or long-running jobs can be checked with manage_monitor action get.`,
   tags: {
     readOnly: false
   }
 })
   .input(
     z.object({
-      monitorId: z.string().describe('ID of the monitor to run')
+      monitorId: z.string().describe('ID of the monitor to run'),
+      async: z
+        .boolean()
+        .optional()
+        .describe('Start asynchronously; check lastRun with manage_monitor action get')
     })
   )
   .output(
     z.object({
       status: z.string().optional(),
+      jobId: z.string().optional(),
+      monitorId: z.string().optional(),
       startedAt: z.string().optional(),
       finishedAt: z.string().optional(),
       totalAssertions: z.number().optional(),
@@ -30,7 +36,7 @@ export let runMonitorTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let run = await client.runMonitor(ctx.input.monitorId);
+    let run = await client.runMonitor(ctx.input.monitorId, ctx.input.async);
 
     let info = run?.info ?? {};
     let stats = run?.stats ?? {};
@@ -38,15 +44,19 @@ export let runMonitorTool = SlateTool.create(spec, {
     return {
       output: {
         status: info.status,
+        jobId: info.jobId,
+        monitorId: info.monitorId ?? ctx.input.monitorId,
         startedAt: info.startedAt,
         finishedAt: info.finishedAt,
         totalAssertions: stats.assertions?.total,
         failedAssertions: stats.assertions?.failed,
         totalRequests: stats.requests?.total,
-        failures: run?.failures ?? [],
+        failures: run?.failures ?? undefined,
         executions: run?.executions
       },
-      message: `Monitor run completed with status **${info.status ?? 'unknown'}**. ${stats.assertions?.failed ? `⚠️ ${stats.assertions.failed} assertion(s) failed.` : '✅ All assertions passed.'}`
+      message: info.finishedAt
+        ? `Monitor run completed with status **${info.status ?? 'unknown'}**. ${stats.assertions?.failed !== undefined ? `${stats.assertions.failed} assertion(s) failed.` : ''}`
+        : `Monitor run requested with status **${info.status ?? 'pending'}**. Check manage_monitor action get for its last run results.`
     };
   })
   .build();

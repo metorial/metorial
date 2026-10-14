@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 let BASE_URL = 'https://api.fireberry.com';
 
@@ -29,6 +34,30 @@ export interface QueryRequest {
   sort_type?: string;
 }
 
+export interface QueryV3Request {
+  objectType: number;
+  fields: { name: string; alias?: string; aggrFunc?: 'SUM' | 'COUNT' | 'MIN' | 'MAX' }[];
+  filter?: {
+    type: 'AND' | 'OR';
+    conditions: {
+      fieldName: string;
+      operator: string;
+      value?: string | number | boolean | (string | number | boolean)[];
+    }[];
+  }[];
+  orderBy?: { name: string; order?: 'asc' | 'desc' }[];
+  groupBy?: { name: string; datePeriod?: string }[];
+  pageSize?: number;
+  pageNumber?: number;
+}
+
+export interface QueryV3Response {
+  data: FireberryRecord[];
+  pageSize: number;
+  pageNumber: number;
+  isLastPage: boolean;
+}
+
 export interface MetadataObject {
   name: string;
   systemName: string;
@@ -53,15 +82,30 @@ export interface MetadataFieldWithValues extends MetadataField {
 }
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private token: string;
 
-  constructor(private token: string) {
-    this.axios = createAxios({
+  constructor(token: string) {
+    this.token = token.trim();
+    if (!this.token) throw createApiServiceError('A Fireberry API access token is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'Content-Type': 'application/json',
-        tokenid: token
+      authHeader: { name: 'tokenid', value: this.token },
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Fireberry',
+          reason: 'fireberry_api_error'
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      if (isApiErrorRecord(response.data) && response.data.success === false) {
+        throw buildApiServiceError(
+          { response: { status: response.status, data: response.data } },
+          { providerLabel: 'Fireberry', reason: 'fireberry_api_error' }
+        );
       }
+      return response;
     });
   }
 
@@ -76,17 +120,24 @@ export class Client {
     if (pageSize !== undefined) params.pagesize = String(pageSize);
     if (pageNumber !== undefined) params.pagenumber = String(pageNumber);
 
-    let response = await this.axios.get(`/api/record/${objectType}`, { params });
+    let response = await this.axios.get(`/api/record/${encodeURIComponent(objectType)}`, {
+      params
+    });
     return response.data.data;
   }
 
   async getRecord(objectType: string, recordId: string): Promise<FireberryRecord> {
-    let response = await this.axios.get(`/api/record/${objectType}/${recordId}`);
+    let response = await this.axios.get(
+      `/api/record/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}`
+    );
     return response.data.data.Record;
   }
 
   async createRecord(objectType: string, data: Record<string, any>): Promise<FireberryRecord> {
-    let response = await this.axios.post(`/api/record/${objectType}`, data);
+    let response = await this.axios.post(
+      `/api/record/${encodeURIComponent(objectType)}`,
+      data
+    );
     return response.data.data.Record;
   }
 
@@ -95,12 +146,17 @@ export class Client {
     recordId: string,
     data: Record<string, any>
   ): Promise<FireberryRecord> {
-    let response = await this.axios.put(`/api/record/${objectType}/${recordId}`, data);
+    let response = await this.axios.put(
+      `/api/record/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}`,
+      data
+    );
     return response.data.data.Record;
   }
 
   async deleteRecord(objectType: string, recordId: string): Promise<void> {
-    await this.axios.delete(`/api/record/${objectType}/${recordId}`);
+    await this.axios.delete(
+      `/api/record/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}`
+    );
   }
 
   // ---- Related Records ----
@@ -108,10 +164,15 @@ export class Client {
   async getRelatedRecords(
     objectType: string,
     recordId: string,
-    relatedObjectType: string
+    relatedObjectType: string,
+    pageSize?: number,
+    pageNumber?: number
   ): Promise<ListRecordsResponse> {
+    let primaryType = await this.resolveObjectType(objectType);
+    let relatedType = await this.resolveObjectType(relatedObjectType);
     let response = await this.axios.get(
-      `/api/record/${objectType}/${recordId}/${relatedObjectType}`
+      `/api/record/${primaryType}/${encodeURIComponent(recordId)}/${relatedType}`,
+      { params: { pagesize: pageSize, pagenumber: pageNumber } }
     );
     return response.data.data;
   }
@@ -119,8 +180,43 @@ export class Client {
   // ---- Query ----
 
   async query(request: QueryRequest): Promise<ListRecordsResponse> {
-    let response = await this.axios.post('/api/query', request);
+    let objecttype = await this.resolveObjectType(request.objecttype);
+    let response = await this.axios.post('/api/query', { ...request, objecttype });
     return response.data.data;
+  }
+
+  async queryV3(request: QueryV3Request): Promise<QueryV3Response> {
+    let response = await this.axios.post<QueryV3Response>('/api/v3/query', request);
+    return response.data;
+  }
+
+  private async resolveObjectType(value: string | number): Promise<number> {
+    let number =
+      typeof value === 'number'
+        ? value
+        : /^\d+$/.test(value.trim())
+          ? Number(value)
+          : undefined;
+    if (number !== undefined) {
+      if (!Number.isSafeInteger(number) || number < 1) {
+        throw createApiServiceError('The object type number must be a positive integer.');
+      }
+      return number;
+    }
+
+    let objects = await this.getAllObjects();
+    let object = objects.find(
+      item =>
+        typeof item.systemName === 'string' &&
+        item.systemName.toLowerCase() === String(value).trim().toLowerCase()
+    );
+    let objectType = Number(object?.objectType);
+    if (!object || !Number.isSafeInteger(objectType) || objectType < 1) {
+      throw createApiServiceError(
+        'Unknown object type. Call list_objects to discover an accessible object system name or number.'
+      );
+    }
+    return objectType;
   }
 
   // ---- Metadata ----
@@ -129,21 +225,36 @@ export class Client {
     let response = await this.axios.get('/metadata/records', {
       params: { tokenid: this.token }
     });
-    return response.data.data;
+    let objects = response.data?.data;
+    if (!Array.isArray(objects) || objects.some(object => !isApiErrorRecord(object))) {
+      throw createApiServiceError(
+        'Fireberry returned an unexpected object metadata response.'
+      );
+    }
+    return objects;
   }
 
   async getObjectFields(objectId: number | string): Promise<MetadataField[]> {
-    let response = await this.axios.get(`/metadata/records/${objectId}/fields`, {
-      params: { tokenid: this.token }
-    });
+    let response = await this.axios.get(
+      `/metadata/records/${encodeURIComponent(String(objectId))}/fields`,
+      { params: { tokenid: this.token } }
+    );
     return response.data.data;
   }
 
-  async getFieldDetails(objectId: number | string, fieldName: string): Promise<MetadataField> {
-    let response = await this.axios.get(`/metadata/records/${objectId}/fields/${fieldName}`, {
-      params: { tokenid: this.token }
-    });
-    return response.data.data;
+  async getFieldDetails(
+    objectId: number | string,
+    fieldName: string
+  ): Promise<Record<string, unknown>> {
+    let response = await this.axios.get(
+      `/metadata/records/${encodeURIComponent(String(objectId))}/fields/${encodeURIComponent(fieldName)}`,
+      { params: { tokenid: this.token } }
+    );
+    let field = response.data?.data;
+    if (!isApiErrorRecord(field)) {
+      throw createApiServiceError('Fireberry returned an unexpected field metadata response.');
+    }
+    return field;
   }
 
   async getPicklistValues(
@@ -151,10 +262,8 @@ export class Client {
     fieldName: string
   ): Promise<MetadataFieldWithValues> {
     let response = await this.axios.get(
-      `/metadata/records/${objectId}/fields/${fieldName}/values`,
-      {
-        params: { tokenid: this.token }
-      }
+      `/metadata/records/${encodeURIComponent(String(objectId))}/fields/${encodeURIComponent(fieldName)}/values`,
+      { params: { tokenid: this.token } }
     );
     return response.data.data;
   }

@@ -1,13 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageApplication = SlateTool.create(spec, {
   name: 'Manage Application',
   key: 'manage_application',
   description: `Perform management actions on an application: delete it, view logs, or get SFTP credentials.
-Choose an action to execute against a specific application on a server.`,
+Choose an action to execute against a specific application on a server.
+${organizationScopeGuidance}`,
   tags: {
     destructive: true,
     readOnly: false
@@ -15,7 +17,7 @@ Choose an action to execute against a specific application on a server.`,
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       applicationId: z.string().describe('Application ID'),
       action: z.enum(['destroy', 'logs', 'sftpCredentials']).describe('Action to perform')
@@ -37,7 +39,8 @@ Choose an action to execute against a specific application on a server.`,
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId, applicationId, action } = ctx.input;
 
@@ -70,6 +73,6 @@ Choose an action to execute against a specific application on a server.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

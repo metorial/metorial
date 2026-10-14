@@ -5,7 +5,9 @@ import { spec } from '../spec';
 
 let paymentSchema = z.object({
   paymentId: z.number().describe('Payment ID'),
-  invoiceId: z.number().optional().describe('Associated invoice ID'),
+  invoiceId: z.number().optional().describe('First associated invoice ID'),
+  invoiceIds: z.array(z.number()).optional().describe('All associated invoice IDs'),
+  success: z.boolean().optional().describe('Whether the provider accepted the payment'),
   customerId: z.number().optional().describe('Customer ID'),
   amount: z.number().optional().describe('Payment amount'),
   paymentMethod: z.string().optional().describe('Payment method'),
@@ -17,14 +19,17 @@ let paymentSchema = z.object({
 
 let mapPayment = (p: any) => ({
   paymentId: p.id,
-  invoiceId: p.invoice_id,
-  customerId: p.customer_id,
-  amount: p.amount ? Number(p.amount) : undefined,
-  paymentMethod: p.payment_method,
-  appliedAt: p.applied_at,
-  notes: p.notes,
-  createdAt: p.created_at,
-  updatedAt: p.updated_at
+  invoiceId: p.invoice_id ?? p.invoice_ids?.find((id: unknown) => typeof id === 'number'),
+  invoiceIds: p.invoice_ids?.filter((id: unknown) => typeof id === 'number'),
+  success: p.success ?? undefined,
+  customerId: p.customer_id ?? p.customer?.id ?? undefined,
+  amount:
+    (p.payment_amount ?? p.amount) == null ? undefined : Number(p.payment_amount ?? p.amount),
+  paymentMethod: p.payment_method ?? undefined,
+  appliedAt: p.applied_at ?? undefined,
+  notes: p.notes ?? undefined,
+  createdAt: p.created_at ?? undefined,
+  updatedAt: p.updated_at ?? undefined
 });
 
 export let searchPayments = SlateTool.create(spec, {
@@ -96,7 +101,7 @@ export let getPayment = SlateTool.create(spec, {
 
     return {
       output: mapPayment(p),
-      message: `Retrieved payment **${p.id}** — $${p.amount || 0} on invoice ${p.invoice_id}.`
+      message: `Retrieved payment **${p.id}** — $${p.payment_amount ?? p.amount ?? 0} on invoice ${p.invoice_id ?? p.invoice_ids?.[0] ?? 'N/A'}.`
     };
   })
   .build();
@@ -109,7 +114,11 @@ export let createPayment = SlateTool.create(spec, {
   .input(
     z.object({
       invoiceId: z.number().describe('Invoice ID to apply the payment to'),
-      amount: z.number().describe('Payment amount'),
+      amount: z
+        .number()
+        .describe(
+          'Payment amount in major currency units, with at most two decimal places (for example 12.50)'
+        ),
       paymentMethod: z
         .string()
         .optional()

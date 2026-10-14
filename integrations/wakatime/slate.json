@@ -1,18 +1,18 @@
 {
   "name": "@metorial/wakatime",
-  "description": "Track and retrieve coding activity metrics for programmers. Read coding summaries, statistics, durations, and heartbeats broken down by project, language, editor, operating system, and category. Create and manage heartbeats and external durations. List projects and view commit history with time-spent data. Manage coding goals, organizations, dashboards, and private leaderboards. Access insights on coding patterns including daily averages, best days, and weekday breakdowns. Define custom rules to transform heartbeat properties. Export coding data and generate embeddable chart URLs. View aggregate stats across all users and access public/private leaderboards.",
+  "description": "Read WakaTime coding summaries, statistics, durations, heartbeats, projects, and commit details. Record heartbeats and external activities such as meetings or code reviews, and read the resulting external durations. View goals, organizations, dashboards, machines, insights, and public or private leaderboards. Request coding data exports and download completed results. Use OAuth for activity reads and external durations; API keys only send heartbeats.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "retrieve coding activity summaries",
     "track time by project",
-    "create and manage heartbeats",
+    "record and delete heartbeats",
     "view coding statistics",
-    "manage coding goals",
-    "list projects and commits",
-    "manage organization dashboards",
+    "view coding goals",
+    "list projects and read commits",
+    "read organization dashboards",
     "access leaderboard rankings",
     "export coding data",
-    "create external durations"
+    "create and read external durations"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/wakatime.svg"
 }

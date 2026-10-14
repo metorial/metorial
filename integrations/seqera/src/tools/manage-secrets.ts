@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SeqeraClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageSecrets = SlateTool.create(spec, {
@@ -14,9 +15,13 @@ export let manageSecrets = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform'),
       secretId: z.number().optional().describe('Secret ID (required for update and delete)'),
-      name: z.string().optional().describe('Secret name (required for create)'),
+      name: z
+        .string()
+        .optional()
+        .describe('Secret name (required for create; cannot be changed on update)'),
       value: z
         .string()
         .optional()
@@ -43,8 +48,8 @@ export let manageSecrets = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SeqeraClient({
       token: ctx.auth.token,
-      baseUrl: ctx.config.baseUrl,
-      workspaceId: ctx.config.workspaceId
+      baseUrl: ctx.auth.baseUrl ?? ctx.config.baseUrl,
+      workspaceId: ctx.input.workspaceId ?? ctx.config.workspaceId
     });
 
     if (ctx.input.action === 'list') {
@@ -52,10 +57,10 @@ export let manageSecrets = SlateTool.create(spec, {
       return {
         output: {
           secrets: secrets.map(s => ({
-            secretId: s.id,
-            name: s.name,
-            dateCreated: s.dateCreated,
-            lastUpdated: s.lastUpdated
+            secretId: s.id ?? undefined,
+            name: s.name ?? undefined,
+            dateCreated: s.dateCreated ?? undefined,
+            lastUpdated: s.lastUpdated ?? undefined
           }))
         },
         message: `Found **${secrets.length}** pipeline secrets.`
@@ -64,7 +69,7 @@ export let manageSecrets = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name || !ctx.input.value)
-        throw new Error('name and value are required to create a secret');
+        throw createApiServiceError('name and value are required to create a secret');
       let secret = await client.createSecret({ name: ctx.input.name, value: ctx.input.value });
       return {
         output: { secretId: secret.id },
@@ -72,7 +77,8 @@ export let manageSecrets = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.secretId) throw new Error('secretId is required for update and delete');
+    if (!ctx.input.secretId)
+      throw createApiServiceError('secretId is required for update and delete');
 
     if (ctx.input.action === 'delete') {
       await client.deleteSecret(ctx.input.secretId);

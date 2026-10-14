@@ -14,6 +14,9 @@ let ticketSchema = z.object({
   customerName: z.string().optional().describe('Associated customer name'),
   assignedTo: z.string().optional().describe('Assigned technician'),
   ticketType: z.string().optional().describe('Ticket type'),
+  ticketTypeId: z.number().optional().describe('Ticket type ID'),
+  problemType: z.string().optional().describe('Problem category'),
+  assignedUserId: z.number().optional().describe('Assigned technician user ID'),
   dueDate: z.string().optional().describe('Due date'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   updatedAt: z.string().optional().describe('Last updated timestamp')
@@ -31,17 +34,20 @@ let commentSchema = z.object({
 let mapTicket = (t: any) => ({
   ticketId: t.id,
   number: t.number?.toString(),
-  subject: t.subject,
-  description: t.description,
-  status: t.status,
-  priority: t.priority,
-  customerId: t.customer_id,
+  subject: t.subject ?? undefined,
+  description: t.description ?? t.comments?.[0]?.body ?? undefined,
+  status: t.status ?? undefined,
+  priority: t.priority ?? undefined,
+  customerId: t.customer_id ?? undefined,
   customerName: t.customer_business_then_name || t.customer?.fullname,
-  assignedTo: t.assigned_to,
-  ticketType: t.ticket_type,
-  dueDate: t.due_date,
-  createdAt: t.created_at,
-  updatedAt: t.updated_at
+  assignedTo: t.user?.full_name ?? t.assigned_to?.toString() ?? t.user_id?.toString(),
+  ticketType: typeof t.ticket_type === 'string' ? t.ticket_type : t.ticket_type?.name,
+  ticketTypeId: t.ticket_type_id ?? t.ticket_type?.id ?? undefined,
+  assignedUserId: t.user_id ?? t.user?.id ?? undefined,
+  problemType: t.problem_type ?? undefined,
+  dueDate: t.due_date ?? undefined,
+  createdAt: t.created_at ?? undefined,
+  updatedAt: t.updated_at ?? undefined
 });
 
 export let searchTickets = SlateTool.create(spec, {
@@ -60,7 +66,10 @@ export let searchTickets = SlateTool.create(spec, {
         .optional()
         .describe('Filter by status (e.g. "new", "in progress", "resolved")'),
       customerId: z.number().optional().describe('Filter by customer ID'),
-      assignedTo: z.number().optional().describe('Filter by assigned technician user ID'),
+      assignedTo: z
+        .number()
+        .optional()
+        .describe('Filter by technician user ID from list_users'),
       createdBefore: z
         .string()
         .optional()
@@ -139,8 +148,13 @@ export let createTicket = SlateTool.create(spec, {
       description: z.string().optional().describe('Detailed problem description'),
       status: z.string().optional().describe('Initial status (e.g. "new", "in progress")'),
       priority: z.string().optional().describe('Priority level'),
-      assignedTo: z.number().optional().describe('User ID of the technician to assign'),
-      ticketType: z.string().optional().describe('Ticket type'),
+      assignedTo: z.number().optional().describe('Technician user ID from list_users'),
+      ticketType: z.string().optional().describe('Exact ticket type name'),
+      ticketTypeId: z
+        .number()
+        .optional()
+        .describe('Ticket type ID; takes precedence over ticketType'),
+      problemType: z.string().optional().describe('Problem category, such as Virus'),
       dueDate: z.string().optional().describe('Due date (YYYY-MM-DD)')
     })
   )
@@ -169,8 +183,13 @@ export let updateTicket = SlateTool.create(spec, {
       description: z.string().optional().describe('New problem description'),
       status: z.string().optional().describe('New status'),
       priority: z.string().optional().describe('New priority'),
-      assignedTo: z.number().optional().describe('User ID of the technician to assign'),
-      ticketType: z.string().optional().describe('New ticket type'),
+      assignedTo: z.number().optional().describe('Technician user ID from list_users'),
+      ticketType: z.string().optional().describe('Exact ticket type name'),
+      ticketTypeId: z
+        .number()
+        .optional()
+        .describe('Ticket type ID; takes precedence over ticketType'),
+      problemType: z.string().optional().describe('New problem category'),
       dueDate: z.string().optional().describe('New due date (YYYY-MM-DD)')
     })
   )
@@ -252,11 +271,11 @@ export let addTicketComment = SlateTool.create(spec, {
     return {
       output: {
         commentId: c.id,
-        body: c.body,
-        subject: c.subject,
-        hidden: c.hidden,
-        createdAt: c.created_at,
-        updatedAt: c.updated_at
+        body: c.body ?? undefined,
+        subject: c.subject ?? undefined,
+        hidden: c.hidden ?? undefined,
+        createdAt: c.created_at ?? undefined,
+        updatedAt: c.updated_at ?? undefined
       },
       message: `Added ${ctx.input.hidden ? 'hidden ' : ''}comment to ticket **${ctx.input.ticketId}**.`
     };
@@ -287,11 +306,11 @@ export let listTicketComments = SlateTool.create(spec, {
     let result = await client.listTicketComments(ctx.input.ticketId, ctx.input.page);
     let comments = (result.comments || []).map((c: any) => ({
       commentId: c.id,
-      body: c.body,
-      subject: c.subject,
-      hidden: c.hidden,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at
+      body: c.body ?? undefined,
+      subject: c.subject ?? undefined,
+      hidden: c.hidden ?? undefined,
+      createdAt: c.created_at ?? undefined,
+      updatedAt: c.updated_at ?? undefined
     }));
 
     return {

@@ -24,7 +24,23 @@ export let createChatbotTool = SlateTool.create(spec, {
         .describe('Pipeline version to use (defaults to "latest")'),
       input: z.string().optional().describe('Input specification for the chatbot'),
       output: z.string().optional().describe('Output specification for the chatbot'),
-      deployed: z.boolean().optional().describe('Whether to deploy the chatbot immediately')
+      deployed: z.boolean().optional().describe('Whether to deploy the chatbot immediately'),
+      deploymentOptions: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Deployment options; omitted options use an empty configuration'),
+      accessConfig: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Access configuration; omitted options use an empty configuration'),
+      twilioConfig: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Twilio configuration; omitted options use an empty configuration'),
+      slackConfig: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Slack configuration; omitted options use an empty configuration')
     })
   )
   .output(
@@ -41,7 +57,11 @@ export let createChatbotTool = SlateTool.create(spec, {
       pipelineVersion: ctx.input.pipelineVersion,
       input: ctx.input.input,
       output: ctx.input.output,
-      deployed: ctx.input.deployed
+      deployed: ctx.input.deployed,
+      deploymentOptions: ctx.input.deploymentOptions,
+      accessConfig: ctx.input.accessConfig,
+      twilioConfig: ctx.input.twilioConfig,
+      slackConfig: ctx.input.slackConfig
     });
 
     return {

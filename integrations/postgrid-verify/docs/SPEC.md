@@ -1,68 +1,32 @@
-Now let me fetch the Postman docs to get more details on the API endpoints:Now I have enough information. Let me compile the specification.
-
-# Slates Specification for PostGrid Verify
-
-## Overview
-
-PostGrid Verify is an address verification and autocomplete API that validates, standardizes, and geocodes postal addresses. It supports US and Canadian addresses (CASS and SERP certified) as well as international addresses across 245+ countries. The API offers single address verification, batch verification, address autocomplete, and geocoding capabilities.
+# PostGrid Verify Specification
 
 ## Authentication
 
-PostGrid Verify uses API key authentication. You authorize HTTP requests by setting the `x-api-key` HTTP header to your API key.
+Use an Address Verification API key from the PostGrid Developers dashboard. Requests use the `x-api-key` header. Secret keys are required for batch verification; public keys may be restricted to browser origins. The API key is validated for a non-empty value and stored without surrounding whitespace.
 
-You can create an API key by accessing the Developers section of the platform, where you can click "Create new access key" and select the type of key you want. There are three types of keys:
+## API coverage
 
-- **Public key**: Used for front-end web applications; can only be used on specified origins.
-- **Secret (server) key**: Used for server-side applications and can be used anywhere. Required for batch verification.
-- **Test key**: Does not consume any lookups but only returns dummy data.
+Standard US/Canada requests use `https://api.postgrid.com/v1/addver`; international requests use `https://api.postgrid.com/v1/intl_addver`.
 
-API keys are created and managed at [https://app.postgrid.com/addver/developers](https://app.postgrid.com/addver/developers).
+- `verify_address` and `verify_international_address` accept exactly one of `freeformAddress` or structured `address`.
+- `batch_verify_addresses` and `batch_verify_international_addresses` preserve input order, support up to 2,000 addresses, and retain individual failures.
+- `autocomplete_address` returns a `previewId` selection token containing the partial-street search and candidate index when the provider supplies preview-only results. `complete_address_suggestion` resolves that token with the documented index-based standard completion request and verification. Provider-issued legacy IDs remain accepted.
+- `autocomplete_international_address` and `complete_international_address_suggestion` use provider-issued preview IDs. Non-address suggestions can be drilled down using `containerId`. Requesting geographic data after completion performs a separate international verification.
+- `get_lookup_info` reads standard lookup usage, plan status, and a nullable unlimited lookup limit.
+- `parse_address` separates a freeform address into components without claiming deliverability.
+- `lookup_city_state` reads US/Canadian localities for a postal or ZIP code.
 
-The base URL for the standard (US/Canada) API is `https://api.postgrid.com/addver/`. A separate base URL exists for the international API at `https://intl.postgrid.com/`.
+Standard failed verification results may contain null address components. International coordinate strings are converted to numeric latitude and longitude to preserve the tool output contract; `geoAccuracy` is exposed through `accuracy`. The current international `verificationStatus` is also exposed through the existing summary `status` field. Detailed components and individual batch error messages remain available.
 
-## Features
+## Official references
 
-### Address Verification
+- [Getting started and API keys](https://guides.postgrid.com/address-verification/getting-started-1/)
+- [Address verification concepts](https://guides.postgrid.com/address-verification/concepts/)
+- [Standard API reference](https://guides.postgrid.com/api/typescript/resources/addressVerification/)
+- [Standard autocomplete](https://guides.postgrid.com/api/typescript/resources/addressVerification/methods/autocomplete/)
+- [International API reference](https://guides.postgrid.com/api/typescript/resources/intlAddressVerification/)
+- [International completion](https://guides.postgrid.com/api/typescript/resources/intlAddressVerification/methods/autocomplete/)
 
-Validates whether addresses are deliverable. A `verified` status means the address is deliverable as-is, `corrected` indicates it was fixed, and `failed` means it could not be fixed. Addresses can be supplied as structured components (line1, city, state, postal code) or as a freeform string. The response includes error details explaining what was fixed or why verification failed.
+## Limits
 
-- **Options**: `includeDetails=true` returns additional parsed components (street name, type, direction, unit number, county, residential/vacant indicators). `properCase=true` returns addresses in proper case format.
-- US addresses support ZIP+4 lookup, residential/vacant detection, and county information. Canadian addresses are SERP-certified.
-
-### Batch Address Verification
-
-Supports verifying addresses in batches of up to 2,000 at a time. Bulk verification can also be done by uploading a CSV file.
-
-- Requires a secret (server) API key.
-
-### Address Autocomplete
-
-Provides type-ahead address suggestions as users type partial addresses. The autocomplete offers real-time, verified, and relevant type-ahead address suggestions, using the user's IP address to suggest nearby addresses.
-
-- A preview endpoint returns suggestions without consuming lookups; a full completion endpoint consumes one lookup when the user selects an address.
-- Suggestions include premise-level data such as unit numbers and PO Boxes.
-
-### Geocoding and Reverse Geocoding
-
-All POST endpoints provide geolocation information when `geocode=true` is provided as a query parameter. Returns latitude/longitude coordinates along with an accuracy score (0.00–1.00) and accuracy type (rooftop, point, range_interpolation, etc.).
-
-- The reverse geocoding feature lets you convert geographic coordinates into readable addresses.
-- Geocoding must be enabled by contacting PostGrid support.
-- Geocoding counts as an additional lookup, so a total of two lookups per API call with geocoding enabled.
-
-### International Address Verification
-
-Allows you to autocomplete, verify, and standardize international addresses in real-time across 245+ countries.
-
-- The transliteration feature allows you to convert foreign languages into understandable address formats (Roman).
-- Uses a separate API endpoint from the standard US/Canada verification.
-
-### Change of Address (NCOA)
-
-PostGrid keeps up with the National Change of Address (NCOA) database to update address details accordingly. It helps automatically replace obsolete addresses with new records and identify when recipients move to different locations.
-
-- Available as part of the bulk verification tool.
-
-## Events
-
-The PostGrid Verify API (address verification) does not support webhooks or event subscriptions. Webhooks are only available on the separate PostGrid Print & Mail API for tracking mail delivery status, which is a different product from PostGrid Verify.
+Address verification and autocomplete are read-only operations that consume lookups according to the account plan. Preview requests do not consume lookups. Geocoding must be enabled for the account and may incur an additional lookup. No webhook or identity tool is exposed because the documented Address Verification API has no suitable account-profile or webhook endpoint.

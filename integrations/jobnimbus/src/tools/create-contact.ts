@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,11 +33,18 @@ export let createContact = SlateTool.create(spec, {
       zip: z.string().optional().describe('Zip code'),
       country: z.string().optional().describe('Country'),
       description: z.string().optional().describe('Description/notes'),
-      recordTypeName: z.string().optional().describe('Workflow type name (e.g. "customer")'),
+      recordTypeName: z
+        .string()
+        .optional()
+        .describe(
+          'Required contact workflow name. Call get_account_settings to discover workflows.'
+        ),
       statusName: z
         .string()
         .optional()
-        .describe('Workflow status name (e.g. "Lead", "Active")'),
+        .describe(
+          'Required status name within the chosen workflow. Call get_account_settings to discover statuses.'
+        ),
       sourceName: z.string().optional().describe('Lead source name'),
       tags: z.array(z.string()).optional().describe('Tags to assign'),
       salesRep: z.string().optional().describe('Sales rep user ID')
@@ -52,6 +59,23 @@ export let createContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ![
+        ctx.input.firstName,
+        ctx.input.lastName,
+        ctx.input.displayName,
+        ctx.input.company
+      ].some(value => value?.trim())
+    ) {
+      throw createApiServiceError(
+        'Provide a first name, last name, display name, or company name.'
+      );
+    }
+    if (!ctx.input.recordTypeName?.trim() || !ctx.input.statusName?.trim()) {
+      throw createApiServiceError(
+        'Provide recordTypeName and statusName. Call get_account_settings to discover contact workflows and their statuses.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let data: Record<string, any> = {};

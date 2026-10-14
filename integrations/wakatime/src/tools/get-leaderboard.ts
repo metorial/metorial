@@ -85,7 +85,7 @@ export let getLeaderboard = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let result: any;
     if (ctx.input.leaderboardId) {
@@ -104,13 +104,13 @@ export let getLeaderboard = SlateTool.create(spec, {
 
     let mapUser = (u: any) => ({
       rank: u.rank ?? 0,
-      userId: u.user?.id,
-      displayName: u.user?.display_name || u.user?.username,
-      username: u.user?.username,
-      photoUrl: u.user?.photo,
-      totalSeconds: u.running_total?.total_seconds,
-      humanReadableTotal: u.running_total?.human_readable_total,
-      dailyAverage: u.running_total?.daily_average,
+      userId: u.user?.id ?? undefined,
+      displayName: u.user?.display_name || u.user?.username || undefined,
+      username: u.user?.username ?? undefined,
+      photoUrl: u.user?.photo ?? undefined,
+      totalSeconds: u.running_total?.total_seconds ?? undefined,
+      humanReadableTotal: u.running_total?.human_readable_total ?? undefined,
+      dailyAverage: u.running_total?.daily_average ?? undefined,
       languages: u.running_total?.languages?.map((l: any) => ({
         name: l.name,
         totalSeconds: l.total_seconds
@@ -119,13 +119,13 @@ export let getLeaderboard = SlateTool.create(spec, {
 
     let currentUser = result.current_user
       ? {
-          rank: result.current_user.rank,
+          rank: result.current_user.rank ?? undefined,
           runningTotal: result.current_user.running_total
             ? {
                 totalSeconds: result.current_user.running_total.total_seconds ?? 0,
                 humanReadableTotal:
                   result.current_user.running_total.human_readable_total ?? '0 secs',
-                dailyAverage: result.current_user.running_total.daily_average,
+                dailyAverage: result.current_user.running_total.daily_average ?? undefined,
                 languages: result.current_user.running_total.languages?.map((l: any) => ({
                   name: l.name,
                   totalSeconds: l.total_seconds
@@ -141,8 +141,8 @@ export let getLeaderboard = SlateTool.create(spec, {
       output: {
         currentUser,
         leaders,
-        totalPages: result.total_pages,
-        currentPage: result.page
+        totalPages: result.total_pages ?? undefined,
+        currentPage: result.page ?? undefined
       },
       message: `Retrieved leaderboard with **${leaders.length}** entries.${currentUser?.rank ? ` Your rank: **#${currentUser.rank}**.` : ''}`
     };

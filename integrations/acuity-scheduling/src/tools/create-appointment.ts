@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,8 @@ export let createAppointment = SlateTool.create(spec, {
   description: `Book a new appointment. Requires the appointment datetime, appointment type, and client details. Optionally provide a calendar, custom intake form field values, add-ons, and coupon/certificate codes.`,
   instructions: [
     'The datetime must be an available time slot. Use the Check Availability tool first to find open slots.',
-    'Dates must be parseable by PHP strtotime() in the business timezone (e.g. "2024-03-15 14:00").'
+    'Dates must be parseable by PHP strtotime() in the business timezone (e.g. "2024-03-15 14:00").',
+    'Administrator booking requires calendarId. Call list_calendars to select a calendar before booking with admin=true or setting notes.'
   ],
   tags: {
     destructive: false
@@ -24,14 +25,29 @@ export let createAppointment = SlateTool.create(spec, {
       firstName: z.string().describe('Client first name'),
       lastName: z.string().describe('Client last name'),
       email: z.string().describe('Client email address'),
-      calendarId: z.number().optional().describe('Calendar ID (auto-selected if omitted)'),
+      calendarId: z
+        .number()
+        .optional()
+        .describe(
+          'Calendar ID from list_calendars. Required when admin=true; auto-selected when omitted for normal booking.'
+        ),
       phone: z.string().optional().describe('Client phone number'),
       timezone: z
         .string()
         .optional()
         .describe('Client timezone (IANA format, e.g. "America/New_York")'),
       certificate: z.string().optional().describe('Package or coupon code to apply'),
-      notes: z.string().optional().describe('Notes for the appointment'),
+      notes: z.string().optional().describe('Appointment notes; requires admin=true'),
+      admin: z
+        .boolean()
+        .optional()
+        .describe(
+          'Book as an administrator, bypassing availability and field validation; requires calendarId and is required to set notes'
+        ),
+      noEmail: z
+        .boolean()
+        .optional()
+        .describe('Suppress confirmation email and SMS notifications'),
       addonIds: z.array(z.number()).optional().describe('IDs of add-ons to include'),
       fields: z
         .array(
@@ -64,20 +80,35 @@ export let createAppointment = SlateTool.create(spec, {
       authMethod: ctx.auth.authMethod
     });
 
-    let a = await client.createAppointment({
-      datetime: ctx.input.datetime,
-      appointmentTypeID: ctx.input.appointmentTypeId,
-      firstName: ctx.input.firstName,
-      lastName: ctx.input.lastName,
-      email: ctx.input.email,
-      calendarID: ctx.input.calendarId,
-      phone: ctx.input.phone,
-      timezone: ctx.input.timezone,
-      certificate: ctx.input.certificate,
-      notes: ctx.input.notes,
-      addonIDs: ctx.input.addonIds,
-      fields: ctx.input.fields?.map(f => ({ id: f.fieldId, value: f.value }))
-    });
+    if (ctx.input.notes !== undefined && ctx.input.admin !== true) {
+      throw createApiServiceError(
+        'Setting appointment notes requires admin=true. Administrator booking bypasses availability validation; check the time slot first.'
+      );
+    }
+
+    if (ctx.input.admin === true && ctx.input.calendarId === undefined) {
+      throw createApiServiceError(
+        'Administrator booking requires calendarId. Call list_calendars to select a calendar, then provide calendarId with admin=true.'
+      );
+    }
+
+    let a = await client.createAppointment(
+      {
+        datetime: ctx.input.datetime,
+        appointmentTypeID: ctx.input.appointmentTypeId,
+        firstName: ctx.input.firstName,
+        lastName: ctx.input.lastName,
+        email: ctx.input.email,
+        calendarID: ctx.input.calendarId,
+        phone: ctx.input.phone,
+        timezone: ctx.input.timezone,
+        certificate: ctx.input.certificate,
+        notes: ctx.input.notes,
+        addonIDs: ctx.input.addonIds,
+        fields: ctx.input.fields?.map(f => ({ id: f.fieldId, value: f.value }))
+      },
+      { admin: ctx.input.admin, noEmail: ctx.input.noEmail }
+    );
 
     return {
       output: {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/client';
 import { spec } from '../spec';
@@ -57,9 +57,9 @@ export let manageRag = SlateTool.create(spec, {
 
     if (ctx.input.action === 'upload') {
       if (!ctx.input.collection)
-        throw new Error('"collection" is required for the upload action.');
+        throw createApiServiceError('"collection" is required for the upload action.');
       if (!ctx.input.documentUrl)
-        throw new Error('"documentUrl" is required for the upload action.');
+        throw createApiServiceError('"documentUrl" is required for the upload action.');
 
       let result = await client.uploadRagDocument({
         collection: ctx.input.collection,
@@ -90,7 +90,7 @@ export let manageRag = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.collection)
-        throw new Error('"collection" is required for the delete action.');
+        throw createApiServiceError('"collection" is required for the delete action.');
 
       let result = await client.deleteRagCollection({
         collection: ctx.input.collection,
@@ -109,6 +109,6 @@ export let manageRag = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

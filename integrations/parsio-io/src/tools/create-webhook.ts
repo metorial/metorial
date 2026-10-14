@@ -16,6 +16,8 @@ export let createWebhook = SlateTool.create(spec, {
     z.object({
       mailboxId: z.string().describe('ID of the mailbox to create the webhook for'),
       url: z.string().describe('URL to receive webhook POST requests'),
+      name: z.string().optional().describe('Webhook name'),
+      enabled: z.boolean().optional().describe('Whether to enable delivery'),
       event: z
         .enum(['doc.parsed', 'doc.parsed.flat', 'doc.fail', 'doc.received', 'table.parsed'])
         .describe('Trigger event type'),
@@ -38,14 +40,16 @@ export let createWebhook = SlateTool.create(spec, {
       mailboxId: ctx.input.mailboxId,
       url: ctx.input.url,
       event: ctx.input.event,
-      tableId: ctx.input.tableId
+      tableId: ctx.input.tableId,
+      name: ctx.input.name,
+      enabled: ctx.input.enabled
     });
 
     return {
       output: {
         webhookId: wh._id || wh.id,
-        url: wh.url,
-        event: wh.event
+        url: wh.url ?? undefined,
+        event: wh.event ?? undefined
       },
       message: `Created webhook for event **${ctx.input.event}** on mailbox **${ctx.input.mailboxId}**.`
     };

@@ -24,7 +24,10 @@ export let updatePerson = SlateTool.create(spec, {
       companyId: z.number().optional().describe('New associated company ID'),
       companyName: z.string().optional().describe('Company name to associate'),
       userId: z.number().optional().describe('New owner user ID'),
-      sourceId: z.number().optional().describe('Updated lead source ID'),
+      sourceId: z
+        .number()
+        .optional()
+        .describe('Updated lead source ID. Call list_lead_sources to discover IDs.'),
       summary: z.string().optional().describe('Updated notes and talking points'),
       address: z.string().optional().describe('Updated address'),
       customFields: z

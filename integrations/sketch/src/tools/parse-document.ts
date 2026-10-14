@@ -1,13 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import {
-  collectAllSymbols,
-  findLayersByClass,
-  flattenLayers,
-  type SketchDocumentJson,
-  type SketchMetaJson,
-  type SketchPage
-} from '../lib/client';
+import { collectAllSymbols, findLayersByClass, flattenLayers } from '../lib/client';
+import { parseSketchDocument, parseSketchMeta, parseSketchPages } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let parseDocumentTool = SlateTool.create(spec, {
@@ -90,9 +84,9 @@ Use this to quickly understand the structure and contents of a Sketch document w
     })
   )
   .handleInvocation(async ctx => {
-    let pages = ctx.input.pages as SketchPage[];
-    let documentJson = ctx.input.documentJson as SketchDocumentJson | undefined;
-    let metaJson = ctx.input.metaJson as SketchMetaJson | undefined;
+    let pages = parseSketchPages(ctx.input.pages);
+    let documentJson = parseSketchDocument(ctx.input.documentJson);
+    let metaJson = parseSketchMeta(ctx.input.metaJson);
 
     let pagesSummary = pages.map(page => {
       let artboards = findLayersByClass(page.layers ?? [], 'artboard');

@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Campayn
 
-Create, send, and track email marketing campaigns and newsletters. Manage contact lists, add and update subscribers with detailed profile information, and unsubscribe contacts. Retrieve email campaign details and access campaign reports filtered by date range. Manage web sign-up forms for contact lists.
+Manage contact lists, add and update subscribers with detailed profile information, and unsubscribe contacts. List email campaigns or look up a campaign by its ID, and access campaign reports filtered by date range. Retrieve web sign-up forms for contact lists.
 
 ## License
 

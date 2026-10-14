@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -81,7 +81,7 @@ export let googleShopping = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.query) throw new Error('Either query or productId is required');
+    if (!ctx.input.query) throw createApiServiceError('Either query or productId is required');
 
     let data = await client.googleShopping({
       q: ctx.input.query,

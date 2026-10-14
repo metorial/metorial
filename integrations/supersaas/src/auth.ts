@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -33,17 +34,7 @@ export let auth = SlateAuth.create()
       output: { token: string; accountName: string };
       input: { accountName: string; apiKey: string };
     }) => {
-      let axiosInstance = createAxios({
-        baseURL: 'https://www.supersaas.com'
-      });
-
-      await axiosInstance.get('/api/users.json', {
-        params: {
-          account: ctx.output.accountName,
-          api_key: ctx.output.token,
-          limit: 1
-        }
-      });
+      await new Client(ctx.output).listSchedules();
 
       return {
         profile: {

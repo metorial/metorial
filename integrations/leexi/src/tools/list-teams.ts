@@ -29,7 +29,8 @@ export let listTeams = SlateTool.create(spec, {
       pagination: z.object({
         page: z.number().describe('Current page number'),
         items: z.number().describe('Items per page'),
-        count: z.number().describe('Total number of teams')
+        count: z.number().describe('Total number of teams'),
+        pages: z.number().optional().describe('Total number of pages')
       })
     })
   )

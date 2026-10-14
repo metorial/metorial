@@ -31,6 +31,10 @@ export let translateText = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       translatedText: z
         .union([z.string(), z.array(z.string())])
         .describe('Translated text matching the input format (single string or array)')
@@ -50,6 +54,7 @@ export let translateText = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         translatedText: result.translated_text
       },
       message: `Translated **${count} text(s)** to **${ctx.input.targetLanguage}**.`

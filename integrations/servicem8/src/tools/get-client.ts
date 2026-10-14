@@ -52,7 +52,7 @@ export let getClient = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let c = await client.getCompany(ctx.input.companyUuid);
 
     let contacts: any[] | undefined;

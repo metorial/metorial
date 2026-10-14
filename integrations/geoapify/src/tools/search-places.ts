@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GeoapifyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -72,6 +72,24 @@ export let searchPlaces = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.categories.trim()) {
+      throw createApiServiceError('Provide at least one place category.');
+    }
+    if (!ctx.input.filter?.trim() && !ctx.input.bias?.trim()) {
+      throw createApiServiceError('Provide filter or bias to specify the place search area.');
+    }
+    if (
+      ctx.input.limit !== undefined &&
+      (!Number.isInteger(ctx.input.limit) || ctx.input.limit < 1)
+    ) {
+      throw createApiServiceError('Places limit must be a positive whole number.');
+    }
+    if (
+      ctx.input.offset !== undefined &&
+      (!Number.isInteger(ctx.input.offset) || ctx.input.offset < 0)
+    ) {
+      throw createApiServiceError('Places offset must be a non-negative whole number.');
+    }
     let client = new GeoapifyClient({ token: ctx.auth.token });
 
     let data = await client.searchPlaces({

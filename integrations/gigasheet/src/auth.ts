@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { GigasheetClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,10 +16,12 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'Gigasheet API key. Generate one from the left menu on your Library page at app.gigasheet.com.'
+          'Gigasheet API key. Generate one under Automation in your Library at app.gigasheet.com after API access is enabled.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim())
+        throw createApiServiceError('A Gigasheet API key is required.');
       return {
         output: {
           token: ctx.input.token
@@ -26,22 +29,21 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.gigasheet.com',
-        headers: {
-          'X-GIGASHEET-TOKEN': ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await client.get('/user/whoami');
-      let details = await client.get('/user/details');
+      let client = new GigasheetClient({ token: ctx.output.token });
+      let response = await client.whoami();
+      let details = await client.getUserDetails();
+      let id = details?.Id ?? response?.username;
+      if (typeof id !== 'string' || !id.trim()) {
+        throw createApiServiceError(
+          'Gigasheet did not return an authenticated user identity. Check your API key.'
+        );
+      }
 
       return {
         profile: {
-          id: details.data?.Id ?? response.data?.username,
-          email: details.data?.Email ?? response.data?.username,
-          name: details.data?.Name ?? response.data?.username
+          id,
+          email: typeof details?.Email === 'string' ? details.Email : response?.username,
+          name: typeof details?.Name === 'string' ? details.Name : response?.username
         }
       };
     }

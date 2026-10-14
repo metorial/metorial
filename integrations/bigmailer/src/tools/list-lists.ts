@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listLists = SlateTool.create(spec, {
   name: 'List Lists',
   key: 'list_lists',
-  description: `Retrieve all lists (tag groups) within a brand. Returns list names and whether each is the system-generated "all contacts" list.`,
+  description: `Retrieve a page of lists (tag groups) within a brand. Returns list names and whether each is the system-generated "all contacts" list.`,
   tags: {
     readOnly: true
   }
@@ -18,6 +18,7 @@ export let listLists = SlateTool.create(spec, {
         .number()
         .min(1)
         .max(100)
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
         .optional()
         .describe('Number of lists to return (1-100). Defaults to 10.'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
@@ -27,7 +28,7 @@ export let listLists = SlateTool.create(spec, {
     z.object({
       hasMore: z.boolean().describe('Whether more lists exist beyond this page'),
       cursor: z.string().describe('Cursor for fetching the next page'),
-      total: z.number().describe('Total number of lists'),
+      total: z.number().optional().describe('Total count, only when supplied by BigMailer'),
       lists: z.array(
         z.object({
           listId: z.string().describe('List unique identifier'),
@@ -61,7 +62,7 @@ export let listLists = SlateTool.create(spec, {
         total: result.total,
         lists
       },
-      message: `Found **${result.total}** list(s). Returned **${lists.length}** list(s)${result.has_more ? ' (more available)' : ''}.`
+      message: `Returned **${lists.length}** list(s)${result.has_more ? ' (more available)' : ''}.`
     };
   })
   .build();

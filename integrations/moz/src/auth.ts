@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,9 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Moz API token from https://moz.com/api/dashboard')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Enter a Moz API token from the API dashboard.');
+      }
       return {
         output: {
           token: ctx.input.token
@@ -31,6 +34,9 @@ export let auth = SlateAuth.create()
       secretKey: z.string().describe('Moz Secret Key')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.accessId.trim() || !ctx.input.secretKey.trim()) {
+        throw createApiServiceError('Enter both the Moz Access ID and Secret Key.');
+      }
       let encoded = Buffer.from(`${ctx.input.accessId}:${ctx.input.secretKey}`).toString(
         'base64'
       );

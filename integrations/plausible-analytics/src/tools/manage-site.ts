@@ -12,16 +12,21 @@ let trackerConfigSchema = z
     hashBasedRouting: z.boolean().optional().describe('Enable hash-based routing'),
     revenueTracking: z.boolean().optional().describe('Enable revenue tracking'),
     taggedEvents: z.boolean().optional().describe('Enable tagged events'),
-    pageviewProps: z.boolean().optional().describe('Enable pageview properties')
+    pageviewProps: z.boolean().optional().describe('Enable pageview properties'),
+    installationType: z
+      .enum(['wordpress', 'manual', 'gtm'])
+      .nullable()
+      .optional()
+      .describe('Tracker installation method; null clears the selected method')
   })
   .optional()
   .describe('Tracker script configuration options');
 
 let toApiTrackerConfig = (
   config?: z.infer<typeof trackerConfigSchema>
-): Record<string, boolean> | undefined => {
+): Record<string, boolean | string | null> | undefined => {
   if (!config) return undefined;
-  let result: Record<string, boolean> = {};
+  let result: Record<string, boolean | string | null> = {};
   if (config.outboundLinks !== undefined) result.outbound_links = config.outboundLinks;
   if (config.fileDownloads !== undefined) result.file_downloads = config.fileDownloads;
   if (config.formSubmissions !== undefined) result.form_submissions = config.formSubmissions;
@@ -31,6 +36,8 @@ let toApiTrackerConfig = (
   if (config.revenueTracking !== undefined) result.revenue_tracking = config.revenueTracking;
   if (config.taggedEvents !== undefined) result.tagged_events = config.taggedEvents;
   if (config.pageviewProps !== undefined) result.pageview_props = config.pageviewProps;
+  if (config.installationType !== undefined)
+    result.installation_type = config.installationType;
   return Object.keys(result).length > 0 ? result : undefined;
 };
 
@@ -49,7 +56,12 @@ export let createSite = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('IANA timezone name (e.g., "America/New_York"). Defaults to Etc/UTC.'),
-      teamId: z.string().optional().describe('Team ID to associate the site with'),
+      teamId: z
+        .string()
+        .optional()
+        .describe(
+          'Team ID to associate the site with. Call list_teams to discover accessible teams.'
+        ),
       trackerConfig: trackerConfigSchema
     })
   )
@@ -182,7 +194,7 @@ export let deleteSite = SlateTool.create(spec, {
 export let getSite = SlateTool.create(spec, {
   name: 'Get Site',
   key: 'get_site',
-  description: `Get details of a specific site including its tracker script configuration and custom properties. Requires a Sites API key (Enterprise plan).`,
+  description: `Get details of a specific site including its tracker script configuration and custom properties. Works with a Stats API key or Sites API key.`,
   tags: {
     readOnly: true
   }
@@ -229,14 +241,17 @@ export let getSite = SlateTool.create(spec, {
 export let listSites = SlateTool.create(spec, {
   name: 'List Sites',
   key: 'list_sites',
-  description: `List all sites accessible from your Plausible Analytics account. Supports pagination and filtering by team. Requires a Sites API key (Enterprise plan).`,
+  description: `List sites accessible to your Plausible Analytics API key. Supports pagination and filtering by team. Works with a Stats API key or Sites API key.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      teamId: z.string().optional().describe('Filter sites by team ID'),
+      teamId: z
+        .string()
+        .optional()
+        .describe('Filter sites by team ID. Call list_teams to discover accessible teams.'),
       limit: z
         .number()
         .optional()

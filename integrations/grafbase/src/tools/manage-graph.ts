@@ -1,15 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type Graph } from '../lib/client';
 import { spec } from '../spec';
 
 export let createGraph = SlateTool.create(spec, {
   name: 'Create Graph',
   key: 'create_graph',
   description: `Creates a new federated graph in a Grafbase account. Requires the account ID and a slug for the new graph. The slug must be unique within the account.`,
-  instructions: [
-    'Use "Get Current User" first to find the account ID for the target organization.'
-  ],
+  instructions: ['Use "Get Account" to find the account ID for the target account slug.'],
   tags: {
     destructive: false
   }
@@ -19,7 +17,7 @@ export let createGraph = SlateTool.create(spec, {
       accountId: z
         .string()
         .describe(
-          'ID of the account (personal or organization) where the graph will be created'
+          'Account ID. Call get_account to discover the account ID for an account slug.'
         ),
       slug: z
         .string()
@@ -36,7 +34,7 @@ export let createGraph = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     let graph = await client.createGraph({
@@ -76,7 +74,16 @@ export let getGraph = SlateTool.create(spec, {
       graphId: z
         .string()
         .optional()
-        .describe('Direct graph ID. Use this as an alternative to accountSlug + graphSlug.')
+        .describe(
+          'Direct graph ID. Call list_graphs to discover graph IDs; use this as an alternative to accountSlug + graphSlug.'
+        ),
+      first: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of branches to return. Defaults to 100.'),
+      after: z.string().optional().describe('Cursor from a previous page of branches.')
     })
   )
   .output(
@@ -94,30 +101,41 @@ export let getGraph = SlateTool.create(spec, {
             name: z.string().describe('Name of the branch')
           })
         )
-        .describe('Branches of the graph')
+        .describe('Branches of the graph'),
+      pageInfo: z
+        .object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() })
+        .optional()
+        .describe('Branch pagination information')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
-    let graph: any;
+    let graph: Graph | null;
 
     if (ctx.input.graphId) {
-      graph = await client.getGraphById(ctx.input.graphId);
+      graph = await client.getGraphById(ctx.input.graphId, ctx.input.first, ctx.input.after);
     } else if (ctx.input.accountSlug && ctx.input.graphSlug) {
-      graph = await client.getGraph(ctx.input.accountSlug, ctx.input.graphSlug);
+      graph = await client.getGraph(
+        ctx.input.accountSlug,
+        ctx.input.graphSlug,
+        ctx.input.first,
+        ctx.input.after
+      );
     } else {
-      throw new Error('Provide either graphId, or both accountSlug and graphSlug.');
+      throw createApiServiceError(
+        'Provide either graphId, or both accountSlug and graphSlug.'
+      );
     }
 
     if (!graph) {
-      throw new Error('Graph not found.');
+      throw createApiServiceError('Graph not found.');
     }
 
-    let branches = (graph.branches?.nodes || []).map((b: any) => ({
+    let branches = graph.branches.nodes.map(b => ({
       branchId: b.id,
       name: b.name
     }));
@@ -130,7 +148,8 @@ export let getGraph = SlateTool.create(spec, {
         accountId: graph.account?.id,
         accountName: graph.account?.name,
         accountSlug: graph.account?.slug,
-        branches
+        branches,
+        pageInfo: graph.branches.pageInfo
       },
       message: `Retrieved graph **${graph.slug}** with ${branches.length} branch(es).`
     };
@@ -158,7 +177,7 @@ export let deleteGraph = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     await client.deleteGraph({ graphId: ctx.input.graphId });

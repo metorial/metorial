@@ -4,6 +4,7 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let geoResultSchema = z.object({
+  status: z.string().optional().describe('Provider query status; OK indicates success'),
   ipAddress: z.string().optional().describe('The queried IP address'),
   city: z.string().optional().describe('City of the IP location'),
   state: z.string().optional().describe('State/region of the IP location'),
@@ -17,6 +18,7 @@ let geoResultSchema = z.object({
 });
 
 let mapResult = (raw: Record<string, string>) => ({
+  status: raw.status,
   ipAddress: raw.ip_address,
   city: raw.city,
   state: raw.state,

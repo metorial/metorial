@@ -16,10 +16,13 @@ export let getSearchIntentTool = SlateTool.create(spec, {
       keyword: z.string().describe('Keyword to analyze search intent for'),
       locale: z.string().optional().describe('Locale code (default: en-US)'),
       device: z
-        .enum(['desktop', 'mobile'])
+        .enum(['desktop', 'mobile', 'mobile_android', 'mobile_ios'])
         .optional()
-        .describe('Device type (default: desktop)'),
-      engine: z.enum(['google', 'bing']).optional().describe('Search engine (default: google)')
+        .describe('Device type (default: desktop); mobile uses mobile_android'),
+      engine: z
+        .enum(['google', 'bing', 'yahoo'])
+        .optional()
+        .describe('Search engine (default: google)')
     })
   )
   .output(
@@ -43,7 +46,8 @@ export let getSearchIntentTool = SlateTool.create(spec, {
     return {
       output: {
         keyword: result?.serp_query?.keyword || ctx.input.keyword,
-        intent: result?.search_intent || result
+        intent:
+          result?.keyword_metrics?.intent ?? result?.intent ?? result?.search_intent ?? result
       },
       message: `Analyzed search intent for "${ctx.input.keyword}".`
     };

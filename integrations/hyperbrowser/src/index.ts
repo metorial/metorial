@@ -7,12 +7,16 @@ import {
   createSession,
   deleteProfile,
   extractData,
+  getBrowserAgentTask,
+  getFileUrl,
+  getProfile,
   getSession,
   getSessionRecording,
   listProfiles,
   listSessions,
   runBrowserAgent,
   scrapeWebpage,
+  stopBrowserAgentTask,
   stopSession,
   webSearch
 } from './tools';
@@ -33,7 +37,11 @@ export let provider = Slate.create({
     listProfiles,
     deleteProfile,
     runBrowserAgent,
-    getSessionRecording
+    getBrowserAgentTask,
+    stopBrowserAgentTask,
+    getProfile,
+    getSessionRecording,
+    getFileUrl
   ],
   triggers: []
 });

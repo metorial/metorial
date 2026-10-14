@@ -1,10 +1,8 @@
-Now I have enough information to write the specification. Let me compile everything.
-
-# Slates Specification for Whop
+# Whop Integration Specification
 
 ## Overview
 
-Whop is a platform for selling digital products, memberships, and subscriptions. It provides APIs for accepting payments, managing payouts, building apps, and embedding real-time chat. The API covers the full commerce lifecycle including checkout, memberships, invoicing, refunds, disputes, and content delivery (courses, forums).
+Whop is a platform for selling digital products, memberships, and subscriptions. It provides APIs for accepting payments, managing payouts, building apps, and embedding real-time chat. This integration supports products, pricing plans, checkout configurations, memberships, members, payments, refunds, promo codes, invoices, user profiles, and account discovery.
 
 ## Authentication
 
@@ -28,9 +26,9 @@ Use OAuth tokens when you want users to sign in with their Whop account and gran
 
 The OAuth flow works as follows:
 
-1. Send users to the Whop OAuth portal at `https://whop.com/oauth` with your `client_id` and `redirect_uri` parameters. The user will be prompted to sign in or create a Whop account.
-2. When the user returns, exchange the authorization code for an access token by making a request to `https://data.whop.com/oauth/token` with your Client ID, Client Secret, the authorization code, redirect URI, and `grant_type` of `authorization_code`.
-3. Use the access token to make API requests on behalf of the user, for example to retrieve profile information via `/me` or check membership status.
+1. Send users to the Whop OAuth portal at `https://api.whop.com/oauth/authorize` with your `client_id`, `redirect_uri`, state, scopes, and an S256 PKCE code challenge. The user will be prompted to sign in or create a Whop account.
+2. When the user returns, exchange the authorization code for an access token by making a request to `https://api.whop.com/oauth/token` with your Client ID, Client Secret, the authorization code, redirect URI, the stored PKCE code verifier, and `grant_type` of `authorization_code`.
+3. Use the access token to make API requests on behalf of the user, for example to retrieve identity information via `https://api.whop.com/oauth/userinfo` or check membership status.
 
 Obtain your Client ID and Client Secret from the Whop developer settings dashboard.
 
@@ -114,3 +112,37 @@ Webhooks are configured in the Whop dashboard by providing a URL and selecting w
 ### Setup Intent Events
 
 - **setup_intent.succeeded** — Fires when a customer saves their payment method via a setup intent.
+
+## Account discovery and checkout retrieval
+
+Use `list_accounts` to discover business accounts available to the credential.
+Pass its `accountId` as `companyId` to company-scoped tools, or keep an optional
+`companyId` default in the connection configuration. Current requests use the
+provider's `account_id` field where documented; the existing public `companyId`
+fields remain supported. Inline checkout plans retain the provider's
+`company_id` property.
+
+Use `get_current_user` with an OAuth connection to read the signed-in user's
+identity. The identity scopes do not grant commerce permissions; company or app
+API keys need the endpoint permissions configured in Whop. Access tokens expire
+and refresh through the current OAuth token endpoint; rotated refresh tokens are
+saved, with the previous token retained when no replacement is returned.
+
+Use `get_checkout` to retrieve an existing checkout configuration and purchase
+URL without creating another checkout. An inline `create_checkout` plan needs
+an existing `productId` or a `product` with `title` and `externalIdentifier`.
+The inline product's external identifier finds or creates a product: Whop updates
+an existing matching product with the supplied title, or creates a product when
+none matches. Use `productId` to select an existing product without updating it.
+
+## Documentation limits
+
+The legacy plan operation documentation currently redirects to Whop's variant
+model documentation. Existing plan tools, inputs, requests, and outputs remain
+available; the redirect alone does not establish that these API operations were
+removed. The legacy user retrieval page currently redirects to sign-in.
+
+Whop documents nullable payment statuses and totals, while the existing payment
+tools expose string `status` and numeric `total` fields. Their established schemas
+and raw provider mappings are preserved; provider responses with a null status or
+total remain a known compatibility limit requiring live verification.

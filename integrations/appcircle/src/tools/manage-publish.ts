@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let managePublish = SlateTool.create(spec, {
@@ -15,7 +15,7 @@ export let managePublish = SlateTool.create(spec, {
     'Use action "start_publish" to begin publishing a version to a store.',
     'Use action "cancel_publish" to stop an active publish.',
     'Use action "restart_publish" to restart publishing with latest flow changes.',
-    'platformType values: 0 = App Store (iOS), 1 = Google Play (Android), 2 = Huawei AppGallery, 3 = Microsoft Intune.'
+    'Use platformType ios or android to choose the target operating system. Legacy values 0 (App Store), 1 (Google Play), and 2 (Huawei AppGallery) remain supported. For Microsoft Intune, choose ios or android.'
   ]
 })
   .input(
@@ -34,7 +34,7 @@ export let managePublish = SlateTool.create(spec, {
       platformType: z
         .string()
         .describe(
-          'Platform type: 0 = App Store, 1 = Google Play, 2 = Huawei AppGallery, 3 = Microsoft Intune'
+          'Target OS: ios or android. Legacy marketplace values 0, 1, and 2 remain supported; choose an OS for Microsoft Intune.'
         ),
       profileId: z
         .string()
@@ -67,11 +67,11 @@ export let managePublish = SlateTool.create(spec, {
           page: ctx.input.page,
           size: ctx.input.size
         });
-        let items = Array.isArray(profiles) ? profiles : [];
+        let items = getAppcircleList(profiles, 'list');
         return { output: items, message: `Found **${items.length}** publish profile(s).` };
       }
       case 'get_profile': {
-        if (!ctx.input.profileId) throw new Error('profileId is required');
+        if (!ctx.input.profileId) throw createApiServiceError('profileId is required');
         let profile = await client.getPublishProfile(platformType, ctx.input.profileId);
         return {
           output: profile,
@@ -79,17 +79,17 @@ export let managePublish = SlateTool.create(spec, {
         };
       }
       case 'list_app_versions': {
-        if (!ctx.input.profileId) throw new Error('profileId is required');
+        if (!ctx.input.profileId) throw createApiServiceError('profileId is required');
         let versions = await client.listPublishAppVersions(platformType, ctx.input.profileId, {
           page: ctx.input.page,
           size: ctx.input.size
         });
-        let items = Array.isArray(versions) ? versions : [];
+        let items = getAppcircleList(versions, 'list');
         return { output: items, message: `Found **${items.length}** app version(s).` };
       }
       case 'get_publish_details': {
         if (!ctx.input.profileId || !ctx.input.appVersionId)
-          throw new Error('profileId and appVersionId are required');
+          throw createApiServiceError('profileId and appVersionId are required');
         let details = await client.getPublishDetails(
           platformType,
           ctx.input.profileId,
@@ -102,7 +102,7 @@ export let managePublish = SlateTool.create(spec, {
       }
       case 'start_publish': {
         if (!ctx.input.profileId || !ctx.input.publishId)
-          throw new Error('profileId and publishId are required');
+          throw createApiServiceError('profileId and publishId are required');
         let result = await client.startPublish(
           platformType,
           ctx.input.profileId,
@@ -113,7 +113,7 @@ export let managePublish = SlateTool.create(spec, {
       }
       case 'cancel_publish': {
         if (!ctx.input.profileId || !ctx.input.publishId)
-          throw new Error('profileId and publishId are required');
+          throw createApiServiceError('profileId and publishId are required');
         let result = await client.cancelPublish(
           platformType,
           ctx.input.profileId,
@@ -123,7 +123,7 @@ export let managePublish = SlateTool.create(spec, {
       }
       case 'restart_publish': {
         if (!ctx.input.profileId || !ctx.input.publishId)
-          throw new Error('profileId and publishId are required');
+          throw createApiServiceError('profileId and publishId are required');
         let result = await client.restartPublish(
           platformType,
           ctx.input.profileId,

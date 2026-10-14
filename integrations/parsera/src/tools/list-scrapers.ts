@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listScrapersTool = SlateTool.create(spec, {
   name: 'List Scrapers',
   key: 'list_scrapers',
-  description: `List all reusable scrapers in your Parsera account. Returns the ID and name of each scraper.`,
+  description: `List reusable scrapers in your Parsera account. Returns their IDs and names, plus type, status, URL, and creation time when available.`,
   tags: {
     readOnly: true
   }
@@ -18,7 +18,23 @@ export let listScrapersTool = SlateTool.create(spec, {
         .array(
           z.object({
             scraperId: z.string().describe('Unique identifier for the scraper'),
-            name: z.string().describe('Name of the scraper')
+            name: z.string().describe('Name of the scraper'),
+            type: z.string().optional().describe('Scraper type: extractor or agentic'),
+            status: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Current scraper state, when available'),
+            url: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Primary URL configured for this scraper'),
+            createdAt: z
+              .string()
+              .nullable()
+              .optional()
+              .describe('Creation timestamp from Parsera')
           })
         )
         .describe('List of scrapers in the account')
@@ -29,9 +45,13 @@ export let listScrapersTool = SlateTool.create(spec, {
 
     let scrapers = await client.listScrapers();
 
-    let mapped = (Array.isArray(scrapers) ? scrapers : []).map(s => ({
+    let mapped = scrapers.map(s => ({
       scraperId: s.id,
-      name: s.name
+      name: s.name,
+      type: s.type,
+      status: s.status,
+      url: s.url,
+      createdAt: s.created_at
     }));
 
     return {

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createIssueTool = SlateTool.create(spec, {
@@ -10,17 +11,17 @@ export let createIssueTool = SlateTool.create(spec, {
   instructions: [
     'Use the **List Projects** tool to find the project ID.',
     'Use the **List Issue Types** tool to find valid issue type IDs for the project.',
-    "The `fields` object accepts dynamic key-value pairs matching the project's issue schema (e.g. summary, description, priority, status, assignee, etc.)."
+    'Call get_issue_schema to discover field codes, required fields, and valid option IDs before creating an issue.'
   ]
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID to create the issue in'),
+      projectId: projectIdSchema,
       issueTypeId: z.number().describe('The issue type ID (e.g. Bug, Task, Story)'),
       fields: z
         .record(z.string(), z.any())
         .describe(
-          'Issue field values. Must include "summary". May include description, priority, status, assignee, owner, startDate, dueDate, storyPoint, sprint, epic, labels, and custom fields.'
+          'Issue field values using codes from get_issue_schema. Common codes include summary, description, priority, status, assignee, owner, estimatePoint, sprint, epic, and label. Selection fields use numeric option IDs.'
         )
     })
   )
@@ -32,6 +33,11 @@ export let createIssueTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    if (typeof ctx.input.fields.summary !== 'string' || !ctx.input.fields.summary.trim()) {
+      throw createApiServiceError('fields.summary must be a nonempty issue title.', {
+        reason: 'missing_issue_summary'
+      });
+    }
 
     let response = await client.createIssue({
       projectId: ctx.input.projectId,
@@ -39,11 +45,12 @@ export let createIssueTool = SlateTool.create(spec, {
       data: ctx.input.fields
     });
 
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to create issue');
-    }
-
     let issueId = response.data?.id;
+    if (typeof issueId !== 'number') {
+      throw createApiServiceError('Leiga did not return the created issue ID.', {
+        reason: 'invalid_issue_response'
+      });
+    }
 
     return {
       output: {

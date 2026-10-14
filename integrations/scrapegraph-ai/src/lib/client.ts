@@ -1,6 +1,46 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 let BASE_URL = 'https://api.scrapegraphai.com/v1';
+let CURRENT_BASE_URL = 'https://v2-api.scrapegraphai.com/api';
+
+let validateWholeNumber = (
+  value: number | undefined,
+  name: string,
+  min: number,
+  max?: number
+) => {
+  if (value === undefined) return;
+  if (!Number.isSafeInteger(value) || value < min || (max !== undefined && value > max)) {
+    throw createApiServiceError(
+      `${name} must be a whole number ${max === undefined ? `of at least ${min}` : `between ${min} and ${max}`}.`,
+      { reason: 'invalid_input' }
+    );
+  }
+};
+
+let validateSource = (sources: (string | undefined)[], names: string[]) => {
+  if (sources.filter(source => source !== undefined).length !== 1) {
+    throw createApiServiceError(`Provide exactly one of ${names.join(', ')}.`, {
+      reason: 'invalid_input'
+    });
+  }
+  if (sources.some(source => source !== undefined && !source.trim())) {
+    throw createApiServiceError('The content source must not be empty.', {
+      reason: 'invalid_input'
+    });
+  }
+};
+
+let validatePrompt = (prompt: string | undefined) => {
+  if (!prompt?.trim()) {
+    throw createApiServiceError('Provide a non-empty prompt.', { reason: 'invalid_input' });
+  }
+};
 
 export interface SmartScraperParams {
   websiteUrl?: string;
@@ -74,18 +114,41 @@ export interface AgenticScraperParams {
 
 export class Client {
   private axios;
+  private currentAxios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide a non-empty ScrapeGraphAI API key.', {
+        reason: 'invalid_auth'
+      });
+    }
+    let authHeader = { name: 'SGAI-APIKEY', value: config.token };
+    let errorAdapter = (error: unknown) =>
+      buildApiServiceError(error, {
+        providerLabel: 'ScrapeGraphAI',
+        reason: 'api_error',
+        nestedKeys: ['error', 'errors', 'details']
+      });
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'SGAI-APIKEY': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader,
+      errorAdapter
+    });
+    this.currentAxios = createAuthenticatedAxios({
+      baseURL: CURRENT_BASE_URL,
+      authHeader,
+      errorAdapter
     });
   }
 
   async smartScraper(params: SmartScraperParams) {
+    validateSource(
+      [params.websiteUrl, params.websiteHtml, params.websiteMarkdown],
+      ['websiteUrl', 'websiteHtml', 'websiteMarkdown']
+    );
+    validatePrompt(params.userPrompt);
+    validateWholeNumber(params.waitMs, 'waitMs', 0);
+    validateWholeNumber(params.numberOfScrolls, 'numberOfScrolls', 0);
     let body: Record<string, unknown> = {
       user_prompt: params.userPrompt
     };
@@ -105,6 +168,8 @@ export class Client {
   }
 
   async searchScraper(params: SearchScraperParams) {
+    validatePrompt(params.userPrompt);
+    validateWholeNumber(params.numResults, 'numResults', 3, 20);
     let body: Record<string, unknown> = {
       user_prompt: params.userPrompt
     };
@@ -120,6 +185,11 @@ export class Client {
   }
 
   async crawl(params: CrawlParams) {
+    if (params.extractionMode !== false) validatePrompt(params.prompt);
+    validateWholeNumber(params.depth, 'depth', 0);
+    validateWholeNumber(params.breadth, 'breadth', 1);
+    validateWholeNumber(params.maxPages, 'maxPages', 1);
+    validateWholeNumber(params.waitMs, 'waitMs', 0);
     let body: Record<string, unknown> = {
       url: params.url
     };
@@ -129,7 +199,7 @@ export class Client {
     if (params.breadth !== undefined) body.breadth = params.breadth;
     if (params.maxPages !== undefined) body.max_pages = params.maxPages;
     if (params.extractionMode !== undefined) body.extraction_mode = params.extractionMode;
-    if (params.schema) body.schema = params.schema;
+    if (params.schema) body.data_schema = params.schema;
     if (params.rules) {
       let rules: Record<string, unknown> = {};
       if (params.rules.includePaths) rules.include_paths = params.rules.includePaths;
@@ -147,6 +217,7 @@ export class Client {
   }
 
   async markdownify(params: MarkdownifyParams) {
+    validateWholeNumber(params.waitMs, 'waitMs', 0);
     let body: Record<string, unknown> = {
       website_url: params.websiteUrl
     };
@@ -160,6 +231,7 @@ export class Client {
   }
 
   async scrape(params: ScrapeParams) {
+    validateWholeNumber(params.waitMs, 'waitMs', 0);
     let body: Record<string, unknown> = {
       website_url: params.websiteUrl
     };
@@ -185,6 +257,12 @@ export class Client {
   }
 
   async agenticScraper(params: AgenticScraperParams) {
+    if (!params.steps.length || params.steps.some(step => !step.trim())) {
+      throw createApiServiceError('Provide at least one non-empty browser action in steps.', {
+        reason: 'invalid_input'
+      });
+    }
+    if (params.aiExtraction) validatePrompt(params.userPrompt);
     let body: Record<string, unknown> = {
       url: params.url,
       steps: params.steps
@@ -205,7 +283,90 @@ export class Client {
   }
 
   async getRequestStatus(service: string, requestId: string) {
-    let response = await this.axios.get(`/${service}/${requestId}`);
+    if (!requestId.trim()) {
+      throw createApiServiceError('Provide a non-empty requestId.', {
+        reason: 'invalid_input'
+      });
+    }
+    let response = await this.axios.get(`/${service}/${encodeURIComponent(requestId)}`);
+    return response.data;
+  }
+
+  async extract(params: {
+    url?: string;
+    html?: string;
+    markdown?: string;
+    prompt: string;
+    schema?: Record<string, unknown>;
+    mode?: 'normal' | 'reader' | 'prune';
+  }) {
+    validateSource([params.url, params.html, params.markdown], ['url', 'html', 'markdown']);
+    validatePrompt(params.prompt);
+    for (let content of [params.html, params.markdown]) {
+      if (content !== undefined && Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) {
+        throw createApiServiceError('HTML and Markdown sources must not exceed 2 MB.', {
+          reason: 'invalid_input'
+        });
+      }
+    }
+    let response = await this.currentAxios.post<{
+      id: string;
+      json: unknown;
+      raw?: string | null;
+      usage?: { promptTokens: number; completionTokens: number };
+      metadata?: Record<string, unknown>;
+    }>('/extract', pickDefined(params));
+    return response.data;
+  }
+
+  async generateSchema(params: {
+    prompt: string;
+    existingSchema?: Record<string, unknown>;
+    model?: string;
+  }) {
+    validatePrompt(params.prompt);
+    let response = await this.currentAxios.post<{
+      schema: Record<string, unknown>;
+      refinedPrompt?: string;
+      usage?: { promptTokens: number; completionTokens: number };
+    }>(
+      '/schema',
+      pickDefined({
+        prompt: params.prompt,
+        existing_schema: params.existingSchema,
+        model: params.model
+      })
+    );
+    return response.data;
+  }
+
+  async listHistory(params: {
+    page?: number;
+    limit?: number;
+    service?: 'scrape' | 'extract' | 'search' | 'monitor' | 'crawl' | 'schema';
+    sessionId?: string;
+  }) {
+    validateWholeNumber(params.page, 'page', 1);
+    validateWholeNumber(params.limit, 'limit', 1);
+    if (params.sessionId !== undefined && params.sessionId.length > 128) {
+      throw createApiServiceError('sessionId must not exceed 128 characters.', {
+        reason: 'invalid_input'
+      });
+    }
+    let response = await this.currentAxios.get<{
+      data: {
+        id: string;
+        userId: string;
+        sessionId: string | null;
+        service: string;
+        status: string;
+        error: unknown;
+        elapsedMs: number | null;
+        requestParentId: string | null;
+        createdAt: string;
+      }[];
+      pagination: { page: number; limit: number; total: number };
+    }>('/history', { params: pickDefined(params) });
     return response.data;
   }
 }

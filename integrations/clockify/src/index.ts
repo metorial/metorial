@@ -24,15 +24,18 @@ import {
   getClients,
   getCurrentUser,
   getInvoices,
+  getProject,
   getProjects,
   getTags,
   getTasks,
   getTimeEntries,
+  getTimeEntry,
   getTimeOffPolicies,
   getTimeOffRequests,
   getUserGroups,
   getUsers,
   getWorkspace,
+  getWorkspaces,
   stopTimer,
   updateClient,
   updateInvoice,
@@ -49,12 +52,14 @@ export let provider = Slate.create({
   tools: [
     createTimeEntry,
     getTimeEntries,
+    getTimeEntry,
     updateTimeEntry,
     deleteTimeEntry,
     stopTimer,
     createProject,
     updateProject,
     deleteProject,
+    getProject,
     getProjects,
     createTask,
     updateTask,
@@ -86,7 +91,8 @@ export let provider = Slate.create({
     createTimeOffRequest,
     updateTimeOffRequestStatus,
     getTimeOffPolicies,
-    getWorkspace
+    getWorkspace,
+    getWorkspaces
   ],
   triggers: []
 });

@@ -1,3 +1,4 @@
+export * from './create-client';
 export * from './create-comment';
 export * from './create-contact';
 export * from './create-event';
@@ -11,6 +12,7 @@ export * from './delete-event';
 export * from './delete-project';
 export * from './delete-subtask';
 export * from './delete-task';
+export * from './delete-time-entry';
 export * from './get-project';
 export * from './list-clients';
 export * from './list-files';
@@ -27,3 +29,4 @@ export * from './update-event';
 export * from './update-project';
 export * from './update-subtask';
 export * from './update-task';
+export * from './who-am-i';

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -51,7 +51,7 @@ export let logTime = SlateTool.create(spec, {
     if (ctx.input.description) data.description = ctx.input.description;
 
     let result = await client.createHour(ctx.input.projectId, data);
-    let h = result.hour || result;
+    let h = result.hour || result.project_item || result;
 
     return {
       output: mapTimeEntry(h),
@@ -91,7 +91,7 @@ export let updateTimeEntry = SlateTool.create(spec, {
     if (ctx.input.description !== undefined) data.description = ctx.input.description;
 
     let result = await client.updateHour(ctx.input.timeEntryId, data);
-    let h = result.hour || result;
+    let h = result.hour || result.project_item || result;
 
     return {
       output: mapTimeEntry(h),
@@ -133,7 +133,7 @@ export let getTimeEntries = SlateTool.create(spec, {
 
     if (ctx.input.timeEntryId) {
       let result = await client.getHour(ctx.input.timeEntryId);
-      let h = result.hour || result;
+      let h = result.hour || result.project_item || result;
       return {
         output: { timeEntries: [mapTimeEntry(h)] },
         message: `Retrieved time entry **${h.id}** — ${h.hours}h for "${h.title}".`
@@ -141,7 +141,7 @@ export let getTimeEntries = SlateTool.create(spec, {
     }
 
     if (!ctx.input.projectId) {
-      throw new Error('projectId is required when timeEntryId is not provided');
+      throw createApiServiceError('projectId is required when timeEntryId is not provided');
     }
 
     let result = await client.listHours(ctx.input.projectId, {
@@ -154,8 +154,8 @@ export let getTimeEntries = SlateTool.create(spec, {
     return {
       output: {
         timeEntries,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${timeEntries.length} time entry(ies) for project ID ${ctx.input.projectId}.`
     };
@@ -194,13 +194,13 @@ export let deleteTimeEntry = SlateTool.create(spec, {
 
 let mapTimeEntry = (h: any) => ({
   timeEntryId: h.id,
-  projectId: h.project_id,
-  userId: h.user_id,
+  projectId: h.project_id ?? undefined,
+  userId: h.user_id ?? undefined,
   title: h.title,
   hours: h.hours,
-  rate: h.rate,
-  date: h.date,
-  description: h.description,
-  billed: h.billed,
-  cost: h.cost
+  rate: h.rate ?? undefined,
+  date: h.date ?? undefined,
+  description: h.description ?? undefined,
+  billed: h.billed ?? h['billed?'] ?? undefined,
+  cost: h.cost ?? undefined
 });

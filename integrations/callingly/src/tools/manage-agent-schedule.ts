@@ -1,11 +1,43 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+let getDayNumber = (value: string) => {
+  let normalized = value.trim().toLowerCase();
+  let day = weekdays.indexOf(normalized);
+  if (day === -1 && /^[0-6]$/.test(normalized)) day = Number(normalized);
+  if (day === -1) {
+    throw createApiServiceError(
+      'Schedule day must be a weekday name or a number from 0 (Sunday) to 6 (Saturday).'
+    );
+  }
+  return day;
+};
+
+let getApiTime = (value: string) => {
+  if (value === 'allday') return value;
+  if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value)) {
+    throw createApiServiceError('Schedule times must use HH:MM, HH:MM:SS, or allday.');
+  }
+  return value.length === 5 ? `${value}:00` : value;
+};
+
+let mapSchedule = (days: any[]) =>
+  days.map(day => ({
+    day:
+      typeof day.day === 'number'
+        ? (weekdays[day.day] ?? String(day.label ?? day.day))
+        : String(day.day ?? day.label),
+    isAvailable: day.is_available === true || day.is_available === 1,
+    times: day.times?.map((time: any) => ({ start: time.start, end: time.end }))
+  }));
+
 let timeWindowSchema = z.object({
-  start: z.string().describe('Start time in HH:MM format (e.g., "09:00")'),
-  end: z.string().describe('End time in HH:MM format (e.g., "17:00")')
+  start: z.string().describe('Start time in HH:MM or HH:MM:SS format, or allday'),
+  end: z.string().describe('End time in HH:MM or HH:MM:SS format, or allday')
 });
 
 let dayScheduleSchema = z.object({
@@ -25,7 +57,7 @@ export let manageAgentSchedule = SlateTool.create(spec, {
 - To **update** the schedule, provide the agentId and the schedule array.`,
   instructions: [
     'Each day supports multiple time windows to allow for split shifts.',
-    'Time format is HH:MM in 24-hour notation.'
+    'Use weekday names and HH:MM or HH:MM:SS times in 24-hour notation, or allday.'
   ],
   tags: {
     destructive: false,
@@ -70,20 +102,23 @@ export let manageAgentSchedule = SlateTool.create(spec, {
     });
 
     if (ctx.input.schedule) {
-      let apiSchedule = ctx.input.schedule.map(day => ({
-        day: day.day,
-        is_available: day.isAvailable,
-        times: day.times?.map(t => ({ start: t.start, end: t.end }))
-      }));
+      let apiSchedule = ctx.input.schedule.map(day => {
+        let dayNumber = getDayNumber(day.day);
+        let weekday = weekdays[dayNumber]!;
+        return {
+          label: `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}`,
+          day: dayNumber,
+          is_available: day.isAvailable,
+          times: day.times?.map(t => ({ start: getApiTime(t.start), end: getApiTime(t.end) }))
+        };
+      });
 
       let result = await client.updateAgentSchedule(ctx.input.agentId, apiSchedule);
-      let scheduleArray = Array.isArray(result) ? result : (result.schedule ?? []);
-
-      let schedule = scheduleArray.map((day: any) => ({
-        day: day.day ?? day.label,
-        isAvailable: day.is_available ?? false,
-        times: day.times?.map((t: any) => ({ start: t.start, end: t.end }))
-      }));
+      if (!Array.isArray(result) && !Array.isArray(result?.schedule)) {
+        result = await client.getAgentSchedule(ctx.input.agentId);
+      }
+      let scheduleArray = Array.isArray(result) ? result : (result?.schedule ?? []);
+      let schedule = mapSchedule(scheduleArray);
 
       return {
         output: { agentId: ctx.input.agentId, schedule },
@@ -94,11 +129,7 @@ export let manageAgentSchedule = SlateTool.create(spec, {
     let result = await client.getAgentSchedule(ctx.input.agentId);
     let scheduleArray = Array.isArray(result) ? result : (result.schedule ?? []);
 
-    let schedule = scheduleArray.map((day: any) => ({
-      day: day.day ?? day.label,
-      isAvailable: day.is_available ?? false,
-      times: day.times?.map((t: any) => ({ start: t.start, end: t.end }))
-    }));
+    let schedule = mapSchedule(scheduleArray);
 
     return {
       output: { agentId: ctx.input.agentId, schedule },

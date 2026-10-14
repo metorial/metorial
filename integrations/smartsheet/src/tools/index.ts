@@ -2,6 +2,7 @@ export * from './create-sheet';
 export * from './create-update-request';
 export * from './delete-rows';
 export * from './delete-sheet';
+export * from './get-row';
 export * from './get-sheet';
 export * from './list-dashboards';
 export * from './list-reports';

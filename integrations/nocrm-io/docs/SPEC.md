@@ -34,6 +34,14 @@ VoIP and other registered partner integrations use an additional `X-API-PARTNER-
 
 ## Features
 
+### Integration Tool Coverage
+
+The integration provides lead CRUD, duplication and assignment, duplicate and unassigned-lead discovery, lead comments, paginated action history, email requests, client folders, teams, prospecting lists and prospects, user discovery, and read-only account configuration. `manage_prospecting` with `get_list` returns column headers and prospect rows for subsequent updates and conversions. User discovery exposes the provider's disabled and activation flags.
+
+`who_am_i` verifies credentials with `GET /ping`. Email/password connections additionally retrieve the user identified by the login response using `GET /users/{id}`. API-key connections return account context without claiming a specific signed-in user. `list_post_sales_processes` uses `GET /follow_ups` with a lead ID or user ID/email and optional status filters, returning process IDs, state, task progress, and timestamps.
+
+The sections below summarize the broader provider API. Provider capabilities such as attachment management, post-sales task mutations, user administration, and webhook management are not registered integration tools.
+
 ### Lead Management
 
 Create, retrieve, update, duplicate, assign, and delete leads. Leads have a title, description (with structured fields like name, email, phone), status (todo, standby, won, lost, cancelled), pipeline step, amount, probability, tags, reminders, and estimated closing dates. Leads can be assigned to users directly, randomly, via round-robin, or weighted round-robin. Leads can be starred, moved between pipeline steps, and associated with client folders. Duplicate detection is available based on title and key fields.

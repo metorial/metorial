@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZeplinClient } from '../lib/client';
 import { spec } from '../spec';
@@ -46,6 +46,9 @@ export let listComponents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.projectId) === Boolean(ctx.input.styleguideId)) {
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
+    }
     let client = new ZeplinClient(ctx.auth.token);
     let components: any[];
 
@@ -60,14 +63,15 @@ export let listComponents = SlateTool.create(spec, {
         offset: ctx.input.offset
       })) as any[];
     } else {
-      throw new Error('Either projectId or styleguideId must be provided');
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
     }
 
     let mapped = components.map((c: any) => ({
       componentId: c.id,
       name: c.name,
       description: c.description,
-      thumbnail: c.thumbnail,
+      thumbnail:
+        c.image?.thumbnails?.medium ?? c.image?.thumbnails?.small ?? c.image?.original_url,
       created: c.created,
       updated: c.updated
     }));
@@ -114,6 +118,9 @@ export let getComponent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.projectId) === Boolean(ctx.input.styleguideId)) {
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
+    }
     let client = new ZeplinClient(ctx.auth.token);
     let component: any;
 
@@ -125,7 +132,7 @@ export let getComponent = SlateTool.create(spec, {
         ctx.input.componentId
       );
     } else {
-      throw new Error('Either projectId or styleguideId must be provided');
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
     }
 
     return {
@@ -133,10 +140,13 @@ export let getComponent = SlateTool.create(spec, {
         componentId: component.id,
         name: component.name,
         description: component.description,
-        thumbnail: component.thumbnail,
+        thumbnail:
+          component.image?.thumbnails?.medium ??
+          component.image?.thumbnails?.small ??
+          component.image?.original_url,
         created: component.created,
         updated: component.updated,
-        sections: component.sections,
+        sections: component.section ? [component.section] : undefined,
         versions: component.versions
       },
       message: `Retrieved component **${component.name}**.`

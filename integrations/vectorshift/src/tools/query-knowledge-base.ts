@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createApiClient, queryKnowledgeBase } from '../lib/client';
 import { spec } from '../spec';
@@ -38,6 +38,9 @@ export let queryKnowledgeBaseTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.topK !== undefined && !Number.isInteger(ctx.input.topK)) {
+      throw createApiServiceError('topK must be a whole number.');
+    }
     let api = createApiClient(ctx.auth.token);
     let result = await queryKnowledgeBase(api, ctx.input.knowledgeBaseId, {
       queries: ctx.input.queries,

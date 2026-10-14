@@ -58,7 +58,7 @@ export let getPhotoAvatarInferences = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
 
     if (ctx.input.photoAvatarInferenceId) {
       let details = await client.getPhotoAvatarInferenceDetails({

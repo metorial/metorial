@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Mailcheck
 
-Verify and validate email addresses for deliverability and trustworthiness. Check single emails instantly with a trust score, upload CSV files for bulk email list verification of up to 1,000,000 addresses, and monitor batch operation status. Retrieves validation data from social networks and public sources to score emails beyond simple MX checks.
+Verify and validate email addresses for deliverability and trustworthiness. Check individual addresses with a trust score, submit lists for batch verification, monitor progress, and download completed results. Retrieves validation data from social networks and public sources to score emails beyond simple MX checks.
 
 ## License
 

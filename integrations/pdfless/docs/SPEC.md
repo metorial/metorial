@@ -1,4 +1,4 @@
-# Slates Specification for Pdfless
+# Pdfless Integration Specification
 
 ## Overview
 
@@ -34,12 +34,21 @@ API keys are scoped to a workspace. There are no OAuth flows or additional scope
 
 ### PDF Generation from Templates
 
-Users create document templates using an HTML/CSS editor in the Pdfless dashboard, then request generation via the API by specifying a template ID and a JSON payload of dynamic data. The API returns a temporary download URL for the generated PDF.
+Users create document templates using an HTML/CSS editor in the Pdfless dashboard, then request generation via `POST /v1/pdfs` with a template ID and a JSON payload of dynamic data. The result includes a temporary provider URL and the generated PDF is prepared for download immediately.
 
 - **`template_id`** (required): The identifier of the pre-designed template.
 - **`payload`** (required): JSON object containing the variable data to populate the template.
 - **`reference_id`** (optional): A caller-defined reference identifier for tracking purposes.
 - The download URL expires after 10 minutes.
+- Generation consumes account quota. There is no documented PDF lookup or URL-renewal endpoint, so an expired provider URL cannot be refreshed without generating another PDF.
+
+### Template Discovery
+
+`list_templates` calls `GET /v1/document-templates` with one-based `page` and `pageSize` query parameters (defaults 1 and 25). The provider returns a direct array of templates. The tool exposes each template's ID and title, plus available creation and modification timestamps. Unnamed templates have an empty title. Both pagination inputs remain JSON numbers and must be positive whole numbers at runtime.
+
+### Connected Workspace
+
+`get_workspace` calls `GET /v1/workspaces` to retrieve the workspace tied to the connected API key. Its direct object response supplies name, active status, creation time, and optional modification time. An unnamed workspace has a null name. The documented response does not include a workspace ID.
 
 ### Semantic Templating (Expressions)
 
@@ -51,7 +60,7 @@ Documents can be encrypted with a user password (required to open) and an option
 
 - Allow/disallow printing, modifying, copying content, modifying annotations, form filling, screen reader access, and document assembly.
 - All permissions default to `true` if not specified.
-- Available on Essentials or Pro plans only.
+- Protection options depend on the account subscription. When setting passwords or permission controls, provide a non-empty user password to enable protection.
 
 ### PDF Metadata
 
@@ -79,3 +88,14 @@ Templates support CSS `@page` rules for controlling page size, orientation, marg
 ## Events
 
 The provider does not support events.
+
+## API References
+
+- [Authentication](https://docs.pdfless.com/authentication)
+- [PDF generation](https://docs.pdfless.com/pdfs)
+- [Native PDF features](https://docs.pdfless.com/native-features)
+- [Errors](https://docs.pdfless.com/errors)
+- [Official SDK and template/workspace operations](https://github.com/Pdfless/pdfless-js)
+- [Official OpenAPI schema](https://github.com/Pdfless/pdfless-js/blob/main/swagger.yml)
+
+The PDF guide documents an object-valued payload, while the official SDK's older OpenAPI model uses a JSON string. This integration preserves its existing object input and request behavior based on the current PDF guide. Templates and workspaces use the endpoint and response shapes from the official SDK/OpenAPI schema.

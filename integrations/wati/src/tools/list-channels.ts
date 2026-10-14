@@ -12,7 +12,7 @@ let channelSchema = z.object({
 export let listChannels = SlateTool.create(spec, {
   name: 'List Channels',
   key: 'list_channels',
-  description: `Retrieve the WhatsApp channels (phone numbers) connected to your Wati account. Use this to find channel identifiers for multi-number setups.`,
+  description: `Retrieve additional WhatsApp channels (phone numbers) connected to your Wati account. The default channel is excluded by Wati. Use this to find channel identifiers for multi-number setups.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -47,9 +47,9 @@ export let listChannels = SlateTool.create(spec, {
     });
 
     let channels = (result?.channels || []).map((c: any) => ({
-      channelId: c.id,
-      name: c.name,
-      channel: c.channel
+      channelId: c.id ?? undefined,
+      name: c.name ?? undefined,
+      channel: c.channel ?? undefined
     }));
 
     return {

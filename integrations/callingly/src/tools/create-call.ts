@@ -66,8 +66,8 @@ export let createCall = SlateTool.create(spec, {
       output: {
         callId: String(result.id ?? result.call_id ?? ''),
         leadId: result.lead_id ? String(result.lead_id) : undefined,
-        status: result.status,
-        scheduledAt: result.scheduled_at
+        status: result.status ?? undefined,
+        scheduledAt: result.scheduled_at ?? undefined
       },
       message: ctx.input.scheduledAt
         ? `Call scheduled for ${ctx.input.scheduledAt} to **${ctx.input.phoneNumber}** via team **${ctx.input.teamId}**.`

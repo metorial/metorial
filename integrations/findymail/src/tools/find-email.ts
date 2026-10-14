@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FindymailClient } from '../lib/client';
 import { spec } from '../spec';
@@ -49,7 +49,7 @@ export let findEmail = SlateTool.create(spec, {
         domain: ctx.input.domain
       });
     } else {
-      throw new Error('Provide either a linkedinUrl, or both name and domain.');
+      throw createApiServiceError('Provide either a linkedinUrl, or both name and domain.');
     }
 
     let contact = result?.contact ?? result;

@@ -1,18 +1,21 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let revokeCredentials = SlateTool.create(spec, {
   name: 'Revoke Credentials',
   key: 'revoke_credentials',
   description: `Batch-revoke one or more previously issued credentials. Supports both SD-JWT and AnonCreds credentials. Optionally notify the holder's wallet about the revocation via DIDComm Revocation Notification.`,
+  instructions: ['Call list_projects to choose the projectId for this operation.'],
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       issuedCredentialIds: z
         .array(z.string())
         .describe('IDs of the issued credentials to revoke'),
@@ -39,9 +42,12 @@ export let revokeCredentials = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
+    if (!ctx.input.issuedCredentialIds.length) {
+      throw createApiServiceError('Provide at least one issued credential ID to revoke.');
+    }
     let result = await client.batchRevokeCredentials({
       issuedCredentialIds: ctx.input.issuedCredentialIds,
       notifyWallet: ctx.input.notifyWallet
@@ -55,7 +61,7 @@ export let revokeCredentials = SlateTool.create(spec, {
 
     return {
       output: { revokedCredentials: revoked },
-      message: `Revoked **${revoked.length}** credential(s).${ctx.input.notifyWallet ? ' Wallet notifications sent.' : ''}`
+      message: `Revoked **${revoked.length}** credential(s).${ctx.input.notifyWallet ? ` ${revoked.filter((credential: { notifiedWallet?: boolean }) => credential.notifiedWallet).length} wallet notification(s) confirmed.` : ''}`
     };
   })
   .build();

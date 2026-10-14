@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ScrapeDoClient } from '../lib/client';
+import { ScrapeDoClient, validateWholeNumber } from '../lib/client';
 import { spec } from '../spec';
 
 export let scrapeWebpage = SlateTool.create(spec, {
@@ -14,7 +14,7 @@ Use **render** to enable JavaScript execution for dynamic pages. Use **output: "
     'Use playWithBrowser as a JSON-encoded array of actions for browser interactions like clicking buttons before scraping.'
   ],
   constraints: [
-    'Maximum timeout is 60000ms by default.',
+    'Timeout must be between 5000 and 120000 milliseconds.',
     'playWithBrowser requires render to be true.',
     'returnJSON, showFrames, and showWebsocketRequests require render to be true.'
   ],
@@ -150,6 +150,51 @@ Use **render** to enable JavaScript execution for dynamic pages. Use **output: "
     let client = new ScrapeDoClient(ctx.auth.token);
     let input = ctx.input;
 
+    if (input.customHeaders && input.extraHeaders) {
+      throw createApiServiceError('Choose either customHeaders or extraHeaders, not both.');
+    }
+    let renderOptions = [
+      input.waitUntil,
+      input.customWait,
+      input.waitSelector,
+      input.width,
+      input.height,
+      input.blockResources,
+      input.playWithBrowser
+    ];
+    if (
+      !input.render &&
+      (renderOptions.some(value => value !== undefined) ||
+        input.returnJSON ||
+        input.showFrames ||
+        input.showWebsocketRequests)
+    ) {
+      throw createApiServiceError('Enable render to use browser options or network capture.');
+    }
+    if ((input.showFrames || input.showWebsocketRequests) && !input.returnJSON) {
+      throw createApiServiceError(
+        'Enable returnJSON to capture frames or WebSocket requests.'
+      );
+    }
+    if (input.playWithBrowser) {
+      let actions: unknown;
+      try {
+        actions = JSON.parse(input.playWithBrowser);
+      } catch {
+        throw createApiServiceError(
+          'playWithBrowser must be a JSON-encoded array of browser actions.'
+        );
+      }
+      if (!Array.isArray(actions))
+        throw createApiServiceError(
+          'playWithBrowser must be a JSON-encoded array of browser actions.'
+        );
+    }
+    validateWholeNumber('timeout', input.timeout, 5000, 120000);
+    validateWholeNumber('retryTimeout', input.retryTimeout, 1);
+    validateWholeNumber('customWait', input.customWait, 0, 35000);
+    validateWholeNumber('width', input.width, 1);
+    validateWholeNumber('height', input.height, 1);
     let headers: Record<string, string> | undefined;
     if (input.customHeaders) {
       headers = input.customHeaders;

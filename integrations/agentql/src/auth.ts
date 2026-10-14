@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,11 @@ export let auth = SlateAuth.create()
         .describe('Your AgentQL API key from the Dev Portal (https://dev.agentql.com)')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError(
+          'Provide a non-empty AgentQL API key from the Dev Portal.'
+        );
+      }
       return {
         output: {
           token: ctx.input.apiKey

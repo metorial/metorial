@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StormboardClient } from '../lib/client';
 import { spec } from '../spec';
@@ -28,7 +28,7 @@ export let manageChat = SlateTool.create(spec, {
 
     if (action === 'list') {
       let messages = await client.getChatMessages(stormId);
-      let list = Array.isArray(messages) ? messages : [];
+      let list = messages;
       return {
         output: { messages: list, success: true },
         message: `Retrieved **${list.length}** chat message(s).`
@@ -37,7 +37,7 @@ export let manageChat = SlateTool.create(spec, {
 
     if (action === 'unread') {
       let messages = await client.getUnreadChatMessages(stormId);
-      let list = Array.isArray(messages) ? messages : [];
+      let list = messages;
       return {
         output: { messages: list, success: true },
         message: `Found **${list.length}** unread message(s).`
@@ -46,7 +46,9 @@ export let manageChat = SlateTool.create(spec, {
 
     if (action === 'send') {
       if (!message) {
-        throw new Error('message is required for sending a chat message');
+        throw createApiServiceError('message is required for sending a chat message', {
+          reason: 'stormboard_invalid_input'
+        });
       }
       let sentMessage = await client.createChatMessage(stormId, { message });
       return {

@@ -20,7 +20,11 @@ export let trackUserEvent = SlateTool.create(spec, {
         .record(z.string(), z.any())
         .optional()
         .describe('Optional key-value attributes for the event'),
-      groupId: z.string().optional().describe('Optional group ID to associate with the event')
+      groupId: z.string().optional().describe('Optional group ID to associate with the event'),
+      context: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Optional event context, such as the page URL')
     })
   )
   .output(
@@ -41,7 +45,8 @@ export let trackUserEvent = SlateTool.create(spec, {
       name: ctx.input.eventName,
       timestamp: ctx.input.timestamp,
       attributes: ctx.input.attributes,
-      groupId: ctx.input.groupId
+      groupId: ctx.input.groupId,
+      context: ctx.input.context
     });
 
     return {

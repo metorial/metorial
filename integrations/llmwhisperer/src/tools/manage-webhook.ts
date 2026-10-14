@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,7 +33,7 @@ When registering, LLMWhisperer sends a test payload to verify the URL is functio
         .string()
         .optional()
         .describe(
-          'Bearer auth token for the webhook endpoint (without "Bearer" prefix). Pass empty string if no auth needed. Required for "register" and "update" actions.'
+          'Bearer auth token for the webhook endpoint (without "Bearer" prefix). Omit or pass an empty string if no authentication is needed.'
         )
     })
   )
@@ -54,7 +54,7 @@ When registering, LLMWhisperer sends a test payload to verify the URL is functio
     let { action, webhookName, url, authToken } = ctx.input;
 
     if (action === 'register') {
-      if (!url) throw new Error('URL is required for registering a webhook.');
+      if (!url) throw createApiServiceError('URL is required for registering a webhook.');
       let result = await client.registerWebhook({
         webhookName,
         url,
@@ -67,7 +67,7 @@ When registering, LLMWhisperer sends a test payload to verify the URL is functio
     }
 
     if (action === 'update') {
-      if (!url) throw new Error('URL is required for updating a webhook.');
+      if (!url) throw createApiServiceError('URL is required for updating a webhook.');
       let result = await client.updateWebhook({
         webhookName,
         url,
@@ -99,6 +99,6 @@ When registering, LLMWhisperer sends a test payload to verify the URL is functio
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown webhook action: ${action}`);
   })
   .build();

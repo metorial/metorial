@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { contactListOutputSchema, mapContact } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -14,31 +15,15 @@ export let listContacts = SlateTool.create(spec, {
   .input(
     z.object({
       limit: z.number().optional().describe('Maximum number of contacts to return'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z
+        .number()
+        .optional()
+        .describe(
+          'Positive whole-number page, starting at 1. Pagination is applied to the complete API response.'
+        )
     })
   )
-  .output(
-    z.object({
-      contacts: z.array(
-        z.object({
-          contactId: z.string().describe('Unique contact ID'),
-          email: z.string().optional().describe('Contact email address'),
-          phone: z.string().optional().describe('Contact phone number'),
-          name: z.string().optional().describe('Contact full name'),
-          firstName: z.string().optional().describe('Contact first name'),
-          lastName: z.string().optional().describe('Contact last name'),
-          company: z.string().optional().describe('Contact company name'),
-          position: z.string().optional().describe('Contact job title'),
-          location: z.string().optional().describe('Contact location'),
-          website: z.string().optional().describe('Contact website URL'),
-          avatar: z.string().optional().describe('Contact avatar image URL'),
-          archived: z.boolean().optional().describe('Whether the contact is archived'),
-          added: z.number().optional().describe('Timestamp when contact was added')
-        })
-      ),
-      total: z.number().optional().describe('Total number of contacts')
-    })
-  )
+  .output(contactListOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -47,21 +32,7 @@ export let listContacts = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let contacts = (result.data || []).map(c => ({
-      contactId: c._id,
-      email: c.email,
-      phone: c.phone,
-      name: c.name,
-      firstName: c.firstName,
-      lastName: c.lastName,
-      company: c.company,
-      position: c.position,
-      location: c.location,
-      website: c.website,
-      avatar: c.avatar,
-      archived: c.archived,
-      added: c.added
-    }));
+    let contacts = result.data.map(mapContact);
 
     return {
       output: {

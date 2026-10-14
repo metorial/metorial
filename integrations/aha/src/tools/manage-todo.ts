@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AhaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,12 @@ export let manageTodo = SlateTool.create(spec, {
       body: z.string().optional().describe('To-do body/description'),
       dueDate: z.string().optional().describe('Due date (YYYY-MM-DD)'),
       completed: z.boolean().optional().describe('Mark as completed (for update)'),
-      assigneeIds: z.array(z.string()).optional().describe('User IDs to assign (for create)'),
+      assigneeIds: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'User IDs to assign (for create). Call list_users to discover IDs; each user must have an email address.'
+        ),
       page: z.number().optional().describe('Page number for listing'),
       perPage: z.number().optional().describe('Records per page for listing')
     })
@@ -57,12 +62,12 @@ export let manageTodo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AhaClient(ctx.config.subdomain, ctx.auth.token);
+    let client = AhaClient.fromContext(ctx);
     let { action } = ctx.input;
 
     if (action === 'list') {
       if (!ctx.input.recordType || !ctx.input.recordId) {
-        throw new Error('recordType and recordId are required to list to-dos');
+        throw createApiServiceError('recordType and recordId are required to list to-dos');
       }
 
       let result = await client.listTodos(ctx.input.recordType, ctx.input.recordId, {
@@ -75,7 +80,7 @@ export let manageTodo = SlateTool.create(spec, {
         name: t.name,
         body: t.body,
         dueDate: t.due_date,
-        completed: t.completed,
+        completed: t.status === 'completed' || t.status === 'complete',
         createdAt: t.created_at,
         updatedAt: t.updated_at
       }));
@@ -91,9 +96,9 @@ export let manageTodo = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.recordType || !ctx.input.recordId) {
-        throw new Error('recordType and recordId are required to create a to-do');
+        throw createApiServiceError('recordType and recordId are required to create a to-do');
       }
-      if (!ctx.input.name) throw new Error('name is required to create a to-do');
+      if (!ctx.input.name) throw createApiServiceError('name is required to create a to-do');
 
       let todo = await client.createTodo(ctx.input.recordType, ctx.input.recordId, {
         name: ctx.input.name,
@@ -109,7 +114,7 @@ export let manageTodo = SlateTool.create(spec, {
             name: todo.name,
             body: todo.body,
             dueDate: todo.due_date,
-            completed: todo.completed,
+            completed: todo.status === 'completed' || todo.status === 'complete',
             createdAt: todo.created_at,
             updatedAt: todo.updated_at
           }
@@ -119,7 +124,8 @@ export let manageTodo = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.todoId) throw new Error('todoId is required to update a to-do');
+      if (!ctx.input.todoId)
+        throw createApiServiceError('todoId is required to update a to-do');
 
       let todo = await client.updateTodo(ctx.input.todoId, {
         name: ctx.input.name,
@@ -135,7 +141,7 @@ export let manageTodo = SlateTool.create(spec, {
             name: todo.name,
             body: todo.body,
             dueDate: todo.due_date,
-            completed: todo.completed,
+            completed: todo.status === 'completed' || todo.status === 'complete',
             createdAt: todo.created_at,
             updatedAt: todo.updated_at
           }
@@ -145,7 +151,7 @@ export let manageTodo = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.todoId) throw new Error('todoId is required to delete a to-do');
+    if (!ctx.input.todoId) throw createApiServiceError('todoId is required to delete a to-do');
     await client.deleteTodo(ctx.input.todoId);
     return {
       output: {},

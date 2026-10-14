@@ -1,3 +1,6 @@
+export { getCurrentUser } from './get-current-user';
+export { listEnvironments } from './list-environments';
+export { listEvents } from './list-events';
 export { manageAudience } from './manage-audience';
 export { manageCmpAsset } from './manage-cmp-asset';
 export { manageCmpCampaign } from './manage-cmp-campaign';

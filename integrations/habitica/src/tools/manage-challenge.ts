@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HabiticaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -24,10 +24,10 @@ export let manageChallenge = SlateTool.create(spec, {
   instructions: [
     'Use action "list" to see challenges available to the user.',
     'Use action "join" or "leave" with a challengeId to participate.',
-    'Creating a challenge requires a groupId and a name.'
+    'Creating a challenge requires groupId, name, and shortName.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -48,6 +48,18 @@ export let manageChallenge = SlateTool.create(spec, {
       shortName: z.string().optional().describe('Short name (for create/update)'),
       description: z.string().optional().describe('Challenge description (for create/update)'),
       prize: z.number().optional().describe('Gem prize for the challenge (for create/update)'),
+      page: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          'Page number for user challenge listing; starts at 0 and returns up to 10 challenges'
+        ),
+      memberOnly: z
+        .boolean()
+        .optional()
+        .describe('For user challenge listing, restrict to joined or owned challenges'),
       keepTasks: z
         .enum(['keep-all', 'remove-all'])
         .optional()
@@ -63,7 +75,9 @@ export let manageChallenge = SlateTool.create(spec, {
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
     let mapChallenge = (c: Record<string, any>) => ({
@@ -71,9 +85,9 @@ export let manageChallenge = SlateTool.create(spec, {
       name: c.name,
       shortName: c.shortName,
       description: c.description,
-      groupId: typeof c.group === 'object' ? c.group?._id : c.group,
+      groupId: typeof c.group === 'object' ? c.group?._id : c.group || undefined,
       groupName: typeof c.group === 'object' ? c.group?.name : undefined,
-      leader: typeof c.leader === 'object' ? c.leader?._id : c.leader,
+      leader: typeof c.leader === 'object' ? c.leader?._id : c.leader || undefined,
       memberCount: c.memberCount,
       prize: c.prize,
       createdAt: c.createdAt,
@@ -83,7 +97,10 @@ export let manageChallenge = SlateTool.create(spec, {
     if (ctx.input.action === 'list') {
       let challenges = ctx.input.groupId
         ? await client.getGroupChallenges(ctx.input.groupId)
-        : await client.getChallenges();
+        : await client.getChallenges({
+            page: ctx.input.page,
+            memberOnly: ctx.input.memberOnly
+          });
       return {
         output: { challenges: challenges.map(mapChallenge) },
         message: `Retrieved **${challenges.length}** challenge(s)`
@@ -91,7 +108,8 @@ export let manageChallenge = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.challengeId) throw new Error('challengeId is required for get action');
+      if (!ctx.input.challengeId)
+        throw createApiServiceError('challengeId is required for get action');
       let challenge = await client.getChallenge(ctx.input.challengeId);
       return {
         output: { challenges: [mapChallenge(challenge)] },
@@ -100,11 +118,16 @@ export let manageChallenge = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.groupId || !ctx.input.name || !ctx.input.shortName)
+        throw createApiServiceError(
+          'groupId, name, and shortName are required to create a challenge.'
+        );
       let challengeData: Record<string, any> = {};
       if (ctx.input.groupId) challengeData.group = ctx.input.groupId;
       if (ctx.input.name) challengeData.name = ctx.input.name;
       if (ctx.input.shortName) challengeData.shortName = ctx.input.shortName;
-      if (ctx.input.description) challengeData.description = ctx.input.description;
+      if (ctx.input.description !== undefined)
+        challengeData.description = ctx.input.description;
       if (ctx.input.prize !== undefined) challengeData.prize = ctx.input.prize;
 
       let challenge = await client.createChallenge(challengeData);
@@ -115,11 +138,13 @@ export let manageChallenge = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.challengeId) throw new Error('challengeId is required for update action');
+      if (!ctx.input.challengeId)
+        throw createApiServiceError('challengeId is required for update action');
       let challengeData: Record<string, any> = {};
       if (ctx.input.name) challengeData.name = ctx.input.name;
       if (ctx.input.shortName) challengeData.shortName = ctx.input.shortName;
-      if (ctx.input.description) challengeData.description = ctx.input.description;
+      if (ctx.input.description !== undefined)
+        challengeData.description = ctx.input.description;
       if (ctx.input.prize !== undefined) challengeData.prize = ctx.input.prize;
 
       let challenge = await client.updateChallenge(ctx.input.challengeId, challengeData);
@@ -130,7 +155,8 @@ export let manageChallenge = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.challengeId) throw new Error('challengeId is required for delete action');
+      if (!ctx.input.challengeId)
+        throw createApiServiceError('challengeId is required for delete action');
       await client.deleteChallenge(ctx.input.challengeId);
       return {
         output: { challenges: [] },
@@ -139,7 +165,8 @@ export let manageChallenge = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'join') {
-      if (!ctx.input.challengeId) throw new Error('challengeId is required for join action');
+      if (!ctx.input.challengeId)
+        throw createApiServiceError('challengeId is required for join action');
       let challenge = await client.joinChallenge(ctx.input.challengeId);
       return {
         output: { challenges: [mapChallenge(challenge)] },
@@ -148,7 +175,8 @@ export let manageChallenge = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'leave') {
-      if (!ctx.input.challengeId) throw new Error('challengeId is required for leave action');
+      if (!ctx.input.challengeId)
+        throw createApiServiceError('challengeId is required for leave action');
       await client.leaveChallenge(ctx.input.challengeId, ctx.input.keepTasks);
       return {
         output: { challenges: [] },
@@ -156,6 +184,6 @@ export let manageChallenge = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

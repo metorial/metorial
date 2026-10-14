@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { asNumber, Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTemplateDetails = SlateTool.create(spec, {
@@ -25,7 +25,10 @@ export let getTemplateDetails = SlateTool.create(spec, {
       succeeded: z.boolean().describe('Whether the operation succeeded'),
       templateName: z.string().optional().describe('Full path and name of the template'),
       sizeBytes: z.number().optional().describe('File size in bytes'),
-      uploadedTime: z.number().optional().describe('Upload timestamp in milliseconds'),
+      uploadedTime: z
+        .number()
+        .optional()
+        .describe('Last modification timestamp in milliseconds'),
       createdTime: z.number().optional().describe('Creation timestamp in milliseconds')
     })
   )
@@ -37,18 +40,20 @@ export let getTemplateDetails = SlateTool.create(spec, {
 
     let result = await client.getTemplateDetails(ctx.input.templateName);
     let details = result.templateDetails;
+    let sizeBytes = asNumber(details?.sizeBytes);
 
     let message = result.succeeded
-      ? `Template \`${details?.name || ctx.input.templateName}\`: **${details?.sizeBytes ? `${Math.round(details.sizeBytes / 1024)} KB` : 'unknown size'}**.`
+      ? `Template \`${details?.name || ctx.input.templateName}\`: **${sizeBytes !== undefined ? `${Math.round(sizeBytes / 1024)} KB` : 'unknown size'}**.`
       : `Failed to get template details: ${result.shortMsg || 'Unknown error'}`;
 
     return {
       output: {
         succeeded: result.succeeded,
         templateName: details?.name,
-        sizeBytes: details?.sizeBytes,
-        uploadedTime: details?.uploadedTime,
-        createdTime: details?.createdTime
+        sizeBytes,
+        uploadedTime:
+          asNumber(details?.lastModifiedMillisSinceEpoch) ?? asNumber(details?.uploadedTime),
+        createdTime: asNumber(details?.createdTime)
       },
       message
     };

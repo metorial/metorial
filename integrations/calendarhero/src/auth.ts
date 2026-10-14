@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let httpClient = createAxios({
-  baseURL: 'https://api.calendarhero.com'
-});
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +16,8 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       token: z
         .string()
+        .trim()
+        .min(1)
         .describe('CalendarHero API token. Found in My Account > My Profile Settings > API.')
     }),
 
@@ -31,19 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await httpClient.get('/user', {
-        headers: {
-          Authorization: ctx.output.token
-        }
-      });
-
-      let user = response.data;
+      let user = await new Client(ctx.output.token).getUser();
       return {
         profile: {
-          id: user._id || user.id,
+          id: user._id || user.id || user.vendastaUserId || user.email,
           email: user.email,
           name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-          imageUrl: user.photo || user.imageUrl
+          imageUrl: user.avatar || user.photo || user.imageUrl
         }
       };
     }

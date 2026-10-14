@@ -1,6 +1,6 @@
 # Fullenrich
 
-Enrich B2B contact data by finding verified work emails, personal emails, and mobile phone numbers using a waterfall approach across 20+ data vendors. Perform reverse email lookups to identify people and companies behind email addresses. Search for people by job title, location, industry, company, and education filters. Search for companies by various filters. Supports bulk enrichment of up to 100 contacts per request with asynchronous processing via webhooks or polling. Check credit balance and verify API key status.
+Enrich B2B contact data by finding verified work emails, personal emails, and mobile phone numbers using a waterfall approach across 20+ data vendors. Perform reverse email lookups to identify people and companies behind email addresses. Search for people by job title, location, industry, company, and education filters. Search for companies by various filters. Supports bulk enrichment of up to 100 contacts per request with asynchronous processing via webhooks or polling. Resolve known people and companies directly by domain or LinkedIn identifiers. Check spendable API-key credits and verify the associated workspace.
 
 ## License
 

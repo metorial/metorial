@@ -3,8 +3,11 @@ import { spec } from './spec';
 import {
   changeUnitState,
   createBooking,
+  getBooking,
+  getCurrentAccount,
   getReservation,
   listBlocks,
+  listBookings,
   listFolios,
   listProperties,
   listRatePlans,
@@ -21,6 +24,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentAccount,
+    listBookings,
+    getBooking,
     listReservations,
     getReservation,
     createBooking,

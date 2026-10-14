@@ -8,7 +8,7 @@ export let publishSubgraph = SlateTool.create(spec, {
   key: 'publish_subgraph',
   description: `Publishes a subgraph schema to the Grafbase schema registry. When published, the registry composes the subgraph with all other subgraphs in the branch to create a unified federated schema.
 
-Republishing an unchanged schema is safe and has no side effects. If composition fails, the federated graph continues running with the previous working schema.`,
+Republishing an unchanged schema is safe and has no side effects. If composition fails, the change is not successfully published and the federated graph continues running with the previous working schema.`,
   instructions: [
     'Use "Get Graph" to obtain the graph ID before publishing.',
     'Publish after each subgraph deployment to keep the registry in sync.',
@@ -20,7 +20,7 @@ Republishing an unchanged schema is safe and has no side effects. If composition
 })
   .input(
     z.object({
-      graphId: z.string().describe('ID of the federated graph'),
+      graphId: z.string().describe('Graph ID. Call list_graphs to discover graph IDs.'),
       subgraphName: z.string().describe('Identifier for the subgraph within the branch'),
       schema: z.string().describe('GraphQL SDL schema of the subgraph'),
       url: z.string().optional().describe('Endpoint URL where the subgraph runs'),
@@ -28,7 +28,11 @@ Republishing an unchanged schema is safe and has no side effects. If composition
         .string()
         .optional()
         .describe('Target branch name. Defaults to the production branch.'),
-      message: z.string().optional().describe('Commit message describing the change')
+      message: z.string().optional().describe('Commit message describing the change'),
+      virtual: z
+        .boolean()
+        .optional()
+        .describe('Publish a virtual subgraph without an endpoint URL.')
     })
   )
   .output(
@@ -45,7 +49,7 @@ Republishing an unchanged schema is safe and has no side effects. If composition
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiUrl: ctx.config.apiUrl
+      apiUrl: ctx.auth.apiUrl ?? (ctx.config as { apiUrl?: string }).apiUrl
     });
 
     let result = await client.publishSubgraph({
@@ -54,7 +58,8 @@ Republishing an unchanged schema is safe and has no side effects. If composition
       schema: ctx.input.schema,
       url: ctx.input.url,
       branch: ctx.input.branch,
-      message: ctx.input.message
+      message: ctx.input.message,
+      virtual: ctx.input.virtual
     });
 
     let compositionErrors = result.compositionErrors || [];
@@ -62,11 +67,11 @@ Republishing an unchanged schema is safe and has no side effects. If composition
 
     return {
       output: {
-        published: true,
+        published: result.published,
         compositionErrors: hasErrors ? compositionErrors : undefined
       },
       message: hasErrors
-        ? `Subgraph **${ctx.input.subgraphName}** was published but composition has ${compositionErrors.length} error(s). The federated graph continues using the previous working schema.`
+        ? `Subgraph **${ctx.input.subgraphName}** could not be composed; composition has ${compositionErrors.length} error(s). The federated graph continues using the previous working schema.`
         : `Subgraph **${ctx.input.subgraphName}** was published and composed successfully.`
     };
   })

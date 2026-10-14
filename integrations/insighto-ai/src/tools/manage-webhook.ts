@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageWebhook = SlateTool.create(spec, {
   name: 'Manage Webhook',
   key: 'manage_webhook',
-  description: `Create, update, or delete outbound webhooks. Webhooks push real-time data to external platforms when events occur (form submissions, conversation events, etc.). Each webhook must be uniquely assigned to a single form or assistant.`,
+  description: `Create, update, or delete outbound webhooks for form and conversation events. Delivery is attempted once; the provider currently does not retry failures or send an HMAC signature.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -34,18 +34,21 @@ export let manageWebhook = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
+      if (!ctx.input.name?.trim() || !ctx.input.endpoint?.trim()) {
+        throw createApiServiceError('name and endpoint are required to create a webhook.');
+      }
       let result = await client.createWebhook({
         name: ctx.input.name!,
         endpoint: ctx.input.endpoint!,
         enabled: ctx.input.enabled
       });
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
-          webhookId: data.id,
-          name: data.name,
-          endpoint: data.endpoint,
-          enabled: data.enabled
+          webhookId: data.id ?? ctx.input.webhookId,
+          name: data.name ?? undefined,
+          endpoint: data.endpoint ?? undefined,
+          enabled: data.enabled ?? undefined
         },
         message: `Created webhook **${data.name}** → \`${data.endpoint}\`.`
       };
@@ -57,13 +60,13 @@ export let manageWebhook = SlateTool.create(spec, {
         endpoint: ctx.input.endpoint,
         enabled: ctx.input.enabled
       });
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
-          webhookId: data.id,
-          name: data.name,
-          endpoint: data.endpoint,
-          enabled: data.enabled
+          webhookId: data.id ?? ctx.input.webhookId,
+          name: data.name ?? undefined,
+          endpoint: data.endpoint ?? undefined,
+          enabled: data.enabled ?? undefined
         },
         message: `Updated webhook **${data.name || ctx.input.webhookId}**.`
       };

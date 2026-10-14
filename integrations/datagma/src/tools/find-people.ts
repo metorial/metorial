@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -49,10 +49,27 @@ Separate multiple job titles with "OR" to search for several roles at once (e.g.
       people: z
         .array(z.any())
         .describe('List of matching people with their profile data and match scores'),
-      totalFound: z.number().optional().describe('Number of people found')
+      totalFound: z.number().optional().describe('Number of people found'),
+      invalidInputs: z
+        .array(z.string())
+        .optional()
+        .describe('Company inputs Datagma could not resolve'),
+      validLinkedInIds: z
+        .array(z.string())
+        .optional()
+        .describe('Company LinkedIn IDs resolved by Datagma')
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.domain?.trim() &&
+      !ctx.input.linkedinId?.trim() &&
+      !ctx.input.companyName?.trim()
+    ) {
+      throw createApiServiceError(
+        'Provide domain, linkedinId, or companyName to identify the company.'
+      );
+    }
     let client = new Client(ctx.auth.token);
 
     let result = await client.findPeople({
@@ -60,18 +77,20 @@ Separate multiple job titles with "OR" to search for several roles at once (e.g.
       domain: ctx.input.domain,
       linkedinId: ctx.input.linkedinId,
       currentCompanies: ctx.input.companyName,
-      countries: ctx.input.country,
+      countries: ctx.input.country?.toLowerCase(),
       fuzzy: ctx.input.fuzzy
     });
 
-    let people = result?.data || result?.persons || [];
+    let people = result?.employees ?? result?.data ?? result?.persons ?? [];
     let companyLabel =
       ctx.input.companyName || ctx.input.domain || ctx.input.linkedinId || 'the company';
 
     return {
       output: {
         people: Array.isArray(people) ? people : [],
-        totalFound: Array.isArray(people) ? people.length : 0
+        totalFound: Array.isArray(people) ? people.length : 0,
+        invalidInputs: result?.listOfInvalidDataInput,
+        validLinkedInIds: result?.listOfValidLinkedInId
       },
       message: `Found **${Array.isArray(people) ? people.length : 0}** people${ctx.input.jobTitle ? ` matching "${ctx.input.jobTitle}"` : ''} at **${companyLabel}**.`
     };

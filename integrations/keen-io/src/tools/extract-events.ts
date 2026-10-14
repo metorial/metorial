@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let extractEvents = SlateTool.create(spec, {
   name: 'Extract Events',
   key: 'extract_events',
-  description: `Extract full-resolution event data from a Keen.io event collection. Returns raw event objects matching the specified criteria. Supports filtering, timeframes, property selection, and pagination via the "latest" or "limit" parameter.`,
+  description: `Extract full-resolution event data from a Keen.io event collection. Returns raw event objects matching the specified criteria. Supports filtering, timeframes, property selection, and limiting results to the latest events. Split large extractions into smaller timeframes.`,
   tags: {
     readOnly: true
   }
@@ -55,10 +55,14 @@ export let extractEvents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      projectId: ctx.config.projectId,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
+
+    if (
+      ctx.input.latest !== undefined &&
+      (!Number.isInteger(ctx.input.latest) || ctx.input.latest < 1)
+    ) {
+      throw createApiServiceError('latest must be a positive whole number.');
+    }
 
     let params: Record<string, any> = {};
     if (ctx.input.timeframe) params.timeframe = ctx.input.timeframe;
@@ -75,7 +79,10 @@ export let extractEvents = SlateTool.create(spec, {
     }
 
     let response = await client.extractEvents(ctx.input.collectionName, params);
-    let events = Array.isArray(response.result) ? response.result : [];
+    if (!Array.isArray(response.result)) {
+      throw createApiServiceError('Keen.io returned an extraction without an event array.');
+    }
+    let events = response.result;
 
     return {
       output: {

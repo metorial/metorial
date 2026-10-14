@@ -1,19 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listLanguages = SlateTool.create(spec, {
   name: 'List Languages',
   key: 'list_languages',
-  description: `Retrieves all languages configured in the environment. Returns language metadata including codename, active status, and fallback language settings. Use language codenames when creating or updating language variants.`,
+  description: `Retrieves a page of languages configured in the environment. Returns language metadata including codename, active status, and fallback language settings. Use language codenames when creating or updating language variants, and continuationToken to fetch more languages.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      environmentId: environmentIdInput,
+      continuationToken: z
+        .string()
+        .optional()
+        .describe('Continuation token from the previous page; omit for the first page.')
+    })
+  )
   .output(
     z.object({
+      continuationToken: z
+        .string()
+        .optional()
+        .describe('Token for retrieving the next page of languages'),
       languages: z.array(
         z.object({
           languageId: z.string().describe('Internal ID of the language'),
@@ -30,12 +43,12 @@ export let listLanguages = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
-    let languages = await client.listLanguages();
+    let result = await client.listLanguages(ctx.input.continuationToken);
 
-    let mapped = languages.map(lang => ({
+    let mapped = result.languages.map(lang => ({
       languageId: lang.id,
       name: lang.name,
       codename: lang.codename,
@@ -46,8 +59,8 @@ export let listLanguages = SlateTool.create(spec, {
     }));
 
     return {
-      output: { languages: mapped },
-      message: `Retrieved **${mapped.length}** language(s). Active: ${mapped.filter(l => l.isActive).length}, Default: ${mapped.find(l => l.isDefault)?.name || 'N/A'}.`
+      output: { languages: mapped, continuationToken: result.continuationToken },
+      message: `Retrieved **${mapped.length}** language(s).${result.continuationToken ? ' More languages are available with continuationToken.' : ''}`
     };
   })
   .build();

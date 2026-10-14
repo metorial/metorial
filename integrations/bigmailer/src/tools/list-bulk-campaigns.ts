@@ -18,6 +18,7 @@ export let listBulkCampaigns = SlateTool.create(spec, {
         .number()
         .min(1)
         .max(100)
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
         .optional()
         .describe('Number of campaigns to return (1-100). Defaults to 10.'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
@@ -27,7 +28,7 @@ export let listBulkCampaigns = SlateTool.create(spec, {
     z.object({
       hasMore: z.boolean().describe('Whether more campaigns exist beyond this page'),
       cursor: z.string().describe('Cursor for fetching the next page'),
-      total: z.number().describe('Total number of campaigns'),
+      total: z.number().optional().describe('Total count, only when supplied by BigMailer'),
       campaigns: z.array(
         z.object({
           campaignId: z.string().describe('Campaign unique identifier'),
@@ -75,7 +76,7 @@ export let listBulkCampaigns = SlateTool.create(spec, {
         total: result.total,
         campaigns
       },
-      message: `Found **${result.total}** campaign(s). Returned **${campaigns.length}** campaign(s)${result.has_more ? ' (more available)' : ''}.`
+      message: `Returned **${campaigns.length}** campaign(s)${result.has_more ? ' (more available)' : ''}.`
     };
   })
   .build();

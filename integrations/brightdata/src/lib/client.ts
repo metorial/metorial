@@ -1,15 +1,27 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
+import { parseScrapedRecords } from './records';
 
 export class BrightDataClient {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim())
+      throw createApiServiceError('A Bright Data API key is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.brightdata.com',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      timeout: 90000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Bright Data',
+          reason: 'brightdata_api_error'
+        })
     });
   }
 
@@ -32,7 +44,7 @@ export class BrightDataClient {
       body.country = params.country;
     }
 
-    if (params.dataFormat) {
+    if (params.dataFormat && params.dataFormat !== 'html') {
       body.data_format = params.dataFormat;
     }
 
@@ -40,7 +52,10 @@ export class BrightDataClient {
     return {
       content:
         typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
-      statusCode: response.status
+      statusCode:
+        isApiErrorRecord(response.data) && typeof response.data.status_code === 'number'
+          ? response.data.status_code
+          : response.status
     };
   }
 
@@ -66,7 +81,10 @@ export class BrightDataClient {
     return {
       content:
         typeof response.data === 'string' ? response.data : JSON.stringify(response.data),
-      statusCode: response.status
+      statusCode:
+        isApiErrorRecord(response.data) && typeof response.data.status_code === 'number'
+          ? response.data.status_code
+          : response.status
     };
   }
 
@@ -77,6 +95,7 @@ export class BrightDataClient {
     inputs: Record<string, string>[];
     format?: string;
     notify?: string;
+    notifyOnCompletion?: boolean;
     endpoint?: string;
     authHeader?: string;
     limitPerInput?: number;
@@ -85,16 +104,28 @@ export class BrightDataClient {
     type?: string;
     discoverBy?: string;
   }): Promise<{ snapshotId: string }> {
+    if (params.inputs.length === 0) {
+      throw createApiServiceError('Provide at least one scraper input.');
+    }
+    if (
+      params.limitPerInput !== undefined &&
+      (!Number.isSafeInteger(params.limitPerInput) || params.limitPerInput < 1)
+    ) {
+      throw createApiServiceError('limitPerInput must be a positive whole number.');
+    }
+    if (params.notify !== undefined && params.notifyOnCompletion !== undefined) {
+      throw createApiServiceError('Use either notify or notifyOnCompletion, not both.');
+    }
     let queryParams: Record<string, string> = {
       dataset_id: params.datasetId
     };
 
     if (params.format) queryParams.format = params.format;
     if (params.notify) queryParams.notify = params.notify;
+    if (params.notifyOnCompletion !== undefined)
+      queryParams.notify = String(params.notifyOnCompletion);
     if (params.endpoint) queryParams.endpoint = params.endpoint;
     if (params.authHeader) queryParams.auth_header = params.authHeader;
-    if (params.limitPerInput !== undefined)
-      queryParams.limit_per_input = String(params.limitPerInput);
     if (params.includeErrors !== undefined)
       queryParams.include_errors = String(params.includeErrors);
     if (params.uncompressedWebhook !== undefined)
@@ -106,9 +137,15 @@ export class BrightDataClient {
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
 
-    let response = await this.axios.post(`/datasets/v3/trigger?${queryString}`, params.inputs);
+    let response = await this.axios.post(
+      `/datasets/v3/trigger?${queryString}`,
+      pickDefined({ input: params.inputs, limit_per_input: params.limitPerInput })
+    );
 
     let data = response.data as { snapshot_id: string };
+    if (typeof data?.snapshot_id !== 'string' || !data.snapshot_id) {
+      throw createApiServiceError('Bright Data did not return a snapshot ID.');
+    }
     return { snapshotId: data.snapshot_id };
   }
 
@@ -121,7 +158,11 @@ export class BrightDataClient {
     records: Record<string, unknown>[];
     snapshotId?: string;
     inProgress: boolean;
+    content?: string;
   }> {
+    if (params.inputs.length === 0) {
+      throw createApiServiceError('Provide at least one scraper input.');
+    }
     let queryParams: Record<string, string> = {
       dataset_id: params.datasetId
     };
@@ -134,15 +175,22 @@ export class BrightDataClient {
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
 
-    let response = await this.axios.post(`/datasets/v3/scrape?${queryString}`, params.inputs);
+    let response = await this.axios.post(`/datasets/v3/scrape?${queryString}`, {
+      input: params.inputs
+    });
 
     if (response.status === 202) {
       let data = response.data as { snapshot_id?: string };
+      if (typeof data?.snapshot_id !== 'string' || !data.snapshot_id) {
+        throw createApiServiceError('Bright Data did not return the pending snapshot ID.');
+      }
       return { records: [], snapshotId: data.snapshot_id, inProgress: true };
     }
 
-    let records = Array.isArray(response.data) ? response.data : [response.data];
-    return { records, inProgress: false };
+    let records = parseScrapedRecords(response.data, params.format ?? 'ndjson');
+    let content =
+      typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    return { records, inProgress: false, content };
   }
 
   // ── Snapshot Management ───────────────────────────────────────────
@@ -152,7 +200,9 @@ export class BrightDataClient {
     datasetId: string;
     status: string;
   }> {
-    let response = await this.axios.get(`/datasets/v3/progress/${snapshotId}`);
+    let response = await this.axios.get(
+      `/datasets/v3/progress/${encodeURIComponent(snapshotId)}`
+    );
     let data = response.data as { snapshot_id: string; dataset_id: string; status: string };
     return {
       snapshotId: data.snapshot_id,
@@ -166,19 +216,12 @@ export class BrightDataClient {
     format?: string;
     compress?: boolean;
   }): Promise<{ records: Record<string, unknown>[] }> {
-    let queryParams: Record<string, string> = {};
-    if (params.format) queryParams.format = params.format;
-    if (params.compress !== undefined) queryParams.compress = String(params.compress);
-
-    let queryString = Object.entries(queryParams)
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-
-    let url = `/datasets/v3/snapshot/${params.snapshotId}`;
-    if (queryString) url += `?${queryString}`;
-
-    let response = await this.axios.get(url);
-    let records = Array.isArray(response.data) ? response.data : [response.data];
+    // Keep parsed records in the requested format alongside the downloadable file.
+    let response = await this.axios.get(
+      `/datasets/v3/snapshot/${encodeURIComponent(params.snapshotId)}`,
+      { params: { format: params.format ?? 'ndjson', compress: false } }
+    );
+    let records = parseScrapedRecords(response.data, params.format ?? 'ndjson');
     return { records };
   }
 
@@ -203,7 +246,7 @@ export class BrightDataClient {
       status: data.status,
       customerId: data.customer,
       canMakeRequests: data.can_make_requests,
-      authFailReason: data.auth_fail_reason,
+      authFailReason: data.auth_fail_reason ?? '',
       ip: data.ip
     };
   }
@@ -266,27 +309,62 @@ export class BrightDataClient {
   }
 
   async toggleZone(zoneName: string, enable: boolean): Promise<void> {
-    if (enable) {
-      await this.axios.post(`/zone/enable?zone=${encodeURIComponent(zoneName)}`);
-    } else {
-      await this.axios.post(`/zone/disable?zone=${encodeURIComponent(zoneName)}`);
-    }
+    await this.axios.post('/zone/change_disable', { zone: zoneName, disable: enable ? 0 : 1 });
   }
 
   // ── Scraping Job History ──────────────────────────────────────────
 
-  async getSnapshotHistory(datasetId: string): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.get(
-      `/datasets/v3/snapshots?dataset_id=${encodeURIComponent(datasetId)}`
-    );
+  async getSnapshotHistory(
+    datasetId: string,
+    filters: {
+      status?: string;
+      skip?: number;
+      limit?: number;
+      fromDate?: string;
+      toDate?: string;
+    } = {}
+  ): Promise<Record<string, unknown>[]> {
+    let response = await this.axios.get('/datasets/v3/snapshots', {
+      params: pickDefined({
+        dataset_id: datasetId,
+        status: filters.status,
+        skip: filters.skip,
+        limit: filters.limit,
+        from_date: filters.fromDate,
+        to_date: filters.toDate
+      })
+    });
     let data = response.data;
-    return Array.isArray(data) ? data : [];
+    if (!Array.isArray(data) || !data.every(isApiErrorRecord)) {
+      throw createApiServiceError(
+        'Bright Data returned an invalid snapshot history response.'
+      );
+    }
+    return data;
   }
 
   async cancelCollection(snapshotId: string): Promise<string> {
     let response = await this.axios.post(
-      `/datasets/v3/cancel?snapshot_id=${encodeURIComponent(snapshotId)}`
+      `/datasets/v3/snapshot/${encodeURIComponent(snapshotId)}/cancel`
     );
     return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+  }
+
+  async listScrapers(filters: { datasetId?: string; domain?: string }) {
+    let response = await this.axios.get('/datasets/v3/scrapers', {
+      params: pickDefined({ dataset_id: filters.datasetId, domain: filters.domain })
+    });
+    if (!Array.isArray(response.data) || !response.data.every(isApiErrorRecord)) {
+      throw createApiServiceError('Bright Data returned an invalid scraper list.');
+    }
+    return response.data as Record<string, unknown>[];
+  }
+
+  async getSnapshotLog(snapshotId: string) {
+    let response = await this.axios.get(`/datasets/v3/log/${encodeURIComponent(snapshotId)}`);
+    if (!isApiErrorRecord(response.data)) {
+      throw createApiServiceError('Bright Data returned an invalid snapshot log.');
+    }
+    return response.data;
   }
 }

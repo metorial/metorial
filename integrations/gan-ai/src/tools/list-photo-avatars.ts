@@ -52,7 +52,7 @@ export let listPhotoAvatars = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
 
     if (ctx.input.photoAvatarId) {
       let details = await client.getPhotoAvatarDetails(ctx.input.photoAvatarId);

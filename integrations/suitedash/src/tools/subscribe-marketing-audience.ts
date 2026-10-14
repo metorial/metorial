@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -23,7 +23,9 @@ export let subscribeMarketingAudience = SlateTool.create(spec, {
         .describe('List of contact UIDs or emails to subscribe'),
       audienceIdentifier: z
         .string()
-        .describe('Identifier of the marketing audience to subscribe contacts to')
+        .describe(
+          'Numeric ID of the marketing audience, supplied as a string. Use Get Metadata to discover available audiences.'
+        )
     })
   )
   .output(
@@ -42,9 +44,17 @@ export let subscribeMarketingAudience = SlateTool.create(spec, {
       audience: ctx.input.audienceIdentifier
     });
 
+    let results = Array.isArray(result.data) ? result.data : [];
+    let succeeded = results.filter(
+      item => isApiErrorRecord(item) && item.success === true
+    ).length;
+    let failed = results.filter(
+      item => isApiErrorRecord(item) && item.success === false
+    ).length;
+
     return {
       output: { result },
-      message: `Subscribed **${ctx.input.contactIdentifiers.length}** contact(s) to marketing audience **${ctx.input.audienceIdentifier}**.`
+      message: `Submitted **${ctx.input.contactIdentifiers.length}** contact(s) to marketing audience **${ctx.input.audienceIdentifier}**.${results.length ? ` **${succeeded}** succeeded and **${failed}** failed. See the result for individual errors.` : ''}`
     };
   })
   .build();

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let updateCustomer = SlateTool.create(spec, {
   name: 'Update Customer',
   key: 'update_customer',
-  description: `Update an existing customer's details or tags in AgencyZoom. Provide only the fields you want to change. If tags are provided, the customer's tags will be replaced via a separate tags endpoint. Returns the updated customer record.`,
+  description: `Update an existing customer's details or tags in AgencyZoom. Provide only the fields you want to change. If tags are provided, the customer's tags will be replaced through the customer update endpoint. Returns the updated customer record.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -49,11 +49,7 @@ export let updateCustomer = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = {};
 

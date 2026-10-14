@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -33,6 +33,23 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      let projectToken = ctx.input.projectToken || ctx.input.projectSecretToken;
+      let cmsToken = ctx.input.cmsPublicToken || ctx.input.cmsSecretToken;
+      if (projectToken && !ctx.input.projectId) {
+        throw createApiServiceError('Provide the project ID for the project token.');
+      }
+      if (cmsToken && !ctx.input.cmsId) {
+        throw createApiServiceError('Provide the CMS database ID for the CMS token.');
+      }
+      if (ctx.input.projectId && !projectToken) {
+        throw createApiServiceError('Provide a public or secret token for the project.');
+      }
+      if (ctx.input.cmsId && !cmsToken) {
+        throw createApiServiceError('Provide a public or secret token for the CMS database.');
+      }
+      if (!projectToken && !cmsToken) {
+        throw createApiServiceError('Provide project credentials, CMS credentials, or both.');
+      }
       return {
         output: {
           projectId: ctx.input.projectId,

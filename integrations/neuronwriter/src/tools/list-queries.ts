@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { NeuronWriterClient } from '../lib/client';
+import { type ListQueriesParams, NeuronWriterClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listQueries = SlateTool.create(spec, {
@@ -26,6 +26,10 @@ export let listQueries = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter queries created after this ISO 8601 date'),
+      updatedAt: z
+        .string()
+        .optional()
+        .describe('Filter by query update timestamp using the provider updated parameter'),
       keyword: z.string().optional().describe('Filter by keyword'),
       language: z.string().optional().describe('Filter by language'),
       engine: z.string().optional().describe('Filter by search engine'),
@@ -55,34 +59,76 @@ export let listQueries = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new NeuronWriterClient(ctx.auth.token);
 
-    let params: Record<string, any> = {
+    let params: ListQueriesParams = {
       project: ctx.input.projectId
     };
 
     if (ctx.input.status) params.status = ctx.input.status;
     if (ctx.input.source) params.source = ctx.input.source;
     if (ctx.input.createdAfter) params.created = ctx.input.createdAfter;
+    if (ctx.input.updatedAt !== undefined) params.updated = ctx.input.updatedAt;
     if (ctx.input.keyword) params.keyword = ctx.input.keyword;
     if (ctx.input.language) params.language = ctx.input.language;
     if (ctx.input.engine) params.engine = ctx.input.engine;
     if (ctx.input.tags) params.tags = ctx.input.tags;
 
-    let queries = await client.listQueries(params as any);
+    let queries = await client.listQueries(params);
 
-    let mapped = queries.map(q => ({
-      queryId: q.query,
-      keyword: q.keyword,
-      language: q.language,
-      engine: q.engine,
-      status: q.status,
-      source: q.source,
-      tags: q.tags || [],
-      createdAt: q.created,
-      updatedAt: q.updated,
-      queryUrl: q.query_url,
-      shareUrl: q.share_url,
-      readonlyUrl: q.readonly_url
-    }));
+    let mapped: {
+      queryId: string;
+      keyword: string;
+      language: string;
+      engine: string;
+      status: string;
+      source: string;
+      tags: string[];
+      createdAt: string;
+      updatedAt: string;
+      queryUrl?: string;
+      shareUrl?: string;
+      readonlyUrl?: string;
+    }[] = [];
+    for (let query of queries) {
+      // The official list examples omit status and sometimes other metadata.
+      let details =
+        query.status === undefined ||
+        query.keyword === undefined ||
+        query.language === undefined ||
+        query.engine === undefined
+          ? await client.getQuery(query.query)
+          : undefined;
+      let keyword = query.keyword ?? details?.keyword;
+      let language = query.language ?? details?.language;
+      let engine = query.engine ?? details?.engine;
+      let status = query.status ?? details?.status;
+
+      if (
+        keyword === undefined ||
+        language === undefined ||
+        engine === undefined ||
+        status === undefined
+      ) {
+        throw createApiServiceError(
+          `NeuronWriter omitted required metadata for query ${query.query}.`,
+          { reason: 'neuronwriter_invalid_response' }
+        );
+      }
+
+      mapped.push({
+        queryId: query.query,
+        keyword,
+        language,
+        engine,
+        status,
+        source: query.source,
+        tags: query.tags ?? [],
+        createdAt: query.created,
+        updatedAt: query.updated,
+        queryUrl: query.query_url,
+        shareUrl: query.share_url,
+        readonlyUrl: query.readonly_url
+      });
+    }
 
     return {
       output: { queries: mapped },

@@ -2,6 +2,8 @@
 
 Retrieve practical SEO, SEM, ecommerce, business, app, content, and AI optimization data from DataForSEO API v3. This integration supports Google, Bing, Yahoo, and YouTube organic SERP live search; Google Ads keyword metrics; DataForSEO Labs keyword/domain intelligence; backlink analysis; OnPage crawl task creation and result retrieval; domain WHOIS and technology analytics; content analysis; Google Shopping and Amazon Merchant task creation; Google Play App Data task creation; Business Listings live search and Google Reviews tasks; and AI Optimization endpoints for AI keyword search volume, LLM mentions, and live LLM response benchmarking.
 
+Get Current User identifies the connected account and reports its available balance. List SERP Locations discovers Google location codes and names for localized searches. Both requests are free of API credit charges. Keywords for Site supports site/page targeting and sorts Google Ads suggestions; its limit and offset apply to the fetched suggestion list, which contains up to 2,000 keywords.
+
 ## Live E2E
 
 Live E2E coverage is available but can consume DataForSEO credits. Run it only with an explicit DataForSEO profile:

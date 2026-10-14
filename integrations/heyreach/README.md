@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Heyreach
 
-Manage LinkedIn outreach campaigns, leads, and messaging. Retrieve campaign details and performance analytics, add leads with personalization data to campaigns and lists, send direct messages, and monitor conversations. Control campaign status (pause/resume), manage lead and company lists, and access LinkedIn sender account information.
+Manage LinkedIn outreach campaigns, leads, and messaging. Retrieve campaign details and performance analytics, add leads with personalization data to campaigns and lists, send direct messages, and monitor conversations. Control campaign status (pause/resume), stop outreach to individual campaign leads, remove leads from lists, and access LinkedIn sender account information.
 
 ## License
 

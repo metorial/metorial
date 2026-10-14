@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZeplinClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,6 +32,9 @@ export let listSpacingTokens = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (Boolean(ctx.input.projectId) === Boolean(ctx.input.styleguideId)) {
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
+    }
     let client = new ZeplinClient(ctx.auth.token);
     let spacingTokens: any[];
 
@@ -46,7 +49,7 @@ export let listSpacingTokens = SlateTool.create(spec, {
         offset: ctx.input.offset
       })) as any[];
     } else {
-      throw new Error('Either projectId or styleguideId must be provided');
+      throw createApiServiceError('Provide exactly one of projectId or styleguideId.');
     }
 
     return {

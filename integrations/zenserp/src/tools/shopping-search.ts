@@ -31,6 +31,9 @@ export let shoppingSearch = SlateTool.create(spec, {
   name: 'Shopping Search',
   key: 'shopping_search',
   description: `Search Google Shopping for product listings. Returns product titles, prices, merchant names, ratings, and product IDs. Product IDs can be used with the **Get Shopping Product Details** tool to fetch detailed product information.`,
+  instructions: [
+    'Zenserp currently does not support start pagination for Shopping searches; omit start or use 0.'
+  ],
   tags: {
     readOnly: true
   }

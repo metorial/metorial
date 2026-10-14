@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,10 @@ export let auth = SlateAuth.create()
         .describe('Botbaba auth token. Found in your profile page at https://app.botbaba.io')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.authToken.trim()) {
+        throw createApiServiceError('Enter the auth token from your Botbaba profile page.');
+      }
+
       return {
         output: {
           token: ctx.input.authToken

@@ -1,141 +1,31 @@
-Now I have a comprehensive view of the AccuLynx API. Let me compile the specification.
+# AccuLynx integration
 
-# Slates Specification for Acculynx
-
-## Overview
-
-AccuLynx is an all-in-one business management and CRM platform designed for roofing contractors. It covers sales, production, finance, and operations management including job tracking, estimates, invoicing, contact management, scheduling, and document management.
+AccuLynx manages sales, production, finance, and operations for roofing contractors.
 
 ## Authentication
 
-All API requests require authentication via an API Key. An API Key must be sent with every request.
+All requests use an API key as a Bearer token against `https://api.acculynx.com/api/v2`. Generate a key on the [AccuLynx API page](https://my.acculynx.com/apikeys). Each company location needs its own API key. `who_am_i` returns the company ID, name, time zone information, and insurance setting for the connected location. See [Advanced API for Developers](https://apidocs.acculynx.com/docs/api-integrations-for-developers).
 
-Each integration within an AccuLynx account location should have its own API Key. Accounts with multiple locations will need to connect each location to the API individually.
+## Jobs and contacts
 
-**Obtaining an API Key:**
+List, search, retrieve, and create jobs. Job creation links an existing contact and starts in the Lead milestone without an assigned representative. Optional classification IDs come from `get_company_settings`; legacy trade type, work type, and lead source names are resolved to those IDs. Description text is sent as job notes. Estimated value and child lead source fields are retained for compatibility but rejected with guidance because the creation endpoint does not support them. See [Create Job](https://apidocs.acculynx.com/reference/createjob).
 
-Go to Account Settings > Add-On Features and Integrations > API Keys in your AccuLynx dashboard. Click "Create Key" to generate your unique API key. The API key management page is available at `https://my.acculynx.com/apikeys`.
+Job listing maps `pageStartIndex` to the API's `recordStartIndex`. `filterByDate` remains supported, with `dateFilterType` taking precedence when both are supplied. Search jobs using a text query, map coordinates, or both; the search endpoint excludes unassigned jobs. See [Get Jobs](https://apidocs.acculynx.com/reference/getjobs) and [Search Jobs](https://apidocs.acculynx.com/reference/searchjobs).
 
-**Using the API Key:**
+List, search, retrieve, and create contacts, and log contact communications. Contact creation resolves contact type names to IDs and country/state names or abbreviations to numeric IDs; state names require a country. Numeric state/country IDs can be supplied directly. Phone numbers must contain exactly 10 digits, with Home as the default phone type. Contact logs require a communication type and date when invoked, accept Phone Call as an alias for PhoneCall, and convert date-only input to midnight UTC. The accepted submitted log details are returned because the provider responds with no content and no log ID. See [Create Contact](https://apidocs.acculynx.com/reference/postcontacts) and [Create Contact Log](https://apidocs.acculynx.com/reference/postcontactlog).
 
-For every request, you'll need to include your API key in the authorization header as a Bearer token.
+Contact search uses a zero-based page index. Its optional date range defaults from 1970 through the current time, with CreatedDate ascending sorting. See [Search Contacts](https://apidocs.acculynx.com/reference/postcontactsearch).
 
-Example header:
+`get_contact_jobs` lists a contact's related job IDs and resource links, with the provider's total count and pagination metadata. `get_job_custom_fields` reads a job's custom field IDs, labels, types, values, and modification details. See [Get Jobs for a Contact](https://apidocs.acculynx.com/reference/getcontactjobs) and [Get Job Custom Fields](https://apidocs.acculynx.com/reference/getjobcustomfields).
 
-```
-Authorization: Bearer <your_api_key>
-```
+## Other supported workflows
 
-**Base URL:** `https://api.acculynx.com/api/v2/`
+- Read job representatives, insurance information, milestone and change history.
+- Retrieve estimates, estimate sections, invoices, financial worksheets, financial amendments, supplements, and accounting integration status.
+- Read or record received payments, outgoing payments, and additional job expenses.
+- List calendars, retrieve calendar appointments, and manage a job's initial appointment.
+- Upload job documents, photos, and videos.
+- Create job messages and replies. An optional new-message subject is prepended to its message text.
+- Retrieve users, company settings, and lead history.
 
-## Features
-
-### Job Management
-
-Create, retrieve, search, and manage roofing jobs. You can create a job in AccuLynx with basic info; the only thing required is the contactId of an already existing contact. Jobs can be filtered by assignment status (e.g., unassigned), milestones (e.g., Lead, Dead), and date ranges. You can also assign insurance companies to jobs, set external references, manage job representatives (company rep, sales owner, A/R owner), and view job change history.
-
-### Contact Management
-
-Get a listing of contacts, create new contacts, and search for existing contacts. You can retrieve contact details including email addresses and phone numbers. You can create a log entry for a specific contact by its ID, including details such as the type of communication (e.g., phone call, SMS, email), the date of the interaction, and an optional description.
-
-### Estimates
-
-Get all estimates for the current location, retrieve individual estimates, and drill down into estimate sections and section items. Estimates can also be retrieved per job.
-
-### Financials & Invoices
-
-Access job financials, worksheets, and financial amendments. Create worksheet items. Retrieve detailed information about a specific invoice by its ID. Check the status of the accounting integration status for a job.
-
-### Supplements
-
-Retrieve supplements across the company, get individual supplement details, items, and notations.
-
-### Payments
-
-View job payments and payment overviews. Create payment records for received payments, paid payments, and additional job expenses.
-
-### Calendar & Appointments
-
-Retrieve a list of calendars for a location, view appointment summaries, and get appointment details. Manage initial appointments for jobs (create or update).
-
-### Measurements
-
-Create manual measurements for a job and upload measurement files (XML and JSON formats).
-
-### Documents & Media
-
-Upload documents, photos, and videos to a job. Documents can be added to specific folders.
-
-### Job Messages
-
-Create and reply to messages on a job record.
-
-### Company Settings
-
-Retrieve company configuration data including insurance companies, job categories, trade types, work types, lead sources, milestones, statuses, document folders, photo/video tags, active account types, and location settings (countries/states).
-
-### Users
-
-Retrieve a list of users or an individual user for the account.
-
-### Reports
-
-Access scheduled report instances, retrieve report data by instance, and get the latest report instance. View report recipients.
-
-### Leads
-
-Retrieve the history of a specified lead.
-
-### Reference Data
-
-Access AccuLynx system-wide reference data including countries, states, and units of measure.
-
-## Events
-
-AccuLynx supports webhooks that deliver real-time notifications when specific events occur. You register an endpoint URL on your server and use your API Key to create a subscription, providing your registered URL. You can manage subscriptions (create, update, delete, list) and send test events via the API.
-
-### Contact Events
-
-- **Contact Added** — Triggered when a new contact is added.
-- **Contact Changed** — Triggered when an existing contact is modified.
-
-### Job Lifecycle Events
-
-- **Job Created** — Triggered when a new job is created in AccuLynx.
-- **Job Updated** — Triggered when an existing job is updated in AccuLynx.
-
-### Job Milestone & Status Events
-
-- **Job Milestone Changed** — Triggered when the milestone changes on an existing job.
-- **Job Milestone Status Changed** — Triggered when a job changes its status inside a given milestone. Available for Elite accounts with custom workflows enabled.
-
-### Job Contact Events
-
-- **Job Primary Contact Changed** — Triggered when the primary contact on a job is changed or added.
-- **Job Contacts Primary Changed** — Triggered when the primary contact details on a job are modified.
-
-### Job Classification Events
-
-- **Job Category Changed** — Triggered when a job's category changes.
-- **Job Trade Type Changed** — Triggered when a job's trade type changes.
-- **Job Work Type Changed** — Triggered when a job's work type changes.
-
-### Job Financial Events
-
-- **Approved Job Value Changed** — Triggered when the approved job value of an existing job changes.
-- **Invoice Updated** — Triggered when an existing invoice is updated in AccuLynx.
-- **Invoice Voided** — Triggered when an invoice is voided.
-
-### Job Appointment Events
-
-- **Initial Appointment Created** — Triggered when an initial appointment is created for a job.
-- **Initial Appointment Updated** — Triggered when an initial appointment is updated for a job.
-
-### Job Representative Events
-
-- **Company Representative Assigned** — Triggered when a company representative is assigned to a job.
-- **Company Representative Changed** — Triggered when the company representative on a job is changed.
-
-### Job Accounting Events
-
-- **Accounting Integration Status Changed** — Triggered when the accounting integration sync status changes for a job.
+This integration currently registers 25 tools and no event triggers. Scheduled reports, measurements, and webhook subscription management are not exposed as tools.

@@ -47,14 +47,14 @@ export let searchMonitors = SlateTool.create(spec, {
     let results = await client.searchWachets(ctx.input.query);
 
     let monitors = results.map(w => ({
-      wachetId: w.id,
-      name: w.name,
-      url: w.url,
-      jobType: w.jobType,
-      recurrenceInSeconds: w.recurrenceInSeconds,
-      lastCheckTimestamp: w.data?.lastCheckTimestamp,
-      lastValue: w.data?.raw,
-      lastError: w.data?.error
+      wachetId: w.id ?? undefined,
+      name: w.name ?? undefined,
+      url: w.url ?? undefined,
+      jobType: w.jobType == null ? undefined : String(w.jobType),
+      recurrenceInSeconds: w.recurrenceInSeconds ?? undefined,
+      lastCheckTimestamp: w.data?.lastCheckTimestamp ?? undefined,
+      lastValue: w.data?.raw ?? undefined,
+      lastError: w.data?.error ?? undefined
     }));
 
     return {

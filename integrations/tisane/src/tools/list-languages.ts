@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,15 +40,21 @@ export let listLanguages = SlateTool.create(spec, {
 
     let langs = await client.listLanguages();
 
-    let mapped = langs.map(l => ({
-      languageCode: l.id,
-      nativeName: l.name,
-      englishName: l.englishName,
-      nativeEncoding: l.nativeEncoding,
-      preferredFont: l.preferredFont,
-      usesLatinScript: l.latin,
-      rightToLeft: l.rightToLeft
-    }));
+    let mapped = langs.map(l => {
+      let languageCode = l.isoCode ?? l.id;
+      if (!languageCode) {
+        throw createApiServiceError('Tisane returned a language without a language code.');
+      }
+      return {
+        languageCode,
+        nativeName: l.name,
+        englishName: l.englishName,
+        nativeEncoding: l.nativeEncoding,
+        preferredFont: l.fontFace ?? l.preferredFont,
+        usesLatinScript: l.latin,
+        rightToLeft: l.rightToLeft
+      };
+    });
 
     return {
       output: { languages: mapped },

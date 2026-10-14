@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
+import { getAppointoRecord } from '../lib/bookings';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -25,7 +26,17 @@ let configSchema = z
     whatsappReminder: z.boolean().optional().describe('Enable WhatsApp reminders'),
     location: z.string().optional().describe('Location for the appointment'),
     cancellationPolicy: z.string().optional().describe('Cancellation policy text'),
-    reschedulingPolicy: z.string().optional().describe('Rescheduling policy text')
+    reschedulingPolicy: z.string().optional().describe('Rescheduling policy text'),
+    allowCancel: z.boolean().optional().describe('Allow customers to cancel bookings'),
+    allowReschedule: z.boolean().optional().describe('Allow customers to reschedule bookings'),
+    cancelDuration: z
+      .number()
+      .optional()
+      .describe("Cancellation cutoff duration in Appointo's configured units"),
+    rescheduleDuration: z
+      .number()
+      .optional()
+      .describe("Rescheduling cutoff duration in Appointo's configured units")
   })
   .passthrough()
   .optional()
@@ -33,8 +44,14 @@ let configSchema = z
 
 let slotSchema = z
   .object({
-    startTime: z.string().optional().describe('Slot start time (HH:MM format)'),
-    endTime: z.string().optional().describe('Slot end time (HH:MM format)'),
+    startTime: z
+      .string()
+      .optional()
+      .describe('Slot start time, e.g. 09:00AM; HH:MM is also accepted'),
+    endTime: z
+      .string()
+      .optional()
+      .describe('Slot end time, e.g. 05:00PM; HH:MM is also accepted'),
     surgePrice: z.number().optional().describe('Surge pricing override for this slot'),
     capacity: z.number().optional().describe('Capacity override for this slot')
   })
@@ -56,14 +73,36 @@ let dateOverrideSchema = z
   })
   .passthrough();
 
+let toProviderTime = (time: string | undefined) => {
+  if (!time) return time;
+  let match = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!match) return time;
+  let hour = Number(match[1]);
+  return `${String(hour % 12 || 12).padStart(2, '0')}:${match[2]}${hour < 12 ? 'AM' : 'PM'}`;
+};
+
+let mapSlot = (slot: z.infer<typeof slotSchema>) => {
+  let { startTime, endTime, surgePrice, capacity, ...providerFields } = slot;
+  return {
+    ...providerFields,
+    ...pickDefined({
+      start_time: toProviderTime(startTime),
+      end_time: toProviderTime(endTime),
+      max_capacity: capacity,
+      surge: surgePrice === undefined ? undefined : true,
+      price: surgePrice === undefined ? undefined : String(surgePrice)
+    })
+  };
+};
+
 export let updateAppointmentConfig = SlateTool.create(spec, {
   name: 'Update Appointment Configuration',
   key: 'update_appointment_config',
-  description: `Update an appointment's configuration, including timezone, duration, interval, capacity, buffer times, reminders (email, SMS, WhatsApp), location, cancellation/rescheduling policies, weekly availability slots with per-slot surge pricing and capacity overrides, and date-specific overrides.`,
+  description: `Update an appointment's configuration, including timezone, duration, interval, capacity, buffer times, reminders (email, SMS, WhatsApp), location, cancellation/rescheduling permissions and cutoff durations, weekly availability slots with per-slot surge pricing and capacity overrides, and date-specific overrides.`,
   instructions: [
-    'The config object fields use snake_case when sent to the API. Provide them as described in the input schema.',
+    'Use the named configuration fields or documented Appointo configuration keys.',
     'Availabilities define the weekly recurring schedule. Each entry represents a day of the week with its enabled slots.',
-    'Overrides define date-specific exceptions that override the weekly schedule for specific dates.'
+    'Overrides define date-specific exceptions. Send the complete set of date overrides when updating them, including existing entries you want to keep.'
   ],
   constraints: ['Write operations are limited to 100 requests per day.'],
   tags: {
@@ -95,39 +134,89 @@ export let updateAppointmentConfig = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    // Transform config keys to snake_case for the API
-    let apiConfig: Record<string, any> | undefined;
+    if (
+      !ctx.input.config &&
+      ctx.input.availabilities === undefined &&
+      ctx.input.dateOverrides === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide configuration, weekly availability, or date overrides to update.'
+      );
+    }
+
+    let apiConfig: Record<string, unknown> | undefined;
     if (ctx.input.config) {
-      let c = ctx.input.config;
+      let {
+        timezone,
+        duration,
+        interval,
+        capacity,
+        startBufferTime,
+        endBufferTime,
+        emailReminder,
+        smsReminder,
+        whatsappReminder,
+        location,
+        cancellationPolicy,
+        reschedulingPolicy,
+        allowCancel,
+        allowReschedule,
+        cancelDuration,
+        rescheduleDuration,
+        ...providerConfig
+      } = ctx.input.config;
       apiConfig = {
-        ...(c.timezone != null && { timezone: c.timezone }),
-        ...(c.duration != null && { duration: c.duration }),
-        ...(c.interval != null && { interval: c.interval }),
-        ...(c.capacity != null && { capacity: c.capacity }),
-        ...(c.startBufferTime != null && { start_buffer_time: c.startBufferTime }),
-        ...(c.endBufferTime != null && { end_buffer_time: c.endBufferTime }),
-        ...(c.emailReminder != null && { email_reminder: c.emailReminder }),
-        ...(c.smsReminder != null && { sms_reminder: c.smsReminder }),
-        ...(c.whatsappReminder != null && { whatsapp_reminder: c.whatsappReminder }),
-        ...(c.location != null && { location: c.location }),
-        ...(c.cancellationPolicy != null && { cancellation_policy: c.cancellationPolicy }),
-        ...(c.reschedulingPolicy != null && { rescheduling_policy: c.reschedulingPolicy })
+        ...providerConfig,
+        ...pickDefined({
+          timezone,
+          duration: duration === undefined ? undefined : String(duration),
+          interval: interval === undefined ? undefined : String(interval),
+          max_capacity: capacity === undefined ? undefined : String(capacity),
+          start_buffer_time:
+            startBufferTime === undefined ? undefined : String(startBufferTime),
+          end_buffer_time: endBufferTime === undefined ? undefined : String(endBufferTime),
+          send_reminder: emailReminder,
+          send_text_reminder: smsReminder,
+          send_whatsapp_reminder: whatsappReminder,
+          location_value: location,
+          cancellation_policy: cancellationPolicy,
+          rescheduling_policy: reschedulingPolicy,
+          allow_cancel: allowCancel,
+          allow_reschedule: allowReschedule,
+          cancel_duration: cancelDuration,
+          reschedule_duration: rescheduleDuration
+        })
       };
     }
 
-    let result = await client.updateAppointmentConfig(ctx.input.appointmentId, {
-      config: apiConfig,
-      availabilities: ctx.input.availabilities,
-      override: ctx.input.dateOverrides
+    let availabilities = ctx.input.availabilities?.map(entry => {
+      let { day, enabled, slots, ...providerFields } = entry;
+      return {
+        ...providerFields,
+        ...pickDefined({ weekday: day, day_available: enabled, slots: slots?.map(mapSlot) })
+      };
+    });
+    let overrides = ctx.input.dateOverrides?.map(entry => {
+      let { date, enabled, slots, ...providerFields } = entry;
+      return {
+        ...providerFields,
+        ...pickDefined({ day: date, day_available: enabled, slots: slots?.map(mapSlot) })
+      };
     });
 
-    let appointment = result?.appointment ?? result?.data ?? result;
+    let result = await client.updateAppointmentConfig(ctx.input.appointmentId, {
+      config: apiConfig,
+      availabilities,
+      override: overrides
+    });
+
+    let appointment = getAppointoRecord(result, 'appointment');
 
     return {
       output: {
-        appointmentId: appointment?.id ?? ctx.input.appointmentId,
-        status: 'updated',
-        ...appointment
+        ...appointment,
+        appointmentId: appointment.id ?? ctx.input.appointmentId,
+        status: 'updated'
       },
       message: `Appointment **#${ctx.input.appointmentId}** configuration updated.`
     };

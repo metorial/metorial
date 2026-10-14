@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -30,9 +30,7 @@ Returns the number of remaining validation credits and, when dates are provided,
   )
   .output(
     z.object({
-      credits: z
-        .number()
-        .describe('Remaining validation credits. -1 indicates an invalid API key.'),
+      credits: z.number().describe('Remaining validation credits.'),
       usage: z
         .object({
           total: z.number().describe('Total API calls in the date range'),
@@ -43,13 +41,38 @@ Returns the number of remaining validation credits and, when dates are provided,
           statusCatchAll: z.number().describe('Number of catch-all emails'),
           statusDoNotMail: z.number().describe('Number of do-not-mail emails'),
           statusSpamtrap: z.number().describe('Number of spamtrap emails'),
-          statusUnknown: z.number().describe('Number of unknown emails')
+          statusUnknown: z.number().describe('Number of unknown emails'),
+          subStatuses: z
+            .record(z.string(), z.number())
+            .optional()
+            .describe('Counts for provider sub-status codes')
         })
         .optional()
         .describe('Usage statistics for the specified date range')
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.startDate === undefined) !== (ctx.input.endDate === undefined)) {
+      throw createApiServiceError(
+        'Provide both startDate and endDate, or omit both to retrieve only credits.'
+      );
+    }
+    for (let date of [ctx.input.startDate, ctx.input.endDate]) {
+      if (
+        date !== undefined &&
+        (!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+          !Number.isFinite(Date.parse(`${date}T00:00:00Z`)) ||
+          new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)
+      ) {
+        throw createApiServiceError(
+          'startDate and endDate must be real calendar dates in yyyy-mm-dd format.'
+        );
+      }
+    }
+    if (ctx.input.startDate && ctx.input.endDate && ctx.input.startDate > ctx.input.endDate) {
+      throw createApiServiceError('startDate must be on or before endDate.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       region: ctx.config.region
@@ -70,6 +93,7 @@ Returns the number of remaining validation credits and, when dates are provided,
           statusDoNotMail: number;
           statusSpamtrap: number;
           statusUnknown: number;
+          subStatuses: Record<string, number>;
         }
       | undefined;
 
@@ -86,7 +110,12 @@ Returns the number of remaining validation credits and, when dates are provided,
         statusCatchAll: Number(usageResult.status_catch_all || 0),
         statusDoNotMail: Number(usageResult.status_do_not_mail || 0),
         statusSpamtrap: Number(usageResult.status_spamtrap || 0),
-        statusUnknown: Number(usageResult.status_unknown || 0)
+        statusUnknown: Number(usageResult.status_unknown || 0),
+        subStatuses: Object.fromEntries(
+          Object.entries(usageResult)
+            .filter(([key]) => key.startsWith('sub_status_'))
+            .map(([key, value]) => [key.slice('sub_status_'.length), Number(value)])
+        )
       };
     }
 

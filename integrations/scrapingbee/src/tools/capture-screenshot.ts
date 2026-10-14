@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let captureScreenshot = SlateTool.create(spec, {
   name: 'Capture Screenshot',
   key: 'capture_screenshot',
-  description: `Capture a screenshot of a web page. Supports full-page screenshots, custom viewport sizes, and element-specific screenshots. Returns the screenshot as a base64-encoded PNG image.`,
+  description: `Capture a downloadable PNG screenshot of a web page. Supports full-page screenshots, custom viewport sizes, and element-specific screenshots. Includes the PNG as base64 for existing workflows.`,
   instructions: [
     'Set fullPage to true to capture the entire page including scrollable content.',
     'Use windowWidth and windowHeight to control the viewport size for responsive testing.',
@@ -72,6 +72,15 @@ export let captureScreenshot = SlateTool.create(spec, {
       device: ctx.input.device,
       wait: ctx.input.wait,
       waitFor: ctx.input.waitFor
+    });
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(new Uint8Array(Buffer.from(base64, 'base64')), {
+        headers: { 'content-type': 'image/png' }
+      }),
+      filename: 'screenshot.png',
+      mimeType: 'image/png'
     });
 
     return {

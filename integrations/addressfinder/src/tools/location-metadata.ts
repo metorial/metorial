@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -53,13 +53,17 @@ export let locationMetadataTool = SlateTool.create(spec, {
     let data: any;
 
     if (country === 'au') {
-      if (!ctx.input.locationId) {
-        throw new Error('locationId is required for AU location metadata');
+      if (!ctx.input.locationId?.trim()) {
+        throw createApiServiceError(
+          'locationId is required for AU location metadata. Use location_search to find it.'
+        );
       }
       data = await client.auLocationMetadata({ locationId: ctx.input.locationId });
     } else {
-      if (!ctx.input.pxid) {
-        throw new Error('pxid is required for NZ location metadata');
+      if (!ctx.input.pxid?.trim()) {
+        throw createApiServiceError(
+          'pxid is required for NZ location metadata. Use location_search to find it.'
+        );
       }
       data = await client.nzLocationMetadata({ pxid: ctx.input.pxid });
     }

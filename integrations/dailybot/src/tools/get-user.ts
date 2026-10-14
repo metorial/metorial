@@ -34,11 +34,15 @@ export let getUser = SlateTool.create(spec, {
     let client = new DailyBotClient({ token: ctx.auth.token });
 
     let user = await client.getUser(ctx.input.userUuid);
+    let fullName =
+      user.full_name ??
+      user.name ??
+      [user.first_name, user.last_name].filter(Boolean).join(' ');
 
     return {
       output: {
         userUuid: user.uuid,
-        fullName: user.full_name ?? user.name ?? '',
+        fullName,
         email: user.email,
         role: user.role,
         timezone: user.timezone,
@@ -48,7 +52,7 @@ export let getUser = SlateTool.create(spec, {
         workStartTime: user.work_start_time,
         raw: user
       },
-      message: `Retrieved user **${user.full_name ?? user.name}**.`
+      message: `Retrieved user **${fullName}**.`
     };
   })
   .build();

@@ -54,7 +54,11 @@ export let listJobs = SlateTool.create(spec, {
       totalCount: z
         .number()
         .optional()
-        .describe('Total number of jobs matching the query (RDC only)')
+        .describe('Total number of jobs matching the query, when provided (RDC only)'),
+      moreAvailable: z
+        .boolean()
+        .optional()
+        .describe('Whether more RDC jobs are available after this page')
     })
   )
   .handleInvocation(async ctx => {
@@ -69,23 +73,30 @@ export let listJobs = SlateTool.create(spec, {
       let entities = result.entities ?? [];
       let jobs = entities.map((j: any) => ({
         jobId: j.id,
-        owner: j.owner,
-        status: j.consolidated_status ?? j.status,
+        owner: j.owner_sauce ?? j.owner ?? undefined,
+        status: j.consolidated_status ?? j.status ?? undefined,
         passed: j.passed,
         name: j.name,
         build: j.build,
         browser: undefined,
         browserVersion: undefined,
-        os: j.os,
-        automationBackend: j.automation_backend,
-        creationTime: j.start_time,
-        duration: j.end_time && j.start_time ? j.end_time - j.start_time : undefined,
-        tags: j.tags,
+        os: j.os ?? undefined,
+        automationBackend: j.automation_backend ?? undefined,
+        creationTime: j.creation_time == null ? undefined : j.creation_time / 1000,
+        duration:
+          j.end_time != null && j.start_time != null
+            ? (j.end_time - j.start_time) / 1000
+            : undefined,
+        tags: j.tags ?? undefined,
         error: j.error
       }));
 
       return {
-        output: { jobs, totalCount: result.metaData?.totalItemCount },
+        output: {
+          jobs,
+          totalCount: result.metaData?.totalItemCount,
+          moreAvailable: result.metaData?.moreAvailable
+        },
         message: `Found **${jobs.length}** real device jobs.`
       };
     }
@@ -100,18 +111,18 @@ export let listJobs = SlateTool.create(spec, {
     let jobsRaw = Array.isArray(result) ? result : [];
     let jobs = jobsRaw.map((j: any) => ({
       jobId: j.id,
-      owner: j.owner,
+      owner: j.owner ?? undefined,
       status: j.consolidated_status ?? j.status,
       passed: j.passed,
       name: j.name,
       build: j.build,
-      browser: j.browser,
-      browserVersion: j.browser_version,
-      os: j.os,
-      automationBackend: j.automation_backend,
-      creationTime: j.creation_time,
-      duration: j.duration,
-      tags: j.tags,
+      browser: j.browser ?? undefined,
+      browserVersion: j.browser_version ?? undefined,
+      os: j.os ?? undefined,
+      automationBackend: j.automation_backend ?? undefined,
+      creationTime: j.creation_time ?? undefined,
+      duration: j.duration ?? undefined,
+      tags: j.tags ?? undefined,
       error: j.error
     }));
 

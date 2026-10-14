@@ -1,14 +1,27 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class StudioClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(token: string) {
-    this.axios = createAxios({
+  constructor(auth: { token: string; authType: 'playground' | 'studio' }) {
+    if (auth.authType !== 'studio') {
+      throw createApiServiceError(
+        'This tool requires Studio authentication. Connect with the Studio authentication method and try again.'
+      );
+    }
+    if (!auth.token.trim()) {
+      throw createApiServiceError(
+        'The Studio credential is missing. Reconnect the account and try again.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.gan.ai',
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      authHeader: { value: `Bearer ${auth.token}` },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Gan.AI Studio',
+          reason: 'gan_ai_api_error'
+        })
     });
   }
 
@@ -100,7 +113,7 @@ export class StudioClient {
     error: { status_code: number; message: string } | null;
   }> {
     let response = await this.axios.get(
-      `/projects/${params.projectId}/inference/${params.inferenceId}/video_status`,
+      `/projects/${encodeURIComponent(params.projectId)}/inference/${encodeURIComponent(params.inferenceId)}/video_status`,
       {
         headers: {
           'x-workspace-id': params.workspaceId

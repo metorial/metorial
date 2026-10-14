@@ -1,7 +1,9 @@
 export * from './convert-lead';
 export * from './generate-pdf';
+export * from './get-current-user';
 export * from './get-record';
 export * from './list-records';
+export * from './list-stream';
 export * from './manage-accounts';
 export * from './manage-attachments';
 export * from './manage-calls';
@@ -10,6 +12,7 @@ export * from './manage-contacts';
 export * from './manage-leads';
 export * from './manage-meetings';
 export * from './manage-opportunities';
+export * from './manage-record';
 export * from './manage-relationships';
 export * from './manage-tasks';
 export * from './post-stream-note';

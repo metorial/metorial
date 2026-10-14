@@ -6,10 +6,10 @@ HTTPS Basic Auth uses the user's login email and API token. API requests use `ht
 
 ## Tool surface
 
-The integration exposes 34 tools:
+The integration exposes 35 tools:
 
 - Conversations: list, get, create, update, add message, list messages.
-- Contacts: list, create, update, list identities, create identity.
+- Contacts: list, create, update, list identities, create identity by email or by an existing mobile/social identifier.
 - Contact notes: list, create, update, delete.
 - Articles: list/search, get, create, update.
 - Channels: list, get.
@@ -35,6 +35,8 @@ Message and conversation writes expose notification, autoresolve and survey supp
 
 Contact identities are typed. Attaching an identity already owned by another contact transfers its associated messages/data; Facebook identity creation is unsupported.
 
+`create_contact_identity_by_identifier` targets the documented alternative identity-creation endpoint with `identifier_type` set to mobile, facebook, twitter, or instagram. The existing email-based identity tool is preserved. New identity types remain email, mobile, twitter, instagram, and igsid.
+
 Notes use contact-scoped endpoints and flat body/creator_email/created_at payloads. Create/update responses may contain a single note or a note collection: creation identifies one new matching note against pre-write IDs, and update selects the requested ID. Ambiguous creation never claims a specific note was created. Deletion requires contactIdentifier and noteIdentifier (or the legacy numeric noteId). Note identifiers are opaque strings, including UUIDs; legacy numeric noteId is only returned when safely numeric.
 
 Articles support published/draft/internal status and topic slugs. Response templates support personal/shared visibility. Staff listing is paginated; creation accepts an optional password, can affect billing, and sends no invitation email.
@@ -43,7 +45,9 @@ Reports and satisfaction ratings default to all account brands; optional brand f
 
 ## Compatibility and release
 
-Version 0.2.0 preserves existing tool keys, field types and enum meanings, adding optional fields and eight tools. All input schemas are top-level objects. Validation and API failures produce structured service errors. Requests have bounded timeouts and do not automatically retry writes.
+Version 0.3.0 preserves existing tool keys, input field types and enum meanings, adding one tool for identity creation on contacts without an email. All input schemas are top-level objects. Validation and API failures produce structured service errors. Requests have bounded timeouts and do not automatically retry writes.
+
+Missing credential state is rejected before requests. Conversation status validation accepts integer codes 0 through 9 without changing the public number input type, and conversation updates reject empty payloads. Message writes reject a sender name without an email and validate the returned body and visibility before reporting a posted message; unexpected responses direct callers to inspect the thread before retrying.
 
 Event triggers are unchanged in this tools-only release; their modernization is tracked separately.
 
@@ -54,4 +58,6 @@ Event triggers are unchanged in this tools-only release; their modernization is 
 - [Messages and pagination](https://www.reamaze.com/api/get_messages)
 - [Contact notes](https://www.reamaze.com/api/get_notes)
 - [Contact identities](https://www.reamaze.com/api/post_identities)
+- [Message creation](https://www.reamaze.com/api/post_messages)
+- [Conversation updates](https://www.reamaze.com/api/put_conversations)
 - [Satisfaction ratings](https://www.reamaze.com/api/get_satisfaction_ratings)

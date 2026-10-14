@@ -40,7 +40,11 @@ export let searchReplies = SlateTool.create(spec, {
       replyId: z
         .union([z.string(), z.array(z.string())])
         .optional()
-        .describe('Filter by specific reply ID(s)')
+        .describe('Filter by specific reply ID(s)'),
+      userReference: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe('Filter by the send ID(s) being replied to')
     })
   )
   .output(
@@ -64,6 +68,7 @@ export let searchReplies = SlateTool.create(spec, {
       kind: ctx.input.kind,
       msisdn: ctx.input.msisdn,
       campaignId: ctx.input.campaignId,
+      userReference: ctx.input.userReference,
       received
     });
 

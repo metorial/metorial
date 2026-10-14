@@ -2,10 +2,12 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   adhocExtraction,
+  createWorkflow,
   getCrawlResults,
   getDataChanges,
   getWorkflowData,
   getWorkflowDetails,
+  listLocations,
   listWorkflows,
   manageWorkflow,
   runWorkflow,
@@ -15,6 +17,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     listWorkflows,
+    createWorkflow,
     getWorkflowDetails,
     getWorkflowData,
     runWorkflow,
@@ -22,7 +25,8 @@ export let provider = Slate.create({
     startCrawl,
     getCrawlResults,
     adhocExtraction,
-    getDataChanges
+    getDataChanges,
+    listLocations
   ],
   triggers: []
 });

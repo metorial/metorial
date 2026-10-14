@@ -1,44 +1,34 @@
-I notice the search results are conflating two different products: **InVision** (the design platform by InVisionApp, invisionapp.com) and **Invision Community** (a community forum platform by IPS, invisioncommunity.com). Let me clarify which one is intended and research InVision (the design platform) specifically.Based on my research, it's clear that InVision (invisionapp.com), the design collaboration platform, **shut down permanently on December 31, 2024**. The platform no longer exists and its APIs are no longer available. This is a critical finding that must be reflected in the specification.
+# InVision Integration
 
-# Slates Specification for InVision
+## Availability
 
-## Overview
+InVision discontinued its design products, including Prototype and DSM, effective December 31, 2024. This package retains its historical DSM and Enterprise SCIM tools for compatibility. Retaining a route does not establish current service availability. No authenticated provider operation has been verified.
 
-InVision was a digital product design platform founded in 2011 that provided interactive prototyping, design collaboration, and design system management (DSM) tools. The company discontinued all its design collaboration services (including prototypes, DSM, etc.) at the end of 2024. The last day of access was December 31, 2024, after which all accounts and data were permanently deleted.
+Official retirement context: https://miro.com/blog/future-miro-freehand/.
+The former InVision announcement and support/API documentation could not be accessed during this refresh:
+https://www.invisionapp.com/inside-design/invision-design-collaboration-services-shutdown/ and https://support.invisionapp.com/.
 
-**⚠️ InVision is no longer operational. Its services were permanently shut down on December 31, 2024. No API integration is possible.**
+## Authentication and Configuration
 
-## Authentication
+- `dsm_api_key`: DSM API authentication key. Use this connection for the DSM tools.
+- `scim_bearer_token`: Enterprise SCIM provisioning bearer token. Use this connection for the SCIM tools.
+- Each tool accepts its historical `dsmExportBaseUrl` or `scimBaseUrl` string. URLs must use HTTPS and omit embedded credentials, queries, and fragments.
+- Optional `designSystemId` configuration is retained for saved-contract compatibility; existing tools use the supplied export URL.
 
-InVision's APIs are no longer available. Prior to shutdown, the platform offered limited API access:
+Microsoft's official InVision provisioning guide documents Enterprise accounts with SSO enabled, the provisioning token and SCIM URL with `/scim/v2` appended, username filtering, and the supported `userName`, `active`, work-email, given-name, and family-name attributes:
+https://learn.microsoft.com/en-us/entra/identity/saas-apps/invision-provisioning-tutorial.
 
-- **Design Tokens & Icons API (DSM):** Required an authentication key generated from the API setup page within the DSM design system settings. Keys could be managed and revoked from the API Authentication section.
-- **SCIM Provisioning (Enterprise only):** Used a bearer token displayed only once when an Enterprise owner or admin initially enabled SCIM provisioning. This was used for user provisioning with identity providers like Okta.
+## Tools
 
-InVision never offered a general-purpose public REST API for managing prototypes, projects, or core platform resources. A general API for user management and platform operations was a tracked feature request that was never fulfilled.
+- `get_design_tokens`: historical `style-data.json` route, preserving `lookup` and `list` formats and structured token output.
+- `get_design_token_styles`: historical `_style-params.<format>` route, preserving all seven format enum values and delivering an authenticated downloadable style file. The existing required `styleContent` string preserves the provider response verbatim for text or JSON-stringifies non-string responses; output also includes format, filename, and MIME type. Provider retrieval must succeed before a downloadable result is prepared.
+- `list_scim_users`: SCIM `GET /Users`, optional username filter, 1-based integer start index, and non-negative integer count. Preserves provider pagination metadata, including a metadata-only count-zero query.
+- `get_scim_user`: SCIM `GET /Users/{id}`.
+- `provision_scim_user`: SCIM `POST /Users` with the core User schema, username, name, work email, and active flag.
+- `update_scim_user`: SCIM `PATCH /Users/{id}` with PatchOp operations targeting only supplied fields. Email updates read the current user to choose filtered replacement of an existing work email or addition of a missing work email while preserving unrelated entries. Empty updates are rejected. Every successful PATCH is followed by a read so profile output remains complete even when the PATCH body is partial.
+- `deprovision_scim_user`: SCIM PATCH setting `active` to false, or the existing explicit permanent-delete option using DELETE.
 
-## Features
+The PATCH correction follows the documented Microsoft Entra provisioning protocol used by InVision, which requires PATCH for updates, and RFC 7644 partial-modification semantics. InVision-specific endpoint acceptance remains unverified:
+https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-provision-users-and-groups and https://datatracker.ietf.org/doc/html/rfc7644.
 
-**Note: All features below are defunct as of December 31, 2024.**
-
-### Design Tokens & Icons API (DSM)
-
-- Allowed programmatic retrieval of design tokens (colors, typography, spacing, etc.) and icons from an InVision DSM design system.
-- Could be used with tools like Style Dictionary to generate style files for different platforms.
-- Was read-only; tokens and icons were managed through the DSM interface, not via the API.
-- Required specifying a design system version to access version-specific token data.
-
-### SCIM User Provisioning
-
-- Supported SCIM-based user provisioning for Enterprise accounts, enabling automated user lifecycle management through identity providers.
-- Integrated with identity providers like Okta for automated user creation, updates, and deactivation.
-- Only available on Enterprise plans.
-
-### Freehand (Acquired by Miro)
-
-- InVision's visual collaboration product, Freehand, was acquired by Miro in the fall of 2023.
-- Freehand functionality has been migrated to Miro's platform.
-
-## Events
-
-The provider does not support events. InVision never provided webhooks or event subscription mechanisms through its APIs. The platform has been permanently shut down as of December 31, 2024.
+No identity endpoint or new tool was fabricated from the SCIM standard. Provider documentation access is insufficient to establish support for optional SCIM discovery, identity, or group endpoints. No trigger or normalized-chat behavior is included.

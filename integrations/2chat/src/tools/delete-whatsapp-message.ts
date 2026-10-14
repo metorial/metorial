@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteWhatsAppMessage = SlateTool.create(spec, {
   name: 'Delete WhatsApp Message',
   key: 'delete_whatsapp_message',
-  description: `Delete a previously sent WhatsApp message by its UUID.`,
+  description: `Request deletion of a WhatsApp message. WhatsApp deletion depends on message age and group permissions; acceptance does not guarantee removal from every device.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -15,7 +15,13 @@ export let deleteWhatsAppMessage = SlateTool.create(spec, {
   .input(
     z.object({
       fromNumber: z.string().describe('Your connected WhatsApp number (with country code)'),
-      messageUuid: z.string().describe('UUID of the message to delete')
+      messageUuid: z.string().describe('UUID of the message to delete'),
+      sessionKey: z
+        .string()
+        .optional()
+        .describe(
+          'Session key returned by Get WhatsApp Messages. Omit only for a message in the newest 100 messages of this number.'
+        )
     })
   )
   .output(
@@ -25,13 +31,17 @@ export let deleteWhatsAppMessage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new TwoChatClient({ token: ctx.auth.token });
-    let result = await client.deleteMessage(ctx.input.fromNumber, ctx.input.messageUuid);
+    let result = await client.deleteMessage(
+      ctx.input.fromNumber,
+      ctx.input.messageUuid,
+      ctx.input.sessionKey
+    );
 
     return {
       output: {
-        success: result.success ?? true
+        success: result.success === true
       },
-      message: `Deleted message **${ctx.input.messageUuid}**.`
+      message: `Deletion request accepted for message **${ctx.input.messageUuid}**.`
     };
   })
   .build();

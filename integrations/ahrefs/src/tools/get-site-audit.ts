@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -53,11 +53,12 @@ Use to access technical SEO audit results and identify on-site issues that need 
         break;
       case 'health-score':
         if (!ctx.input.projectId)
-          throw new Error('projectId is required for health-score report');
+          throw createApiServiceError('projectId is required for health-score report');
         result = await client.getSiteAuditHealthScore({ project_id: ctx.input.projectId });
         break;
       case 'issues':
-        if (!ctx.input.projectId) throw new Error('projectId is required for issues report');
+        if (!ctx.input.projectId)
+          throw createApiServiceError('projectId is required for issues report');
         result = await client.getSiteAuditIssues({
           project_id: ctx.input.projectId,
           select: ctx.input.select,
@@ -69,7 +70,7 @@ Use to access technical SEO audit results and identify on-site issues that need 
         break;
       case 'page-explorer':
         if (!ctx.input.projectId)
-          throw new Error('projectId is required for page-explorer report');
+          throw createApiServiceError('projectId is required for page-explorer report');
         result = await client.getSiteAuditPageExplorer({
           project_id: ctx.input.projectId,
           select: ctx.input.select,

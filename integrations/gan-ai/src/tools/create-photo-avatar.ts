@@ -29,7 +29,7 @@ export let createPhotoAvatar = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
     let result = await client.createPhotoAvatar({
       baseImageUrl: ctx.input.baseImageUrl,
       title: ctx.input.title,

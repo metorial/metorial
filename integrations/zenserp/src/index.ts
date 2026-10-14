@@ -9,7 +9,9 @@ import {
   reverseImageSearch,
   shoppingProductDetails,
   shoppingSearch,
-  webSearch
+  trendingSearches,
+  webSearch,
+  youtubeSearch
 } from './tools';
 
 export let provider = Slate.create({
@@ -23,7 +25,9 @@ export let provider = Slate.create({
     shoppingProductDetails,
     mapsSearch,
     googleTrends,
-    accountStatus
+    accountStatus,
+    youtubeSearch,
+    trendingSearches
   ],
   triggers: []
 });

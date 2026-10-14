@@ -48,10 +48,6 @@ export let createUser = SlateTool.create(spec, {
       managedBusinessIds: ctx.input.managedBusinessIds
     });
 
-    if (data.errorCode !== 0) {
-      throw new Error(`Failed to create user: ${data.errorMessage} (code: ${data.errorCode})`);
-    }
-
     return {
       output: {
         userId: data.userId,

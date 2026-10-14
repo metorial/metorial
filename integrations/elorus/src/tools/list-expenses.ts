@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listExpenses = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listExpenses = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       search: z.string().optional().describe('Free-text search.'),
       ordering: z.string().optional().describe('Sort field. Prefix with "-" for descending.'),
       periodFrom: z.string().optional().describe('Filter from this date (YYYY-MM-DD).'),
@@ -35,7 +37,7 @@ export let listExpenses = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.input.organizationId ?? ctx.config.organizationId
     });
 
     let result = await client.listExpenses({

@@ -1,10 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { scheduleIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let appointmentSchema = z.object({
   appointmentId: z.string().optional().describe('SuperSaaS appointment ID'),
+  scheduleId: scheduleIdSchema.optional(),
+  formData: z.any().optional().describe('Attached custom form data when requested'),
   start: z.string().optional().describe('Start date/time'),
   finish: z.string().optional().describe('End date/time'),
   resourceName: z.string().optional().describe('Resource name'),
@@ -36,13 +39,21 @@ export let listAppointmentsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      scheduleId: z.string().describe('Schedule ID to query appointments from'),
+      scheduleId: scheduleIdSchema,
       from: z
         .string()
         .optional()
         .describe('Start date filter (ISO format YYYY-MM-DD HH:MM:SS)'),
       to: z.string().optional().describe('End date filter (ISO format YYYY-MM-DD HH:MM:SS)'),
       userId: z.string().optional().describe('Filter by user ID, username, or foreign key'),
+      resourceId: z
+        .string()
+        .optional()
+        .describe('Resource ID to filter. Call list_resources to discover IDs.'),
+      serviceId: z
+        .string()
+        .optional()
+        .describe('Service ID to filter. Call list_resources to discover IDs.'),
       limit: z.number().optional().describe('Maximum number of results'),
       offset: z.number().optional().describe('Pagination offset'),
       includeFormData: z.boolean().optional().describe('Whether to include attached form data')
@@ -61,7 +72,9 @@ export let listAppointmentsTool = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       form: ctx.input.includeFormData,
-      user: ctx.input.userId
+      user: ctx.input.userId,
+      resourceId: ctx.input.resourceId,
+      serviceId: ctx.input.serviceId
     });
 
     let appointments = Array.isArray(data) ? data.map(mapAppointmentResponse) : [];
@@ -83,13 +96,19 @@ export let getAppointmentTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      appointmentId: z.string().describe('The appointment ID to retrieve')
+      appointmentId: z.string().describe('The appointment ID to retrieve'),
+      scheduleId: scheduleIdSchema.optional(),
+      includeFormData: z.boolean().optional().describe('Include attached custom form data')
     })
   )
   .output(appointmentSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth);
-    let data = await client.getAppointment(ctx.input.appointmentId);
+    let data = await client.getAppointment(
+      ctx.input.appointmentId,
+      ctx.input.scheduleId,
+      ctx.input.includeFormData
+    );
     let appointment = mapAppointmentResponse(data);
 
     return {
@@ -109,7 +128,7 @@ export let getUserAgendaTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      scheduleId: z.string().describe('Schedule ID to query'),
+      scheduleId: scheduleIdSchema,
       userId: z.string().describe('User ID, username, or foreign key'),
       from: z
         .string()
@@ -146,8 +165,13 @@ export let createAppointmentTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      scheduleId: z.string().describe('Schedule ID to create the appointment on'),
-      start: z.string().describe('Start date/time (ISO format YYYY-MM-DD HH:MM:SS)'),
+      scheduleId: scheduleIdSchema,
+      start: z
+        .string()
+        .optional()
+        .describe(
+          'Start date/time in calendar local time (YYYY-MM-DD HH:MM:SS). Required for resource schedules unless slotId is provided.'
+        ),
       finish: z
         .string()
         .optional()
@@ -157,7 +181,10 @@ export let createAppointmentTool = SlateTool.create(spec, {
         .optional()
         .describe('User ID, username, or foreign key for the booker'),
       resourceId: z.string().optional().describe('Resource ID to book'),
-      slotId: z.string().optional().describe('Slot ID for capacity-type schedules'),
+      slotId: z
+        .string()
+        .optional()
+        .describe('Slot ID for capacity schedules. Call list_slots to discover slot IDs.'),
       fullName: z.string().optional().describe('Booker full name'),
       email: z.string().optional().describe('Booker email'),
       phone: z.string().optional().describe('Booker phone'),
@@ -172,6 +199,12 @@ export let createAppointmentTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth);
     let { scheduleId, userId, ...fields } = ctx.input;
+    if (!fields.start && !fields.slotId) {
+      throw createApiServiceError(
+        'Provide start for a resource booking or slotId for a capacity booking.',
+        { reason: 'SUPERSAAS_BOOKING_INPUT_INVALID' }
+      );
+    }
 
     let bookingData = buildBookingParams(fields);
     let data = await client.createAppointment(scheduleId, bookingData, userId);
@@ -179,7 +212,7 @@ export let createAppointmentTool = SlateTool.create(spec, {
 
     return {
       output: appointment,
-      message: `Created appointment on schedule **${scheduleId}** starting at **${ctx.input.start}**.`
+      message: `Created appointment on schedule **${scheduleId}** ${ctx.input.slotId ? `in slot **${ctx.input.slotId}**` : `starting at **${ctx.input.start}**`}.`
     };
   })
   .build();
@@ -192,6 +225,7 @@ export let updateAppointmentTool = SlateTool.create(spec, {
   .input(
     z.object({
       appointmentId: z.string().describe('Appointment ID to update'),
+      scheduleId: scheduleIdSchema.optional(),
       start: z.string().optional().describe('New start date/time'),
       finish: z.string().optional().describe('New end date/time'),
       resourceId: z.string().optional().describe('New resource ID'),
@@ -209,10 +243,10 @@ export let updateAppointmentTool = SlateTool.create(spec, {
   .output(appointmentSchema)
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth);
-    let { appointmentId, ...fields } = ctx.input;
+    let { appointmentId, scheduleId, ...fields } = ctx.input;
 
     let bookingData = buildBookingParams(fields);
-    let data = await client.updateAppointment(appointmentId, bookingData);
+    let data = await client.updateAppointment(appointmentId, bookingData, scheduleId);
     let appointment = mapAppointmentResponse(data);
 
     return {
@@ -232,7 +266,8 @@ export let deleteAppointmentTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      appointmentId: z.string().describe('Appointment ID to delete')
+      appointmentId: z.string().describe('Appointment ID to delete'),
+      scheduleId: scheduleIdSchema.optional()
     })
   )
   .output(
@@ -242,7 +277,7 @@ export let deleteAppointmentTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth);
-    await client.deleteAppointment(ctx.input.appointmentId);
+    await client.deleteAppointment(ctx.input.appointmentId, ctx.input.scheduleId);
 
     return {
       output: { deleted: true },
@@ -281,11 +316,13 @@ let mapAppointmentResponse = (data: any): any => {
   if (!data) return {};
   return {
     appointmentId: data.id != null ? String(data.id) : undefined,
+    scheduleId: data.schedule_id != null ? String(data.schedule_id) : undefined,
+    formData: data.form ?? data.forms ?? undefined,
     start: data.start ?? undefined,
     finish: data.finish ?? undefined,
-    resourceName: data.resource ?? undefined,
+    resourceName: data.res_name ?? data.resource ?? undefined,
     resourceId: data.resource_id != null ? String(data.resource_id) : undefined,
-    serviceName: data.service ?? undefined,
+    serviceName: data.service_name ?? data.service ?? undefined,
     serviceId: data.service_id != null ? String(data.service_id) : undefined,
     fullName: data.full_name ?? undefined,
     email: data.email ?? undefined,
@@ -297,7 +334,10 @@ let mapAppointmentResponse = (data: any): any => {
     price: data.price != null ? String(data.price) : undefined,
     slotId: data.slot_id != null ? String(data.slot_id) : undefined,
     deleted: data.deleted ?? undefined,
-    waitlisted: data.waitlisted ?? undefined,
+    waitlisted:
+      data.waitlisted != null
+        ? data.waitlisted === true || data.waitlisted === 'W'
+        : undefined,
     createdOn: data.created_on ?? undefined,
     updatedOn: data.updated_on ?? undefined
   };

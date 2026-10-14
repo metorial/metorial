@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let paymentSchema = z.object({
@@ -38,19 +39,34 @@ export let listPayments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      companyId: z
-        .string()
-        .optional()
-        .describe('Company ID. Uses config companyId if not provided.'),
+      companyId: companyIdSchema,
       productIds: z.array(z.string()).optional().describe('Filter by product IDs'),
       statuses: z
         .array(
-          z.enum(['draft', 'open', 'paid', 'pending', 'uncollectible', 'unresolved', 'void'])
+          z.enum([
+            'draft',
+            'open',
+            'authorized',
+            'paid',
+            'pending',
+            'uncollectible',
+            'unresolved',
+            'void'
+          ])
         )
         .optional()
         .describe('Filter by payment status'),
       billingReasons: z
-        .array(z.enum(['subscription_create', 'subscription_cycle', 'one_time', 'manual']))
+        .array(
+          z.enum([
+            'subscription_create',
+            'subscription_cycle',
+            'subscription_update',
+            'one_time',
+            'manual',
+            'subscription'
+          ])
+        )
         .optional()
         .describe('Filter by billing reason'),
       query: z.string().optional().describe('Search by user ID, email, name, or username'),

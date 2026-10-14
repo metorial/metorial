@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -100,7 +100,7 @@ export let upsertContacts = SlateTool.create(spec, {
 export let removeContact = SlateTool.create(spec, {
   name: 'Remove Contact',
   key: 'remove_contact',
-  description: `Remove a contact from your OKSign account by their contact ID.`,
+  description: `Remove a contact from your OKSign account by their exact name and email. Call list_contacts to discover both values.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -108,7 +108,14 @@ export let removeContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      contactId: z.string().describe('ID of the contact to remove')
+      contactId: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy contact ID; use name and email because OKSign identifies contacts by both values'
+        ),
+      name: z.string().optional().describe('Exact contact name from list_contacts'),
+      email: z.string().optional().describe('Exact contact email from list_contacts')
     })
   )
   .output(
@@ -118,11 +125,19 @@ export let removeContact = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.removeContact(ctx.input.contactId);
+    if (!ctx.input.name?.trim() || !ctx.input.email?.trim()) {
+      throw createApiServiceError(
+        'Provide the contact name and email from list_contacts. OKSign does not expose a contact ID.'
+      );
+    }
+    let count = await client.removeContact(ctx.input.name, ctx.input.email);
 
     return {
-      output: { removed: true },
-      message: `Contact \`${ctx.input.contactId}\` removed successfully.`
+      output: { removed: count === undefined || count > 0 },
+      message:
+        count === 0
+          ? 'No matching contact was removed.'
+          : `Contact **${ctx.input.name}** (${ctx.input.email}) removed successfully.`
     };
   })
   .build();

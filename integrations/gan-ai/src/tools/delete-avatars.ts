@@ -45,7 +45,7 @@ export let deleteAvatars = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PlaygroundClient(ctx.auth.token);
+    let client = new PlaygroundClient(ctx.auth);
     let messages: string[] = [];
     let output: Record<string, number> = {};
 

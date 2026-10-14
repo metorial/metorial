@@ -1,12 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ServerAvatarClient } from '../lib/client';
+import { organizationIdSchema, organizationScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageServices = SlateTool.create(spec, {
   name: 'Manage Services',
   key: 'manage_services',
-  description: `List or control services running on a server. View all services with their status and resource usage, or start, stop, restart, or reload individual services like Nginx, Apache, MySQL, PHP-FPM, Redis, etc.`,
+  description: `List or control services running on a server. View all services with their status and resource usage, or start, stop, restart, or reload individual services like Nginx, Apache, MySQL, PHP-FPM, Redis, etc.
+${organizationScopeGuidance}`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,7 +16,7 @@ export let manageServices = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Organization ID'),
+      organizationId: organizationIdSchema,
       serverId: z.string().describe('Server ID'),
       action: z
         .enum(['list', 'start', 'stop', 'restart', 'reload'])
@@ -39,7 +41,8 @@ export let manageServices = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ServerAvatarClient({ token: ctx.auth.token });
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required either in input or config');
+    if (!orgId)
+      throw createApiServiceError('organizationId is required either in input or config');
 
     let { serverId, action } = ctx.input;
 
@@ -52,7 +55,9 @@ export let manageServices = SlateTool.create(spec, {
     }
 
     if (!ctx.input.service)
-      throw new Error('service name is required for start/stop/restart/reload actions');
+      throw createApiServiceError(
+        'service name is required for start/stop/restart/reload actions'
+      );
 
     let result = await client.updateService(orgId, serverId, ctx.input.service, action);
     return {

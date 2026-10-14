@@ -1,12 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { mapProject, mapTask, projectOutputSchema, taskOutputSchema } from '../lib/schemas';
+import {
+  mapProject,
+  mapTask,
+  projectIdSchema,
+  projectOutputSchema,
+  taskOutputSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 let columnSchema = z.object({
   columnId: z.string().describe('Column identifier'),
-  projectId: z.string().describe('Parent project ID'),
+  projectId: projectIdSchema,
   name: z.string().describe('Column name'),
   sortOrder: z.number().describe('Display order')
 });
@@ -22,7 +28,7 @@ export let getProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('ID of the project to retrieve'),
+      projectId: projectIdSchema,
       includeTasks: z
         .boolean()
         .optional()

@@ -16,6 +16,8 @@ export let updateProduct = SlateTool.create(spec, {
     z.object({
       productId: z.string().describe('ID of the product to update'),
       name: z.string().optional().describe('Product name'),
+      sku: z.string().optional().describe('Unique product SKU or code'),
+      isActive: z.boolean().optional().describe('Whether the product is active for sales'),
       owner: z.number().optional().describe('User ID of the product owner'),
       unitPrice: z.number().optional().describe('Unit price'),
       currency: z.string().optional().describe('Currency code'),

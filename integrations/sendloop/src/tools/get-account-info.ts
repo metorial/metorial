@@ -21,13 +21,13 @@ export let getAccountInfo = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     let result = await client.getAccountInfo();
 
     return {
-      output: { account: result },
+      output: { account: result.AccountInfo || result },
       message: `Retrieved account information.`
     };
   })

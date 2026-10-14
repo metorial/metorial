@@ -1,24 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listPresentationTemplates = SlateTool.create(spec, {
   name: 'List Presentation Templates',
   key: 'list_presentation_templates',
   description: `Retrieve presentation templates configured in a Paradym project. Presentation templates define what credentials and attributes to request from a holder during verification.`,
+  instructions: ['Call list_projects to choose the projectId for this operation.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      pageBefore: z.string().optional().describe('Cursor for fetching the previous page'),
+      projectId: projectIdSchema,
       pageSize: z.number().optional().describe('Number of templates to return per page'),
       pageAfter: z.string().optional().describe('Cursor for fetching the next page of results')
     })
   )
   .output(
     z.object({
+      metadata: z
+        .any()
+        .optional()
+        .describe('Provider pagination metadata, including next and previous page URLs'),
       templates: z
         .array(
           z.object({
@@ -36,25 +44,26 @@ export let listPresentationTemplates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
     let result = await client.listPresentationTemplates({
       pageSize: ctx.input.pageSize,
+      pageBefore: ctx.input.pageBefore,
       pageAfter: ctx.input.pageAfter
     });
 
     let templates = (result.data ?? []).map((t: any) => ({
       presentationTemplateId: t.id,
       name: t.name,
-      description: t.description,
+      description: t.description ?? undefined,
       credentials: t.credentials,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt
     }));
 
     return {
-      output: { templates },
+      output: { templates, metadata: result.meta },
       message: `Found **${templates.length}** presentation template(s).`
     };
   })

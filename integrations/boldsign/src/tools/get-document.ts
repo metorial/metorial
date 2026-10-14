@@ -41,7 +41,7 @@ export let getDocument = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       region: ctx.config.region
     });
 
@@ -49,19 +49,19 @@ export let getDocument = SlateTool.create(spec, {
 
     return {
       output: {
-        documentId: result.documentId,
-        messageTitle: result.messageTitle,
-        documentDescription: result.documentDescription,
-        status: result.status,
-        senderDetail: result.senderDetail,
-        signerDetails: result.signerDetails,
-        ccDetails: result.ccDetails,
-        brandId: result.brandId,
-        labels: result.labels,
-        createdDate: result.createdDate,
-        activityDate: result.activityDate,
-        expiryDate: result.expiryDate,
-        enableSigningOrder: result.enableSigningOrder
+        documentId: result.documentId ?? ctx.input.documentId,
+        messageTitle: result.messageTitle ?? undefined,
+        documentDescription: result.documentDescription ?? undefined,
+        status: result.status ?? undefined,
+        senderDetail: result.senderDetail ?? undefined,
+        signerDetails: result.signerDetails ?? undefined,
+        ccDetails: result.ccDetails ?? undefined,
+        brandId: result.brandId ?? undefined,
+        labels: result.labels ?? undefined,
+        createdDate: result.createdDate ?? undefined,
+        activityDate: result.activityDate ?? undefined,
+        expiryDate: result.expiryDate ?? undefined,
+        enableSigningOrder: result.enableSigningOrder ?? undefined
       },
       message: `Document **${result.messageTitle ?? result.documentId}** — Status: **${result.status}**`
     };

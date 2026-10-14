@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, durationMilliseconds } from '../lib/client';
 import { spec } from '../spec';
 
 export let getTestRun = SlateTool.create(spec, {
@@ -19,7 +19,7 @@ export let getTestRun = SlateTool.create(spec, {
   .output(
     z.object({
       testRunId: z.string().describe('Unique identifier of the test run'),
-      testId: z.string().describe('ID of the test that was run'),
+      testId: z.string().nullable().describe('ID of the test that was run'),
       testName: z.string().describe('Name of the test that was run'),
       status: z
         .string()
@@ -36,19 +36,21 @@ export let getTestRun = SlateTool.create(spec, {
 
     let run = await client.getTestRun(ctx.input.testRunId);
 
+    let duration = durationMilliseconds(run);
+
     return {
       output: {
         testRunId: run.id,
         testId: run.testId,
-        testName: run.testName,
+        testName: run.name,
         status: run.status,
         started: run.started,
-        finished: run.finished,
-        duration: run.duration,
+        finished: run.ended,
+        duration,
         runMode: run.runMode,
-        runProfileName: run.runProfileName
+        runProfileName: run.profileName
       },
-      message: `Test run for **${run.testName}**: status **${run.status}**${run.duration != null ? `, duration ${run.duration}ms` : ''}.`
+      message: `Test run for **${run.name}**: status **${run.status}**${duration != null ? `, duration ${duration}ms` : ''}.`
     };
   })
   .build();

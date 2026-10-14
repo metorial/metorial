@@ -36,7 +36,7 @@ export let deleteDid = SlateTool.create(spec, {
         did: ctx.input.did,
         jobId: jobId ? String(jobId) : undefined
       },
-      message: `Deleted DID **${ctx.input.did}**.`
+      message: `Submitted deletion of DID **${ctx.input.did}**.${jobId ? ` Check get_job with job ID **${jobId}** for completion.` : ''}`
     };
   })
   .build();

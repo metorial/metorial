@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,9 @@ export let auth = SlateAuth.create()
       token: z.string().describe('Truvera API key. Obtain from the Truvera Workspace.')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.token.trim()) {
+        throw createApiServiceError('Enter a valid Truvera API key from Truvera Workspace.');
+      }
       return {
         output: {
           token: ctx.input.token

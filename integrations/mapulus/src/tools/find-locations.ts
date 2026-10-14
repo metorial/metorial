@@ -23,7 +23,7 @@ let locationSchema = z
 export let findLocations = SlateTool.create(spec, {
   name: 'Find Locations',
   key: 'find_locations',
-  description: `Search for locations in Mapulus by various criteria. Filter by map, layer, address, coordinates, location ID, or external ID. Returns all matching locations with their full details.`,
+  description: `Search for locations in Mapulus by various criteria. Filter by map, layer, address, coordinates, location ID, or external ID. Returns the first page of matching locations. Address and coordinate filters retain their existing behavior but are not documented in the current API reference.`,
   instructions: [
     'Provide at least one search criterion. Multiple criteria are combined to narrow results.'
   ],

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAccountStatusTool = SlateTool.create(spec, {
   name: 'Get Account Status',
   key: 'get_account_status',
-  description: `Retrieve the current status of the linked WhatsApp account. Returns connectivity information, device details, battery level, and the configured webhook URL.`,
+  description: `Retrieve information about the linked WhatsApp account, including its phone number, account name, device details, battery level, and configured webhook URL.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,6 +15,7 @@ export let getAccountStatusTool = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
+      phoneNumber: z.string().optional().describe('Linked WhatsApp account phone number.'),
       accountName: z
         .string()
         .optional()
@@ -40,18 +41,33 @@ export let getAccountStatusTool = SlateTool.create(spec, {
     });
 
     let result = await client.getStatus();
+    let name = result.alias ?? result.name;
+    let hook = result.hook_url ?? result.hook;
+    let battery =
+      typeof result.battery === 'number'
+        ? result.battery
+        : typeof result.battery === 'string' && result.battery.trim()
+          ? Number(result.battery)
+          : undefined;
+    let isCharging =
+      result.plugged === true || result.plugged === 1 || result.plugged === '1'
+        ? true
+        : result.plugged === false || result.plugged === 0 || result.plugged === '0'
+          ? false
+          : undefined;
 
     return {
       output: {
-        accountName: result?.name,
-        platform: result?.platform,
-        batteryLevel: result?.battery,
-        isCharging: result?.plugged,
-        locale: result?.locale,
-        webhookUrl: result?.hook,
+        phoneNumber: typeof result.uid === 'string' ? result.uid : ctx.auth.phoneNumber,
+        accountName: typeof name === 'string' ? name : undefined,
+        platform: typeof result.platform === 'string' ? result.platform : undefined,
+        batteryLevel: battery !== undefined && Number.isFinite(battery) ? battery : undefined,
+        isCharging,
+        locale: typeof result.locale === 'string' ? result.locale : undefined,
+        webhookUrl: typeof hook === 'string' ? hook.trim() : undefined,
         raw: result
       },
-      message: `Account **${result?.name ?? ctx.auth.phoneNumber}** is connected on **${result?.platform ?? 'unknown'}** (battery: ${result?.battery ?? 'N/A'}%).`
+      message: `Retrieved details for WhatsApp account **${typeof name === 'string' ? name : ctx.auth.phoneNumber}**.`
     };
   })
   .build();

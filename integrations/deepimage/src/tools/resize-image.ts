@@ -109,6 +109,10 @@ Can also add a watermark/caption overlay to the output image with configurable p
       outputQuality: ctx.input.outputQuality
     });
 
+    if (result.status === 'complete' && result.resultUrl) {
+      await ctx.addAttachment({ type: 'url', url: result.resultUrl });
+    }
+
     let message =
       result.status === 'complete'
         ? `Image resized successfully. Result: ${result.resultUrl}`

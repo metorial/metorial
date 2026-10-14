@@ -1,5 +1,6 @@
 export * from './create-contact';
 export * from './get-contact';
+export * from './get-email';
 export * from './get-form';
 export * from './list-contacts';
 export * from './list-emails';

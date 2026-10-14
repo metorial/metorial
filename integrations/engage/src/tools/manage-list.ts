@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,7 @@ export let manageList = SlateTool.create(spec, {
     let { action, listId, title, description, redirectUrl, doubleOptin } = ctx.input;
 
     if (action === 'create') {
-      if (!title) throw new Error('Title is required when creating a list');
+      if (!title) throw createApiServiceError('Title is required when creating a list');
       let list = await client.createList({ title, description, redirectUrl, doubleOptin });
       return {
         output: {
@@ -73,7 +73,8 @@ export let manageList = SlateTool.create(spec, {
       };
     }
 
-    if (!listId) throw new Error('List ID is required for update, get, and archive actions');
+    if (!listId)
+      throw createApiServiceError('List ID is required for update, get, and archive actions');
 
     if (action === 'get') {
       let list = await client.getList(listId);

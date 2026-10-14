@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -41,7 +41,8 @@ export let sendCampaign = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'send_test') {
-      if (!ctx.input.testEmail) throw new Error('testEmail is required for send_test action');
+      if (!ctx.input.testEmail)
+        throw createApiServiceError('testEmail is required for send_test action');
       await client.sendCampaignTest(ctx.input.campaignUuid, ctx.input.testEmail);
       return {
         output: { success: true },

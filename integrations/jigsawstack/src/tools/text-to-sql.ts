@@ -37,6 +37,10 @@ export let textToSql = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       sql: z.string().describe('Generated SQL query')
     })
   )
@@ -53,6 +57,7 @@ export let textToSql = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         sql: result.sql
       },
       message: `Generated SQL query from natural language prompt.\n\n\`\`\`sql\n${result.sql}\n\`\`\``

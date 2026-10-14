@@ -24,21 +24,24 @@ let leadSchema = z.object({
 
 let mapLead = (l: any) => ({
   leadId: l.id,
-  firstname: l.firstname,
-  lastname: l.lastname,
-  fullname: l.fullname,
-  businessName: l.business_name,
-  email: l.email,
-  phone: l.phone,
-  address: l.address,
-  city: l.city,
-  state: l.state,
-  zip: l.zip,
-  notes: l.notes,
-  status: l.status,
-  assignedTo: l.assigned_to?.toString(),
-  createdAt: l.created_at,
-  updatedAt: l.updated_at
+  firstname: l.first_name ?? l.firstname ?? undefined,
+  lastname: l.last_name ?? l.lastname ?? undefined,
+  fullname:
+    l.fullname ??
+    ([l.first_name ?? l.firstname, l.last_name ?? l.lastname].filter(Boolean).join(' ') ||
+      undefined),
+  businessName: l.business_name ?? l.business_then_name ?? undefined,
+  email: l.email ?? undefined,
+  phone: l.phone ?? undefined,
+  address: l.address ?? undefined,
+  city: l.city ?? undefined,
+  state: l.state ?? undefined,
+  zip: l.zip ?? undefined,
+  notes: l.hidden_notes ?? l.notes ?? undefined,
+  status: l.status ?? undefined,
+  assignedTo: (l.user_id ?? l.assigned_to)?.toString(),
+  createdAt: l.created_at ?? undefined,
+  updatedAt: l.updated_at ?? undefined
 });
 
 export let searchLeads = SlateTool.create(spec, {
@@ -53,7 +56,7 @@ export let searchLeads = SlateTool.create(spec, {
     z.object({
       query: z.string().optional().describe('General search query'),
       status: z.string().optional().describe('Filter by status'),
-      assignedTo: z.number().optional().describe('Filter by assigned user ID'),
+      assignedTo: z.number().optional().describe('Filter by assigned user ID from list_users'),
       createdBefore: z
         .string()
         .optional()
@@ -129,7 +132,10 @@ export let createLead = SlateTool.create(spec, {
       phone: z.string().optional().describe('Phone number'),
       businessName: z.string().optional().describe('Business name'),
       notes: z.string().optional().describe('Lead notes'),
-      assignedTo: z.number().optional().describe('User ID to assign the lead to'),
+      assignedTo: z
+        .number()
+        .optional()
+        .describe('User ID from list_users to assign the lead to'),
       status: z.string().optional().describe('Initial lead status'),
       address: z.string().optional().describe('Address'),
       city: z.string().optional().describe('City'),
@@ -164,7 +170,10 @@ export let updateLead = SlateTool.create(spec, {
       phone: z.string().optional().describe('Phone number'),
       businessName: z.string().optional().describe('Business name'),
       notes: z.string().optional().describe('Lead notes'),
-      assignedTo: z.number().optional().describe('User ID to assign the lead to'),
+      assignedTo: z
+        .number()
+        .optional()
+        .describe('User ID from list_users to assign the lead to'),
       status: z.string().optional().describe('Updated lead status'),
       address: z.string().optional().describe('Address'),
       city: z.string().optional().describe('City'),

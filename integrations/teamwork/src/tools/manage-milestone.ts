@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageMilestone = SlateTool.create(spec, {
   key: 'manage_milestone',
   description: `Create, update, complete, reopen, or delete a milestone within a Teamwork project. Milestones can have deadlines, responsible parties, and tags.`,
   instructions: [
-    'For "create", provide projectId and title at minimum.',
+    'For "create", provide projectId, title, deadline, and responsiblePartyIds.',
     'For "update", "complete", "reopen", and "delete", provide the milestoneId.',
     'Deadline format: YYYYMMDD.'
   ],
@@ -26,8 +26,16 @@ export let manageMilestone = SlateTool.create(spec, {
       projectId: z.string().optional().describe('Project ID (required for create)'),
       title: z.string().optional().describe('Milestone title'),
       description: z.string().optional().describe('Milestone description'),
-      deadline: z.string().optional().describe('Deadline date (YYYYMMDD)'),
-      responsiblePartyIds: z.string().optional().describe('Comma-separated person IDs'),
+      deadline: z
+        .string()
+        .optional()
+        .describe('Deadline date (YYYYMMDD, required for create)'),
+      responsiblePartyIds: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated person IDs (required for create). Call list_people to discover IDs.'
+        ),
       tags: z.string().optional().describe('Comma-separated tags')
     })
   )
@@ -45,8 +53,14 @@ export let manageMilestone = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.projectId) throw new Error('projectId is required to create a milestone');
-      if (!ctx.input.title) throw new Error('title is required to create a milestone');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required to create a milestone');
+      if (!ctx.input.title)
+        throw createApiServiceError('title is required to create a milestone');
+      if (!ctx.input.deadline)
+        throw createApiServiceError('deadline is required to create a milestone');
+      if (!ctx.input.responsiblePartyIds)
+        throw createApiServiceError('responsiblePartyIds is required to create a milestone');
       let result = await client.createMilestone(ctx.input.projectId, {
         title: ctx.input.title,
         description: ctx.input.description,
@@ -54,7 +68,7 @@ export let manageMilestone = SlateTool.create(spec, {
         responsiblePartyIds: ctx.input.responsiblePartyIds,
         tags: ctx.input.tags
       });
-      let milestoneId = result.milestoneId || result.id;
+      let milestoneId = result.milestoneid || result.milestoneId || result.id;
       return {
         output: {
           milestoneId: milestoneId ? String(milestoneId) : undefined,
@@ -66,7 +80,7 @@ export let manageMilestone = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.milestoneId)
-        throw new Error('milestoneId is required to update a milestone');
+        throw createApiServiceError('milestoneId is required to update a milestone');
       await client.updateMilestone(ctx.input.milestoneId, {
         title: ctx.input.title,
         description: ctx.input.description,
@@ -82,7 +96,7 @@ export let manageMilestone = SlateTool.create(spec, {
 
     if (action === 'complete') {
       if (!ctx.input.milestoneId)
-        throw new Error('milestoneId is required to complete a milestone');
+        throw createApiServiceError('milestoneId is required to complete a milestone');
       await client.completeMilestone(ctx.input.milestoneId);
       return {
         output: { milestoneId: ctx.input.milestoneId, completed: true },
@@ -92,7 +106,7 @@ export let manageMilestone = SlateTool.create(spec, {
 
     if (action === 'reopen') {
       if (!ctx.input.milestoneId)
-        throw new Error('milestoneId is required to reopen a milestone');
+        throw createApiServiceError('milestoneId is required to reopen a milestone');
       await client.reopenMilestone(ctx.input.milestoneId);
       return {
         output: { milestoneId: ctx.input.milestoneId, reopened: true },
@@ -102,7 +116,7 @@ export let manageMilestone = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.milestoneId)
-        throw new Error('milestoneId is required to delete a milestone');
+        throw createApiServiceError('milestoneId is required to delete a milestone');
       await client.deleteMilestone(ctx.input.milestoneId);
       return {
         output: { milestoneId: ctx.input.milestoneId, deleted: true },
@@ -110,6 +124,6 @@ export let manageMilestone = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

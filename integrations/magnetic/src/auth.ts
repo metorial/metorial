@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let http = createAxios({
-  baseURL: 'https://app.magnetichq.com/Magnetic/rest/coreAPI'
-});
+import { MagneticClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -33,19 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await http.get('/user', {
-        params: {
-          token: ctx.output.token
-        }
-      });
-
-      let user = response.data;
+      let user = await new MagneticClient({ token: ctx.output.token }).getUser();
 
       return {
         profile: {
           id: String(user.id),
-          name: user.fullName,
-          email: user.email
+          name: typeof user.fullName === 'string' ? user.fullName : String(user.id),
+          email: typeof user.email === 'string' ? user.email : undefined
         }
       };
     }

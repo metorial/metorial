@@ -3,7 +3,9 @@ import { spec } from './spec';
 import {
   cancelOrder,
   downloadCertificate,
+  getCurrentUser,
   getOrder,
+  getOrderValidation,
   listDomains,
   listOrders,
   listOrganizations,
@@ -18,9 +20,11 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     orderCertificate,
     listOrders,
     getOrder,
+    getOrderValidation,
     revokeCertificate,
     reissueCertificate,
     downloadCertificate,

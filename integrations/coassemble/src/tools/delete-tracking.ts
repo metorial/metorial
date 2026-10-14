@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteTracking = SlateTool.create(spec, {
   name: 'Delete Tracking',
   key: 'delete_tracking',
-  description: `Delete a learner's tracking record for a specific course. This removes progress data for the given learner and course combination.`,
+  description: `Soft-delete a learner's tracking for a course. Outcome records remain for reporting, while hosted SCORM resume state and runtime logs are permanently removed and the learner can no longer launch or resume the course.`,
   tags: {
     destructive: true
   }
@@ -14,7 +14,11 @@ export let deleteTracking = SlateTool.create(spec, {
   .input(
     z.object({
       courseId: z.string().describe('Course ID of the tracking to delete'),
-      identifier: z.string().describe('Learner identifier whose tracking to delete')
+      identifier: z.string().describe('Learner identifier whose tracking to delete'),
+      clientIdentifier: z
+        .string()
+        .optional()
+        .describe('Restrict deletion to the learner in this client/tenant')
     })
   )
   .output(
@@ -29,11 +33,18 @@ export let deleteTracking = SlateTool.create(spec, {
       authScheme: ctx.auth.authScheme
     });
 
-    await client.deleteTracking(ctx.input.courseId, ctx.input.identifier);
+    let result = await client.deleteTracking(
+      ctx.input.courseId,
+      ctx.input.identifier,
+      ctx.input.clientIdentifier
+    );
+    let success = result !== false;
 
     return {
-      output: { success: true },
-      message: `Deleted tracking for learner \`${ctx.input.identifier}\` on course **${ctx.input.courseId}**.`
+      output: { success },
+      message: success
+        ? `Deleted tracking for learner \`${ctx.input.identifier}\` on course **${ctx.input.courseId}**.`
+        : `Coassemble did not delete tracking for learner \`${ctx.input.identifier}\` on course **${ctx.input.courseId}**.`
     };
   })
   .build();

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, subscriberDetails } from '../lib/client';
 import { spec } from '../spec';
 
 export let listSubscribers = SlateTool.create(spec, {
@@ -28,7 +28,15 @@ export let listSubscribers = SlateTool.create(spec, {
       subscribers: z
         .array(
           z.object({
-            subscriberId: z.number().describe('Unique ID'),
+            subscriberId: z
+              .number()
+              .optional()
+              .describe('Legacy numeric subscriber ID, when returned by Sender'),
+            subscriberKey: z
+              .string()
+              .describe(
+                'Subscriber ID. Pass this value to get_subscriber or update_subscriber as identifier'
+              ),
             email: z.string().describe('Email address'),
             firstname: z.string().nullable().describe('First name'),
             lastname: z.string().nullable().describe('Last name'),
@@ -51,14 +59,7 @@ export let listSubscribers = SlateTool.create(spec, {
 
     return {
       output: {
-        subscribers: result.data.map(s => ({
-          subscriberId: s.id,
-          email: s.email,
-          firstname: s.firstname,
-          lastname: s.lastname,
-          subscriberStatus: s.subscriber_status,
-          createdAt: s.created
-        })),
+        subscribers: result.data.map(subscriberDetails),
         currentPage: result.meta.current_page,
         lastPage: result.meta.last_page,
         total: result.meta.total

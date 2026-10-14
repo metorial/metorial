@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'async-interview',
   name: 'Async Interview',
   description:
-    'Asynchronous video interviewing platform for managing interview jobs, collecting candidate video/audio/text responses, and automating recruitment workflows.',
+    'Review interview jobs and retrieve candidate responses with video, audio, and text answers from Async Interview.',
   metadata: {},
   config,
   auth

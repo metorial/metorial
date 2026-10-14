@@ -13,7 +13,14 @@ let historyEntrySchema = z.object({
   reason: z.string().optional().describe('Reason for the reputation entry'),
   score: z.number().optional().describe('Risk score at this point in time'),
   cats: z.record(z.string(), z.number()).optional().describe('Category scores at this point'),
-  geo: z.record(z.string(), z.number()).optional().describe('Geolocation data at this point')
+  geo: z
+    .record(z.string(), z.number())
+    .optional()
+    .describe('Numeric geolocation data at this point'),
+  geolocation: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Full geolocation data at this point')
 });
 
 export let lookupIpReputation = SlateTool.create(spec, {
@@ -127,7 +134,18 @@ Supports IPv4 and IPv6 addresses. Categories include Spam, Malware, Bots, Scanni
     if (ctx.input.includeHistory) {
       ctx.progress('Fetching reputation history...');
       let historyData = await client.getIpHistory(ctx.input.ip);
-      result.history = historyData.history || [];
+      result.history = (historyData.history || []).map((history: any) => ({
+        created: history.created ?? undefined,
+        reason: history.reason ?? undefined,
+        score: history.score ?? undefined,
+        cats: history.cats ?? undefined,
+        geo: history.geo
+          ? Object.fromEntries(
+              Object.entries(history.geo).filter(([, value]) => typeof value === 'number')
+            )
+          : undefined,
+        geolocation: history.geo ?? undefined
+      }));
     }
 
     if (ctx.input.includeMalware) {

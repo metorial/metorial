@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { HereClient } from '../lib/client';
 import { spec } from '../spec';
 
+let routeCoordinateSchema = z.object({
+  lat: z.number(),
+  lng: z.number(),
+  elv: z.number().optional().describe('WGS84 elevation in meters, when requested')
+});
+
 let sectionSchema = z.object({
   sectionId: z.string().optional().describe('Section identifier'),
   type: z.string().optional().describe('Section type (e.g. vehicle, pedestrian, transit)'),
@@ -12,8 +18,8 @@ let sectionSchema = z.object({
       place: z
         .object({
           type: z.string().optional(),
-          location: z.object({ lat: z.number(), lng: z.number() }).optional(),
-          originalLocation: z.object({ lat: z.number(), lng: z.number() }).optional()
+          location: routeCoordinateSchema.optional(),
+          originalLocation: routeCoordinateSchema.optional()
         })
         .optional()
     })
@@ -24,8 +30,8 @@ let sectionSchema = z.object({
       place: z
         .object({
           type: z.string().optional(),
-          location: z.object({ lat: z.number(), lng: z.number() }).optional(),
-          originalLocation: z.object({ lat: z.number(), lng: z.number() }).optional()
+          location: routeCoordinateSchema.optional(),
+          originalLocation: routeCoordinateSchema.optional()
         })
         .optional()
     })
@@ -37,7 +43,25 @@ let sectionSchema = z.object({
       baseDuration: z.number().optional().describe('Base duration without traffic in seconds')
     })
     .optional(),
-  polyline: z.string().optional().describe('Flexible polyline encoded route geometry'),
+  polyline: z
+    .string()
+    .optional()
+    .describe(
+      'Flexible polyline encoded route geometry; includes a third elevation dimension when polyline and elevation are requested'
+    ),
+  actions: z
+    .array(z.unknown())
+    .optional()
+    .describe('Turn-by-turn actions, including requested instructions'),
+  turnByTurnActions: z
+    .array(z.unknown())
+    .optional()
+    .describe('Detailed turn-by-turn guidance'),
+  tolls: z.array(z.unknown()).optional().describe('Toll costs for this section'),
+  notices: z
+    .array(z.unknown())
+    .optional()
+    .describe('Route warnings and violated restrictions'),
   transport: z
     .object({
       mode: z.string().optional()
@@ -47,6 +71,8 @@ let sectionSchema = z.object({
 
 let routeSchema = z.object({
   routeId: z.string().optional().describe('Route identifier'),
+  routeHandle: z.string().optional().describe('Handle for temporary route reuse'),
+  notices: z.array(z.unknown()).optional().describe('Provider notices applying to this route'),
   sections: z.array(sectionSchema).optional().describe('Route sections')
 });
 
@@ -58,6 +84,8 @@ Supports truck-specific parameters (weight, height, hazardous goods), toll avoid
   instructions: [
     'Coordinates must be in "lat,lng" format (e.g. "52.5308,13.3847").',
     'Use "returnFields" to control response detail: "summary", "polyline", "actions", "instructions", "tolls", "elevation".',
+    'Request both "polyline" and "elevation" for a 3D elevation profile encoded in the flexible polyline.',
+    'Review response, route, and section notices before using a route, especially notices with critical severity.',
     'For truck routing, set transportMode to "truck" and provide truck parameters.',
     'Set departureTime to "any" for traffic-independent results, or an ISO 8601 datetime for traffic-aware routing.'
   ],
@@ -116,7 +144,13 @@ Supports truck-specific parameters (weight, height, hazardous goods), toll avoid
   )
   .output(
     z.object({
-      routes: z.array(routeSchema).describe('Calculated routes')
+      routes: z.array(routeSchema).describe('Calculated routes'),
+      notices: z
+        .array(z.unknown())
+        .optional()
+        .describe(
+          'Provider request and calculation notices, including reasons for an empty routes array'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -150,6 +184,8 @@ Supports truck-specific parameters (weight, height, hazardous goods), toll avoid
 
     let routes = (response.routes || []).map((route: any, index: number) => ({
       routeId: route.id || `route-${index}`,
+      routeHandle: route.routeHandle,
+      notices: route.notices,
       sections: route.sections?.map((section: any) => ({
         sectionId: section.id,
         type: section.type,
@@ -157,6 +193,10 @@ Supports truck-specific parameters (weight, height, hazardous goods), toll avoid
         arrival: section.arrival,
         summary: section.summary,
         polyline: section.polyline,
+        actions: section.actions,
+        turnByTurnActions: section.turnByTurnActions,
+        tolls: section.tolls,
+        notices: section.notices,
         transport: section.transport
       }))
     }));
@@ -176,7 +216,7 @@ Supports truck-specific parameters (weight, height, hazardous goods), toll avoid
     let distanceKm = (totalLength / 1000).toFixed(1);
 
     return {
-      output: { routes },
+      output: { routes, notices: response.notices },
       message:
         routes.length > 0
           ? `Calculated **${routes.length}** route(s) by **${ctx.input.transportMode}**. Best route: **${distanceKm} km**, **${durationMin} min**.`

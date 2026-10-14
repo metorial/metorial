@@ -1,4 +1,4 @@
-# Slates Specification for Rocketlane
+# Rocketlane Integration Specification
 
 ## Overview
 
@@ -58,7 +58,7 @@ Create and manage conversations within projects, including adding/removing membe
 
 ### Custom Fields
 
-Create, update, delete, and list custom fields for projects, tasks, and companies. Field options can be added and updated for dropdown-type fields. Separate endpoints exist for listing project fields, task fields, company fields, and company note fields.
+Create, update, delete, and list custom fields for projects, tasks, and companies. Field options can be added and updated for dropdown-type fields. The fields endpoint uses `objectType.eq` to select project, task, or company fields. Field options use provider-assigned numeric option IDs. Creation sends a label and a documented color; the optional color input defaults to GRAY.
 
 ### Templates
 
@@ -71,6 +71,20 @@ Retrieve resource allocation data across projects, enabling visibility into team
 ### Financials
 
 Search invoices and retrieve subscription details. Supports listing available currencies.
+
+## Tool API conventions
+
+- Project templates use `sources`, and project members use `teamMembers.members`. Project creation requires a customer and an owner, plus a start date when applying a template.
+- Task creation references `project`, `phase`, and `parent` objects. Effort maps to `effortInMinutes`, descriptions to `taskDescription`, and status to `{ value: <numeric option ID> }`. The public task output retains flattened project/phase IDs and arrays of assignees/followers.
+- Task assignee/follower updates use the dedicated add/remove relationship endpoints. Moving a task uses `/tasks/{taskId}/move-phase`.
+- Time-entry duration maps to `minutes`; task/project, user, and category identifiers use nested objects. Description maps to `notes`. Updating a time entry preserves the existing date or minutes when omitted.
+- List responses expose cursor pagination. Supply `pageToken` from `pagination.nextPageToken` within 15 minutes. Legacy `offset` inputs traverse pages; use cursor pagination for large results.
+- `list_phases` and `list_spaces` require a project ID at invocation. `list_resource_allocations` requires a start/end date range.
+- `get_company` and `get_phase` retrieve the individual company/phase from their corresponding discovery tools.
+- The current API reference does not provide a documented API-key-owner identity endpoint. No inferred identity endpoint is called.
+- Invoice project filtering is applied to each provider page using its `projects` relationships; pagination and status filtering still use the provider API.
+
+Official API reference: https://developer.rocketlane.com/reference
 
 ## Events
 

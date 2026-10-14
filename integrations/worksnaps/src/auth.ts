@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,26 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.worksnaps.com/api',
-        auth: {
-          username: ctx.output.token,
-          password: 'ignored'
-        },
-        headers: {
-          Accept: 'application/xml'
-        }
-      });
-
-      let response = await client.get('/me.xml');
-      let xml = response.data as string;
-
-      let id = extractXmlValue(xml, 'id');
-      let email = extractXmlValue(xml, 'email');
-      let firstName = extractXmlValue(xml, 'first-name');
-      let lastName = extractXmlValue(xml, 'last-name');
-      let login = extractXmlValue(xml, 'login');
-
+      let user = await new Client(ctx.output.token).getCurrentUser();
+      let id = typeof user.id === 'string' ? user.id : undefined;
+      if (!id) throw createApiServiceError('Worksnaps returned a current user without an ID.');
+      let email = typeof user.email === 'string' ? user.email : undefined;
+      let firstName = typeof user.firstName === 'string' ? user.firstName : undefined;
+      let lastName = typeof user.lastName === 'string' ? user.lastName : undefined;
+      let login = typeof user.login === 'string' ? user.login : undefined;
       let name = [firstName, lastName].filter(Boolean).join(' ') || login || undefined;
 
       return {
@@ -60,9 +48,3 @@ export let auth = SlateAuth.create()
       };
     }
   });
-
-let extractXmlValue = (xml: string, tag: string): string | undefined => {
-  let regex = new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`);
-  let match = xml.match(regex);
-  return match?.[1] || undefined;
-};

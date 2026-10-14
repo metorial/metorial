@@ -5,13 +5,16 @@ import {
   createMeetingEvent,
   deleteMeetingEvent,
   getCall,
+  getCallNote,
   getMeetingEvent,
   getPresignedUrl,
   launchMeetingAssistant,
+  listCallNotes,
   listCalls,
   listMeetingEvents,
   listTeams,
-  listUsers
+  listUsers,
+  updateCallNote
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -26,7 +29,10 @@ export let provider = Slate.create({
     getMeetingEvent,
     createMeetingEvent,
     deleteMeetingEvent,
-    launchMeetingAssistant
+    launchMeetingAssistant,
+    listCallNotes,
+    getCallNote,
+    updateCallNote
   ],
   triggers: []
 });

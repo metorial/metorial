@@ -8,7 +8,7 @@ export let addMessages = SlateTool.create(spec, {
   key: 'add_messages',
   description: `Add one or more chat messages to a thread. Messages are stored in thread history and automatically processed into the user's knowledge graph. Supports batch mode for concurrent processing of large message sets.`,
   instructions: [
-    'Use batch mode for adding more than a few messages at once for better throughput.',
+    'Batch mode queues messages for asynchronous processing. The batch endpoint remains available for existing workflows but is deprecated by Zep.',
     'Set returnContext to true if you need the assembled context immediately after adding messages.'
   ],
   tags: {
@@ -26,7 +26,17 @@ export let addMessages = SlateTool.create(spec, {
               .enum(['user', 'assistant', 'system', 'tool'])
               .describe('Role of the message sender'),
             content: z.string().describe('Message content text'),
-            name: z.string().optional().describe('Optional speaker name for display')
+            name: z.string().optional().describe('Optional speaker name for display'),
+            createdAt: z
+              .string()
+              .optional()
+              .describe('Original message timestamp in ISO 8601 format'),
+            metadata: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe(
+                'Message metadata, up to ten keys with scalar values or arrays of scalars'
+              )
           })
         )
         .min(1)
@@ -42,7 +52,11 @@ export let addMessages = SlateTool.create(spec, {
       batch: z
         .boolean()
         .optional()
-        .describe('Use batch mode for concurrent processing of messages')
+        .describe('Use the legacy batch endpoint for asynchronous processing of messages'),
+      strictOntology: z
+        .boolean()
+        .optional()
+        .describe('Only extract entities matching the configured ontology')
     })
   )
   .output(
@@ -52,31 +66,45 @@ export let addMessages = SlateTool.create(spec, {
         .optional()
         .nullable()
         .describe('Assembled context if returnContext was true'),
-      messageCount: z.number().describe('Number of messages added')
+      messageCount: z.number().describe('Number of messages added'),
+      messageUuids: z
+        .array(z.string())
+        .optional()
+        .describe('UUIDs assigned to stored messages'),
+      taskId: z
+        .string()
+        .optional()
+        .describe('Task ID for asynchronous processing, when returned')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
 
     let params = {
-      messages: ctx.input.messages,
+      messages: ctx.input.messages.map(message => ({
+        role: message.role,
+        content: message.content,
+        name: message.name,
+        created_at: message.createdAt,
+        metadata: message.metadata
+      })),
       ignoreRoles: ctx.input.ignoreRoles,
-      returnContext: ctx.input.returnContext
+      returnContext: ctx.input.returnContext,
+      strictOntology: ctx.input.strictOntology
     };
 
-    let result: any;
-    if (ctx.input.batch) {
-      result = await client.addMessagesBatch(ctx.input.threadId, params);
-    } else {
-      result = await client.addMessages(ctx.input.threadId, params);
-    }
+    let result = ctx.input.batch
+      ? await client.addMessagesBatch(ctx.input.threadId, params)
+      : await client.addMessages(ctx.input.threadId, params);
 
     return {
       output: {
         context: result?.context,
-        messageCount: ctx.input.messages.length
+        messageCount: ctx.input.messages.length,
+        messageUuids: result.message_uuids,
+        taskId: result.task_id
       },
-      message: `Added **${ctx.input.messages.length}** message(s) to thread **${ctx.input.threadId}**${ctx.input.batch ? ' (batch mode)' : ''}.`
+      message: `${ctx.input.batch ? 'Queued' : 'Added'} **${ctx.input.messages.length}** message(s) for thread **${ctx.input.threadId}**${ctx.input.batch ? ' (batch mode)' : ''}.`
     };
   })
   .build();

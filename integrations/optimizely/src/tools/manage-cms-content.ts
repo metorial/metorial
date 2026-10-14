@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmsClient } from '../lib/cms-client';
 import { spec } from '../spec';
@@ -42,10 +42,15 @@ Content items are managed as structured data with typed properties. Use this to 
       parentKey: z
         .string()
         .optional()
-        .describe('Parent content key (for create or filtering list)'),
+        .describe('Parent container content key (for create; required for list)'),
       name: z.string().optional().describe('Content name (for create/update)'),
       locale: z.string().optional().describe('Locale code (for create/get)'),
-      version: z.string().optional().describe('Content version (for get)'),
+      version: z
+        .string()
+        .optional()
+        .describe(
+          'Content version (for get/update/publish); required when more than one version exists'
+        ),
       status: z.string().optional().describe('Content status (for create/update)'),
       properties: z
         .record(z.string(), z.any())
@@ -81,19 +86,20 @@ Content items are managed as structured data with typed properties. Use this to 
         };
       }
       case 'get': {
-        if (!ctx.input.contentKey) throw new Error('contentKey is required');
+        if (!ctx.input.contentKey) throw createApiServiceError('contentKey is required');
         let content = await client.getContent(ctx.input.contentKey, {
           locale: ctx.input.locale,
           version: ctx.input.version
         });
         return {
           output: { content },
-          message: `Retrieved CMS content **${content.name || ctx.input.contentKey}**.`
+          message: `Retrieved CMS content **${content.displayName || content.name || ctx.input.contentKey}**.`
         };
       }
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required');
-        if (!ctx.input.contentTypeKey) throw new Error('contentTypeKey is required');
+        if (!ctx.input.name) throw createApiServiceError('name is required');
+        if (!ctx.input.contentTypeKey)
+          throw createApiServiceError('contentTypeKey is required');
         let content = await client.createContent({
           name: ctx.input.name,
           contentType: ctx.input.contentTypeKey,
@@ -104,23 +110,27 @@ Content items are managed as structured data with typed properties. Use this to 
         });
         return {
           output: { content },
-          message: `Created CMS content **${content.name}**.`
+          message: `Created CMS content **${content.displayName || content.name}**.`
         };
       }
       case 'update': {
-        if (!ctx.input.contentKey) throw new Error('contentKey is required');
-        let content = await client.updateContent(ctx.input.contentKey, {
-          name: ctx.input.name,
-          properties: ctx.input.properties,
-          status: ctx.input.status
-        });
+        if (!ctx.input.contentKey) throw createApiServiceError('contentKey is required');
+        let content = await client.updateContent(
+          ctx.input.contentKey,
+          {
+            name: ctx.input.name,
+            properties: ctx.input.properties,
+            status: ctx.input.status
+          },
+          { locale: ctx.input.locale, version: ctx.input.version }
+        );
         return {
           output: { content },
-          message: `Updated CMS content **${content.name || ctx.input.contentKey}**.`
+          message: `Updated CMS content **${content.displayName || content.name || ctx.input.contentKey}**.`
         };
       }
       case 'delete': {
-        if (!ctx.input.contentKey) throw new Error('contentKey is required');
+        if (!ctx.input.contentKey) throw createApiServiceError('contentKey is required');
         await client.deleteContent(ctx.input.contentKey);
         return {
           output: {},
@@ -128,8 +138,11 @@ Content items are managed as structured data with typed properties. Use this to 
         };
       }
       case 'publish': {
-        if (!ctx.input.contentKey) throw new Error('contentKey is required');
-        let content = await client.publishContent(ctx.input.contentKey);
+        if (!ctx.input.contentKey) throw createApiServiceError('contentKey is required');
+        let content = await client.publishContent(ctx.input.contentKey, {
+          locale: ctx.input.locale,
+          version: ctx.input.version
+        });
         return {
           output: { content },
           message: `Published CMS content **${ctx.input.contentKey}**.`
@@ -147,11 +160,12 @@ Content items are managed as structured data with typed properties. Use this to 
         };
       }
       case 'get_type': {
-        if (!ctx.input.contentTypeKey) throw new Error('contentTypeKey is required');
+        if (!ctx.input.contentTypeKey)
+          throw createApiServiceError('contentTypeKey is required');
         let contentType = await client.getContentType(ctx.input.contentTypeKey);
         return {
           output: { contentType },
-          message: `Retrieved CMS content type **${contentType.name || ctx.input.contentTypeKey}**.`
+          message: `Retrieved CMS content type **${contentType.displayName || contentType.name || ctx.input.contentTypeKey}**.`
         };
       }
     }

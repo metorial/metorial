@@ -1,7 +1,16 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  isApiErrorRecord
+} from 'slates';
 
 export interface ClientConfig {
   token: string;
+  apiKey?: string;
+  expiresAt?: string;
+  refreshToken?: string;
 }
 
 export interface ListOptions {
@@ -13,13 +22,41 @@ export class Client {
   private http;
 
   constructor(config: ClientConfig) {
-    this.http = createAxios({
+    if (!(config.apiKey || config.token)) {
+      throw createApiServiceError('Reconnect ServiceM8 with a valid API key or OAuth token.');
+    }
+    let apiKey =
+      config.apiKey ||
+      (config.expiresAt === undefined && config.refreshToken === undefined
+        ? config.token
+        : undefined);
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.servicem8.com/api_1.0',
+      authHeader: apiKey
+        ? { name: 'X-API-Key', value: apiKey }
+        : { value: `Bearer ${config.token}` },
       headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
         Accept: 'application/json'
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ServiceM8',
+          reason: 'servicem8_api_error'
+        })
+    });
+    this.http.interceptors.response.use(response => {
+      let data: unknown = response.data;
+      if (
+        isApiErrorRecord(data) &&
+        data.errorCode !== undefined &&
+        Number(data.errorCode) !== 0
+      ) {
+        throw createApiServiceError(
+          typeof data.message === 'string' ? data.message : 'ServiceM8 rejected the request.',
+          { upstreamStatus: response.status, upstreamCode: String(data.errorCode) }
+        );
       }
+      return response;
     });
   }
 
@@ -30,30 +67,52 @@ export class Client {
     if (options?.filter) {
       params.$filter = options.filter;
     }
-    if (options?.pageStart) {
-      params['%next_page_start%'] = options.pageStart;
+    let cursor = options?.pageStart ?? '-1';
+    let seen = new Set<string>();
+    let records: any[] = [];
+    while (cursor) {
+      if (seen.has(cursor)) {
+        throw createApiServiceError('ServiceM8 returned a repeated pagination cursor.');
+      }
+      seen.add(cursor);
+      let response = await this.http.get(`/${resource}.json`, {
+        params: { ...params, cursor }
+      });
+      if (!Array.isArray(response.data)) {
+        throw createApiServiceError(`ServiceM8 did not return a list of ${resource} records.`);
+      }
+      records.push(...response.data);
+      cursor = getResponseHeaderValue(response.headers, 'x-next-cursor') ?? '';
     }
-    let response = await this.http.get(`/${resource}.json`, { params });
-    return response.data;
+    return records;
   }
 
   async get(resource: string, uuid: string): Promise<any> {
-    let response = await this.http.get(`/${resource}/${uuid}.json`);
+    let response = await this.http.get(`/${resource}/${encodeURIComponent(uuid)}.json`);
     return response.data;
   }
 
   async create(resource: string, data: Record<string, any>): Promise<string> {
     let response = await this.http.post(`/${resource}.json`, data);
-    let recordUuid = response.headers?.['x-record-uuid'] || response.data?.uuid;
+    let recordUuid =
+      getResponseHeaderValue(response.headers, 'x-record-uuid') || response.data?.uuid;
+    if (typeof recordUuid !== 'string' || !recordUuid) {
+      throw createApiServiceError(
+        'ServiceM8 did not confirm the created record UUID. Check the account before retrying.'
+      );
+    }
     return recordUuid;
   }
 
   async update(resource: string, uuid: string, data: Record<string, any>): Promise<void> {
-    await this.http.post(`/${resource}/${uuid}.json`, data);
+    if (!Object.keys(data).length) {
+      throw createApiServiceError('Provide at least one field to update.');
+    }
+    await this.http.post(`/${resource}/${encodeURIComponent(uuid)}.json`, data);
   }
 
   async remove(resource: string, uuid: string): Promise<void> {
-    await this.http.delete(`/${resource}/${uuid}.json`);
+    await this.http.delete(`/${resource}/${encodeURIComponent(uuid)}.json`);
   }
 
   // --- Jobs ---

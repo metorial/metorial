@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let clientOutputSchema = z.object({
@@ -15,11 +16,12 @@ let clientOutputSchema = z.object({
 export let createClient = SlateTool.create(spec, {
   name: 'Create Client',
   key: 'create_client',
-  description: `Create a new client in the Clockify workspace. Clients can be associated with projects for billing and reporting.`,
+  description: `Create a new client in the Clockify workspace. Clients can be associated with projects for billing and reporting. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Client name'),
       email: z.string().optional().describe('Client email address'),
       address: z.string().optional().describe('Client address'),
@@ -28,11 +30,7 @@ export let createClient = SlateTool.create(spec, {
   )
   .output(clientOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let result = await client.createClient({
       name: ctx.input.name,
@@ -58,11 +56,12 @@ export let createClient = SlateTool.create(spec, {
 export let updateClient = SlateTool.create(spec, {
   name: 'Update Client',
   key: 'update_client',
-  description: `Update an existing client in Clockify. Modify name, email, address, notes, or archive status.`,
+  description: `Update an existing client in Clockify. Modify name, email, address, notes, or archive status. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       clientId: z.string().describe('ID of the client to update'),
       name: z.string().optional().describe('Updated name'),
       email: z.string().optional().describe('Updated email'),
@@ -73,11 +72,7 @@ export let updateClient = SlateTool.create(spec, {
   )
   .output(clientOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let result = await client.updateClient(ctx.input.clientId, {
       name: ctx.input.name,
@@ -104,11 +99,12 @@ export let updateClient = SlateTool.create(spec, {
 export let deleteClient = SlateTool.create(spec, {
   name: 'Delete Client',
   key: 'delete_client',
-  description: `Delete a client from the Clockify workspace.`,
+  description: `Delete a client from the Clockify workspace. Call get_workspaces to discover the workspace ID.`,
   tags: { destructive: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       clientId: z.string().describe('ID of the client to delete')
     })
   )
@@ -118,11 +114,7 @@ export let deleteClient = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     await client.deleteClient(ctx.input.clientId);
 
@@ -136,15 +128,26 @@ export let deleteClient = SlateTool.create(spec, {
 export let getClients = SlateTool.create(spec, {
   name: 'Get Clients',
   key: 'get_clients',
-  description: `List clients in the Clockify workspace. Filter by name or archived status.`,
+  description: `List clients in the Clockify workspace. Filter by name or archived status. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().optional().describe('Filter by client name (partial match)'),
       archived: z.boolean().optional().describe('Filter by archived status'),
-      page: z.number().optional().describe('Page number'),
-      pageSize: z.number().optional().describe('Entries per page')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Page number'),
+      pageSize: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Entries per page')
     })
   )
   .output(
@@ -154,11 +157,7 @@ export let getClients = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let results = await client.getClients({
       name: ctx.input.name,

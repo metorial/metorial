@@ -1,18 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BusinessClient } from '../lib/client';
+import { botIdSchema, pageSchema, sizeSchema, workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listConversations = SlateTool.create(spec, {
   name: 'List Conversations',
   key: 'list_conversations',
   description: `Retrieve a paginated list of all conversations for a bot. Supports filtering by date range, searching, sorting by recency or sentiment, and pagination. Useful for reviewing interactions and analytics.`,
+  instructions: [
+    'For account API key connections, call list_bots and provide botId. A Bot API Token connection targets the bot owning that token.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       searchQuery: z
         .string()
         .optional()
@@ -30,8 +36,8 @@ export let listConversations = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter conversations updated before this ISO 8601 datetime'),
-      page: z.number().optional().describe('Page number (starts at 1)'),
-      size: z.number().optional().describe('Number of results per page (1-100, default 50)')
+      page: pageSchema,
+      size: sizeSchema
     })
   )
   .output(
@@ -48,13 +54,18 @@ export let listConversations = SlateTool.create(spec, {
           })
         )
         .describe('List of conversations'),
-      total: z.number().describe('Total number of conversations'),
-      page: z.number().describe('Current page number'),
-      pages: z.number().describe('Total number of pages')
+      total: z.number().optional().describe('Total number of conversations'),
+      page: z.number().optional().describe('Current page number'),
+      pages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     let result = await client.listConversations({
       searchQuery: ctx.input.searchQuery,
@@ -78,11 +89,11 @@ export let listConversations = SlateTool.create(spec, {
     return {
       output: {
         conversations,
-        total: result.total,
-        page: result.page,
-        pages: result.pages
+        total: result.total ?? undefined,
+        page: result.page ?? undefined,
+        pages: result.pages ?? undefined
       },
-      message: `Found **${result.total}** conversations (page ${result.page}/${result.pages}).`
+      message: `Returned **${conversations.length}** conversations${result.total == null ? '' : ` of ${result.total} total`}.`
     };
   })
   .build();
@@ -91,12 +102,17 @@ export let getConversation = SlateTool.create(spec, {
   name: 'Get Conversation',
   key: 'get_conversation',
   description: `Retrieve the full details of a specific conversation including all messages and metadata. Useful for reviewing a particular chat interaction.`,
+  instructions: [
+    'For account API key connections, call list_bots and provide botId. A Bot API Token connection targets the bot owning that token.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       chatId: z.string().describe('The unique chat ID of the conversation to retrieve')
     })
   )
@@ -119,7 +135,12 @@ export let getConversation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     let result = await client.getConversation(ctx.input.chatId);
 
@@ -130,10 +151,10 @@ export let getConversation = SlateTool.create(spec, {
         ownerId: result.owner_id,
         messageCount: result.num_messages || 0,
         chatMessages: result.chat_data || [],
-        source: result.source,
-        isResolved: result.is_resolved,
-        chatEnded: result.chat_ended,
-        additionalFeedback: result.additional_feedback,
+        source: result.source ?? undefined,
+        isResolved: result.is_resolved ?? undefined,
+        chatEnded: result.chat_ended ?? undefined,
+        additionalFeedback: result.additional_feedback ?? undefined,
         createdAt: result.created_at,
         updatedAt: result.updated_at
       },
@@ -146,12 +167,17 @@ export let endChat = SlateTool.create(spec, {
   name: 'End Chat',
   key: 'end_chat',
   description: `End an active chat session. Optionally provide feedback status (liked/disliked) and a text feedback message.`,
+  instructions: [
+    'For account API key connections, call list_bots and provide botId. A Bot API Token connection targets the bot owning that token.'
+  ],
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       chatId: z.string().describe('The chat ID of the conversation to end'),
       feedbackStatus: z
         .enum(['liked', 'disliked', 'none'])
@@ -167,7 +193,12 @@ export let endChat = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     await client.endChat(ctx.input.chatId, {
       status: ctx.input.feedbackStatus,

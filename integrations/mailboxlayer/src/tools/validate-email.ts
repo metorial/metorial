@@ -10,7 +10,7 @@ export let validateEmail = SlateTool.create(spec, {
 Also detects whether the email belongs to a **free provider** (e.g., Gmail, Yahoo), a **disposable/temporary provider** (e.g., Mailinator), or is a **role-based address** (e.g., support@, info@). If a typo is detected in the domain, a "did you mean" suggestion is provided.`,
   instructions: [
     'Disabling SMTP check significantly speeds up the response but reduces verification accuracy.',
-    'Enabling catch-all detection adds latency due to additional SMTP checks.'
+    'Enabling catch-all detection adds latency due to additional SMTP checks and requires a paid plan.'
   ],
   constraints: [
     'Validates one email address per request. Use the bulk validation tool for multiple addresses.'
@@ -85,11 +85,21 @@ Also detects whether the email belongs to a **free provider** (e.g., Gmail, Yaho
 
     let scoreSummary = result.score !== null ? ` Quality score: **${result.score}**.` : '';
     let suggestion = result.didYouMean ? ` Did you mean **${result.didYouMean}**?` : '';
-    let validity = result.formatValid ? 'valid' : 'invalid';
+    let validity =
+      result.formatValid === null ? 'not checked' : result.formatValid ? 'valid' : 'invalid';
+    let mx = result.mxFound === null ? 'not checked' : result.mxFound ? 'found' : 'not found';
+    let smtp =
+      ctx.input.smtp === false
+        ? 'disabled'
+        : result.smtpCheck === null
+          ? 'not checked'
+          : result.smtpCheck
+            ? 'passed'
+            : 'failed';
 
     return {
       output: result,
-      message: `Validated **${result.email}** — format is ${validity}, MX ${result.mxFound ? 'found' : 'not found'}, SMTP ${result.smtpCheck ? 'passed' : 'failed'}.${scoreSummary}${suggestion}`
+      message: `Validated **${result.email}** — format is ${validity}, MX ${mx}, SMTP ${smtp}.${scoreSummary}${suggestion}`
     };
   })
   .build();

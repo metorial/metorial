@@ -40,7 +40,7 @@ export let postStreamNote = SlateTool.create(spec, {
     return {
       output: {
         noteId: result.id,
-        createdAt: result.createdAt
+        createdAt: result.createdAt ?? undefined
       },
       message: `Note posted to ${ctx.input.entityType} **${ctx.input.recordId}**.`
     };

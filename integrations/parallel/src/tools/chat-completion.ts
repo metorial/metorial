@@ -35,7 +35,7 @@ Compatible with the OpenAI chat completions format.`,
       responseFormat: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('JSON schema for structured output'),
+        .describe('JSON schema for structured output, or an OpenAI response_format envelope'),
       previousInteractionId: z
         .string()
         .optional()
@@ -72,7 +72,11 @@ Compatible with the OpenAI chat completions format.`,
         )
         .nullable()
         .describe('Citations and reasoning (available for lite/base/core models)'),
-      interactionId: z.string().describe('Interaction ID for follow-up chats')
+      interactionId: z
+        .string()
+        .describe(
+          'Interaction ID for follow-up chats, or empty when the model does not provide one'
+        )
     })
   )
   .handleInvocation(async ctx => {

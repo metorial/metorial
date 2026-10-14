@@ -25,7 +25,7 @@ export let getMe = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
     let me = await client.getMe();
 
     return {

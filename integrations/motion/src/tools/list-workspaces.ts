@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MotionClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listWorkspaces = SlateTool.create(spec, {
@@ -25,7 +26,7 @@ export let listWorkspaces = SlateTool.create(spec, {
       workspaces: z
         .array(
           z.object({
-            workspaceId: z.string().describe('Unique identifier of the workspace'),
+            workspaceId: workspaceIdSchema,
             name: z.string().describe('Name of the workspace'),
             teamId: z.string().optional().describe('Team ID'),
             type: z.string().optional().describe('Workspace type (team or individual)'),

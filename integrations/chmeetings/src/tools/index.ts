@@ -2,6 +2,7 @@ export * from './create-person';
 export * from './delete-person';
 export * from './get-person';
 export * from './list-campaigns-pledges';
+export * from './list-events';
 export * from './list-groups';
 export * from './list-organizations';
 export * from './list-people';

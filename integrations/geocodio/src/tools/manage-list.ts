@@ -1,7 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+
+let listState = (response: any, fallback = 'UNKNOWN'): string =>
+  typeof response.status === 'string' ? response.status : (response.status?.state ?? fallback);
 
 export let createGeocodingList = SlateTool.create(spec, {
   name: 'Create Geocoding List',
@@ -26,11 +29,16 @@ Optionally specify a **callbackUrl** to receive a webhook notification when proc
 })
   .input(
     z.object({
-      csvContent: z.string().describe('CSV file content as a string'),
-      filename: z.string().describe('Filename for the uploaded data, e.g. "addresses.csv"'),
+      csvContent: z.string().min(1).describe('CSV file content as a string'),
+      filename: z
+        .string()
+        .trim()
+        .min(1)
+        .describe('Filename for the uploaded data, e.g. "addresses.csv"'),
       direction: z.enum(['forward', 'reverse']).describe('Geocoding direction'),
       formatTemplate: z
         .string()
+        .min(1)
         .describe('Column mapping template, e.g. "{{A}}, {{B}}, {{C}} {{D}}"'),
       fields: z
         .array(z.string())
@@ -38,6 +46,7 @@ Optionally specify a **callbackUrl** to receive a webhook notification when proc
         .describe('Data enrichment fields to append, e.g. ["timezone", "census"]'),
       callbackUrl: z
         .string()
+        .url()
         .optional()
         .describe('Webhook URL to receive notification when processing completes')
     })
@@ -51,6 +60,11 @@ Optionally specify a **callbackUrl** to receive a webhook notification when proc
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.callbackUrl && new URL(ctx.input.callbackUrl).protocol !== 'https:') {
+      throw createApiServiceError(
+        'callbackUrl must be an HTTPS URL with a valid SSL certificate.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let response = await client.createList({
@@ -66,10 +80,10 @@ Optionally specify a **callbackUrl** to receive a webhook notification when proc
       output: {
         listId: response.id,
         filename: response.file?.filename || ctx.input.filename,
-        status: response.status || 'processing',
+        status: listState(response, 'UPLOADED'),
         rows: response.file?.estimated_rows_count
       },
-      message: `Created geocoding list **#${response.id}** (${ctx.input.filename}) with **${response.file?.estimated_rows_count || 'unknown'}** rows. Status: **${response.status || 'processing'}**.`
+      message: `Created geocoding list **#${response.id}** (${ctx.input.filename}) with **${response.file?.estimated_rows_count ?? 'unknown'}** rows. Status: **${listState(response, 'UPLOADED')}**.`
     };
   })
   .build();
@@ -84,7 +98,11 @@ export let getListStatus = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.number().describe('ID of the geocoding list to check')
+      listId: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger, 'Use a whole number')
+        .describe('ID of the geocoding list to check')
     })
   )
   .output(
@@ -109,17 +127,20 @@ export let getListStatus = SlateTool.create(spec, {
     return {
       output: {
         listId: response.id,
-        filename: response.file?.filename,
-        status: response.status,
-        rows: response.file?.estimated_rows_count,
-        geocodedRows: response.file?.geocoded_rows_count,
-        fields: response.fields,
-        progress: response.progress,
-        estimatedTimeRemaining: response.estimated_time_remaining,
-        downloadUrl: response.download_url,
-        expiresAt: response.expires_at
+        filename: response.file?.filename ?? undefined,
+        status: listState(response),
+        rows: response.file?.estimated_rows_count ?? undefined,
+        geocodedRows: response.file?.geocoded_rows_count ?? undefined,
+        fields: response.fields ?? undefined,
+        progress: response.status?.progress ?? response.progress ?? undefined,
+        estimatedTimeRemaining:
+          response.status?.time_left_description ??
+          response.estimated_time_remaining ??
+          undefined,
+        downloadUrl: response.download_url ?? undefined,
+        expiresAt: response.expires_at ?? undefined
       },
-      message: `List **#${response.id}** status: **${response.status}**${response.progress !== undefined ? ` (${response.progress}% complete)` : ''}. ${response.file?.geocoded_rows_count || 0}/${response.file?.estimated_rows_count || '?'} rows geocoded.`
+      message: `List **#${response.id}** status: **${listState(response)}**${response.status?.progress != null ? ` (${response.status.progress}% complete)` : ''}.`
     };
   })
   .build();
@@ -134,7 +155,12 @@ export let getLists = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      page: z.number().optional().describe('Page number for pagination (15 results per page)')
+      page: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger, 'Use a whole number')
+        .optional()
+        .describe('Page number for pagination (15 results per page)')
     })
   )
   .output(
@@ -162,20 +188,20 @@ export let getLists = SlateTool.create(spec, {
 
     let lists = (response.data || response.lists || []).map((item: any) => ({
       listId: item.id,
-      filename: item.file?.filename,
-      status: item.status,
-      rows: item.file?.estimated_rows_count,
-      geocodedRows: item.file?.geocoded_rows_count,
-      createdAt: item.created_at
+      filename: item.file?.filename ?? undefined,
+      status: listState(item),
+      rows: item.file?.estimated_rows_count ?? undefined,
+      geocodedRows: item.file?.geocoded_rows_count ?? undefined,
+      createdAt: item.created_at ?? undefined
     }));
 
     return {
       output: {
         lists,
-        currentPage: response.current_page,
-        totalPages: response.last_page
+        currentPage: response.current_page ?? undefined,
+        totalPages: response.last_page ?? undefined
       },
-      message: `Found **${lists.length}** geocoding list(s)${response.current_page ? ` (page ${response.current_page}/${response.last_page})` : ''}.`
+      message: `Found **${lists.length}** geocoding list(s)${response.current_page ? ` (page ${response.current_page}${response.last_page ? `/${response.last_page}` : ''})` : ''}.`
     };
   })
   .build();
@@ -190,7 +216,11 @@ export let deleteGeocodingList = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.number().describe('ID of the geocoding list to delete')
+      listId: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger, 'Use a whole number')
+        .describe('ID of the geocoding list to delete')
     })
   )
   .output(
@@ -201,7 +231,12 @@ export let deleteGeocodingList = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    await client.deleteList(ctx.input.listId);
+    let response = await client.deleteList(ctx.input.listId);
+    if (response.success !== true) {
+      throw createApiServiceError(
+        'Geocodio did not confirm that the list was deleted. Check get_list_status before retrying.'
+      );
+    }
 
     return {
       output: { success: true },
@@ -213,7 +248,7 @@ export let deleteGeocodingList = SlateTool.create(spec, {
 export let downloadGeocodingList = SlateTool.create(spec, {
   name: 'Download Geocoding List',
   key: 'download_geocoding_list',
-  description: `Downloads the results of a completed geocoding list job as CSV data. Only available when the list status is "completed".`,
+  description: `Downloads the results of a completed geocoding list job as a CSV file. Only available when the list status is "COMPLETED".`,
   constraints: ['Results are only available for 72 hours after processing completes.'],
   tags: {
     readOnly: true
@@ -221,23 +256,41 @@ export let downloadGeocodingList = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.number().describe('ID of the completed geocoding list to download')
+      listId: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger, 'Use a whole number')
+        .describe('ID of the completed geocoding list to download')
     })
   )
   .output(
     z.object({
-      csvContent: z.string().describe('CSV content of the geocoded results')
+      csvContent: z.string().describe('CSV content of the geocoded results'),
+      listId: z.number().describe('ID of the downloaded list'),
+      filename: z.string().describe('Filename of the downloaded CSV')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.downloadList(ctx.input.listId);
-
-    let csvContent = typeof response === 'string' ? response : JSON.stringify(response);
+    let status = await client.getListStatus(ctx.input.listId);
+    if (listState(status).toUpperCase() !== 'COMPLETED') {
+      throw createApiServiceError(
+        'The list is not completed. Check get_list_status and download once its status is COMPLETED.'
+      );
+    }
+    let csvContent = await client.downloadList(ctx.input.listId);
+    let filename = `geocodio-list-${ctx.input.listId}.csv`;
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(csvContent, {
+        headers: { 'content-type': 'text/csv; charset=utf-8' }
+      }),
+      filename
+    });
 
     return {
-      output: { csvContent },
+      output: { csvContent, listId: ctx.input.listId, filename },
       message: `Downloaded results for geocoding list **#${ctx.input.listId}**.`
     };
   })

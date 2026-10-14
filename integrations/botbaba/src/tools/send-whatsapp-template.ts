@@ -6,8 +6,8 @@ import { spec } from '../spec';
 export let sendWhatsAppTemplate = SlateTool.create(spec, {
   name: 'Send WhatsApp Template',
   key: 'send_whatsapp_template',
-  description: `Send a WhatsApp template message to a recipient via your Botbaba chatbot. Supports both **360Dialog** and **Gupshup** WhatsApp Business API providers.
-Specify the recipient's mobile number (with country code), the template to use, and optionally a block to continue the conversation flow after the message is received.`,
+  description: `Submit a WhatsApp template message to a recipient via your Botbaba chatbot. Supports both **360Dialog** and **Gupshup** WhatsApp Business API providers.
+Specify the recipient's mobile number (with country code), the template to use, and optionally a block to continue the conversation flow after the message is received. Use send_whatsapp_template_request when your dashboard provides a complete JSON request body.`,
   instructions: [
     'The mobile number must include the country code without any spaces, dashes, or plus sign (e.g., "919999999999" for India).',
     'The template name must match an approved WhatsApp template configured in your Botbaba account.',
@@ -69,7 +69,7 @@ Specify the recipient's mobile number (with country code), the template to use, 
       output: {
         response: result
       },
-      message: `WhatsApp template message **${ctx.input.templateName}** sent to **${ctx.input.mobileNumber}** via **${ctx.input.provider}**.`
+      message: `WhatsApp template request **${ctx.input.templateName}** submitted to Botbaba for **${ctx.input.mobileNumber}** via **${ctx.input.provider}**. This does not confirm delivery.`
     };
   })
   .build();

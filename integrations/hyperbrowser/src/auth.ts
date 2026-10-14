@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,6 +15,9 @@ export let auth = SlateAuth.create()
       apiKey: z.string().describe('Hyperbrowser API key from https://app.hyperbrowser.ai/')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Provide your Hyperbrowser API key from the dashboard.');
+      }
       return {
         output: {
           token: ctx.input.apiKey

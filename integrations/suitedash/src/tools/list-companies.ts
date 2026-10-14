@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listCompanies = SlateTool.create(spec, {
   name: 'List Companies',
   key: 'list_companies',
-  description: `Retrieves companies from SuiteDash CRM. Returns a paginated list of companies. Specify a page number to navigate through results, or fetch all companies at once.`,
+  description: `Retrieves companies from SuiteDash CRM. Idle companies are excluded by the provider. Specify a page number to navigate through results, or fetch all available companies at once.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -41,7 +41,7 @@ export let listCompanies = SlateTool.create(spec, {
         output: {
           companies: response.data,
           totalPages: response.meta?.pagination?.totalPages,
-          total: response.meta?.pagination?.total
+          total: response.meta?.pagination?.totalItems ?? response.meta?.pagination?.total
         },
         message: `Retrieved **${response.data.length}** companies (page ${ctx.input.page} of ${response.meta?.pagination?.totalPages ?? 1}).`
       };

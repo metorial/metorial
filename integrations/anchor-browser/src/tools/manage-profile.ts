@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -82,7 +82,7 @@ export let manageProfile = SlateTool.create(spec, {
     }
 
     if (input.action === 'get') {
-      if (!input.profileName) throw new Error('profileName is required for get.');
+      if (!input.profileName) throw createApiServiceError('profileName is required for get.');
       let p = await client.getProfile(input.profileName);
       return {
         output: {
@@ -100,7 +100,12 @@ export let manageProfile = SlateTool.create(spec, {
     }
 
     if (input.action === 'create') {
-      if (!input.profileName) throw new Error('profileName is required for create.');
+      if (!input.profileName)
+        throw createApiServiceError('profileName is required for create.');
+      if (!input.sessionId)
+        throw createApiServiceError(
+          'sessionId is required for create. Use an active browser session.'
+        );
       let result = await client.createProfile({
         name: input.profileName,
         description: input.description,
@@ -111,20 +116,20 @@ export let manageProfile = SlateTool.create(spec, {
       return {
         output: {
           profile: {
-            profileName: result.name,
-            description: result.description,
-            source: result.source,
-            sessionId: result.session_id,
-            status: result.status,
-            createdAt: result.created_at
+            profileName: input.profileName,
+            description: input.description,
+            source: 'session',
+            sessionId: input.sessionId,
+            status: result.status
           }
         },
-        message: `Profile **${result.name}** created from session **${result.session_id}**.`
+        message: `Profile **${input.profileName}** requested from session **${input.sessionId}** (status: ${result.status}). The profile is stored when the session ends.`
       };
     }
 
     if (input.action === 'delete') {
-      if (!input.profileName) throw new Error('profileName is required for delete.');
+      if (!input.profileName)
+        throw createApiServiceError('profileName is required for delete.');
       await client.deleteProfile(input.profileName);
       return {
         output: { deleted: true },
@@ -132,6 +137,6 @@ export let manageProfile = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

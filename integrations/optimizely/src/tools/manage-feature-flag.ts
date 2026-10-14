@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FlagsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let manageFeatureFlag = SlateTool.create(spec, {
 Use this to manage feature flag lifecycle including toggling flags on/off per environment and configuring rulesets.`,
   instructions: [
     'Use "enable" or "disable" actions to toggle a flag in a specific environment.',
-    'Use "get_ruleset" to inspect the current ruleset for a flag in an environment.'
+    'Call list_environments to discover environment keys, then use "get_ruleset" to inspect the ruleset.'
   ],
   tags: {
     destructive: false,
@@ -32,7 +32,15 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
           'update_ruleset'
         ])
         .describe('Action to perform'),
-      projectId: z.number().describe('Project ID'),
+      projectId: z
+        .number()
+        .describe('Project ID. Call manage_project with action=list to discover projects.'),
+      perPage: z.number().optional().describe('Maximum flags returned per page (for list)'),
+      page: z.number().optional().describe('Page number (for list)'),
+      pageToken: z
+        .string()
+        .optional()
+        .describe('Page token from a previous result URL (for list)'),
       flagKey: z
         .string()
         .optional()
@@ -59,6 +67,7 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
     z.object({
       flag: z.any().optional().describe('Feature flag data'),
       flags: z.array(z.any()).optional().describe('List of feature flags'),
+      pagination: z.any().optional().describe('Provider pagination information for list'),
       ruleset: z.any().optional().describe('Ruleset data')
     })
   )
@@ -67,14 +76,21 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
 
     switch (ctx.input.action) {
       case 'list': {
-        let flags = await client.listFlags(ctx.input.projectId);
+        let flags = await client.listFlags(ctx.input.projectId, {
+          per_page: ctx.input.perPage,
+          page_number: ctx.input.page,
+          page_token: ctx.input.pageToken
+        });
         return {
-          output: { flags: Array.isArray(flags) ? flags : flags.items || [] },
+          output: {
+            flags: Array.isArray(flags) ? flags : flags.items || [],
+            pagination: Array.isArray(flags) ? undefined : { ...flags, items: undefined }
+          },
           message: `Listed feature flags in project ${ctx.input.projectId}.`
         };
       }
       case 'get': {
-        if (!ctx.input.flagKey) throw new Error('flagKey is required');
+        if (!ctx.input.flagKey) throw createApiServiceError('flagKey is required');
         let flag = await client.getFlag(ctx.input.projectId, ctx.input.flagKey);
         return {
           output: { flag },
@@ -82,8 +98,9 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
         };
       }
       case 'create': {
-        if (!ctx.input.key) throw new Error('key is required for creating a flag');
-        if (!ctx.input.name) throw new Error('name is required for creating a flag');
+        if (!ctx.input.key) throw createApiServiceError('key is required for creating a flag');
+        if (!ctx.input.name)
+          throw createApiServiceError('name is required for creating a flag');
         let flag = await client.createFlag(ctx.input.projectId, {
           key: ctx.input.key,
           name: ctx.input.name,
@@ -95,7 +112,7 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
         };
       }
       case 'update': {
-        if (!ctx.input.flagKey) throw new Error('flagKey is required');
+        if (!ctx.input.flagKey) throw createApiServiceError('flagKey is required');
         let flag = await client.updateFlag(ctx.input.projectId, ctx.input.flagKey, {
           name: ctx.input.name,
           description: ctx.input.description,
@@ -107,7 +124,7 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
         };
       }
       case 'delete': {
-        if (!ctx.input.flagKey) throw new Error('flagKey is required');
+        if (!ctx.input.flagKey) throw createApiServiceError('flagKey is required');
         await client.deleteFlag(ctx.input.projectId, ctx.input.flagKey);
         return {
           output: {},
@@ -115,8 +132,9 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
         };
       }
       case 'enable': {
-        if (!ctx.input.flagKey) throw new Error('flagKey is required');
-        if (!ctx.input.environmentKey) throw new Error('environmentKey is required');
+        if (!ctx.input.flagKey) throw createApiServiceError('flagKey is required');
+        if (!ctx.input.environmentKey)
+          throw createApiServiceError('environmentKey is required');
         let ruleset = await client.enableFlag(
           ctx.input.projectId,
           ctx.input.flagKey,
@@ -128,8 +146,9 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
         };
       }
       case 'disable': {
-        if (!ctx.input.flagKey) throw new Error('flagKey is required');
-        if (!ctx.input.environmentKey) throw new Error('environmentKey is required');
+        if (!ctx.input.flagKey) throw createApiServiceError('flagKey is required');
+        if (!ctx.input.environmentKey)
+          throw createApiServiceError('environmentKey is required');
         let ruleset = await client.disableFlag(
           ctx.input.projectId,
           ctx.input.flagKey,
@@ -141,8 +160,9 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
         };
       }
       case 'get_ruleset': {
-        if (!ctx.input.flagKey) throw new Error('flagKey is required');
-        if (!ctx.input.environmentKey) throw new Error('environmentKey is required');
+        if (!ctx.input.flagKey) throw createApiServiceError('flagKey is required');
+        if (!ctx.input.environmentKey)
+          throw createApiServiceError('environmentKey is required');
         let ruleset = await client.listRulesets(
           ctx.input.projectId,
           ctx.input.flagKey,
@@ -154,9 +174,10 @@ Use this to manage feature flag lifecycle including toggling flags on/off per en
         };
       }
       case 'update_ruleset': {
-        if (!ctx.input.flagKey) throw new Error('flagKey is required');
-        if (!ctx.input.environmentKey) throw new Error('environmentKey is required');
-        if (!ctx.input.rulesetData) throw new Error('rulesetData is required');
+        if (!ctx.input.flagKey) throw createApiServiceError('flagKey is required');
+        if (!ctx.input.environmentKey)
+          throw createApiServiceError('environmentKey is required');
+        if (!ctx.input.rulesetData) throw createApiServiceError('rulesetData is required');
         let ruleset = await client.updateRuleset(
           ctx.input.projectId,
           ctx.input.flagKey,

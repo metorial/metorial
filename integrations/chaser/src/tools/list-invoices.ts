@@ -60,11 +60,14 @@ export let listInvoices = SlateTool.create(spec, {
       date: inv.date || '',
       dueDate: inv.dueDate || '',
       fullyPaidDate: inv.fullyPaidDate ?? null,
+      expectPaymentDate: inv.expectPaymentDate,
       customerExternalId: inv.customerExternalId || '',
       customerName: inv.customerName ?? null,
       payments: inv.payments,
       invoicePdfLink: inv.invoicePdfLink ?? null,
-      invoicePdfLinkUpdatedAt: inv.invoicePdfLinkUpdatedAt ?? null
+      invoicePdfLinkSource: inv.invoicePdfLinkSource,
+      invoicePdfLinkUpdatedAt: inv.invoicePdfLinkUpdatedAt ?? null,
+      chasing: inv.chasing
     }));
 
     return {

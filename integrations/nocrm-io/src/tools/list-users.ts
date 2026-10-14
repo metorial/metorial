@@ -28,7 +28,15 @@ export let listUsers = SlateTool.create(spec, {
           firstname: z.string().optional().describe('First name'),
           lastname: z.string().optional().describe('Last name'),
           isAdmin: z.boolean().optional().describe('Whether user is an admin'),
-          isActive: z.boolean().optional().describe('Whether user is active'),
+          isActive: z
+            .boolean()
+            .optional()
+            .describe('Whether the user is enabled (not disabled)'),
+          isDisabled: z.boolean().optional().describe('Whether the user is disabled'),
+          hasActivated: z
+            .boolean()
+            .optional()
+            .describe('Whether the user activated their account'),
           createdAt: z.string().optional().describe('Account creation timestamp')
         })
       )
@@ -43,7 +51,10 @@ export let listUsers = SlateTool.create(spec, {
       firstname: u.firstname ?? undefined,
       lastname: u.lastname ?? undefined,
       isAdmin: u.is_admin ?? undefined,
-      isActive: u.is_active ?? undefined,
+      isActive:
+        typeof u.is_disabled === 'boolean' ? !u.is_disabled : (u.is_active ?? undefined),
+      isDisabled: u.is_disabled ?? undefined,
+      hasActivated: u.has_activated ?? undefined,
       createdAt: u.created_at
     });
 

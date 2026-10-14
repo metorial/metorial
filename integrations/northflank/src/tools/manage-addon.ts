@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageAddon = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ export let manageAddon = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       action: z
         .enum(['create', 'get', 'delete', 'credentials', 'backup', 'list_backups'])
         .describe('Operation to perform'),
@@ -81,18 +83,24 @@ export let manageAddon = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId:
+        ctx.input.teamId ??
+        (typeof ctx.config.teamId === 'string' ? ctx.config.teamId : undefined)
     });
 
     let { action, projectId, addonId } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating an addon');
-      if (!ctx.input.addonType) throw new Error('addonType is required for creating an addon');
-      if (!ctx.input.version) throw new Error('version is required for creating an addon');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for creating an addon');
+      if (!ctx.input.addonType)
+        throw createApiServiceError('addonType is required for creating an addon');
+      if (!ctx.input.version)
+        throw createApiServiceError('version is required for creating an addon');
       if (!ctx.input.deploymentPlan)
-        throw new Error('deploymentPlan is required for creating an addon');
-      if (!ctx.input.storageMb) throw new Error('storageMb is required for creating an addon');
+        throw createApiServiceError('deploymentPlan is required for creating an addon');
+      if (!ctx.input.storageMb)
+        throw createApiServiceError('storageMb is required for creating an addon');
 
       let result = await client.createAddon(projectId, {
         name: ctx.input.name,
@@ -119,7 +127,7 @@ export let manageAddon = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!addonId) throw new Error('addonId is required');
+      if (!addonId) throw createApiServiceError('addonId is required');
       let result = await client.getAddon(projectId, addonId);
       return {
         output: {
@@ -132,7 +140,7 @@ export let manageAddon = SlateTool.create(spec, {
     }
 
     if (action === 'credentials') {
-      if (!addonId) throw new Error('addonId is required');
+      if (!addonId) throw createApiServiceError('addonId is required');
       let result = await client.getAddonCredentials(projectId, addonId);
       return {
         output: {
@@ -144,7 +152,7 @@ export let manageAddon = SlateTool.create(spec, {
     }
 
     if (action === 'backup') {
-      if (!addonId) throw new Error('addonId is required');
+      if (!addonId) throw createApiServiceError('addonId is required');
       await client.backupAddon(projectId, addonId);
       return {
         output: {
@@ -156,7 +164,7 @@ export let manageAddon = SlateTool.create(spec, {
     }
 
     if (action === 'list_backups') {
-      if (!addonId) throw new Error('addonId is required');
+      if (!addonId) throw createApiServiceError('addonId is required');
       let result = await client.listAddonBackups(projectId, addonId);
       let backups = (result.data?.backups || []).map((b: any) => ({
         backupId: b.id,
@@ -174,7 +182,7 @@ export let manageAddon = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!addonId) throw new Error('addonId is required');
+      if (!addonId) throw createApiServiceError('addonId is required');
       await client.deleteAddon(projectId, addonId);
       return {
         output: {
@@ -185,6 +193,6 @@ export let manageAddon = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

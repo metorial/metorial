@@ -22,7 +22,7 @@ If the video requires async processing, a job ID is returned that can be polled 
   ],
   constraints: [
     'Only publicly accessible videos can be transcribed. Private, login-required, age-restricted, or paywalled content is not supported.',
-    'Maximum file size for direct file URLs is 1 GB.'
+    'Maximum file size for direct file URLs is 750 MB and maximum duration is 12 hours.'
   ],
   tags: {
     readOnly: true
@@ -88,7 +88,7 @@ If the video requires async processing, a job ID is returned that can be polled 
     let contentSummary =
       typeof result.content === 'string'
         ? `${result.content.length} characters`
-        : `${(result.content as any[])?.length ?? 0} segments`;
+        : `${Array.isArray(result.content) ? result.content.length : 0} segments`;
 
     return {
       output: {

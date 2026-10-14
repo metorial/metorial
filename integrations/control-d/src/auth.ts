@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,16 +25,12 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.controld.com',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/json'
-        }
-      });
-
-      let response = await client.get('/users');
-      let user = response.data.body;
+      let user = await new Client({ token: ctx.output.token }).getUser();
+      if (!user?.PK || !user.email) {
+        throw createApiServiceError(
+          'Control D returned incomplete account information; verify the API token'
+        );
+      }
 
       return {
         profile: {

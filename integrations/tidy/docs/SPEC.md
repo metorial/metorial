@@ -1,73 +1,58 @@
-There are multiple "Tidy" products. Given the context mentions "Tidy" as an integration platform provider, the most likely candidate is **TIDY** (tidy.com) - the property management/cleaning services platform. Let me get more details on their API.Now let me get more details on the API reference to understand the full feature set.Now I have all the information I need to write the specification.
+# TIDY API capabilities
 
-# Slates Specification for Tidy
-
-## Overview
-
-TIDY is a property management platform that connects property owners and managers with cleaning and maintenance service professionals. It provides tools for booking and managing cleaning/maintenance jobs, managing properties (addresses), handling guest reservations, tracking to-do lists, and managing service provider relationships.
+Manage property addresses, cleaning jobs, service professionals, guest reservations,
+and property issues with TIDY.
 
 ## Authentication
 
-TIDY uses **API Key** authentication via Bearer tokens.
+Generate an API key under Developers > API Keys in the TIDY website or mobile app.
+Requests use HTTPS and `Authorization: Bearer <api_key>`.
+See [TIDY authentication](https://www.tidy.com/docs/developers/authentication).
 
-- **Type:** Bearer Token (API Key)
-- **Header:** `Authorization: Bearer <your_api_key>`
-- **Base URL:** `https://api.tidy.com/api/v1/`
+## Structured operations
 
-To obtain an API key:
+The [v1 API reference](https://tidy.readme.io/reference/get-addresses) documents
+the existing structured operations under `https://api.tidy.com/api/v1`:
 
-1. Log into your TIDY account.
-2. Navigate to the "Developers" section.
-3. Go to the "API Keys" section and generate a new API key.
+| Resource | Operations |
+| --- | --- |
+| Addresses | List, retrieve, create, update name/access/parking details, delete |
+| Jobs | List/filter, retrieve, create, update, cancel, reschedule |
+| Booking availability | List available start times, service types, prices, and currencies |
+| Pros | Add a professional to the priority list for all account addresses |
+| To-do lists | List active lists, optionally filtered by address |
+| Guest reservations | List, retrieve, create, delete |
+| Issues | List/filter, retrieve, create, resolve, delete |
 
-All requests must be made over HTTPS. Requests over plain HTTP or without authentication will fail.
+Use `list_addresses` to find property IDs and `list_todo_lists` to find checklist
+IDs before scheduling. Public IDs remain strings even though TIDY represents
+them as numbers. Job date and time fields remain strings; use ISO 8601 local date
+and time at the property, on a 30-minute interval. The date and time portion is
+sent to TIDY without converting an offset to UTC. Returned job timestamps use
+`YYYY-MM-DDTHH:MM:00` for TIDY's property-local `{date,time}` values.
 
-## Features
+The documented cleaning service keys are `regular_cleaning.one_hour`,
+`regular_cleaning.two_and_a_half_hours`, and `regular_cleaning.four_hours`.
+Availability end times are calculated from those service durations when TIDY
+only supplies a start time. Prices use the smallest currency unit, such as cents
+for USD. Pro service types use a comma-separated string in the public tool and
+an array in the TIDY request.
 
-### Address (Property) Management
+Cancellation first confirms the provider's success result, then retrieves job
+details to retain the normal job output. Deleting a guest reservation does not
+cancel a scheduled job; cancel the job separately. An address with actively
+scheduled jobs cannot be deleted. Minor job time adjustments must remain within
+three days of the current scheduled or preferred date; use rescheduling for major
+changes.
 
-Manage the physical properties/locations where services are requested. Create, update, retrieve, list, and delete addresses associated with your account. Addresses are the foundational entity to which jobs, pros, and to-do lists are linked.
+## Natural-language requests
 
-### Job Management
+`message_tidy` sends a property management request to
+`POST https://api.tidy.com/api/v2/message-tidy`, as documented in the current
+[TIDY REST API overview](https://www.tidy.com/developers/api). Requests may schedule
+services or change account state. The full response preserves the returned status,
+response text, action details, and any additional provider fields.
 
-Request, schedule, and manage cleaning or maintenance jobs at your properties. You can create jobs by specifying the address, service type (e.g., `regular_cleaning.one_hour`), and a preferred time window. Jobs can be updated, cancelled, rescheduled, and retrieved. Jobs can have assigned pros (who performs the work) and to-do lists (what to do on the job).
-
-- Key parameters include `address_id`, `service_type_key`, `start_no_earlier_than`, and `end_no_later_than`.
-
-### Pro (Service Provider) Management
-
-Add and manage service professionals who perform jobs. Pros are linked to your account and can be assigned to specific jobs at your properties.
-
-### Booking Availability
-
-Query available time slots for booking jobs. This allows checking pro availability before scheduling.
-
-### To-Do Lists
-
-Manage to-do lists that define the specific tasks to be completed during a job. To-do lists can be retrieved and associated with addresses and jobs.
-
-### Guest Reservations
-
-Manage guest reservations for your properties. Create, retrieve, list, and delete guest reservations linked to addresses. This is useful for short-term rental scenarios where cleaning is coordinated around guest check-in/check-out schedules.
-
-### Issue Tracking
-
-Report, track, and resolve property issues. Create issues, retrieve them, list all issues, delete them, or mark them as resolved.
-
-## Events
-
-TIDY supports webhooks that send event notifications to your application via HTTP POST requests when certain actions occur. Webhook endpoints are configured in the "Developers" section of the TIDY dashboard.
-
-If a webhook delivery fails, TIDY retries up to 10 times with increasing intervals between attempts, from a few seconds up to approximately one week.
-
-### Booking Updates
-
-Notifications related to the lifecycle of a booking/job. The following event types are supported:
-
-- **Booking Scheduled** — A booking has been scheduled.
-- **Booking In Progress** — A booking is currently being performed.
-- **Booking Completed** — A booking has been completed.
-- **Booking Cancelled** — A booking has been cancelled.
-- **Booking Failed** — A booking has failed.
-
-Each webhook payload includes the event type, a UUID, and the booking data (including current attributes and previous attributes for change tracking).
+The v1 reference exposes no current-account/profile endpoint. The existing API-key
+method needs no OAuth refresh callback. No file download or export operation is
+exposed by these tools.

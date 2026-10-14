@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let checkDocument = SlateTool.create(spec, {
   name: 'Check Document',
   key: 'check_document',
-  description: `Check if a document exists on the OKSign platform and retrieve its basic info including filename and whether it's a reusable template. Also retrieves the form descriptor if the document has one configured.`,
+  description: `Check if a document exists on the OKSign platform and retrieve its basic info including filename and whether it's a reusable template. Provider errors are reported rather than treated as missing documents.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -30,31 +30,18 @@ export let checkDocument = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    try {
-      let info = await client.documentExists(ctx.input.documentId);
-      return {
-        output: {
-          exists: true,
-          filename: info.filename,
-          isTemplate: info.template
-        },
-        message: `Document \`${ctx.input.documentId}\` exists: **${info.filename}**${info.template ? ' (template)' : ''}`
-      };
-    } catch {
-      return {
-        output: {
-          exists: false
-        },
-        message: `Document \`${ctx.input.documentId}\` does not exist.`
-      };
-    }
+    let info = await client.documentExists(ctx.input.documentId);
+    return {
+      output: { exists: true, filename: info.filename, isTemplate: info.template },
+      message: `Document \`${ctx.input.documentId}\` exists: **${info.filename}**${info.template ? ' (template)' : ''}`
+    };
   })
   .build();
 
 export let removeDocument = SlateTool.create(spec, {
   name: 'Remove Document',
   key: 'remove_document',
-  description: `Remove a document from the OKSign platform. Documents are automatically removed once all signatures are collected, but this tool allows manual removal. Cannot be undone.`,
+  description: `Remove a document from the OKSign platform. Documents remain available until explicitly removed. Cannot be undone.`,
   tags: {
     destructive: true,
     readOnly: false

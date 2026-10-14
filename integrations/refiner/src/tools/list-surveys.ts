@@ -15,7 +15,15 @@ let surveySchema = z.object({
   updatedAt: z.string().nullable().describe('ISO 8601 timestamp when last updated'),
   responsesCount: z.number().describe('Total number of responses'),
   viewsCount: z.number().describe('Total number of views'),
-  pageUrl: z.string().nullable().describe('Public survey page URL')
+  pageUrl: z.string().nullable().describe('Public survey page URL'),
+  config: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('Survey configuration when includeConfig is true'),
+  elements: z
+    .array(z.record(z.string(), z.unknown()))
+    .optional()
+    .describe('Survey questions and their configuration when includeConfig is true')
 });
 
 export let listSurveys = SlateTool.create(spec, {
@@ -73,7 +81,9 @@ export let listSurveys = SlateTool.create(spec, {
       updatedAt: item.updated_at ?? null,
       responsesCount: item.responses_count ?? 0,
       viewsCount: item.views_count ?? 0,
-      pageUrl: item.page_url ?? null
+      pageUrl: item.page_url ?? null,
+      config: item.config,
+      elements: item.elements
     }));
 
     let pagination = result.pagination || {};

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { EverhourClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,8 +35,21 @@ export let listTasks = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('If true, include closed tasks in search results'),
-      limit: z.number().optional().describe('Maximum number of tasks to return (max 250)'),
-      page: z.number().optional().describe('Page number for pagination')
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number within the safe integer range')
+        .min(1)
+        .max(250)
+        .optional()
+        .describe('Maximum number of tasks to return (max 250)'),
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a whole number within the safe integer range')
+        .min(1)
+        .optional()
+        .describe(
+          'Page number for project task listing, starting at 1; not supported by search'
+        )
     })
   )
   .output(
@@ -47,6 +60,12 @@ export let listTasks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new EverhourClient(ctx.auth.token);
     let tasks: any[];
+
+    if ((!ctx.input.projectId || ctx.input.query) && ctx.input.page !== undefined) {
+      throw createApiServiceError(
+        'page is supported only when listing project tasks without a search query.'
+      );
+    }
 
     if (ctx.input.query && !ctx.input.projectId) {
       tasks = await client.searchTasks({
@@ -73,13 +92,13 @@ export let listTasks = SlateTool.create(spec, {
     let mapped = tasks.map((t: any) => ({
       taskId: t.id,
       name: t.name,
-      projects: t.projects,
-      section: t.section,
-      labels: t.labels,
-      description: t.description,
-      dueAt: t.dueAt,
-      status: t.status,
-      position: t.position,
+      projects: t.projects ?? undefined,
+      section: t.section ?? undefined,
+      labels: t.labels ?? undefined,
+      description: t.description ?? undefined,
+      dueAt: t.dueAt ?? undefined,
+      status: t.status ?? undefined,
+      position: t.position ?? undefined,
       time: t.time,
       estimate: t.estimate
     }));
@@ -109,13 +128,13 @@ export let getTask = SlateTool.create(spec, {
       output: {
         taskId: t.id,
         name: t.name,
-        projects: t.projects,
-        section: t.section,
-        labels: t.labels,
-        description: t.description,
-        dueAt: t.dueAt,
-        status: t.status,
-        position: t.position,
+        projects: t.projects ?? undefined,
+        section: t.section ?? undefined,
+        labels: t.labels ?? undefined,
+        description: t.description ?? undefined,
+        dueAt: t.dueAt ?? undefined,
+        status: t.status ?? undefined,
+        position: t.position ?? undefined,
         time: t.time,
         estimate: t.estimate
       },
@@ -126,14 +145,19 @@ export let getTask = SlateTool.create(spec, {
 export let createTask = SlateTool.create(spec, {
   name: 'Create Task',
   key: 'create_task',
-  description: `Create a new task in a project. Optionally assign it to a section, set labels, due date, and description.`,
+  description: `Create a new task in a project and section. Call list_sections to discover section IDs. Optionally set labels, due date, and description.`,
   tags: { destructive: false }
 })
   .input(
     z.object({
       projectId: z.string().describe('Project ID to create the task in'),
       name: z.string().describe('Task name'),
-      section: z.number().optional().describe('Section ID to place the task in'),
+      section: z
+        .number()
+        .optional()
+        .describe(
+          'Section ID required to create the task. Call list_sections to discover section IDs.'
+        ),
       labels: z.array(z.string()).optional().describe('Labels to assign'),
       description: z.string().optional().describe('Task description'),
       dueOn: z.string().optional().describe('Due date (YYYY-MM-DD)'),
@@ -142,6 +166,11 @@ export let createTask = SlateTool.create(spec, {
   )
   .output(taskSchema)
   .handleInvocation(async ctx => {
+    if (ctx.input.section === undefined) {
+      throw createApiServiceError(
+        'section is required to create a task. Call list_sections with the projectId to discover section IDs.'
+      );
+    }
     let client = new EverhourClient(ctx.auth.token);
     let { projectId, ...taskData } = ctx.input;
     let t = await client.createTask(projectId, taskData);
@@ -149,13 +178,13 @@ export let createTask = SlateTool.create(spec, {
       output: {
         taskId: t.id,
         name: t.name,
-        projects: t.projects,
-        section: t.section,
-        labels: t.labels,
-        description: t.description,
-        dueAt: t.dueAt,
-        status: t.status,
-        position: t.position,
+        projects: t.projects ?? undefined,
+        section: t.section ?? undefined,
+        labels: t.labels ?? undefined,
+        description: t.description ?? undefined,
+        dueAt: t.dueAt ?? undefined,
+        status: t.status ?? undefined,
+        position: t.position ?? undefined,
         time: t.time,
         estimate: t.estimate
       },
@@ -182,7 +211,9 @@ export let updateTask = SlateTool.create(spec, {
       estimate: z
         .object({
           total: z.number().describe('Total estimate in seconds'),
-          type: z.enum(['overall']).describe('Estimate type'),
+          type: z
+            .enum(['overall', 'users'])
+            .describe('Estimate type: overall total or per-user estimates'),
           users: z
             .record(z.string(), z.number())
             .optional()
@@ -197,6 +228,19 @@ export let updateTask = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new EverhourClient(ctx.auth.token);
     let { taskId, estimate, removeEstimate, ...updateData } = ctx.input;
+
+    if (estimate && removeEstimate) {
+      throw createApiServiceError('Provide estimate or removeEstimate, not both.');
+    }
+    if (
+      estimate?.type === 'users' &&
+      (!estimate.users || Object.keys(estimate.users).length === 0)
+    ) {
+      throw createApiServiceError(
+        'Per-user estimates require a non-empty users map of user IDs to seconds.'
+      );
+    }
+    updateData = pickDefined(updateData);
 
     if (Object.keys(updateData).length > 0) {
       await client.updateTask(taskId, updateData);
@@ -213,13 +257,13 @@ export let updateTask = SlateTool.create(spec, {
       output: {
         taskId: t.id,
         name: t.name,
-        projects: t.projects,
-        section: t.section,
-        labels: t.labels,
-        description: t.description,
-        dueAt: t.dueAt,
-        status: t.status,
-        position: t.position,
+        projects: t.projects ?? undefined,
+        section: t.section ?? undefined,
+        labels: t.labels ?? undefined,
+        description: t.description ?? undefined,
+        dueAt: t.dueAt ?? undefined,
+        status: t.status ?? undefined,
+        position: t.position ?? undefined,
         time: t.time,
         estimate: t.estimate
       },

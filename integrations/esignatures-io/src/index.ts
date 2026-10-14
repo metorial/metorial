@@ -6,11 +6,15 @@ import {
   createTemplate,
   deleteTemplate,
   generatePdfPreview,
+  getDocumentContent,
+  getFileUrl,
   getTemplate,
   listTemplates,
   manageCollaborators,
   manageSigners,
   queryContract,
+  sendDraftContract,
+  updateDocumentContent,
   updateTemplate,
   withdrawContract
 } from './tools';
@@ -28,7 +32,11 @@ export let provider = Slate.create({
     updateTemplate,
     copyTemplate,
     deleteTemplate,
-    manageCollaborators
+    manageCollaborators,
+    sendDraftContract,
+    getDocumentContent,
+    updateDocumentContent,
+    getFileUrl
   ],
   triggers: []
 });

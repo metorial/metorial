@@ -1,66 +1,48 @@
-Let me get more details on the specific API resources.Now I have enough information to construct the specification. Let me note that webhooks are listed on their roadmap as a future feature ("Add webhooks to our API for realtime data"), so they don't currently support webhooks.
+# Productlane integration
 
-# Slates Specification for Productlane
+Manage customer companies, contacts, feedback threads, public roadmap items,
+upvotes, and changelogs. The integration also reads workspace branding and
+workspace members.
 
-## Overview
+## API and authentication
 
-Productlane is a customer support tool built for modern companies. Deeply integrated with Linear, it turns customer feedback into actionable work, so nothing gets lost and every request finds its way into the roadmap. It consolidates support channels like Slack and email, integrates with Linear for prioritization, and offers features like a customer portal, public roadmap, and AI suggestions.
+The existing tools use `https://productlane.com/api/v1` and send API keys as
+Bearer tokens. Keep an existing v1 key for this integration. Productlane now
+issues v2 keys with the `pl_v2_` prefix; this integration does not yet implement
+the v2 payloads and routes. Productlane announced a v1 sunset of 20 November
+2026. See the [current API guide](https://productlane.com/docs/integrations/api)
+and [legacy authentication reference](https://productlane.readme.io/reference/api-authentication).
 
-## Authentication
+Workspace-scoped tools accept `workspaceId` as input and fall back to the
+optional configured workspace. Find the ID in `list_contacts` or
+`list_companies` results, or in Settings → API.
 
-Productlane uses **API Key** authentication via Bearer token.
+## Available workflows
 
-Obtain your API key from the API settings page in Productlane. When making requests that require authentication, set the `Authorization` header to `Bearer API_KEY`, where `API_KEY` is the key you obtained.
+- List, retrieve, create, update, and delete companies and contacts.
+- List, retrieve, create, and update feedback threads, and send thread replies.
+- List portal projects and issues, retrieve projects, and manage upvotes.
+- Submit portal feedback with `create_portal_feedback`: provide customer email,
+  feedback text, pain level, and workspace ID; optionally link a portal project
+  and choose notification preferences. The tool preserves the provider's
+  response because the legacy reference does not specify its response fields.
+- List, retrieve, create, update, and delete changelogs.
+- Retrieve a workspace and list its users.
 
-Example header:
+`create_company` additionally accepts the `domain` and `segments` fields
+specified in the legacy company reference. Existing `domains` and company
+attribute inputs remain available for compatibility.
 
-```
-Authorization: Bearer <API_KEY>
-```
+Provider webhooks exist, but this integration does not register triggers.
 
-The base URL for API requests is `https://productlane.com/api/v1`.
+## References
 
-Note that some public-facing endpoints (such as retrieving changelogs and workspaces) do not require authentication.
+- [Legacy endpoint index](https://productlane.readme.io/llms.txt)
+- [Company creation](https://productlane.readme.io/reference/companies-newcompany)
+- [Company listing and pagination](https://productlane.readme.io/reference/companies-listcompanies)
+- [Portal feedback request schema](https://productlane.readme.io/reference/portal-createfeedback)
+- [Workspace retrieval](https://productlane.readme.io/reference/workspaces-get)
 
-## Features
-
-### Company Management
-
-Manage companies within Productlane. The API provides a Companies resource that allows listing and managing company records associated with your workspace.
-
-### Contact Management
-
-Create contacts with email, name, and an array of segments. Contacts represent individual users or customers who provide feedback or interact through support channels. Contacts can be listed, created, and retrieved.
-
-### Segment Management
-
-Manage segments used to categorize and group contacts and companies. Segments can be synced from external sources like Intercom contacts. Segments are useful for filtering and prioritizing feedback based on customer attributes.
-
-### Thread / Insight Management
-
-The Threads resource supports listing, creating, retrieving, and updating insights. Insights represent feedback items or conversation threads. You can create new feedback programmatically, which is useful for ingesting feedback from external sources into Productlane.
-
-- When creating feedback, you can associate it with a contact and relevant context.
-
-### Portal (Public Roadmap & Voting)
-
-Access and interact with portal-related data including projects and issues that represent your public roadmap.
-
-- List projects, get individual projects, list issues, get individual issues, retrieve upvotes, upvote a project or issue, delete upvotes, and create feedback through the portal.
-- Portal endpoints for upvoting and feedback do not require authorization and accept an email to identify the user, along with an optional project or issue ID.
-
-### Changelog
-
-Retrieve changelogs by listing all changelogs or getting a specific changelog by ID. Changelogs are identified by workspace ID and changelog ID. Each changelog entry includes title, date, published status, notes, and an optional image URL.
-
-- Changelog endpoints are public and do not require authentication.
-
-### Workspace Information
-
-Fetch workspace details by ID, including the latest changelog entry. This is a public endpoint that does not require authentication.
-
-## Events
-
-Webhooks are listed on Productlane's public roadmap as a planned feature ("Add webhooks to our API for realtime data") but are not currently available.
-
-The provider does not currently support events.
+The legacy reference contains older customer/insight routes that differ from
+some existing contact/thread routes. Those routes and response mappings have
+been retained pending a separate v2 migration and provider verification.

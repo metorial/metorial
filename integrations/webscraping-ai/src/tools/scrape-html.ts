@@ -15,7 +15,7 @@ Use POST mode to submit form data or interact with target page APIs. Optionally 
     'Use **POST** method with a **requestBody** to submit forms or interact with target page APIs.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -33,6 +33,12 @@ Use POST mode to submit form data or interact with target page APIs. Optionally 
         .string()
         .optional()
         .describe('Request body for POST requests (e.g. form data or JSON string).'),
+      requestContentType: z
+        .string()
+        .optional()
+        .describe(
+          'Content type of the POST body, such as application/json. Defaults to application/x-www-form-urlencoded; a Content-Type entry in headers is also supported.'
+        ),
       ...scrapingOptionsSchema
     })
   )
@@ -62,7 +68,11 @@ Use POST mode to submit form data or interact with target page APIs. Optionally 
 
     let html: string;
     if (ctx.input.method === 'POST') {
-      html = await client.postHtml({ ...options, body: ctx.input.requestBody });
+      html = await client.postHtml({
+        ...options,
+        body: ctx.input.requestBody,
+        contentType: ctx.input.requestContentType
+      });
     } else {
       html = await client.getHtml(options);
     }

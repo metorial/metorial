@@ -55,9 +55,9 @@ export let listWebUsers = SlateTool.create(spec, {
     let users = result.objects.map(u => ({
       userId: u.id,
       username: u.username,
-      firstName: u.first_name,
-      lastName: u.last_name,
-      email: u.email,
+      firstName: u.first_name ?? '',
+      lastName: u.last_name ?? '',
+      email: u.email ?? '',
       isAdmin: u.is_admin,
       role: u.role,
       permissions: u.permissions

@@ -5,6 +5,7 @@ export interface SeqeraPipeline {
   icon?: string;
   repository?: string;
   computeEnvId?: string;
+  computeEnv?: { id?: string };
   workDir?: string;
   revision?: string;
   configProfiles?: string[];
@@ -133,7 +134,7 @@ export interface SeqeraLabel {
   id?: number;
   name?: string;
   value?: string;
-  resource?: string;
+  resource?: boolean;
   isDefault?: boolean;
 }
 
@@ -147,6 +148,7 @@ export interface SeqeraTeam {
 }
 
 export interface SeqeraWorkflowTask {
+  id?: number;
   taskId?: number;
   name?: string;
   process?: string;
@@ -181,9 +183,20 @@ export interface SeqeraParticipant {
   firstName?: string;
   lastName?: string;
   role?: string;
+  wspRole?: string;
   teamId?: number;
   teamName?: string;
   teamAvatarUrl?: string;
+}
+
+export interface SeqeraUser {
+  id?: number;
+  userName?: string;
+  email?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  avatar?: string | null;
+  organization?: string | null;
 }
 
 export interface SeqeraLaunchRequest {

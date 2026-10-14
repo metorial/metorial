@@ -63,8 +63,8 @@ export let updateBoard = SlateTool.create(spec, {
       output: {
         boardId: board.id,
         name: board.name,
-        description: board.description,
-        viewLink: board.viewLink
+        description: board.description ?? undefined,
+        viewLink: board.viewLink ?? undefined
       },
       message: `Updated board **${board.name}** (ID: ${board.id}).`
     };

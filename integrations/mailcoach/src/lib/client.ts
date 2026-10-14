@@ -1,17 +1,24 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; domain: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: `https://${config.domain}.mailcoach.app/api`,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Mailcoach',
+          reason: 'mailcoach_api_error'
+        })
     });
+  }
+
+  async getCurrentUser() {
+    let response = await this.http.get('/user');
+    return response.data.data;
   }
 
   // ── Email Lists ──
@@ -79,12 +86,14 @@ export class Client {
     emailListUuid: string,
     params?: {
       search?: string;
+      email?: string;
       status?: string;
       sort?: string;
       page?: number;
     }
   ) {
     let query: Record<string, string> = {};
+    if (params?.email) query['filter[email]'] = params.email;
     if (params?.search) query['filter[search]'] = params.search;
     if (params?.status) query['filter[status]'] = params.status;
     if (params?.sort) query.sort = params.sort;
@@ -109,6 +118,7 @@ export class Client {
       tags?: string[];
       extra_attributes?: Record<string, unknown>;
       skip_confirmation?: boolean;
+      strict?: boolean;
     }
   ) {
     let response = await this.http.post(`/email-lists/${emailListUuid}/subscribers`, data);
@@ -123,6 +133,7 @@ export class Client {
       last_name?: string;
       tags?: string[];
       extra_attributes?: Record<string, unknown>;
+      append_tags?: boolean;
     }
   ) {
     let response = await this.http.patch(`/subscribers/${subscriberUuid}`, data);
@@ -134,13 +145,13 @@ export class Client {
   }
 
   async confirmSubscriber(subscriberUuid: string) {
-    let response = await this.http.post(`/subscribers/${subscriberUuid}/confirm`);
-    return response.data.data;
+    await this.http.post(`/subscribers/${subscriberUuid}/confirm`);
+    return this.getSubscriber(subscriberUuid);
   }
 
   async unsubscribe(subscriberUuid: string) {
-    let response = await this.http.post(`/subscribers/${subscriberUuid}/unsubscribe`);
-    return response.data.data;
+    await this.http.post(`/subscribers/${subscriberUuid}/unsubscribe`);
+    return this.getSubscriber(subscriberUuid);
   }
 
   async resendConfirmation(subscriberUuid: string) {
@@ -322,6 +333,14 @@ export class Client {
     return response.data;
   }
 
+  async listTransactionalTemplates(params?: { name?: string; page?: number }) {
+    let query: Record<string, string> = {};
+    if (params?.name) query['filter[name]'] = params.name;
+    if (params?.page) query.page = params.page.toString();
+    let response = await this.http.get('/transactional-mails/templates', { params: query });
+    return response.data;
+  }
+
   // ── Tags ──
 
   async listTags(emailListUuid: string, params?: { page?: number }) {
@@ -431,7 +450,7 @@ export class Client {
   }
 
   async getSuppression(emailOrUuid: string) {
-    let response = await this.http.get(`/suppressions/${emailOrUuid}`);
+    let response = await this.http.get(`/suppressions/${encodeURIComponent(emailOrUuid)}`);
     return response.data.data;
   }
 
@@ -441,7 +460,7 @@ export class Client {
   }
 
   async deleteSuppression(emailOrUuid: string) {
-    await this.http.delete(`/suppressions/${emailOrUuid}`);
+    await this.http.delete(`/suppressions/${encodeURIComponent(emailOrUuid)}`);
   }
 
   // ── Sends ──
@@ -469,16 +488,17 @@ export class Client {
   async createSubscriberImport(data: {
     email_list_uuid: string;
     subscribers_csv: string;
-    subscribe_unsubscribed?: boolean;
-    unsubscribe_others?: boolean;
+    subscribe_unsubscribed: boolean;
+    unsubscribe_others: boolean;
+    replace_tags: boolean;
   }) {
     let response = await this.http.post('/subscriber-imports', data);
     return response.data.data;
   }
 
   async startSubscriberImport(importUuid: string) {
-    let response = await this.http.post(`/subscriber-imports/${importUuid}/start`);
-    return response.data.data;
+    await this.http.post(`/subscriber-imports/${importUuid}/start`);
+    return this.getSubscriberImport(importUuid);
   }
 
   async getSubscriberImport(importUuid: string) {

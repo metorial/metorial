@@ -98,7 +98,7 @@ export let queryAnalytics = SlateTool.create(spec, {
           z.tuple([z.string(), z.string()])
         ])
         .describe(
-          'Date range for the query. Use a preset string or a tuple of [startDate, endDate] in YYYY-MM-DD format.'
+          'Date range for the query. Use a preset string or a tuple of [startDate, endDate] as ISO 8601 dates or timestamps with timezone offsets.'
         ),
       dimensions: z
         .array(z.string())

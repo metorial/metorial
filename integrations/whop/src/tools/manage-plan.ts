@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let planOutputSchema = z.object({
@@ -59,10 +60,7 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
     z.object({
       action: z.enum(['create', 'update', 'get', 'delete']).describe('Operation to perform'),
       planId: z.string().optional().describe('Plan ID (required for get, update, delete)'),
-      companyId: z
-        .string()
-        .optional()
-        .describe('Company ID (required for create). Uses config companyId if not provided.'),
+      companyId: companyIdSchema,
       productId: z.string().optional().describe('Product ID (required for create)'),
       title: z.string().optional().describe('Plan title (max 30 chars)'),
       description: z.string().optional().describe('Plan description (max 500 chars)'),
@@ -94,7 +92,7 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
     let { action } = ctx.input;
 
     if (action === 'get') {
-      if (!ctx.input.planId) throw new Error('planId is required for get action');
+      if (!ctx.input.planId) throw createApiServiceError('planId is required for get action');
       let p = await client.getPlan(ctx.input.planId);
       return {
         output: { plan: mapPlan(p) },
@@ -104,8 +102,9 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
 
     if (action === 'create') {
       let companyId = ctx.input.companyId || ctx.config.companyId;
-      if (!companyId) throw new Error('companyId is required for create action');
-      if (!ctx.input.productId) throw new Error('productId is required for create action');
+      if (!companyId) throw createApiServiceError('companyId is required for create action');
+      if (!ctx.input.productId)
+        throw createApiServiceError('productId is required for create action');
 
       let p = await client.createPlan({
         companyId,
@@ -133,7 +132,8 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
     }
 
     if (action === 'update') {
-      if (!ctx.input.planId) throw new Error('planId is required for update action');
+      if (!ctx.input.planId)
+        throw createApiServiceError('planId is required for update action');
 
       let p = await client.updatePlan(ctx.input.planId, {
         title: ctx.input.title,
@@ -157,7 +157,8 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
     }
 
     if (action === 'delete') {
-      if (!ctx.input.planId) throw new Error('planId is required for delete action');
+      if (!ctx.input.planId)
+        throw createApiServiceError('planId is required for delete action');
       let result = await client.deletePlan(ctx.input.planId);
       return {
         output: { plan: null, deleted: !!result },
@@ -165,6 +166,6 @@ Use **action** to specify the operation: \`create\`, \`update\`, \`get\`, or \`d
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

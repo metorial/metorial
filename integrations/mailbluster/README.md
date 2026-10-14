@@ -1,6 +1,6 @@
-# Mail Bluster
+# MailBluster
 
-Manage email marketing leads, products, and e-commerce orders in MailBluster. Create, read, update, and delete leads (subscribers) with custom fields, tags, and subscription status. Manage custom fields for campaign personalization. Create and manage products for e-commerce tracking. Create and manage orders linked to products and campaigns for revenue attribution. Note: the API does not send emails directly; it manages lead and e-commerce data used by MailBluster's email campaign system.
+Manage email marketing leads, products, and e-commerce orders in MailBluster. Create, read, update, and delete leads (subscribers) with custom fields, tags, and subscription status. Create, list, update, and delete custom fields for campaign personalization. Create and manage products for e-commerce tracking. Create and manage orders linked to products and campaigns for revenue attribution. Product and order listings include pagination details. Note: the API does not send emails directly; it manages lead and e-commerce data used by MailBluster's email campaign system.
 
 ## License
 

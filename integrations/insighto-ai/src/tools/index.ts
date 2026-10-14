@@ -1,6 +1,7 @@
 export * from './delete-conversation';
 export * from './disconnect-call';
 export * from './list-assistants';
+export * from './list-campaigns';
 export * from './list-contacts';
 export * from './list-conversations';
 export * from './list-data-sources';
@@ -15,3 +16,4 @@ export * from './manage-data-source';
 export * from './manage-form';
 export * from './manage-webhook';
 export * from './send-message';
+export * from './who-am-i';

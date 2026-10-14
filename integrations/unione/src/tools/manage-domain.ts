@@ -13,8 +13,12 @@ let dnsRecordSchema = z.object({
 let domainInfoSchema = z.object({
   domain: z.string().describe('Domain name'),
   verificationRecord: dnsRecordSchema.optional().describe('TXT verification record'),
-  dkim: dnsRecordSchema.optional().describe('DKIM DNS record'),
-  spf: dnsRecordSchema.optional().describe('SPF include record'),
+  dkim: dnsRecordSchema
+    .optional()
+    .describe(
+      'DKIM public key and status. The returned value is the raw key, not a complete TXT record.'
+    ),
+  spf: dnsRecordSchema.optional().describe('SPF record details when returned by the provider'),
   status: z.string().optional().describe('Overall domain status')
 });
 
@@ -23,10 +27,15 @@ let domainInfoSchema = z.object({
 export let getDomainDnsRecords = SlateTool.create(spec, {
   name: 'Get Domain DNS Records',
   key: 'get_domain_dns_records',
-  description: `Retrieve the required DNS records for verifying a sender domain. Returns the TXT verification record, DKIM key, and SPF include that need to be added to your DNS configuration.
-Use this as the first step when setting up a new sender domain.`,
+  description: `Register a sender domain and generate its verification TXT value and raw DKIM public key, or retrieve the existing values if the domain is already registered. Use this as the first step when setting up a sender domain.`,
+  instructions: [
+    'Publish verificationRecord.value as a TXT record at the domain root (@), using the returned value exactly.',
+    'Publish a TXT record at us._domainkey.<domain> with value "k=rsa; p=<dkim.value>". The returned dkim.value is the raw public key; the selector and prefix are required for DNS setup.',
+    'For SPF, add include:spf.unione.io to the existing SPF record. If no SPF record exists, UniOne recommends a root TXT value of "v=spf1 include:spf.unione.io ~all". SPF guidance is not an additional API-returned record.',
+    'After configuring DNS, use validate_domain and list_domains to check verification and DKIM status.'
+  ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(
@@ -140,12 +149,18 @@ export let validateDomain = SlateTool.create(spec, {
 export let listDomains = SlateTool.create(spec, {
   name: 'List Domains',
   key: 'list_domains',
-  description: `List all registered sender domains with their verification and DKIM status.`,
+  description: `List registered sender domains with their verification and DKIM status. Use limit and offset to paginate, or domain to check one sender domain.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      domain: z.string().optional().describe('Filter to one sender domain'),
+      limit: z.number().optional().describe('Maximum domains per page (default: 50)'),
+      offset: z.number().optional().describe('Number of domains to skip (default: 0)')
+    })
+  )
   .output(
     z.object({
       domains: z.array(domainInfoSchema).describe('List of registered domains')
@@ -157,7 +172,7 @@ export let listDomains = SlateTool.create(spec, {
       datacenter: ctx.config.datacenter
     });
 
-    let result = await client.listDomains();
+    let result = await client.listDomains(ctx.input);
 
     let domains = (result.domains ?? []).map(d => ({
       domain: d.domain,

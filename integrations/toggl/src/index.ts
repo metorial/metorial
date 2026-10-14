@@ -3,7 +3,9 @@ import { spec } from './spec';
 import {
   createTimeEntry,
   deleteTimeEntry,
+  getClient,
   getMe,
+  getProject,
   getReport,
   getTimeEntry,
   getWorkspace,
@@ -39,7 +41,9 @@ export let provider = Slate.create({
     listTasks,
     getWorkspace,
     listWorkspaceUsers,
+    getClient,
     getMe,
+    getProject,
     getReport
   ],
   triggers: []

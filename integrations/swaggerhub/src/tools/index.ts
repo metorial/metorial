@@ -1,5 +1,7 @@
+export * from './clone-definition-version';
 export * from './delete-api';
 export * from './delete-domain';
+export * from './download-definition';
 export * from './get-api-definition';
 export * from './get-collaboration';
 export * from './get-comments';

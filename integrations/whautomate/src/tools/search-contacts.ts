@@ -63,7 +63,7 @@ export let searchContacts = SlateTool.create(spec, {
     });
 
     let contacts = Array.isArray(result) ? result : result.contacts || result.data || [];
-    let totalCount = result.totalCount || result.total || contacts.length;
+    let totalCount = result.totalCount ?? result.total ?? contacts.length;
 
     return {
       output: {

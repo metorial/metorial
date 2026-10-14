@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTasks = SlateTool.create(spec, {
@@ -15,12 +16,14 @@ export let listTasks = SlateTool.create(spec, {
     z.object({
       projectId: z.number().optional().describe('Filter tasks by project ID'),
       phaseId: z.number().optional().describe('Filter tasks by phase ID'),
+      pageToken: pageTokenSchema,
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Maximum number of tasks to return')
     })
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       tasks: z
         .array(
           z.object({
@@ -43,6 +46,7 @@ export let listTasks = SlateTool.create(spec, {
     let result = await client.listTasks({
       projectId: ctx.input.projectId,
       phaseId: ctx.input.phaseId,
+      pageToken: ctx.input.pageToken,
       offset: ctx.input.offset,
       limit: ctx.input.limit
     });
@@ -50,7 +54,7 @@ export let listTasks = SlateTool.create(spec, {
     let tasks = Array.isArray(result) ? result : (result.tasks ?? result.data ?? []);
 
     return {
-      output: { tasks },
+      output: { tasks, pagination: result.pagination },
       message: `Found **${tasks.length}** task(s).`
     };
   })

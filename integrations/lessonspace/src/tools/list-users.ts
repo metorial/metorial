@@ -34,7 +34,8 @@ export let listUsers = SlateTool.create(spec, {
         .array(
           z.object({
             userId: z.number().describe('Lessonspace user ID.'),
-            username: z.string().describe('Username of the user.'),
+            username: z.string().optional().describe('Username when provided by the API.'),
+            email: z.string().optional().describe('Email address of the user when provided.'),
             role: z.string().describe('User role: teacher, student, or admin.'),
             active: z.boolean().describe('Whether the user is currently active.'),
             name: z.string().nullable().describe('Display name of the user.'),
@@ -47,8 +48,7 @@ export let listUsers = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      organisationId: ctx.config.organisationId
+      token: ctx.auth.token
     });
 
     let result = await client.listUsers({
@@ -62,6 +62,7 @@ export let listUsers = SlateTool.create(spec, {
     let users = result.results.map(u => ({
       userId: u.user.id,
       username: u.user.username,
+      email: u.user.email,
       role: u.role,
       active: u.active,
       name: u.name,

@@ -1,10 +1,8 @@
-Now I have enough information. Let me compile the specification.
-
-# Slates Specification for Teamwork
+# Teamwork Integration Specification
 
 ## Overview
 
-Teamwork.com is a project management platform that provides tools for task management, time tracking, resource planning, collaboration, and client work management. It offers multiple product modules including Teamwork (projects), Teamwork Desk (helpdesk/support tickets), and Teamwork Spaces (content/documentation management). The API (currently on V3) allows programmatic access to manage projects, tasks, people, time entries, files, and more.
+Teamwork.com is a project management platform that provides tools for task management, time tracking, resource planning, collaboration, and client work management. It offers multiple product modules including Teamwork (projects), Teamwork Desk (helpdesk/support tickets), and Teamwork Spaces (content/documentation management). The API provides supported V1 endpoints and current V3 endpoints for programmatic access to manage projects, tasks, people, time entries, files, and more.
 
 ## Authentication
 
@@ -14,6 +12,7 @@ Teamwork supports two authentication methods:
 
 For personal use or testing, Basic Auth is sufficient. You will need your API key and your site URL to start using the API.
 
+- Provide the site name and region when connecting with an API key. The resolved site URL is stored with the connection.
 - Your API key can be found under your profile's **API & Mobile** tab in Teamwork.com.
 - All API requests are scoped to `https://{yourSiteName}.teamwork.com`.
 - Pass the API key as the username with any value (e.g., `x`) as the password, base64-encoded in the `Authorization` header: `Authorization: Basic base64({API_KEY}:x)`.
@@ -27,10 +26,15 @@ If you are developing an application or integration for others to use, you shoul
 - **Authorization URL:** `https://www.teamwork.com/launchpad/login?redirect_uri=XXX&client_id=YYY` (generic, for any Teamwork site). Alternatively, use `https://{yourSiteName}.teamwork.com/launchpad/login?redirect_uri=XXX&client_id=YYY` for a specific account.
 - A `code` query parameter is appended to the redirect URI containing a temporary authentication token (which expires in 15 minutes).
 - **Token URL:** Make a HTTP POST request to `https://www.teamwork.com/launchpad/v1/token.json` with the `code`, `client_id`, `client_secret`, and `redirect_uri` as a JSON body.
-- Store the `access_token` for all future requests. The token should be passed under the Authorization header as `Bearer XXX` where `XXX` is the token.
+- The returned access token is permanent; the App Login Flow does not document a refresh-token exchange. Store the `access_token` for all future requests. The token should be passed under the Authorization header as `Bearer XXX` where `XXX` is the token.
 - The token exchange response also includes an `apiEndPoint` field indicating the correct regional API URL to use.
 - Teamwork.com has multiple data center regions but you do not need to worry about making requests to multiple regions, as App Login Flow will handle everything.
 - There are no granular OAuth scopes; the authenticated user will only have access and permission to the information that is accessible through their profile in Teamwork.com.
+
+## Available Discovery Tools
+
+- `get_current_user` retrieves the authenticated person ID and profile using `GET /me.json`.
+- `list_milestones` retrieves milestones using `GET /projects/api/v3/milestones.json`, with optional project and status filters and pagination.
 
 ## Features
 

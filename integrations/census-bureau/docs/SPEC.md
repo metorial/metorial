@@ -1,4 +1,4 @@
-# Slates Specification for Census Bureau
+# Census Bureau Integration Specification
 
 ## Overview
 
@@ -6,7 +6,7 @@ The U.S. Census Bureau provides a free, public REST API that gives access to raw
 
 ## Authentication
 
-The Census Bureau API uses **API Key** authentication. The API can be used without a key for limited usage, but you can make up to 500 queries per IP address per day, and more than 500 queries per day requires that you register for a Census key.
+The Census Data API uses **API Key** authentication. Since May 12, 2026, an API key is required for all statistical data queries. Dataset discovery and metadata, the Census Geocoder, and TIGERweb remain usable without an API key through the no-auth connection option.
 
 To obtain an API key:
 
@@ -29,6 +29,7 @@ The Census Data API gives the public access to raw statistical data from various
 - **Variables**: Each dataset exposes named variables (e.g., POP, STNAME). You can include up to 50 variables in a single API query. Variable groups allow fetching all variables in a table at once.
 - **Geography filtering**: Data is aggregated and associated with Census geographic boundaries defined by FIPS codes. Supported geographies include nation, state, county, tract, block group, congressional district, metro area, and more, varying by dataset.
 - **Predicates**: Queries can be filtered using predicates on variable values, including exact matches, ranges (for numeric variables), and wildcards (for string variables and geographies).
+- **Results**: Query Census Data returns string rows and original `rawRows` that preserve unavailable values as `null`. Empty strings in the string rows represent unavailable values. Discovery and variable lookup support `offset` and return `nextOffset` when more matching results exist.
 
 ### Dataset Discovery
 
@@ -36,11 +37,22 @@ A Discovery Tool at `https://api.census.gov/data.html` lists all available datas
 
 ### Geocoding
 
-The Geocoding Services engine takes a structured address or lat/long, and the response can include the lat/long and/or census geographies. Batch coding is supported. This is useful for converting addresses to geographic coordinates and identifying which Census geographic areas an address falls within.
+The Geocoding Services engine converts a structured or single-line address to coordinates and optional Census geographies. Structured addresses require a street and ZIP code, or a street, city, and state. Coordinate searches return containing geographies and do not return a street address. Get Geocoder Options discovers address benchmarks and compatible geography vintages; select a returned vintage when using a historical benchmark. The current defaults are `Public_AR_Current` and `Current_Current`.
 
 ### Geographic Boundary Data (TIGERweb)
 
 TIGERweb GeoServices REST API provides Census area boundaries/shapes referenced by FIPS codes, and can take a FIPS code or a latitude/longitude pair to return one or more Census boundaries. This follows the GeoServices REST specification for GIS server communication.
+
+Get Boundary Layers lists layer IDs and names for a map service and can inspect attribute fields, geometry type, record limits, and pagination support. Layer IDs differ by service and vintage. Query Geographic Boundaries accepts `resultOffset`, returns `exceededTransferLimit`, and exposes the spatial reference of returned geometries. Only layers advertising pagination support accept paginated queries.
+
+## Official documentation
+
+- [Census Data API query limits and API key policy](https://www.census.gov/data/developers/guidance/api-user-guide.Query_Limits.html)
+- [Census Data API core concepts](https://www.census.gov/data/developers/guidance/api-user-guide.Core_Concepts.html)
+- [Dataset discovery directory](https://api.census.gov/data.html)
+- [Census Geocoder API](https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html)
+- [Current TIGERweb service directory](https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer)
+- [GeoServices layer query parameters](https://developers.arcgis.com/rest/services-reference/enterprise/query-map-service-layer/)
 
 ### Microdata Access
 

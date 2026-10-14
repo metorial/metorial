@@ -1,6 +1,10 @@
-# <img src="logo.svg" height="20"> Sitespeakai
+# <img src="logo.png" height="20"> SiteSpeakAI
 
-Query custom-trained AI chatbots and manage their configurations, conversations, and training data. Send questions to chatbots and receive AI-generated answers with source citations. Retrieve and manage conversation history, captured leads, suggested messages, and training sources. Create, retrieve, and delete fine-tuned question-answer pairs to override or improve chatbot responses. Access chatbot settings including appearance, behavior, AI model configuration, and escalation rules. List all chatbots and retrieve account details.
+Query custom-trained AI chatbots and inspect their settings, conversations, and training data. Send questions and receive AI-generated answers with source citations. Review conversation history, captured leads, suggested messages, training sources, and date-range analytics. Create or update, retrieve, and delete custom question-answer pairs to improve chatbot responses. List chatbots to discover their IDs, and retrieve the connected account's details.
+
+## API documentation
+
+See the [SiteSpeakAI API reference](https://sitespeak.ai/docs/api-reference/introduction) for API token setup, endpoint details, and availability. Analytics includes current and previous-period conversation metrics, feedback, leads, popular content, and question insights. Lead totals may be unavailable when the token's user lacks contact permissions.
 
 ## License
 

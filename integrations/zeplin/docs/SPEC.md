@@ -1,4 +1,4 @@
-# Slates Specification for Zeplin
+# Zeplin API Specification
 
 ## Overview
 
@@ -25,7 +25,7 @@ There are 3 steps to authorize a Zeplin app: Users are redirected to Zeplin's we
 **Endpoints:**
 
 - Authorization: `GET https://api.zeplin.dev/v1/oauth/authorize`
-  - Required parameters: `client_id`, `redirect_uri`
+  - Required parameters: `client_id`, `redirect_uri`, `response_type=code`
   - Optional parameters: `state`, `code_challenge`, `code_challenge_method`
 - Token exchange: `POST https://api.zeplin.dev/v1/oauth/token`
   - Parameters: `grant_type` (`authorization_code` or `refresh_token`), `code`, `redirect_uri`, `client_id`, `client_secret` (or `code_verifier` for PKCE)
@@ -114,3 +114,9 @@ Webhooks can also be created programmatically via the API at the organization, p
 - **Styleguide Text Style** — Triggered when text styles are created or updated.
 - **Styleguide Component** — Triggered when components are created or updated.
 - **Styleguide Spacing Token** — Triggered when spacing tokens are created or updated.
+
+## Registered Tool Coverage
+
+This integration exposes project discovery, retrieval, updates, and membership; screens and published version details; screen notes, replies, and note resolution; project/styleguide components, colors, text styles, spacing tokens, and design tokens; styleguide discovery and details; organizations; flow boards with all nodes and connectors; and current-account identity. Other provider API capabilities described above are API background, not registered tools.
+
+Project updates return HTTP 204; the integration retrieves the project after updating it to supply its existing output fields. Project invitations accept only a handle and do not assign a role. Screen-note creation supplies yellow and center position defaults when those optional tool inputs are omitted. OAuth access tokens expire and refresh tokens rotate; reconnect if no refresh token is available.

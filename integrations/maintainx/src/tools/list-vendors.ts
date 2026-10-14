@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listVendors = SlateTool.create(spec, {
   name: 'List Vendors',
   key: 'list_vendors',
-  description: `Lists vendors in MaintainX. Vendors supply parts and services, and can be linked to purchase orders, assets, and locations.`,
+  description: `Lists vendors in MaintainX. Vendors supply parts and services, and can be linked to purchase orders, assets, and locations. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +15,14 @@ export let listVendors = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Max results per page (1-200, default 100)'),
+      organizationId: organizationIdSchema,
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Max results per page (1-200, default 100)'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
     })
   )
@@ -36,10 +44,7 @@ export let listVendors = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.listVendors({
       limit: ctx.input.limit,
@@ -47,12 +52,12 @@ export let listVendors = SlateTool.create(spec, {
     });
 
     let vendors = (result.vendors ?? []).map((v: any) => ({
-      vendorId: v.id,
-      name: v.name,
-      email: v.email,
-      phone: v.phone,
-      createdAt: v.createdAt,
-      updatedAt: v.updatedAt
+      vendorId: v.id ?? undefined,
+      name: v.name ?? undefined,
+      email: undefined,
+      phone: undefined,
+      createdAt: v.createdAt ?? undefined,
+      updatedAt: v.updatedAt ?? undefined
     }));
 
     return {

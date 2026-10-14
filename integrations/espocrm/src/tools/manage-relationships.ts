@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -43,7 +43,13 @@ export let manageRelationships = SlateTool.create(spec, {
       totalRelated: z
         .number()
         .optional()
-        .describe('Total count of related records (for list action)')
+        .describe(
+          'Total count of related records; negative values indicate that record counting is disabled (for list action)'
+        ),
+      hasMore: z
+        .boolean()
+        .optional()
+        .describe('Whether another page is available (for list action)')
     })
   )
   .handleInvocation(async ctx => {
@@ -51,7 +57,8 @@ export let manageRelationships = SlateTool.create(spec, {
     let { action, entityType, recordId, linkName, relatedRecordId } = ctx.input;
 
     if (action === 'link') {
-      if (!relatedRecordId) throw new Error('relatedRecordId is required for link action');
+      if (!relatedRecordId)
+        throw createApiServiceError('relatedRecordId is required for link action');
       await client.linkRecord(entityType, recordId, linkName, relatedRecordId);
       return {
         output: { success: true },
@@ -60,7 +67,8 @@ export let manageRelationships = SlateTool.create(spec, {
     }
 
     if (action === 'unlink') {
-      if (!relatedRecordId) throw new Error('relatedRecordId is required for unlink action');
+      if (!relatedRecordId)
+        throw createApiServiceError('relatedRecordId is required for unlink action');
       await client.unlinkRecord(entityType, recordId, linkName, relatedRecordId);
       return {
         output: { success: true },
@@ -69,20 +77,35 @@ export let manageRelationships = SlateTool.create(spec, {
     }
 
     if (action === 'list') {
+      let maxSize = ctx.input.maxSize ?? 20;
+      let offset = ctx.input.offset ?? 0;
+      if (
+        !Number.isInteger(maxSize) ||
+        maxSize < 1 ||
+        !Number.isInteger(offset) ||
+        offset < 0
+      ) {
+        throw createApiServiceError(
+          'maxSize must be a positive integer and offset must be a non-negative integer.'
+        );
+      }
       let result = await client.getRelatedRecords(entityType, recordId, linkName, {
-        maxSize: ctx.input.maxSize || 20,
-        offset: ctx.input.offset
+        maxSize: Math.min(maxSize, 200),
+        offset
       });
       return {
         output: {
           success: true,
-          relatedRecords: result.list,
-          totalRelated: result.total
+          relatedRecords: result.list ?? undefined,
+          totalRelated: result.total ?? undefined,
+          hasMore:
+            result.total === -1 ||
+            (result.total >= 0 && offset + result.list.length < result.total)
         },
         message: `Found **${result.total}** related "${linkName}" records for ${entityType} **${recordId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Signaturely
 
-Send, manage, and track electronic signature requests for documents. Upload documents and send them to one or multiple signers for legally binding e-signatures. Create and use reusable document templates with configurable roles and field placements (signatures, initials, dates, textboxes, checkboxes). Embed signing and requesting experiences directly within external applications. Track document signing status (sent, viewed, signed, pending), download completed signed documents with audit trails, and manage document workflows. Monitor events when documents are sent, viewed, or completed.
+Create electronic signature requests from existing Signaturely templates, find documents and signer IDs, download document PDFs, send signing reminders, and inspect the connected account. Supports document search, page or offset pagination, ordered signing, and text or checkbox template field values.
 
 ## License
 

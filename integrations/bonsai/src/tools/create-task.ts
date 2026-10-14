@@ -10,7 +10,8 @@ export let createTask = SlateTool.create(spec, {
   instructions: [
     'A **title** is required to create a task.',
     'Link the task to a project by providing a **projectId**.',
-    'Assign the task to a team member by providing their **email** via assigneeEmail.'
+    'Call list_team_members to find the email for assigneeEmail.',
+    'Call list_task_statuses to find a board column name for status. Tags must be existing task tag names.'
   ],
   tags: {
     destructive: false,
@@ -20,7 +21,10 @@ export let createTask = SlateTool.create(spec, {
   .input(
     z.object({
       title: z.string().describe('Title of the task'),
-      projectId: z.string().optional().describe('ID of the project this task belongs to'),
+      projectId: z
+        .string()
+        .optional()
+        .describe('Numeric ID of the project. Call list_projects to discover project IDs.'),
       description: z.string().optional().describe('Detailed description of the task'),
       assigneeEmail: z
         .string()
@@ -33,7 +37,9 @@ export let createTask = SlateTool.create(spec, {
       status: z
         .string()
         .optional()
-        .describe('Task status (e.g., "todo", "in_progress", "done")'),
+        .describe(
+          'Task board column name from list_task_statuses (e.g., "To Do", "In Progress", "Done"). Underscore spellings are accepted.'
+        ),
       startDate: z
         .string()
         .optional()
@@ -42,11 +48,18 @@ export let createTask = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Due date for the task (ISO 8601 format, e.g., "2025-01-31")'),
-      timeEstimate: z.number().optional().describe('Estimated time for the task in hours'),
+      timeEstimate: z
+        .number()
+        .optional()
+        .describe(
+          'Positive estimated hours that convert to whole minutes, such as 1.5 for 90 minutes'
+        ),
       billingType: z
         .string()
         .optional()
-        .describe('Billing type for the task (e.g., "billable", "non_billable")'),
+        .describe(
+          'billable or non_billable. Requires permission and a plan that supports task billing.'
+        ),
       tags: z.array(z.string()).optional().describe('Tags to categorize the task')
     })
   )
@@ -63,7 +76,10 @@ export let createTask = SlateTool.create(spec, {
       dueDate: z.string().optional().describe('Due date'),
       timeEstimate: z.number().optional().describe('Time estimate in hours'),
       billingType: z.string().optional().describe('Billing type'),
-      tags: z.array(z.string()).optional().describe('Tags')
+      tags: z.array(z.string()).optional().describe('Tags'),
+      assigneeMemberId: z.string().optional().describe('Assigned team member ID'),
+      taskStatusId: z.string().optional().describe('Task board column ID'),
+      url: z.string().optional().describe('Link to the task in Bonsai')
     })
   )
   .handleInvocation(async ctx => {
@@ -96,7 +112,10 @@ export let createTask = SlateTool.create(spec, {
         dueDate: result.dueDate,
         timeEstimate: result.timeEstimate,
         billingType: result.billingType,
-        tags: result.tags
+        tags: result.tags,
+        assigneeMemberId: result.assigneeMemberId,
+        taskStatusId: result.taskStatusId,
+        url: result.url
       },
       message: `Created task **${result.title}** (\`${result.id}\`)${result.projectId ? ` in project \`${result.projectId}\`` : ''}${result.assigneeEmail ? ` assigned to ${result.assigneeEmail}` : ''}.`
     };

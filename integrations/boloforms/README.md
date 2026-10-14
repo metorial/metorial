@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Boloforms
 
-Send documents for electronic signature, manage PDF and form templates, and collect form responses. Retrieve documents filtered by type (PDFs, forms, templates), send templates to multiple recipients for signing, download signed documents, and fetch template respondent details. Track signing events via webhooks including document viewed, individual signed, and signature completed notifications.
+Send PDF and form templates for electronic signature and retrieve submitted form answers or PDF template respondent details. List single-signature PDFs and PDF templates, filter by status, dates, and archive state, send signing reminders, and void in-progress documents.
+
+Document listing requires the workspace UUID associated with the API key. PDF template sends require each recipient's exact, unique template role title. Use the returned `createdDocumentId` as `responseId` for reminder and void operations on a PDF template.
 
 ## License
 

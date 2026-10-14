@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { exportDownload } from '../lib/export';
+import { siteIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageInspection = SlateTool.create(spec, {
@@ -29,7 +31,7 @@ export let manageInspection = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Template ID to start a new inspection from (required for "start")'),
-      siteId: z.string().optional().describe('Site ID (used with "start" or "set_site")'),
+      siteId: siteIdSchema.optional(),
       ownerId: z
         .string()
         .optional()
@@ -44,7 +46,14 @@ export let manageInspection = SlateTool.create(spec, {
     z.object({
       inspectionId: z.string().optional().describe('ID of the affected inspection'),
       success: z.boolean().describe('Whether the operation succeeded'),
-      exportUrl: z.string().optional().describe('Download URL for exported inspection'),
+      exportUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Download URL for the exported inspection, when provided. Signed URLs may expire.'
+        ),
+      exportStatus: z.string().optional().describe('Export processing status'),
+      fileName: z.string().optional().describe('Name of the ready export file'),
       rawResponse: z.any().optional().describe('Full API response')
     })
   )
@@ -57,7 +66,8 @@ export let manageInspection = SlateTool.create(spec, {
 
     switch (operation) {
       case 'start': {
-        if (!templateId) throw new Error('templateId is required for starting an inspection');
+        if (!templateId)
+          throw createApiServiceError('templateId is required for starting an inspection');
         result = await client.startInspection(templateId, { siteId });
         let newId = result.audit_id || result.id;
         return {
@@ -66,42 +76,64 @@ export let manageInspection = SlateTool.create(spec, {
         };
       }
       case 'complete': {
-        if (!inspectionId) throw new Error('inspectionId is required');
+        if (!inspectionId) throw createApiServiceError('inspectionId is required');
         result = await client.completeInspection(inspectionId);
         message = `Completed inspection **${inspectionId}**.`;
         break;
       }
       case 'archive': {
-        if (!inspectionId) throw new Error('inspectionId is required');
+        if (!inspectionId) throw createApiServiceError('inspectionId is required');
         result = await client.archiveInspection(inspectionId);
         message = `Archived inspection **${inspectionId}**.`;
         break;
       }
       case 'delete': {
-        if (!inspectionId) throw new Error('inspectionId is required');
+        if (!inspectionId) throw createApiServiceError('inspectionId is required');
         result = await client.deleteInspection(inspectionId);
         message = `Deleted inspection **${inspectionId}**.`;
         break;
       }
       case 'export': {
-        if (!inspectionId) throw new Error('inspectionId is required');
+        if (!inspectionId) throw createApiServiceError('inspectionId is required');
         result = await client.exportInspection(inspectionId, exportFormat || 'pdf');
-        let url = result.url || result.download_url;
+        let format = exportFormat || 'pdf';
+        let download = exportDownload(result, inspectionId, format);
+        if (download) {
+          await ctx.addAttachment({
+            type: 'url',
+            url: download.url,
+            mimeType: download.mimeType,
+            filename: download.filename,
+            ...(download.refreshAt
+              ? { refreshAt: download.refreshAt, refreshReference: { inspectionId, format } }
+              : {})
+          });
+        }
         return {
-          output: { inspectionId, success: true, exportUrl: url, rawResponse: result },
-          message: `Exported inspection **${inspectionId}** as ${exportFormat || 'pdf'}.${url ? ` [Download](${url})` : ''}`
+          output: {
+            inspectionId,
+            success: Boolean(download),
+            exportUrl: download?.url || result.url || result.download_url,
+            exportStatus: result.status ?? (download ? 'STATUS_DONE' : 'STATUS_IN_PROGRESS'),
+            fileName: download?.filename,
+            rawResponse: result
+          },
+          message: download
+            ? `Prepared inspection **${inspectionId}** as a downloadable ${format} file.`
+            : `Inspection **${inspectionId}** export is still processing. Repeat the same export request to check its status.`
         };
       }
       case 'set_owner': {
-        if (!inspectionId) throw new Error('inspectionId is required');
-        if (!ownerId) throw new Error('ownerId is required for set_owner operation');
+        if (!inspectionId) throw createApiServiceError('inspectionId is required');
+        if (!ownerId)
+          throw createApiServiceError('ownerId is required for set_owner operation');
         result = await client.setInspectionOwner(inspectionId, ownerId);
         message = `Set owner of inspection **${inspectionId}** to user ${ownerId}.`;
         break;
       }
       case 'set_site': {
-        if (!inspectionId) throw new Error('inspectionId is required');
-        if (!siteId) throw new Error('siteId is required for set_site operation');
+        if (!inspectionId) throw createApiServiceError('inspectionId is required');
+        if (!siteId) throw createApiServiceError('siteId is required for set_site operation');
         result = await client.setInspectionSite(inspectionId, siteId);
         message = `Set site of inspection **${inspectionId}** to ${siteId}.`;
         break;

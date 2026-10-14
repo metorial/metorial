@@ -28,7 +28,7 @@ export let getReviews = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -36,7 +36,9 @@ export let getReviews = SlateTool.create(spec, {
       platform: ctx.input.platform
     });
 
-    let reviews = Array.isArray(result) ? result : result.reviews || [];
+    let reviews = Array.isArray(result)
+      ? result
+      : result[ctx.input.platform] || result.reviews || [];
 
     return {
       output: {

@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createWorkRequest = SlateTool.create(spec, {
   name: 'Create Work Request',
   key: 'create_work_request',
-  description: `Creates a new work request in MaintainX. Work requests can be reviewed and approved before being converted into work orders. Useful for request-then-approve maintenance workflows.`,
+  description: `Creates a new work request in MaintainX. Work requests can be reviewed and approved before being converted into work orders. Useful for request-then-approve maintenance workflows. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let createWorkRequest = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       title: z.string().describe('Title of the work request'),
       description: z
         .string()
@@ -34,10 +36,7 @@ export let createWorkRequest = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.createWorkRequest({
       title: ctx.input.title,

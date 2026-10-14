@@ -24,7 +24,11 @@ export let getLinkedInAccounts = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      accounts: z.array(z.any()).describe('Array of LinkedIn sender account objects')
+      accounts: z.array(z.any()).describe('Array of LinkedIn sender account objects'),
+      totalCount: z
+        .union([z.number(), z.string()])
+        .optional()
+        .describe('Total matching records reported by HeyReach')
     })
   )
   .handleInvocation(async ctx => {
@@ -35,10 +39,11 @@ export let getLinkedInAccounts = SlateTool.create(spec, {
       ctx.input.offset,
       ctx.input.keyword
     );
-    let accounts = Array.isArray(result) ? result : (result?.data ?? result?.items ?? []);
+    let page = result?.data ?? result;
+    let accounts = Array.isArray(page) ? page : (page?.items ?? []);
 
     return {
-      output: { accounts },
+      output: { accounts, totalCount: page?.totalCount },
       message: `Retrieved **${accounts.length}** LinkedIn sender account(s).`
     };
   })

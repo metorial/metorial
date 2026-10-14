@@ -28,7 +28,7 @@ export let listTagsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listTags(ctx.input.muralId);
 
     let tags = result.value.map(t => ({
@@ -53,13 +53,13 @@ export let createTagTool = SlateTool.create(spec, {
   .input(
     z.object({
       muralId: z.string().describe('ID of the mural to create the tag in'),
-      text: z.string().describe('Tag text (max 25 characters)'),
+      text: z.string().max(25).describe('Tag text (max 25 characters)'),
       color: z.string().optional().describe('Tag color')
     })
   )
   .output(tagOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let t = await client.createTag(ctx.input.muralId, {
       text: ctx.input.text,
       color: ctx.input.color
@@ -81,13 +81,13 @@ export let updateTagTool = SlateTool.create(spec, {
     z.object({
       muralId: z.string().describe('ID of the mural containing the tag'),
       tagId: z.string().describe('ID of the tag to update'),
-      text: z.string().optional().describe('New tag text (max 25 characters)'),
+      text: z.string().max(25).optional().describe('New tag text (max 25 characters)'),
       color: z.string().optional().describe('New tag color')
     })
   )
   .output(tagOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let t = await client.updateTag(ctx.input.muralId, ctx.input.tagId, {
       text: ctx.input.text,
       color: ctx.input.color
@@ -120,7 +120,7 @@ export let deleteTagTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteTag(ctx.input.muralId, ctx.input.tagId);
 
     return {

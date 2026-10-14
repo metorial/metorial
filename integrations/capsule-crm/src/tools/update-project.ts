@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
+import { customFieldValuesSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateProject = SlateTool.create(spec, {
@@ -14,21 +15,41 @@ export let updateProject = SlateTool.create(spec, {
       name: z.string().optional().describe('Updated name'),
       description: z.string().optional().describe('Updated description'),
       status: z.enum(['OPEN', 'CLOSED']).optional().describe('Updated status'),
-      ownerId: z.number().optional().describe('New owner user ID'),
-      teamId: z.number().optional().describe('New team ID'),
+      ownerId: z
+        .number()
+        .optional()
+        .describe('New owner user ID. Use list_users to discover IDs.'),
+      teamId: z.number().optional().describe('New team ID. Use list_teams to discover IDs.'),
+      startOn: z.string().optional().describe('Scheduled start date (YYYY-MM-DD)'),
+      opportunityId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Related opportunity ID. Use list_opportunities or search_opportunities to discover IDs.'
+        ),
+      stageId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Existing project stage ID, for example a stage returned by get_project'),
       expectedCloseOn: z
         .string()
         .optional()
         .describe('Updated expected close date (YYYY-MM-DD)'),
+      fields: customFieldValuesSchema,
       tags: z
         .array(
           z.object({
             tagId: z.number().optional(),
-            name: z.string().optional()
+            name: z.string().optional(),
+            delete: z.boolean().optional().describe('Remove the tag identified by tagId')
           })
         )
         .optional()
-        .describe('Tags to set')
+        .describe('Tags to add or remove; unspecified tags remain unchanged')
     })
   )
   .output(
@@ -51,8 +72,25 @@ export let updateProject = SlateTool.create(spec, {
     if (ctx.input.expectedCloseOn !== undefined)
       kase.expectedCloseOn = ctx.input.expectedCloseOn;
 
+    if (ctx.input.fields) {
+      kase.fields = ctx.input.fields.map(field => ({
+        definition: { id: field.definitionId },
+        value: field.value
+      }));
+    }
+
+    if (ctx.input.startOn !== undefined) kase.startOn = ctx.input.startOn;
+    if (ctx.input.opportunityId !== undefined)
+      kase.opportunity = { id: ctx.input.opportunityId };
+    if (ctx.input.stageId !== undefined) kase.stage = { id: ctx.input.stageId };
+
     if (ctx.input.tags) {
-      kase.tags = ctx.input.tags.map(t => (t.tagId ? { id: t.tagId } : { name: t.name }));
+      if (ctx.input.tags.some(tag => tag.delete && !tag.tagId)) {
+        throw createApiServiceError('Provide tagId when removing a tag.');
+      }
+      kase.tags = ctx.input.tags.map(t =>
+        t.tagId ? { id: t.tagId, ...(t.delete ? { _delete: true } : {}) } : { name: t.name }
+      );
     }
 
     let result = await client.updateProject(ctx.input.projectId, kase);
@@ -60,8 +98,8 @@ export let updateProject = SlateTool.create(spec, {
     return {
       output: {
         projectId: result.id,
-        name: result.name,
-        updatedAt: result.updatedAt
+        name: result.name ?? undefined,
+        updatedAt: result.updatedAt ?? undefined
       },
       message: `Updated project **${result.name ?? `#${result.id}`}**.`
     };

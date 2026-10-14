@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListItems } from '../lib/client';
 import { spec } from '../spec';
 
 export let listCourses = SlateTool.create(spec, {
@@ -48,7 +48,7 @@ export let listCourses = SlateTool.create(spec, {
       deleted: ctx.input.includeDeleted
     });
 
-    let courses = Array.isArray(result) ? result : (result?.data ?? [result]);
+    let courses = getListItems(result);
 
     return {
       output: { courses },

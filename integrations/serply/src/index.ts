@@ -4,6 +4,7 @@ import {
   bingSearch,
   imageSearch,
   jobSearch,
+  mapsSearch,
   newsSearch,
   productSearch,
   scholarSearch,
@@ -22,7 +23,8 @@ export let provider = Slate.create({
     productSearch,
     jobSearch,
     scholarSearch,
-    serpRanking
+    serpRanking,
+    mapsSearch
   ],
   triggers: []
 });

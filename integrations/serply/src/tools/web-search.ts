@@ -91,7 +91,7 @@ export let webSearch = SlateTool.create(spec, {
       output: {
         results,
         total,
-        answer: data.answer || null
+        answer: data.answer ?? data.answers ?? null
       },
       message: `Found **${results.length}** web results${total ? ` out of ${total} total` : ''} for "${ctx.input.query}".`
     };

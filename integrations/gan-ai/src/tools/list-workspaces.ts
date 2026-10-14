@@ -24,7 +24,7 @@ export let listWorkspaces = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new StudioClient(ctx.auth.token);
+    let client = new StudioClient(ctx.auth);
     let result = await client.listWorkspaces();
 
     return {

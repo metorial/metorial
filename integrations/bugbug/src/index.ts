@@ -1,11 +1,14 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  downloadRunReport,
+  getProfile,
   getSuite,
   getSuiteRun,
   getTest,
   getTestRun,
   listProfiles,
+  listProjects,
   listSuiteRuns,
   listSuites,
   listTestRuns,
@@ -31,7 +34,10 @@ export let provider = Slate.create({
     getSuiteRun,
     listSuiteRuns,
     stopSuiteRun,
-    listProfiles
+    listProfiles,
+    getProfile,
+    listProjects,
+    downloadRunReport
   ],
   triggers: []
 });

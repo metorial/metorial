@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -26,20 +27,13 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://deep-image.ai/rest_api'
-      });
-
-      let response = await axios.get('/me', {
-        headers: {
-          'X-API-KEY': ctx.output.token
-        }
-      });
+      let client = new Client({ token: ctx.output.token });
+      let account = await client.getAccountInfo();
 
       return {
         profile: {
-          email: response.data.email,
-          name: response.data.username
+          email: account.email,
+          name: account.username
         }
       };
     }

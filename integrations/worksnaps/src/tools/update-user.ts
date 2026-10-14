@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let updateUser = SlateTool.create(spec, {
   name: 'Update User',
   key: 'update_user',
-  description: `Update a user account's profile information. Only the fields provided will be updated; omitted fields remain unchanged.`,
+  description: `Update your own user profile, or another user's profile when authenticated with a trusted partner API token. Only the fields provided will be updated; omitted fields remain unchanged.`,
   tags: {
     destructive: false,
     readOnly: false

@@ -1,4 +1,4 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { baseDocumentInputSchema } from '../lib/schemas';
@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let createDocument = SlateTool.create(spec, {
   name: 'Create Document',
   key: 'create_document',
-  description: `Synchronously converts HTML/CSS/JavaScript content into a PDF or Excel (XLS/XLSX) document. Returns the generated document as an attachment. Content can be provided as inline HTML or by referencing a URL. For large or complex documents that may take longer than 60 seconds, use asynchronous document creation instead.`,
+  description: `Synchronously converts HTML/CSS/JavaScript content into a PDF or Excel (XLS/XLSX) document. Returns the generated document as a downloadable file. Content can be provided as inline HTML or by referencing a URL. For large or complex documents that may take longer than 60 seconds, use asynchronous document creation instead.`,
   instructions: [
     'Either documentContent or documentUrl must be provided, but not both.',
     'For Excel files (xls/xlsx), input must be valid XML rather than arbitrary HTML.',
@@ -15,7 +15,7 @@ export let createDocument = SlateTool.create(spec, {
   ],
   constraints: [
     'Synchronous requests have a 60-second timeout.',
-    'The response document is returned in the response attachments.'
+    'The generated document is available to download.'
   ],
   tags: {
     destructive: false,
@@ -38,18 +38,16 @@ export let createDocument = SlateTool.create(spec, {
       test: testMode,
       princeOptions: ctx.input.princeOptions ?? undefined
     });
-    let mimeType =
-      ctx.input.documentType === 'pdf'
-        ? 'application/pdf'
-        : ctx.input.documentType === 'xlsx'
-          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          : 'application/vnd.ms-excel';
+    await ctx.addAttachment({
+      type: 'content',
+      content: result.content,
+      filename: ctx.input.name || `document.${ctx.input.documentType}`
+    });
 
     return {
       output: {
         contentLengthBytes: result.contentLength
       },
-      attachments: [createBase64Attachment(result.content, mimeType)],
       message: `Successfully created ${ctx.input.documentType.toUpperCase()} document${ctx.input.name ? ` "${ctx.input.name}"` : ''}${testMode ? ' (test mode)' : ''}. Size: ${result.contentLength} bytes.`
     };
   })

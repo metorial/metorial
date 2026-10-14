@@ -9,7 +9,7 @@ export let createMailbox = SlateTool.create(spec, {
   description: `Create a new mailbox (parser) in Parseur. A mailbox is configured to process a specific type of document. You can optionally start from a ready-made template (e.g. invoices, leads, travel, resume-cv) and choose an AI engine.`,
   instructions: [
     'Use templateSlug to start from a ready-made template. Common slugs: invoices, leads, travel, resume-cv, food-delivery, real-estate.',
-    'AI engines: DISABLED (no AI), GCP_AI_1 (standard), GCP_AI_2 (advanced), GCP_AI_2_5 (latest).'
+    'Current AI engines: DISABLED, GCP_AI_2, GCP_AI_2_5, GCP_AI_3_TXT. GCP_AI_1 remains available as a legacy input.'
   ],
   tags: {
     destructive: false
@@ -22,7 +22,7 @@ export let createMailbox = SlateTool.create(spec, {
         .optional()
         .describe('Name for the new mailbox. If omitted, a random name is generated.'),
       aiEngine: z
-        .enum(['DISABLED', 'GCP_AI_1', 'GCP_AI_2', 'GCP_AI_2_5'])
+        .enum(['DISABLED', 'GCP_AI_1', 'GCP_AI_2', 'GCP_AI_2_5', 'GCP_AI_3_TXT'])
         .optional()
         .describe('AI engine to use. Defaults to GCP_AI_2.'),
       templateSlug: z
@@ -67,10 +67,10 @@ export let createMailbox = SlateTool.create(spec, {
         mailboxId: mailbox.id,
         name: mailbox.name,
         emailPrefix: mailbox.email_prefix,
-        emailAddress: `${mailbox.email_prefix}@parseur.com`,
+        emailAddress: `${mailbox.email_prefix}@in.parseur.com`,
         aiEngine: mailbox.ai_engine
       },
-      message: `Created mailbox **${mailbox.name}** (ID: ${mailbox.id}). Send documents to \`${mailbox.email_prefix}@parseur.com\` or upload via API.`
+      message: `Created mailbox **${mailbox.name}** (ID: ${mailbox.id}). Send documents to \`${mailbox.email_prefix}@in.parseur.com\` or upload via API.`
     };
   })
   .build();

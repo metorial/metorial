@@ -1,4 +1,36 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+
+export let normalizeCredentials = (config: { token: string; instanceUrl: string }) => {
+  let token = config.token.trim();
+  if (!token || /[\r\n]/.test(token)) {
+    throw createApiServiceError('Provide a non-empty Docnify API token without line breaks.');
+  }
+
+  let instanceUrl = config.instanceUrl.trim().replace(/\/+$/, '');
+  let url: URL;
+  try {
+    url = new URL(instanceUrl);
+  } catch {
+    throw createApiServiceError('Provide a valid HTTP or HTTPS Docnify instance URL.');
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw createApiServiceError(
+      'Provide a Docnify instance URL without credentials, query parameters, or a fragment.'
+    );
+  }
+  return { token, instanceUrl: url.toString().replace(/\/+$/, '') };
+};
 
 export interface DocnifyDocument {
   id: string;
@@ -39,41 +71,45 @@ export interface AddRecipientParams {
 }
 
 export class Client {
-  private instanceUrl: string;
-  private token: string;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; instanceUrl: string }) {
-    this.token = config.token;
-    this.instanceUrl = config.instanceUrl.replace(/\/+$/, '');
-  }
-
-  private getAxios() {
-    return createAxios({
-      baseURL: `${this.instanceUrl}/api/v1`,
-      headers: {
-        Authorization: this.token,
-        'Content-Type': 'application/json'
-      }
+    let credentials = normalizeCredentials(config);
+    this.http = createAuthenticatedAxios({
+      baseURL: `${credentials.instanceUrl}/api/v1`,
+      authHeader: { value: credentials.token },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Docnify',
+          reason: 'docnify_api_error'
+        })
     });
   }
 
   async listDocuments(params?: ListDocumentsParams): Promise<DocnifyDocument[]> {
-    let http = this.getAxios();
-    let response = await http.get('/documents', { params });
+    let response = await this.http.get('/documents', { params });
+    if (!Array.isArray(response.data)) {
+      throw createApiServiceError('Docnify returned an unexpected document list response.');
+    }
     return response.data;
   }
 
   async getDocument(documentId: string): Promise<DocnifyDocument> {
-    let http = this.getAxios();
-    let response = await http.get(`/documents/${documentId}`);
+    if (!documentId.trim()) {
+      throw createApiServiceError('Provide the ID of the Docnify document to retrieve.');
+    }
+    let response = await this.http.get(`/documents/${encodeURIComponent(documentId)}`);
     return response.data;
   }
 
   async createDocumentFromTemplate(
     params: CreateDocumentFromTemplateParams
   ): Promise<DocnifyDocument> {
-    let http = this.getAxios();
-    let response = await http.post('/documents', params);
+    if (!params.templateId.trim()) {
+      throw createApiServiceError('Provide the Docnify template ID to create a document.');
+    }
+    let response = await this.http.post('/documents', pickDefined(params));
     return response.data;
   }
 
@@ -81,14 +117,23 @@ export class Client {
     documentId: string,
     recipient: AddRecipientParams
   ): Promise<DocnifyRecipient> {
-    let http = this.getAxios();
-    let response = await http.post(`/documents/${documentId}/recipients`, recipient);
+    if (!documentId.trim() || !recipient.email.trim() || !recipient.name.trim()) {
+      throw createApiServiceError(
+        'Provide a Docnify document ID and a non-empty recipient email and name.'
+      );
+    }
+    let response = await this.http.post(
+      `/documents/${encodeURIComponent(documentId)}/recipients`,
+      pickDefined(recipient)
+    );
     return response.data;
   }
 
   async sendDocument(documentId: string): Promise<DocnifyDocument> {
-    let http = this.getAxios();
-    let response = await http.post(`/documents/${documentId}/send`);
+    if (!documentId.trim()) {
+      throw createApiServiceError('Provide the ID of the Docnify document to send.');
+    }
+    let response = await this.http.post(`/documents/${encodeURIComponent(documentId)}/send`);
     return response.data;
   }
 
@@ -96,8 +141,7 @@ export class Client {
     updatedSince: string | null,
     limit: number = 100
   ): Promise<DocnifyDocument[]> {
-    let http = this.getAxios();
-    let params: Record<string, string | number> = {
+    let params: ListDocumentsParams & { updatedSince?: string } = {
       limit,
       sortBy: 'updatedAt',
       sortOrder: 'desc'
@@ -105,7 +149,6 @@ export class Client {
     if (updatedSince) {
       params.updatedSince = updatedSince;
     }
-    let response = await http.get('/documents', { params });
-    return response.data;
+    return this.listDocuments(params);
   }
 }

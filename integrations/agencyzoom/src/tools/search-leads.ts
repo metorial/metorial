@@ -84,11 +84,7 @@ export let searchLeads = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let params: Record<string, unknown> = {};
     if (ctx.input.search !== undefined) params.search = ctx.input.search;
@@ -104,19 +100,41 @@ export let searchLeads = SlateTool.create(spec, {
 
     let result = await client.searchLeads(params);
 
-    let leads = Array.isArray(result.data) ? result.data : Array.isArray(result) ? result : [];
-    let total = result.total ?? result.count ?? leads.length;
+    let leads = Array.isArray(result.leads)
+      ? result.leads
+      : Array.isArray(result.data)
+        ? result.data
+        : Array.isArray(result)
+          ? result
+          : [];
+    let total = result.total ?? result.totalCount ?? result.count ?? leads.length;
 
     let mappedLeads = leads.map((lead: Record<string, any>) => ({
-      leadId: lead.leadId ?? lead.id ?? '',
-      firstName: lead.firstName,
-      lastName: lead.lastName,
+      leadId: String(lead.leadId ?? lead.id ?? ''),
+      firstName: lead.firstName ?? lead.firstname,
+      lastName: lead.lastName ?? lead.lastname,
       email: lead.email,
       phone: lead.phone,
-      status: lead.status,
-      producer: lead.producer,
-      leadSource: lead.leadSource,
-      createdAt: lead.createdAt
+      status:
+        typeof lead.status === 'number'
+          ? ((
+              {
+                0: 'new',
+                1: 'quoted',
+                2: 'won',
+                3: 'lost',
+                4: 'contacted',
+                5: 'x-dated'
+              } as Record<number, string>
+            )[lead.status] ?? String(lead.status))
+          : lead.status,
+      producer: lead.producer ?? {
+        id: lead.assignedTo,
+        firstName: lead.assignToFirstname,
+        lastName: lead.assignToLastname
+      },
+      leadSource: lead.leadSource ?? { id: lead.leadSourceId, name: lead.leadSourceName },
+      createdAt: lead.createdAt ?? lead.createDate
     }));
 
     return {

@@ -1,4 +1,4 @@
-# Slates Specification for Erpnext
+# ERPNext Integration Specification
 
 ## Overview
 
@@ -6,7 +6,7 @@ ERPNext is an open-source enterprise resource planning (ERP) software built on t
 
 ## Authentication
 
-ERPNext supports three authentication methods. A site URL (e.g., `https://yoursite.erpnext.com` or a self-hosted domain) is required for all methods.
+ERPNext supports three authentication methods. A site URL (e.g., `https://yoursite.erpnext.com` or a self-hosted domain) is required on the selected authentication method. It is saved with the credentials and used for subsequent operations. Existing connections can continue using their previously saved site configuration.
 
 ### 1. Token-Based Authentication (API Key + API Secret)
 
@@ -14,7 +14,7 @@ Generate an API Key and API Secret from your ERPNext user account in Settings > 
 
 ### 2. Password-Based Authentication (Session/Cookie)
 
-POST credentials (`usr` and `pwd`) to `/api/method/login`. A successful response returns a session cookie (`sid`) that must be sent with subsequent requests. The session expires in three days.
+POST credentials (`usr` and `pwd`) to `/api/method/login`. A successful response returns a session cookie (`sid`) that must be sent with subsequent requests. Session lifetime depends on the site configuration; reconnect when the session expires.
 
 ### 3. OAuth 2.0
 
@@ -68,9 +68,9 @@ Create and manage Projects, Tasks, and Timesheets. Track project progress and re
 
 ERPNext's API is built on the Frappe Framework, which allows calling arbitrary whitelisted server-side Python methods via `/api/method/<dotted.path>`. This enables access to custom business logic, report generation, and specialized operations beyond standard CRUD.
 
-### File Uploads
+### Connection Identity
 
-Upload files to ERPNext via a dedicated endpoint (`/api/method/upload_file`), supporting binary file data attached to documents.
+Use `get_current_user` to retrieve the user identifier authenticated by the current connection. All document operations follow that user's permissions.
 
 ### Reporting & Data Extraction
 
@@ -78,7 +78,7 @@ The API can be used to extract data for advanced analytics and reporting. Busine
 
 ## Events
 
-ERPNext supports outbound webhooks that can be configured for any DocType.
+ERPNext supports outbound webhooks that can be configured for any DocType. This integration does not register event triggers; the following describes provider capabilities.
 
 ### Document Events
 

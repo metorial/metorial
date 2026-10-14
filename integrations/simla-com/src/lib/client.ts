@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  extractApiErrorMessage
+} from 'slates';
 import type {
   PaginationResponse,
   SimlaCorporateCustomer,
@@ -14,16 +19,41 @@ import type {
 } from './types';
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private site?: string;
 
   constructor(config: { token: string; subdomain: string; site?: string }) {
     this.site = config.site;
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://${config.subdomain}.simla.com/api/v5`,
-      headers: {
-        'X-API-KEY': config.token
+      timeout: 30000,
+      contentType: false,
+      authHeader: { name: 'X-API-KEY', value: config.token },
+      errorMapping: {
+        mapAxiosError: (error, inferred) => ({
+          ...inferred,
+          message: extractApiErrorMessage(error, { detailKeys: ['errorMsg', 'message'] })
+        })
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Simla.com',
+          reason: 'simla_api_error',
+          detailKeys: ['errorMsg', 'message']
+        })
+    });
+    this.axios.interceptors.response.use(response => {
+      if (response.data?.success === false) {
+        throw buildApiServiceError(
+          { response },
+          {
+            providerLabel: 'Simla.com',
+            reason: 'simla_api_error',
+            detailKeys: ['errorMsg', 'message']
+          }
+        );
       }
+      return response;
     });
   }
 
@@ -241,7 +271,20 @@ export class Client {
     pagination: PaginationResponse;
   }> {
     let params: Record<string, any> = {};
-    if (filter) params.filter = filter;
+    if (filter) {
+      let { statuses, minSumm, maxSumm, ...rest } = filter;
+      params.filter = {
+        ...rest,
+        extendedStatus: statuses,
+        minPrice: minSumm,
+        maxPrice: maxSumm,
+        createdAtFrom: rest.createdAtFrom?.replace(
+          /^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2}$/,
+          '$1'
+        ),
+        createdAtTo: rest.createdAtTo?.replace(/^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2}$/, '$1')
+      };
+    }
     if (page) params.page = page;
     if (limit) params.limit = limit;
     let response = await this.axios.get('/orders', { params });
@@ -362,7 +405,47 @@ export class Client {
     pagination: PaginationResponse;
   }> {
     let params: Record<string, any> = {};
-    if (filter) params.filter = filter;
+    if (filter) {
+      let { groups, groupIds, offerActive, active, ...rest } = filter;
+      if (offerActive !== undefined) {
+        throw createApiServiceError(
+          'Simla.com does not support filtering offers by offerActive. Use active to filter product activity.'
+        );
+      }
+      let resolvedGroupIds: number[] = [...(groupIds ?? [])];
+      if (groups?.length) {
+        let missing = new Set<string>(groups);
+        let groupPage = 1;
+        while (true) {
+          let result = await this.getProductGroups(undefined, groupPage, 100);
+          for (let group of result.productGroup) {
+            if (
+              group.externalId &&
+              groups.includes(group.externalId) &&
+              group.id !== undefined
+            ) {
+              resolvedGroupIds.push(group.id);
+              missing.delete(group.externalId);
+            }
+          }
+          if (groupPage >= result.pagination.totalPageCount) break;
+          groupPage++;
+        }
+        if (missing.size) {
+          throw createApiServiceError(
+            `Product groups not found: ${[...missing].join(', ')}. Use list_product_groups to discover available groups.`
+          );
+        }
+      }
+      params.filter = {
+        ...rest,
+        active,
+        groups:
+          groups !== undefined || groupIds !== undefined
+            ? [...new Set(resolvedGroupIds)]
+            : undefined
+      };
+    }
     if (page) params.page = page;
     if (limit) params.limit = limit;
     let response = await this.axios.get('/store/products', { params });
@@ -383,6 +466,7 @@ export class Client {
       name?: string;
       externalId?: string;
       active?: boolean;
+      site?: string;
     }>;
     pagination: PaginationResponse;
   }> {
@@ -408,7 +492,13 @@ export class Client {
     pagination: PaginationResponse;
   }> {
     let params: Record<string, any> = {};
-    if (filter) params.filter = filter;
+    if (filter) {
+      let { complete, ...rest } = filter;
+      params.filter = {
+        ...rest,
+        status: complete === undefined ? undefined : complete ? 'completed' : 'performing'
+      };
+    }
     if (page) params.page = page;
     if (limit) params.limit = limit;
     let response = await this.axios.get('/tasks', { params });
@@ -425,7 +515,13 @@ export class Client {
 
   async createTask(task: SimlaTask): Promise<{ taskId: number }> {
     let params = new URLSearchParams();
-    params.append('task', JSON.stringify(task));
+    params.append(
+      'task',
+      JSON.stringify({
+        ...task,
+        datetime: task.datetime?.replace(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}):\d{2}$/, '$1')
+      })
+    );
     if (this.site) params.append('site', this.site);
     let response = await this.axios.post('/tasks/create', params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -435,7 +531,13 @@ export class Client {
 
   async editTask(id: number, task: SimlaTask): Promise<void> {
     let params = new URLSearchParams();
-    params.append('task', JSON.stringify(task));
+    params.append(
+      'task',
+      JSON.stringify({
+        ...task,
+        datetime: task.datetime?.replace(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}):\d{2}$/, '$1')
+      })
+    );
     if (this.site) params.append('site', this.site);
     await this.axios.post(`/tasks/${id}/edit`, params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -453,7 +555,19 @@ export class Client {
     pagination: PaginationResponse;
   }> {
     let params: Record<string, any> = {};
-    if (filter) params.filter = filter;
+    if (filter) {
+      if (filter.isManager === false) {
+        throw createApiServiceError(
+          'Simla.com only supports isManager=true. Omit this filter to retrieve all users.'
+        );
+      }
+      params.filter = Object.fromEntries(
+        Object.entries(filter).map(([key, value]) => [
+          key,
+          typeof value === 'boolean' ? (value ? '1' : '0') : value
+        ])
+      );
+    }
     if (page) params.page = page;
     if (limit) params.limit = limit;
     let response = await this.axios.get('/users', { params });
@@ -586,7 +700,9 @@ export class Client {
   }
 
   async getCustomField(entity: string, code: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/custom-fields/${entity}/${code}`);
+    let response = await this.axios.get(
+      `/custom-fields/${encodeURIComponent(entity)}/${encodeURIComponent(code)}`
+    );
     return response.data.customField;
   }
 
@@ -596,9 +712,13 @@ export class Client {
   ): Promise<{ code: string }> {
     let params = new URLSearchParams();
     params.append('customField', JSON.stringify(customField));
-    let response = await this.axios.post(`/custom-fields/${entity}/create`, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
+    let response = await this.axios.post(
+      `/custom-fields/${encodeURIComponent(entity)}/create`,
+      params,
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
     return { code: response.data.code };
   }
 
@@ -609,9 +729,13 @@ export class Client {
   ): Promise<void> {
     let params = new URLSearchParams();
     params.append('customField', JSON.stringify(customField));
-    await this.axios.post(`/custom-fields/${entity}/${code}/edit`, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
+    await this.axios.post(
+      `/custom-fields/${encodeURIComponent(entity)}/${encodeURIComponent(code)}/edit`,
+      params,
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
   }
 
   // ========== Custom Dictionaries ==========
@@ -636,7 +760,9 @@ export class Client {
   }
 
   async getCustomDictionary(code: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/custom-fields/dictionaries/${code}`);
+    let response = await this.axios.get(
+      `/custom-fields/dictionaries/${encodeURIComponent(code)}`
+    );
     return response.data.customDictionary;
   }
 
@@ -652,18 +778,31 @@ export class Client {
   async editCustomDictionary(code: string, dictionary: Record<string, any>): Promise<void> {
     let params = new URLSearchParams();
     params.append('customDictionary', JSON.stringify(dictionary));
-    await this.axios.post(`/custom-fields/dictionaries/${code}/edit`, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    });
+    await this.axios.post(
+      `/custom-fields/dictionaries/${encodeURIComponent(code)}/edit`,
+      params,
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
   }
 
   // ========== API Credentials ==========
 
-  async getCredentials(): Promise<{ credentials: string[]; siteAccess: string[] }> {
-    let response = await this.axios.get('/credentials');
+  async getCredentials(): Promise<{
+    credentials: string[];
+    scopes: string[];
+    siteAccess: 'access_full' | 'access_selective';
+    sitesAvailable: string[];
+  }> {
+    let response = await this.axios.get('/api/credentials', {
+      baseURL: this.axios.defaults.baseURL?.replace(/\/api\/v5$/, '')
+    });
     return {
       credentials: response.data.credentials || [],
-      siteAccess: response.data.siteAccess || []
+      scopes: response.data.scopes || [],
+      siteAccess: response.data.siteAccess,
+      sitesAvailable: response.data.sitesAvailable || []
     };
   }
 }

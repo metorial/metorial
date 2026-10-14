@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -62,7 +62,7 @@ export let manageProject = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required to create a project');
+      if (!ctx.input.name) throw createApiServiceError('Name is required to create a project');
       let result = await client.createProject({
         name: ctx.input.name,
         description: ctx.input.description,
@@ -89,7 +89,8 @@ export let manageProject = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.projectId) throw new Error('projectId is required to update a project');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required to update a project');
       await client.updateProject(ctx.input.projectId, {
         name: ctx.input.name,
         description: ctx.input.description,
@@ -109,7 +110,8 @@ export let manageProject = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.projectId) throw new Error('projectId is required to delete a project');
+      if (!ctx.input.projectId)
+        throw createApiServiceError('projectId is required to delete a project');
       await client.deleteProject(ctx.input.projectId);
       return {
         output: { deleted: true },
@@ -117,6 +119,6 @@ export let manageProject = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

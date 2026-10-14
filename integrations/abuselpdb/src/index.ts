@@ -5,6 +5,7 @@ import {
   checkIp,
   checkSubnet,
   clearIpReports,
+  exportBlacklist,
   getBlacklist,
   getIpReports,
   reportIp
@@ -19,6 +20,7 @@ export let provider = Slate.create({
     reportIp,
     bulkReport,
     getBlacklist,
+    exportBlacklist,
     clearIpReports
   ],
   triggers: []

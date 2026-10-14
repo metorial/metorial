@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HyperbrowserClient } from '../lib/client';
 import { profileSchema } from '../lib/schemas';
@@ -38,6 +38,35 @@ Attach the created profile to sessions to maintain authenticated state.`,
         name: result.name as string | null | undefined
       },
       message: `Profile **${result.id}** created${result.name ? ` (${result.name})` : ''}.`
+    };
+  })
+  .build();
+
+export let getProfile = SlateTool.create(spec, {
+  name: 'Get Profile',
+  key: 'get_profile',
+  description:
+    'Retrieve a saved browser profile by ID, including its name and timestamps. Call list_profiles to discover profile IDs.',
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      profileId: z.string().describe('Profile ID from create_profile or list_profiles')
+    })
+  )
+  .output(profileSchema)
+  .handleInvocation(async ctx => {
+    let client = new HyperbrowserClient({ token: ctx.auth.token });
+    let result = await client.getProfile(ctx.input.profileId);
+    return {
+      output: {
+        profileId: result.id as string,
+        name: result.name as string | null | undefined,
+        teamId: result.teamId as string | undefined,
+        createdAt: result.createdAt as string | undefined,
+        updatedAt: result.updatedAt as string | undefined
+      },
+      message: `Retrieved profile **${result.id}**.`
     };
   })
   .build();
@@ -114,7 +143,12 @@ export let deleteProfile = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new HyperbrowserClient({ token: ctx.auth.token });
-    await client.deleteProfile(ctx.input.profileId);
+    let result = await client.deleteProfile(ctx.input.profileId);
+    if (result.success !== true) {
+      throw createApiServiceError(
+        'Hyperbrowser did not confirm that the profile was deleted.'
+      );
+    }
 
     return {
       output: {

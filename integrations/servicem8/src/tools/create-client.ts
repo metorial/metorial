@@ -34,7 +34,7 @@ export let createClient = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     let data: Record<string, any> = { name: ctx.input.name };
     if (ctx.input.addressStreet) data.address_street = ctx.input.addressStreet;

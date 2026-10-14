@@ -50,7 +50,9 @@ export let listInterviewResponses = SlateTool.create(spec, {
       jobId: z
         .number()
         .optional()
-        .describe('Filter responses by job ID. If not provided, all responses are returned.')
+        .describe(
+          'Filter responses by job ID. Call list_jobs to discover job IDs. If omitted, return all responses from the API.'
+        )
     })
   )
   .output(

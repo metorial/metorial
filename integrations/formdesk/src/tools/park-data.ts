@@ -18,12 +18,17 @@ export let parkData = SlateTool.create(spec, {
       fields: z
         .record(z.string(), z.string())
         .describe('Field data as key-value pairs to pre-fill the form with'),
-      expires: z.number().optional().describe('Expiration time in seconds for the ticket'),
+      expires: z
+        .number()
+        .optional()
+        .describe('Expiration time in seconds for the ticket; defaults to 86400 (one day)'),
       reuse: z.boolean().optional().describe('Whether the ticket can be used multiple times'),
       preventChange: z
         .boolean()
         .optional()
-        .describe('Whether to prevent changes to the pre-filled fields')
+        .describe(
+          'Whether to prevent changes and require a parking ticket for this form. To restore access without a ticket, park with false and open the returned URL'
+        )
     })
   )
   .output(

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getEmployeeRecord } from '../lib/client';
 import { spec } from '../spec';
 
 export let getEmployee = SlateTool.create(spec, {
@@ -8,7 +8,7 @@ export let getEmployee = SlateTool.create(spec, {
   key: 'get_employee',
   description: `Retrieve tracking data for a single employee. Look up by employee ID or email address. Returns productivity data including productive, neutral, and unproductive time breakdowns, arrival/departure times, and app/website usage for a given date.`,
   instructions: [
-    'Provide either an employeeId or email to look up a specific employee. If neither is provided, returns data for the API key owner.',
+    'Provide either an employeeId or email to look up a specific employee, never both. If neither is provided, returns data for the API key owner. Call get_employees to discover employee IDs.',
     'Date format must be Y-m-d (e.g. 2024-01-15). If omitted, returns data for today.'
   ],
   tags: {
@@ -17,7 +17,10 @@ export let getEmployee = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      employeeId: z.string().optional().describe('The employee ID to look up'),
+      employeeId: z
+        .string()
+        .optional()
+        .describe('The employee ID to look up. Call get_employees to discover IDs.'),
       email: z.string().optional().describe('The employee email address to look up'),
       date: z
         .string()
@@ -38,10 +41,13 @@ export let getEmployee = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.employeeId !== undefined && ctx.input.email !== undefined) {
+      throw createApiServiceError('Provide either employeeId or email, never both.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
-    let response: any;
-    if (ctx.input.email) {
+    let response: unknown;
+    if (ctx.input.email !== undefined) {
       response = await client.getEmployeeByEmail(ctx.input.email, ctx.input.date);
     } else {
       response = await client.getEmployee({
@@ -50,7 +56,7 @@ export let getEmployee = SlateTool.create(spec, {
       });
     }
 
-    let employee = response?.employee || response;
+    let employee = getEmployeeRecord(response);
 
     let employeeName =
       employee?.name || ctx.input.email || ctx.input.employeeId || 'the current user';

@@ -1,18 +1,26 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { credentialFormatSchema, projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCredentialTemplates = SlateTool.create(spec, {
   name: 'List Credential Templates',
   key: 'list_credential_templates',
   description: `Retrieve credential templates configured in a Paradym project. Returns templates for all supported formats (SD-JWT VC, mDOC, AnonCreds) including their attributes, branding, issuer settings, and revocability configuration.`,
+  instructions: ['Call list_projects to choose the projectId for this operation.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
+      format: credentialFormatSchema
+        .optional()
+        .describe(
+          'Limit to one format. Specify a format when paging; without a format the first page of each format is returned.'
+        ),
       pageSize: z
         .number()
         .optional()
@@ -22,6 +30,9 @@ export let listCredentialTemplates = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      pagination: z
+        .array(z.object({ format: credentialFormatSchema, metadata: z.any().optional() }))
+        .describe('Provider pagination metadata for each requested format'),
       templates: z
         .array(
           z.object({
@@ -51,28 +62,40 @@ export let listCredentialTemplates = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
-    let result = await client.listCredentialTemplates({
-      pageSize: ctx.input.pageSize,
-      pageAfter: ctx.input.pageAfter
-    });
-
-    let templates = (result.data ?? []).map((t: any) => ({
-      templateId: t.id,
-      name: t.name,
-      format: t.format,
-      type: t.type,
-      description: t.description,
-      revocable: t.revocable,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-      attributes: t.attributes
-    }));
+    if (!ctx.input.format && ctx.input.pageAfter) {
+      throw createApiServiceError(
+        'Specify format when using pageAfter; each credential format has its own cursor.'
+      );
+    }
+    let formats = ctx.input.format ? [ctx.input.format] : credentialFormatSchema.options;
+    let templates: any[] = [];
+    let pagination: { format: (typeof formats)[number]; metadata?: unknown }[] = [];
+    for (let format of formats) {
+      let result = await client.listCredentialTemplates(format, {
+        pageSize: ctx.input.pageSize,
+        pageAfter: ctx.input.pageAfter
+      });
+      templates.push(
+        ...result.data.map((t: any) => ({
+          templateId: t.id,
+          name: t.name,
+          format: t.format,
+          type: t.type,
+          description: t.description ?? undefined,
+          revocable: t.revocable,
+          createdAt: t.createdAt,
+          updatedAt: t.updatedAt,
+          attributes: t.attributes
+        }))
+      );
+      pagination.push({ format, metadata: result.meta });
+    }
 
     return {
-      output: { templates },
+      output: { templates, pagination },
       message: `Found **${templates.length}** credential template(s).`
     };
   })

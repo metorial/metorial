@@ -21,7 +21,7 @@ let memberSchema = z
 export let createProject = SlateTool.create(spec, {
   name: 'Create Project',
   key: 'create_project',
-  description: `Creates a new project in Rocketlane. Can optionally associate a customer company, assign an owner, set dates, apply a template, add members, and set custom fields.`,
+  description: `Creates a new project in Rocketlane. Requires a customer company and a project owner. Can set dates, apply a template, add members, and set custom fields. Applying a template requires a start date.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -33,13 +33,27 @@ export let createProject = SlateTool.create(spec, {
       customerCompanyName: z
         .string()
         .optional()
-        .describe('Name of the customer company to associate'),
+        .describe(
+          'Customer company name; provide this or customerCompanyId. Call list_companies to discover customers.'
+        ),
       customerCompanyId: z
         .number()
         .optional()
-        .describe('ID of an existing customer company to associate'),
-      ownerEmail: z.string().optional().describe('Email of the project owner'),
-      ownerId: z.number().optional().describe('User ID of the project owner'),
+        .describe(
+          'Existing customer company ID; provide this or customerCompanyName. Call list_companies to discover customers.'
+        ),
+      ownerEmail: z
+        .string()
+        .optional()
+        .describe(
+          'Project owner email; provide this or ownerId. Call list_users to discover owners.'
+        ),
+      ownerId: z
+        .number()
+        .optional()
+        .describe(
+          'Project owner user ID; provide this or ownerEmail. Call list_users to discover owners.'
+        ),
       startDate: z.string().optional().describe('Project start date in YYYY-MM-DD format'),
       dueDate: z.string().optional().describe('Project due date in YYYY-MM-DD format'),
       projectDescription: z

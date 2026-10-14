@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let managePresentationTemplate = SlateTool.create(spec, {
@@ -8,12 +9,14 @@ export let managePresentationTemplate = SlateTool.create(spec, {
   key: 'manage_presentation_template',
   description: `Create or update a presentation template that defines what credentials and attributes to request from a holder during verification. Supports SD-JWT VC, mDOC, and AnonCreds credential formats. Each template can request up to 20 credentials with attribute constraints (value, range, type).`,
   instructions: [
+    'Call list_projects to choose the projectId for this operation.',
     'To create: omit presentationTemplateId. To update: provide the presentationTemplateId.',
     'Each credential in the credentials array should specify a format and type/schema along with requested attributes.'
   ]
 })
   .input(
     z.object({
+      projectId: projectIdSchema,
       presentationTemplateId: z
         .string()
         .optional()
@@ -43,9 +46,20 @@ export let managePresentationTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
+    if (!ctx.input.credentials.length || ctx.input.credentials.length > 20) {
+      throw createApiServiceError(
+        'Provide between 1 and 20 credential requests in a presentation template.'
+      );
+    }
+    let formats = new Set(ctx.input.credentials.map(credential => credential.format));
+    if (formats.has('anoncreds') && (formats.has('sd-jwt-vc') || formats.has('mdoc'))) {
+      throw createApiServiceError(
+        'AnonCreds requests cannot share a presentation template with SD-JWT VC or mDOC requests.'
+      );
+    }
     let result: any;
     let action: string;
 

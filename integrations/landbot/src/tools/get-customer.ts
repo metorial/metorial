@@ -25,7 +25,8 @@ export let getCustomerTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new PlatformClient(ctx.auth.token);
-    let customer = await client.getCustomer(ctx.input.customerId);
+    let result = await client.getCustomer(ctx.input.customerId);
+    let customer = result.customer ?? result;
 
     return {
       output: {

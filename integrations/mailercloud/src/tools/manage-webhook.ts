@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { getMailercloudCount, getMailercloudItems } from '../lib/responses';
 import { spec } from '../spec';
 
 let webhookEventTypes = z.enum([
@@ -23,7 +24,7 @@ export let manageWebhook = SlateTool.create(spec, {
     'Webhooks are auto-deactivated after 20 consecutive delivery failures.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -42,7 +43,16 @@ export let manageWebhook = SlateTool.create(spec, {
       webhookId: z
         .string()
         .optional()
-        .describe('ID of the webhook to delete (required for delete)')
+        .describe('ID of the webhook to delete (required for delete)'),
+      page: z.number().int().min(1).optional().describe('Page for list action (default: 1)'),
+      limit: z
+        .number()
+        .int()
+        .min(10)
+        .max(100)
+        .optional()
+        .describe('Page size for list action (default: 20)'),
+      search: z.string().optional().describe('Name search for list action')
     })
   )
   .output(
@@ -53,7 +63,8 @@ export let manageWebhook = SlateTool.create(spec, {
           .array(z.record(z.string(), z.unknown()))
           .optional()
           .describe('List of webhooks (for list action)'),
-        action: z.string().describe('Action that was performed')
+        action: z.string().describe('Action that was performed'),
+        totalCount: z.number().optional().describe('Total matching webhooks for list action')
       })
       .passthrough()
   )
@@ -61,14 +72,15 @@ export let manageWebhook = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let result = await client.listWebhooks();
+      let result = await client.listWebhooks(ctx.input);
       let data = result?.data ?? result;
-      let webhooks = Array.isArray(data) ? data : (data?.webhooks ?? data?.data ?? []);
+      let webhooks = getMailercloudItems(data?.webhooks ?? data?.data ?? data);
 
       return {
         output: {
           webhooks,
-          action: 'listed'
+          action: 'listed',
+          totalCount: getMailercloudCount(result?.total ?? result?.count, webhooks.length)
         },
         message: `Retrieved **${webhooks.length}** webhook(s).`
       };
@@ -76,7 +88,7 @@ export let manageWebhook = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.webhookId) {
-        throw new Error('webhookId is required for delete action');
+        throw createApiServiceError('webhookId is required for delete action.');
       }
       await client.deleteWebhook(ctx.input.webhookId);
       return {
@@ -88,9 +100,14 @@ export let manageWebhook = SlateTool.create(spec, {
       };
     }
 
-    // create
-    if (!ctx.input.name || !ctx.input.url || !ctx.input.events) {
-      throw new Error('name, url, and events are required for create action');
+    if (!ctx.input.name || !ctx.input.url || !ctx.input.events?.length) {
+      throw createApiServiceError(
+        'name, url, and at least one event are required for create action.'
+      );
+    }
+
+    if (!/^https?:\/\//i.test(ctx.input.url) || !URL.canParse(ctx.input.url)) {
+      throw createApiServiceError('Webhook URL must be a valid HTTP or HTTPS URL.');
     }
 
     let result = await client.createWebhook({

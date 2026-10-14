@@ -1,4 +1,4 @@
-# Slates Specification for Placekey
+# Placekey Integration Specification
 
 ## Overview
 
@@ -25,14 +25,16 @@ Content-Type: application/json
 
 ### Placekey Lookup
 
-Retrieve a unique Placekey identifier for a single location. Places can be specified using latitude, longitude, location_name, street_address, city, region, postal_code, iso_country_code, and place_metadata. If you only have a pair of coordinates you can still get a Placekey, though it will only contain the "where" part. If you provide the name of the place, the Placekey will contain a unique identifier for the POI located there.
+Retrieve a unique Placekey identifier for a single location. Places can be specified using latitude, longitude, location_name, street_address, city, region, postal_code, iso_country_code, and place_metadata. Coordinates alone return only the geographic Where part. An address and location name are needed to match a specific POI.
+
+Each query must include both coordinates, or a street address, region, country code, and either city or postal code. Invalid input combinations are rejected before a request is sent. An optional `queryId` is echoed in the response.
 
 - **Place metadata** can include optional disambiguation hints like `store_id`, `phone_number`, `website`, `naics_code`, and `mcc_code`.
 - The more input parameters provided, the more precise the match.
 
 ### Bulk Placekey Lookup
 
-For large numbers of places to match, you can send batches. All queries in a batch must have the same `iso_country_code`. Custom `query_id` values can be specified per query to correlate results.
+For large numbers of places to match, you can send batches of 1–100 queries. Supplied `iso_country_code` values must agree; coordinate-only queries may omit the country code. Custom `query_id` values can be specified per query to correlate results. Custom IDs must be unique within a batch, and generated IDs avoid collisions with them.
 
 ### Optional Response Fields
 
@@ -40,17 +42,19 @@ In addition to getting a Placekey and a query_id, you can request additional fie
 
 - **address_placekey**: A subcomponent of a Placekey that has the `location_name` not included in the request.
 - **building_placekey**: A subcomponent of the address_placekey representing the query without the suite or apartment number.
-- **confidence_score**: Reflects the level of confidence in the accuracy of the assigned Placekey, influenced by quality of input data, precision of coordinates, and comprehensiveness of reference data.
+- **confidence_score**: The current API returns `HIGH`, `MEDIUM`, or `LOW`, exposed as `confidenceLevel`. The optional numeric `confidenceScore` output remains available for numeric responses for compatibility.
 - **normalized_address**: A structured and parsed representation of an address, ensuring consistency across datasets.
 - **geocode**: Converts an address or place description into precise geographic coordinates (latitude and longitude).
 - **upi**: Universal Parcel Identifier developed by RESO, a standard for a single identifier that includes both parcel numbers and the geographies of the authorities that created them.
 - **parcel**: A unique identifier assigned to a specific piece of land by a local government or tax authority.
 - **geoid**: Geographic identifier for census areas.
-- **gers**: Global Entity Reference System identifier.
+- **gers**: Global Entity Reference System identifier, omitted from output when the API returns null.
+
+Query-level match failures return an `error` and an empty `placekey` string, allowing batch results to retain their individual query IDs. HTTP failures and malformed responses raise a structured service error.
 
 ### Geocoding
 
-Geocoding is the process of converting addresses into geographic coordinates (latitude and longitude), which you can use to place markers on a map or position the map. You can request geocodes from the Placekey API the same way you request optional responses. The geocoder status indicates the precision and method used to determine the location, returned in the `location_type` field.
+Geocoding is the process of converting addresses into geographic coordinates, which you can use to place markers on a map or position the map. Request it through `fields: ["geocode"]`. The returned object contains `location.lat`, `location.lng`, and `location_type`. Each geocode consumes an additional lookup on top of the Placekey lookup.
 
 ### Join Data Product
 

@@ -11,18 +11,22 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
     'The campaign must be configured in the BigMailer console before sending via API.',
     'field_values are stored permanently on the contact and can be used for segmentation.',
     'variables are used only for merge tag replacement in this send and are then discarded.',
-    'Field values support string, date (YYYY-MM-DD), and integer types.'
+    'Field values support exactly one string, date (YYYY-MM-DD), or integer value per field.'
   ]
 })
   .input(
     z.object({
       brandId: z.string().describe('ID of the brand'),
-      campaignId: z.string().describe('ID of the transactional campaign'),
+      campaignId: z
+        .string()
+        .describe(
+          'ID of the transactional campaign. Call list_transactional_campaigns to discover campaign IDs.'
+        ),
       email: z.string().describe('Recipient email address'),
       fieldValues: z
         .array(
           z.object({
-            name: z.string().describe('Field name'),
+            name: z.string().describe('Existing field merge tag name from list_fields'),
             stringValue: z.string().optional().describe('String value'),
             dateValue: z.string().optional().describe('Date value (YYYY-MM-DD)'),
             integerValue: z.number().optional().describe('Integer value')
@@ -43,7 +47,11 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      sent: z.boolean().describe('Whether the email was sent successfully')
+      sent: z.boolean().describe('Whether BigMailer accepted the email send'),
+      contactId: z
+        .string()
+        .optional()
+        .describe('ID of the contact created or updated by the send')
     })
   )
   .handleInvocation(async ctx => {
@@ -56,7 +64,7 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
       ...(fv.integerValue !== undefined ? { integer: fv.integerValue } : {})
     }));
 
-    await client.sendTransactionalEmail(ctx.input.brandId, ctx.input.campaignId, {
+    let result = await client.sendTransactionalEmail(ctx.input.brandId, ctx.input.campaignId, {
       email: ctx.input.email,
       field_values: fieldValues,
       variables: ctx.input.variables
@@ -64,9 +72,10 @@ export let sendTransactionalEmail = SlateTool.create(spec, {
 
     return {
       output: {
-        sent: true
+        sent: true,
+        contactId: result.contact_id
       },
-      message: `Sent transactional email to **${ctx.input.email}** via campaign ${ctx.input.campaignId}.`
+      message: `BigMailer accepted a transactional email to **${ctx.input.email}** via campaign ${ctx.input.campaignId}.`
     };
   })
   .build();

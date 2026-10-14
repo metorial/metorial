@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { PointagramClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -23,17 +24,11 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let http = createAxios({
-        baseURL: 'https://app.pointagram.com/server/externalapi.php'
+      let client = new PointagramClient({
+        token: ctx.input.apiKey,
+        apiUser: ctx.input.apiUser
       });
-
-      await http.get('/test', {
-        headers: {
-          api_key: ctx.input.apiKey,
-          api_user: ctx.input.apiUser,
-          'Content-Type': 'application/json'
-        }
-      });
+      await client.testCredentials();
 
       return {
         output: {

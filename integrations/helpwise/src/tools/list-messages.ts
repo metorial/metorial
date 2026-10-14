@@ -17,8 +17,18 @@ export let listMessages = SlateTool.create(spec, {
       conversationId: z
         .string()
         .describe('ID of the conversation/thread to retrieve messages from'),
-      limit: z.number().optional().describe('Maximum number of messages to return'),
-      page: z.number().optional().describe('Page number for pagination')
+      limit: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Maximum number of messages to return'),
+      page: z
+        .number()
+        .positive()
+        .refine(Number.isSafeInteger)
+        .optional()
+        .describe('Page number for pagination')
     })
   )
   .output(
@@ -40,7 +50,7 @@ export let listMessages = SlateTool.create(spec, {
 
     let messages = Array.isArray(result)
       ? result
-      : (result.messages ?? result.emails ?? result.data ?? []);
+      : (result.messages ?? result.emails ?? result.data?.emails ?? result.data ?? []);
 
     return {
       output: { messages },

@@ -1,4 +1,9 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export interface PaginatedResponse<T> {
   count: number;
@@ -57,6 +62,70 @@ export interface Document {
   ocr_pages: any[] | null;
   credit_usage: number;
 }
+
+interface ApiDocument {
+  id: number;
+  parser: number;
+  status: string;
+  name?: string;
+  received?: string;
+  processed?: string | null;
+  original_document_url?: string | null;
+  credits_used?: number;
+  result?: string | Record<string, any> | null;
+  ocr_page_set?: any[] | null;
+  file_name?: string;
+  file_url?: string | null;
+  content_type?: string | null;
+  created?: string;
+  modified?: string;
+  credit_usage?: number;
+  ocr_pages?: any[] | null;
+}
+
+let normalizeDocument = (document: ApiDocument): Document => {
+  let result: unknown = document.result;
+  if (typeof result === 'string') {
+    try {
+      result = result.trim() ? JSON.parse(result) : null;
+    } catch (error) {
+      throw createApiServiceError('Parseur returned invalid JSON in the document result.', {
+        reason: 'invalid_parseur_response',
+        parent: error
+      });
+    }
+  }
+  if (result !== undefined && result !== null && !isApiErrorRecord(result)) {
+    throw createApiServiceError('Parseur returned a document result that is not an object.', {
+      reason: 'invalid_parseur_response'
+    });
+  }
+
+  return {
+    id: document.id,
+    parser: document.parser,
+    status: document.status,
+    file_name: document.name ?? document.file_name ?? '',
+    file_url: document.original_document_url ?? document.file_url ?? null,
+    content_type: document.content_type ?? null,
+    created: document.received ?? document.created ?? '',
+    modified:
+      document.processed ?? document.modified ?? document.received ?? document.created ?? '',
+    credit_usage: document.credits_used ?? document.credit_usage ?? 0,
+    result: result ?? null,
+    ocr_pages: document.ocr_page_set ?? document.ocr_pages ?? null
+  };
+};
+
+export interface NotificationResponse {
+  message?: string;
+  notification_set?: { info?: string[] };
+}
+
+export let getNotificationMessage = (
+  response: NotificationResponse,
+  fallbackMessage: string
+) => response.notification_set?.info?.join(' ') || response.message || fallbackMessage;
 
 export interface DocumentLog {
   id: number;
@@ -153,14 +222,27 @@ export interface UploadEmailParams {
 }
 
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'A Parseur API key is required. Reconnect with a valid key.',
+        {
+          reason: 'missing_parseur_api_key'
+        }
+      );
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.parseur.com',
-      headers: {
-        Authorization: config.token
-      }
+      authHeader: { value: config.token },
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Parseur',
+          reason: 'parseur_api_error',
+          detailKeys: ['message', 'detail', 'error', 'non_field_errors']
+        })
     });
   }
 
@@ -189,7 +271,7 @@ export class Client {
       identification_status: 'REQUESTED'
     };
     if (params.name) body.name = params.name;
-    if (params.templateSlug) body.template_slug = params.templateSlug;
+    if (params.templateSlug) body.master_parser_slug = params.templateSlug;
     if (params.processAttachments !== undefined)
       body.process_attachments = params.processAttachments;
     if (params.retentionPolicy !== undefined) body.retention_policy = params.retentionPolicy;
@@ -219,7 +301,7 @@ export class Client {
     return response.data;
   }
 
-  async copyMailbox(mailboxId: number): Promise<{ message: string }> {
+  async copyMailbox(mailboxId: number): Promise<NotificationResponse> {
     let response = await this.axios.post(`/parser/${mailboxId}/copy`);
     return response.data;
   }
@@ -239,25 +321,31 @@ export class Client {
     mailboxId: number,
     params?: ListDocumentsParams
   ): Promise<PaginatedResponse<Document>> {
-    let response = await this.axios.get(`/parser/${mailboxId}/document_set`, {
-      params: {
-        page: params?.page,
-        page_size: params?.pageSize,
-        search: params?.search,
-        ordering: params?.ordering,
-        received_after: params?.receivedAfter,
-        received_before: params?.receivedBefore,
-        status: params?.status,
-        tz: params?.tz,
-        with_result: params?.withResult
+    let response = await this.axios.get<PaginatedResponse<ApiDocument>>(
+      `/parser/${mailboxId}/document_set`,
+      {
+        params: {
+          page: params?.page,
+          page_size: params?.pageSize,
+          search: params?.search,
+          ordering: params?.ordering,
+          received_after: params?.receivedAfter,
+          received_before: params?.receivedBefore,
+          status: params?.status,
+          tz: params?.tz,
+          with_result: params?.withResult
+        }
       }
-    });
-    return response.data;
+    );
+    return {
+      ...response.data,
+      results: response.data.results.map(normalizeDocument)
+    };
   }
 
   async getDocument(documentId: number): Promise<Document> {
-    let response = await this.axios.get(`/document/${documentId}`);
-    return response.data;
+    let response = await this.axios.get<ApiDocument>(`/document/${documentId}`);
+    return normalizeDocument(response.data);
   }
 
   async getDocumentLogs(
@@ -280,14 +368,13 @@ export class Client {
     contentType?: string
   ): Promise<UploadResponse> {
     let formData = new FormData();
-    let blob = new Blob([fileContent], { type: contentType || 'application/octet-stream' });
+    let bytes = new Uint8Array(
+      typeof fileContent === 'string' ? Buffer.from(fileContent) : fileContent
+    );
+    let blob = new Blob([bytes], { type: contentType || 'application/octet-stream' });
     formData.append('file', blob, fileName);
 
-    let response = await this.axios.post(`/parser/${mailboxId}/upload`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
+    let response = await this.axios.post(`/parser/${mailboxId}/upload`, formData);
     return response.data;
   }
 
@@ -310,7 +397,7 @@ export class Client {
     return response.data;
   }
 
-  async reprocessDocument(documentId: number): Promise<{ message: string }> {
+  async reprocessDocument(documentId: number): Promise<NotificationResponse> {
     let response = await this.axios.post(`/document/${documentId}/process`);
     return response.data;
   }
@@ -323,7 +410,7 @@ export class Client {
   async copyDocument(
     documentId: number,
     targetMailboxId: number
-  ): Promise<{ message: string }> {
+  ): Promise<NotificationResponse> {
     let response = await this.axios.post(`/document/${documentId}/copy/${targetMailboxId}`);
     return response.data;
   }
@@ -355,7 +442,7 @@ export class Client {
   async copyTemplate(
     templateId: number,
     targetMailboxId: number
-  ): Promise<{ message: string }> {
+  ): Promise<NotificationResponse> {
     let response = await this.axios.post(`/template/${templateId}/copy/${targetMailboxId}`);
     return response.data;
   }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TaveLeadClient } from '../lib/client';
 import { spec } from '../spec';
@@ -58,14 +58,14 @@ export let createLead = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.secretKey || !ctx.auth.studioId) {
-      throw new Error(
+      throw createApiServiceError(
         'New Lead API requires Secret Key and Studio ID authentication. Please use the "New Lead API (Legacy)" auth method.'
       );
     }
 
     let client = new TaveLeadClient(ctx.auth.secretKey, ctx.auth.studioId);
 
-    let leadData: Record<string, unknown> = {
+    let leadData: Record<string, string> = {
       FirstName: ctx.input.firstName,
       JobType: ctx.input.jobType
     };
@@ -83,6 +83,11 @@ export let createLead = SlateTool.create(spec, {
 
     if (ctx.input.customFields) {
       for (let [key, value] of Object.entries(ctx.input.customFields)) {
+        if (key === 'SecretKey' || key in leadData) {
+          throw createApiServiceError(
+            `Custom field "${key}" conflicts with authentication or a supplied lead field. Use the dedicated input field instead.`
+          );
+        }
         leadData[key] = value;
       }
     }
@@ -93,7 +98,7 @@ export let createLead = SlateTool.create(spec, {
       jobType: ctx.input.jobType
     });
 
-    let response = await client.createLead(leadData);
+    let response = await client.createLead(leadData, ctx.input.suppressEmailNotification);
 
     return {
       output: {

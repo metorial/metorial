@@ -1,6 +1,15 @@
 # <img src="logo.svg" height="20"> Boldsign
 
-Send, sign, track, and manage electronic signature documents. Create and manage reusable document templates with predefined roles and form fields. Place signature fields, text boxes, checkboxes, dropdowns, and other form fields on documents. Embed signing, sending, and template creation experiences directly within applications. Verify signer identities using access codes, OTP, or ID document verification. Manage sender identities, users, teams, contacts, and branding. Download signed documents and tamper-proof audit trails. Revoke, extend, remind, and delete documents. Send documents on behalf of other users.
+Send documents and templates for electronic signature, place signer form fields, and enable embedded signing. List and inspect documents, templates, users, brands, and saved contacts. Revoke documents, send reminders, extend signing deadlines, and move documents to Trash or permanently delete them. Download signed PDFs and audit trails. Connect with a BoldSign API key or OAuth 2.0 and choose the US or EU API region.
+
+## Notes
+
+- `send_document` requires a title and at least one publicly accessible document URL. Assign `formFields` to signers or enable `useTextTags` for documents containing field tags.
+- Passing `reminderSettings` enables automatic reminders by default. Set `enableAutoReminder` to false to disable them.
+- `manage_document` with action `delete` moves the document to Trash by default. Set `deletePermanently` to true only for permanent deletion.
+- OAuth requests use PKCE and `offline_access` for token refresh. Existing OAuth connections may need to reconnect to grant `BoldSign.Users.Read` before calling `list_users`.
+- The EU API endpoint is `https://api-eu.boldsign.com`.
+
 
 ## License
 

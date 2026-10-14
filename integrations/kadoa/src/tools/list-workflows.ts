@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KadoaClient } from '../lib/client';
+import { validateKadoaInteger } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listWorkflows = SlateTool.create(spec, {
@@ -56,6 +57,8 @@ Returns workflow summaries including name, URL, state, schedule, and record coun
   )
   .handleInvocation(async ctx => {
     let client = new KadoaClient({ token: ctx.auth.token });
+    validateKadoaInteger(ctx.input.skip, 'skip', 0);
+    validateKadoaInteger(ctx.input.limit, 'limit', 1);
 
     let result = await client.listWorkflows({
       search: ctx.input.search,
@@ -67,18 +70,24 @@ Returns workflow summaries including name, URL, state, schedule, and record coun
       limit: ctx.input.limit
     });
 
-    let workflows = (result.workflows || result || []).map((w: any) => ({
+    let rows = result.workflows ?? result;
+    if (!Array.isArray(rows)) {
+      throw createApiServiceError(
+        'Kadoa returned an invalid workflow list. Try listing workflows again.'
+      );
+    }
+    let workflows = rows.map((w: any) => ({
       workflowId: w.id,
-      name: w.name,
-      description: w.description,
-      state: w.state,
-      displayState: w.displayState,
-      url: w.url,
-      urls: w.urls,
-      totalRecords: w.totalRecords,
-      runState: w.runState,
-      tags: w.tags,
-      monitoring: w.monitoring,
+      name: w.name ?? undefined,
+      description: w.description ?? undefined,
+      state: w.state ?? undefined,
+      displayState: w.displayState ?? undefined,
+      url: w.url ?? undefined,
+      urls: w.urls ?? undefined,
+      totalRecords: w.totalRecords ?? undefined,
+      runState: w.runState ?? undefined,
+      tags: w.tags ?? undefined,
+      monitoring: w.monitoring ?? undefined,
       createdAt: w.createdAt
     }));
 

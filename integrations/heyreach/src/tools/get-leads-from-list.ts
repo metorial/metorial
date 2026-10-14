@@ -33,7 +33,11 @@ export let getLeadsFromList = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      leads: z.array(z.any()).describe('Array of lead objects')
+      leads: z.array(z.any()).describe('Array of lead objects'),
+      totalCount: z
+        .union([z.number(), z.string()])
+        .optional()
+        .describe('Total matching records reported by HeyReach')
     })
   )
   .handleInvocation(async ctx => {
@@ -48,10 +52,11 @@ export let getLeadsFromList = SlateTool.create(spec, {
       createdTo: ctx.input.createdTo
     });
 
-    let leads = Array.isArray(result) ? result : (result?.data ?? result?.items ?? []);
+    let page = result?.data ?? result;
+    let leads = Array.isArray(page) ? page : (page?.items ?? []);
 
     return {
-      output: { leads },
+      output: { leads, totalCount: page?.totalCount },
       message: `Retrieved **${leads.length}** lead(s) from list **${ctx.input.listId}**.`
     };
   })

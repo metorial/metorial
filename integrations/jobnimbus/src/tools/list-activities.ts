@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { recordId, recordName } from '../lib/records';
 import { spec } from '../spec';
 
 export let listActivities = SlateTool.create(spec, {
@@ -58,7 +59,7 @@ export let listActivities = SlateTool.create(spec, {
     let mustClauses: any[] = [];
 
     if (ctx.input.parentRecordId) {
-      mustClauses.push({ term: { primary: ctx.input.parentRecordId } });
+      mustClauses.push({ term: { 'primary.id': ctx.input.parentRecordId } });
     }
     if (ctx.input.recordTypeName) {
       mustClauses.push({ term: { record_type_name: ctx.input.recordTypeName } });
@@ -72,17 +73,17 @@ export let listActivities = SlateTool.create(spec, {
       filter
     });
 
-    let activities = (result.results || []).map((a: any) => ({
+    let activities = (result.activity ?? result.results ?? []).map((a: any) => ({
       activityId: a.jnid,
-      note: a.note,
-      recordTypeName: a.record_type_name,
-      parentRecordId: a.primary,
-      parentRecordName: a.primary_name,
-      isStatusChange: a.is_status_change,
-      oldStatus: a.primary_old_status,
-      newStatus: a.primary_new_status,
-      createdByName: a.created_by_name,
-      dateCreated: a.date_created
+      note: a.note ?? undefined,
+      recordTypeName: a.record_type_name ?? undefined,
+      parentRecordId: recordId(a.primary),
+      parentRecordName: recordName(a.primary) ?? a.primary_name ?? undefined,
+      isStatusChange: a.is_status_change ?? undefined,
+      oldStatus: a.primary_old_status ?? undefined,
+      newStatus: a.primary_new_status ?? undefined,
+      createdByName: a.created_by_name ?? undefined,
+      dateCreated: a.date_created ?? undefined
     }));
 
     return {

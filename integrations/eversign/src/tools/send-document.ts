@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, isEnabled } from '../lib/helpers';
+import { businessIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let signerSchema = z.object({
@@ -85,7 +86,7 @@ let fieldSchema = z.object({
 export let sendDocument = SlateTool.create(spec, {
   name: 'Send Document',
   key: 'send_document',
-  description: `Create and send a document for electronic signature. Supports uploading files via URL, file ID, or base64, adding multiple signers with configurable signing order, placing signature fields on specific pages, and adding CC recipients. Optionally enable embedded signing to get signing URLs for each signer.`,
+  description: `Create and send a document for electronic signature. Supports uploading files via URL, file ID, or base64, adding multiple signers with configurable signing order, placing signature fields on specific pages, and adding CC recipients. Optionally enable embedded signing to get signing URLs for each signer. Call list_businesses to discover the businessId.`,
   instructions: [
     'At least one file and one signer must be provided.',
     'Files can be specified by URL, a previously uploaded file ID, or base64 content.',
@@ -98,6 +99,7 @@ export let sendDocument = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      businessId: businessIdSchema,
       title: z.string().optional().describe('Document title'),
       message: z.string().optional().describe('Message for all signers'),
       files: z.array(fileSchema).min(1).describe('Files to include in the document'),
@@ -109,7 +111,9 @@ export let sendDocument = SlateTool.create(spec, {
       fields: z
         .array(z.array(fieldSchema))
         .optional()
-        .describe('2D array of fields grouped per field set'),
+        .describe(
+          '2D array with one field array per file, using an empty array for files without fields'
+        ),
       useSignerOrder: z.boolean().optional().describe('Enable sequential signing order'),
       reminders: z.boolean().optional().describe('Enable automatic signing reminders'),
       requireAllSigners: z.boolean().optional().describe('Require all signers to sign'),
@@ -160,21 +164,69 @@ export let sendDocument = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input.businessId);
+    for (let [index, file] of ctx.input.files.entries()) {
+      if (
+        [file.fileUrl, file.fileId, file.fileBase64].filter(value => value?.trim()).length !==
+        1
+      ) {
+        throw createApiServiceError(
+          `File ${index + 1} requires exactly one of fileUrl, fileId, or fileBase64.`
+        );
+      }
+    }
+    if (ctx.input.fields && ctx.input.fields.length !== ctx.input.files.length) {
+      throw createApiServiceError(
+        'Provide one fields array per file, using an empty array when a file has no fields.'
+      );
+    }
+    if (
+      ctx.input.useSignerOrder &&
+      ctx.input.signers.some(
+        signer => !Number.isInteger(signer.order) || (signer.order ?? 0) < 1
+      )
+    ) {
+      throw createApiServiceError(
+        'Every signer requires a positive integer order when useSignerOrder is enabled.'
+      );
+    }
+    if (ctx.input.expires !== undefined && !/^\d+$/.test(ctx.input.expires)) {
+      throw createApiServiceError(
+        'expires must be a Unix timestamp string containing only digits.'
+      );
+    }
+    for (let field of ctx.input.fields?.flat() ?? []) {
+      if (
+        !Number.isInteger(field.signer) ||
+        field.signer < 1 ||
+        field.signer > ctx.input.signers.length
+      ) {
+        throw createApiServiceError(
+          'Every field signer must reference a signer by its position, starting at 1.'
+        );
+      }
+      if (field.group !== undefined && !/^\d+$/.test(field.group)) {
+        throw createApiServiceError('Radio field group must be a numeric string.');
+      }
+    }
 
     let body: Record<string, any> = {};
 
     if (ctx.input.title) body.title = ctx.input.title;
     if (ctx.input.message) body.message = ctx.input.message;
-    if (ctx.input.isDraft) body.is_draft = 1;
-    if (ctx.input.useSignerOrder) body.use_signer_order = 1;
-    if (ctx.input.reminders) body.reminders = 1;
-    if (ctx.input.requireAllSigners) body.require_all_signers = 1;
-    if (ctx.input.embeddedSigningEnabled) body.embedded_signing_enabled = 1;
-    if (ctx.input.flexibleSigning) body.flexible_signing = 1;
+    if (ctx.input.isDraft !== undefined) body.is_draft = ctx.input.isDraft ? 1 : 0;
+    if (ctx.input.useSignerOrder !== undefined)
+      body.use_signer_order = ctx.input.useSignerOrder ? 1 : 0;
+    if (ctx.input.reminders !== undefined) body.reminders = ctx.input.reminders ? 1 : 0;
+    if (ctx.input.requireAllSigners !== undefined)
+      body.require_all_signers = ctx.input.requireAllSigners ? 1 : 0;
+    if (ctx.input.embeddedSigningEnabled !== undefined)
+      body.embedded_signing_enabled = ctx.input.embeddedSigningEnabled ? 1 : 0;
+    if (ctx.input.flexibleSigning !== undefined)
+      body.flexible_signing = ctx.input.flexibleSigning ? 1 : 0;
     if (ctx.input.redirect) body.redirect = ctx.input.redirect;
     if (ctx.input.redirectDecline) body.redirect_decline = ctx.input.redirectDecline;
-    if (ctx.input.expires) body.expires = ctx.input.expires;
+    if (ctx.input.expires !== undefined) body.expires = Number(ctx.input.expires);
     if (ctx.input.customRequesterName)
       body.custom_requester_name = ctx.input.customRequesterName;
     if (ctx.input.customRequesterEmail)
@@ -227,14 +279,14 @@ export let sendDocument = SlateTool.create(spec, {
           if (f.required !== undefined) field.required = f.required ? 1 : 0;
           if (f.readonly !== undefined) field.readonly = f.readonly ? 1 : 0;
           if (f.name) field.name = f.name;
-          if (f.value) field.value = f.value;
+          if (f.value !== undefined) field.value = f.value;
           if (f.validationType) field.validation_type = f.validationType;
           if (f.textSize) field.text_size = f.textSize;
           if (f.textColor) field.text_color = f.textColor;
           if (f.textFont) field.text_font = f.textFont;
           if (f.textStyle) field.text_style = f.textStyle;
           if (f.options) field.options = f.options;
-          if (f.group) field.group = f.group;
+          if (f.group !== undefined) field.group = Number(f.group);
           return field;
         })
       );
@@ -243,10 +295,10 @@ export let sendDocument = SlateTool.create(spec, {
     let doc = await client.createDocument(body);
 
     let signers = (doc.signers || []).map((s: any) => ({
-      signerId: s.id,
+      signerId: Number(s.id),
       name: s.name,
       email: s.email,
-      signed: s.signed === 1 || s.signed === true,
+      signed: isEnabled(s.signed),
       embeddedSigningUrl: s.embedded_signing_url || undefined
     }));
 
@@ -254,13 +306,14 @@ export let sendDocument = SlateTool.create(spec, {
       output: {
         documentHash: doc.document_hash,
         title: doc.title || undefined,
-        isDraft: doc.is_draft === 1 || doc.is_draft === true,
-        isCompleted: doc.is_completed === 1 || doc.is_completed === true,
-        embeddedSigningEnabled:
-          doc.embedded_signing_enabled === 1 || doc.embedded_signing_enabled === true,
+        isDraft: isEnabled(doc.is_draft),
+        isCompleted: isEnabled(doc.is_completed),
+        embeddedSigningEnabled: isEnabled(doc.embedded_signing_enabled),
         signers
       },
-      message: `Document "${doc.title || doc.document_hash}" created and sent to ${signers.length} signer(s).`
+      message: isEnabled(doc.is_draft)
+        ? `Document "${doc.title || doc.document_hash}" created as a draft.`
+        : `Document "${doc.title || doc.document_hash}" created and sent to ${signers.length} signer(s).`
     };
   })
   .build();

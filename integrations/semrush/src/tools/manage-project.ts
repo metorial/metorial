@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SemrushV4Client } from '../lib/v4-client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let manageProject = SlateTool.create(spec, {
   name: 'Manage Project',
   key: 'manage_project',
   description: `Create, update, delete, or list Semrush projects. Projects are the foundation for position tracking, site audits, and other campaign-based tools.
-Requires OAuth 2.0 authentication and an SEO Business subscription.`,
+Requires an SEO Business subscription. API Key connections use the legacy Standard Projects API; OAuth connections use the legacy OAuth Projects API.`,
   instructions: [
     'Use action "list" to get all projects, "get" to retrieve a specific project, "create" to add a new one, "update" to modify, or "delete" to remove.',
     'A domain is required when creating a project.'
@@ -26,11 +26,14 @@ Requires OAuth 2.0 authentication and an SEO Business subscription.`,
         .string()
         .optional()
         .describe('Project ID (required for get, update, delete)'),
-      domain: z.string().optional().describe('Domain for the project (required for create)'),
+      domain: z
+        .string()
+        .optional()
+        .describe('Domain for the project (required for create; cannot be changed by update)'),
       projectName: z
         .string()
         .optional()
-        .describe('Name for the project (optional for create/update)')
+        .describe('Name for the project (optional for create, required for update)')
     })
   )
   .output(
@@ -48,7 +51,8 @@ Requires OAuth 2.0 authentication and an SEO Business subscription.`,
   )
   .handleInvocation(async ctx => {
     let client = new SemrushV4Client({
-      token: ctx.auth.token
+      token: ctx.auth.token,
+      authType: ctx.auth.authType
     });
 
     switch (ctx.input.action) {
@@ -61,7 +65,8 @@ Requires OAuth 2.0 authentication and an SEO Business subscription.`,
       }
 
       case 'get': {
-        if (!ctx.input.projectId) throw new Error('projectId is required for get action.');
+        if (!ctx.input.projectId)
+          throw createApiServiceError('projectId is required for get action.');
         let project = await client.getProject(ctx.input.projectId);
         return {
           output: { project },
@@ -70,7 +75,8 @@ Requires OAuth 2.0 authentication and an SEO Business subscription.`,
       }
 
       case 'create': {
-        if (!ctx.input.domain) throw new Error('domain is required for create action.');
+        if (!ctx.input.domain)
+          throw createApiServiceError('domain is required for create action.');
         let project = await client.createProject({
           domain: ctx.input.domain,
           name: ctx.input.projectName
@@ -82,7 +88,8 @@ Requires OAuth 2.0 authentication and an SEO Business subscription.`,
       }
 
       case 'update': {
-        if (!ctx.input.projectId) throw new Error('projectId is required for update action.');
+        if (!ctx.input.projectId)
+          throw createApiServiceError('projectId is required for update action.');
         let project = await client.updateProject(ctx.input.projectId, {
           name: ctx.input.projectName,
           domain: ctx.input.domain
@@ -94,7 +101,8 @@ Requires OAuth 2.0 authentication and an SEO Business subscription.`,
       }
 
       case 'delete': {
-        if (!ctx.input.projectId) throw new Error('projectId is required for delete action.');
+        if (!ctx.input.projectId)
+          throw createApiServiceError('projectId is required for delete action.');
         await client.deleteProject(ctx.input.projectId);
         return {
           output: { deleted: true },
@@ -103,7 +111,7 @@ Requires OAuth 2.0 authentication and an SEO Business subscription.`,
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

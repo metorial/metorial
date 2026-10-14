@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotAdminClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteSource = SlateTool.create(spec, {
   name: 'Delete Source',
   key: 'delete_source',
-  description: `Delete a training source from a bot. The source data will be removed from the bot's index. Sources may still appear in chat results for several minutes while being fully removed.`,
+  description: `Delete a training source from a bot. The source data will be removed from the bot's index. Sources may still appear in chat results for several minutes while being fully removed. Call list_teams to discover accessible team IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID the source belongs to'),
       sourceId: z.string().describe('Source ID to delete')
     })
@@ -24,7 +26,11 @@ export let deleteSource = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new DocsBotAdminClient(ctx.auth.token);
-    await client.deleteSource(ctx.config.teamId, ctx.input.botId, ctx.input.sourceId);
+    await client.deleteSource(
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
+      ctx.input.botId,
+      ctx.input.sourceId
+    );
 
     return {
       output: { deleted: true },

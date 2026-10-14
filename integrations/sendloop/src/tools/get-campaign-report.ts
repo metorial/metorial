@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getCampaignReport = SlateTool.create(spec, {
   name: 'Get Campaign Report',
   key: 'get_campaign_report',
-  description: `Retrieve detailed performance reports for a campaign including opens, clicks, bounces, unsubscriptions, forwards, and geographic open locations. Select which metrics to include in the report.`,
+  description: `Retrieve detailed performance reports for a campaign including opens, clicks, bounces, unsubscriptions, forwards, and geographic open locations. Select which metrics to include. Opens are aggregate statistics; other sections return a page of event records.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,6 +15,19 @@ export let getCampaignReport = SlateTool.create(spec, {
   .input(
     z.object({
       campaignId: z.string().describe('ID of the campaign to get the report for'),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Page of event data to retrieve; defaults to 1'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Event records per section; defaults to 10 and maximum is 50'),
       includeOpens: z.boolean().optional().default(true).describe('Include open statistics'),
       includeClicks: z.boolean().optional().default(true).describe('Include link click data'),
       includeBounces: z.boolean().optional().default(false).describe('Include bounce details'),
@@ -45,10 +58,11 @@ export let getCampaignReport = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
-    let { campaignId } = ctx.input;
+    let { campaignId, page, limit } = ctx.input;
+    let pagination = { page, limit };
     let sections: string[] = [];
 
     let opens: any;
@@ -59,32 +73,32 @@ export let getCampaignReport = SlateTool.create(spec, {
     let openLocations: any;
 
     if (ctx.input.includeOpens) {
-      opens = await client.getCampaignEmailOpens(campaignId);
+      opens = await client.getCampaignOpens(campaignId);
       sections.push('opens');
     }
 
     if (ctx.input.includeClicks) {
-      clicks = await client.getCampaignLinkClicks(campaignId);
+      clicks = await client.getCampaignLinkClicks(campaignId, pagination);
       sections.push('clicks');
     }
 
     if (ctx.input.includeBounces) {
-      bounces = await client.getCampaignBounceDetails(campaignId);
+      bounces = await client.getCampaignBounceDetails(campaignId, pagination);
       sections.push('bounces');
     }
 
     if (ctx.input.includeUnsubscriptions) {
-      unsubscriptions = await client.getCampaignUnsubscriptions(campaignId);
+      unsubscriptions = await client.getCampaignUnsubscriptions(campaignId, pagination);
       sections.push('unsubscriptions');
     }
 
     if (ctx.input.includeForwards) {
-      forwards = await client.getCampaignForwards(campaignId);
+      forwards = await client.getCampaignForwards(campaignId, pagination);
       sections.push('forwards');
     }
 
     if (ctx.input.includeOpenLocations) {
-      openLocations = await client.getCampaignOpenLocations(campaignId);
+      openLocations = await client.getCampaignOpenLocations(campaignId, pagination);
       sections.push('open locations');
     }
 

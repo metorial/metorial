@@ -4,13 +4,16 @@ import {
   addScore,
   createPlayer,
   createTeam,
+  getPlayer,
   listCompetitions,
   listPlayers,
   listScoreHistory,
   listScoreSeries,
+  listTeamPlayers,
   listTeams,
   manageTeamMembership,
-  removePlayer
+  removePlayer,
+  updatePlayer
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -24,7 +27,10 @@ export let provider = Slate.create({
     addScore,
     listScoreSeries,
     listScoreHistory,
-    listCompetitions
+    listCompetitions,
+    getPlayer,
+    updatePlayer,
+    listTeamPlayers
   ],
   triggers: []
 });

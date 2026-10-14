@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { getAppointoRecord, mapBooking } from '../lib/bookings';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -36,6 +37,10 @@ export let updateBooking = SlateTool.create(spec, {
       .passthrough()
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.startBufferTime === undefined && ctx.input.endBufferTime === undefined) {
+      throw createApiServiceError('Provide a start or end buffer time to update the booking.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.updateBooking(ctx.input.bookingId, {
@@ -43,13 +48,13 @@ export let updateBooking = SlateTool.create(spec, {
       endBufferTime: ctx.input.endBufferTime
     });
 
-    let booking = result?.booking ?? result?.data ?? result;
+    let booking = getAppointoRecord(result, 'booking');
 
     return {
       output: {
-        bookingId: booking?.id ?? booking?.booking_id ?? ctx.input.bookingId,
-        status: booking?.status,
-        ...booking
+        ...mapBooking(booking),
+        bookingId: booking.id ?? booking.booking_id ?? ctx.input.bookingId,
+        status: booking.status ?? result?.response?.status
       },
       message: `Buffer times updated on booking **#${ctx.input.bookingId}**${ctx.input.startBufferTime != null ? ` (start: ${ctx.input.startBufferTime}min)` : ''}${ctx.input.endBufferTime != null ? ` (end: ${ctx.input.endBufferTime}min)` : ''}.`
     };

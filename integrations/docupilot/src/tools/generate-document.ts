@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { getResponseHeaderValue, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let generateDocument = SlateTool.create(spec, {
   name: 'Generate Document',
   key: 'generate_document',
-  description: `Generate a document from a template by merging data into it. Provide the template ID and a data object whose keys match the template's merge field tokens (use **Get Template** to discover available tokens). Returns a secure download URL for the generated document (valid for 24 hours by default). Generated documents are also sent to any configured deliveries.`,
+  description: `Generate a document from a template by merging data into it. Provide the template ID and a data object whose keys match the template's merge field tokens (use **Get Template** to discover available tokens). Provides the generated document for download. A returned secure provider URL expires according to your data retention settings (24 hours by default). Generated documents are also sent to any configured deliveries.`,
   instructions: [
     'Use the Get Template tool first to discover available merge field tokens for the template.',
     'The mergeData keys must match the template token names exactly.',
@@ -32,7 +32,9 @@ export let generateDocument = SlateTool.create(spec, {
       fileUrl: z
         .string()
         .optional()
-        .describe('Secure download URL for the generated document (valid for 24 hours)'),
+        .describe(
+          'Secure provider download URL; expiration follows workspace data retention settings'
+        ),
       fileName: z.string().optional().describe('Name of the generated file')
     })
   )
@@ -47,13 +49,25 @@ export let generateDocument = SlateTool.create(spec, {
       outputType: ctx.input.outputType
     });
 
+    if (result.file_url) {
+      let download = await client.downloadGeneratedDocument(result.file_url);
+      let contentType = getResponseHeaderValue(download.headers, 'content-type');
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(new Uint8Array(download.data), {
+          headers: contentType ? { 'Content-Type': contentType } : {}
+        }),
+        filename: result.file_name ?? undefined
+      });
+    }
+
     return {
       output: {
-        fileUrl: result.file_url,
-        fileName: result.file_name
+        fileUrl: result.file_url ?? undefined,
+        fileName: result.file_name ?? undefined
       },
       message: result.file_url
-        ? `Document generated successfully: **${result.file_name ?? 'document'}**. [Download link](${result.file_url}) (valid for 24 hours).`
+        ? `Document generated successfully: **${result.file_name ?? 'document'}**. Prepared for download.`
         : `Document generation triggered. The document will be sent to configured deliveries.`
     };
   })

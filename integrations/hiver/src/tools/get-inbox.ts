@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type HiverTag, type HiverUser } from '../lib/client';
 import { spec } from '../spec';
 
 export let getInbox = SlateTool.create(spec, {
@@ -14,7 +14,7 @@ export let getInbox = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      inboxId: z.string().describe('ID of the inbox to retrieve'),
+      inboxId: z.string().describe('Inbox ID from list_inboxes'),
       includeUsers: z
         .boolean()
         .optional()
@@ -60,10 +60,10 @@ export let getInbox = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let inbox = await client.getInbox(ctx.input.inboxId);
 
-    let users: any;
+    let users: { userId: string; name?: string; email?: string; role?: string }[] | undefined;
     if (ctx.input.includeUsers) {
       let rawUsers = await client.getInboxUsers(ctx.input.inboxId);
-      users = rawUsers.map(u => ({
+      users = rawUsers.map((u: HiverUser) => ({
         userId: String(u.id),
         name: u.name,
         email: u.email,
@@ -71,10 +71,10 @@ export let getInbox = SlateTool.create(spec, {
       }));
     }
 
-    let tags: any;
+    let tags: { tagId: string; name?: string; color?: string }[] | undefined;
     if (ctx.input.includeTags) {
       let rawTags = await client.getInboxTags(ctx.input.inboxId);
-      tags = rawTags.map(t => ({
+      tags = rawTags.map((t: HiverTag) => ({
         tagId: String(t.id),
         name: t.name,
         color: t.color

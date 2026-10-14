@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsBotChatClient } from '../lib/client';
+import { resolveTeamId, teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let askQuestion = SlateTool.create(spec, {
   name: 'Ask Question',
   key: 'ask_question',
-  description: `Send a question to a DocsBot AI agent and receive an answer with source citations. Supports multi-turn conversations by reusing the same conversationId, multimodal inputs via image URLs, and configurable parameters like reasoning effort and context items.`,
+  description: `Send a question to a DocsBot AI agent and receive an answer with source citations. Supports multi-turn conversations by reusing the same conversationId, multimodal inputs via image URLs, and configurable parameters like reasoning effort and context items. Call list_teams to discover accessible team IDs.`,
   instructions: [
     'Generate a unique conversationId (UUID) for new conversations. Reuse the same conversationId for follow-up questions in the same conversation.',
     'The response contains events with different types: "answer" for simple responses, "lookup_answer" for answers with source citations.'
@@ -14,6 +15,7 @@ export let askQuestion = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       botId: z.string().describe('Bot ID to ask the question to'),
       conversationId: z
         .string()
@@ -70,6 +72,10 @@ export let askQuestion = SlateTool.create(spec, {
                 title: z.string().describe('Source title'),
                 url: z.string().optional().describe('Source URL'),
                 page: z.string().optional().describe('Page reference'),
+                content: z
+                  .string()
+                  .optional()
+                  .describe('Full source text when fullSource is enabled'),
                 used: z
                   .boolean()
                   .optional()
@@ -92,19 +98,23 @@ export let askQuestion = SlateTool.create(spec, {
       if (ctx.input.userEmail) metadata.email = ctx.input.userEmail;
     }
 
-    let chatEvents = await client.chatAgent(ctx.config.teamId, ctx.input.botId, {
-      conversationId: ctx.input.conversationId,
-      question: ctx.input.question,
-      metadata,
-      contextItems: ctx.input.contextItems,
-      humanEscalation: ctx.input.humanEscalation,
-      followupRating: ctx.input.followupRating,
-      fullSource: ctx.input.fullSource,
-      imageUrls: ctx.input.imageUrls,
-      model: ctx.input.model,
-      reasoningEffort: ctx.input.reasoningEffort,
-      searchLimit: ctx.input.searchLimit
-    });
+    let chatEvents = await client.chatAgent(
+      resolveTeamId(ctx.input.teamId, ctx.config.teamId),
+      ctx.input.botId,
+      {
+        conversationId: ctx.input.conversationId,
+        question: ctx.input.question,
+        metadata,
+        contextItems: ctx.input.contextItems,
+        humanEscalation: ctx.input.humanEscalation,
+        followupRating: ctx.input.followupRating,
+        fullSource: ctx.input.fullSource,
+        imageUrls: ctx.input.imageUrls,
+        model: ctx.input.model,
+        reasoningEffort: ctx.input.reasoningEffort,
+        searchLimit: ctx.input.searchLimit
+      }
+    );
 
     let events = chatEvents.map(e => ({
       eventType: e.event,
@@ -116,6 +126,7 @@ export let askQuestion = SlateTool.create(spec, {
         title: s.title,
         url: s.url ?? undefined,
         page: s.page ?? undefined,
+        content: s.content ?? undefined,
         used: s.used
       }))
     }));

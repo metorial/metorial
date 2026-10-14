@@ -13,8 +13,16 @@ export let getVideoStatus = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workspaceId: z.string().describe('Workspace ID containing the project'),
-      projectId: z.string().describe('Project ID the video belongs to'),
+      workspaceId: z
+        .string()
+        .describe(
+          'Workspace ID containing the project. Call list_workspaces to discover workspace IDs.'
+        ),
+      projectId: z
+        .string()
+        .describe(
+          'Project ID the video belongs to. Call list_projects to discover project IDs.'
+        ),
       inferenceId: z.string().describe('Inference ID from the video creation response')
     })
   )
@@ -37,7 +45,7 @@ export let getVideoStatus = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new StudioClient(ctx.auth.token);
+    let client = new StudioClient(ctx.auth);
     let result = await client.getVideoStatus({
       workspaceId: ctx.input.workspaceId,
       projectId: ctx.input.projectId,

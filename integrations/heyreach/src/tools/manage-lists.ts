@@ -23,17 +23,22 @@ export let listLists = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      lists: z.array(z.any()).describe('Array of lead/company list objects')
+      lists: z.array(z.any()).describe('Array of lead/company list objects'),
+      totalCount: z
+        .union([z.number(), z.string()])
+        .optional()
+        .describe('Total matching records reported by HeyReach')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.getAllLists(ctx.input.limit, ctx.input.offset);
-    let lists = Array.isArray(result) ? result : (result?.data ?? result?.items ?? []);
+    let page = result?.data ?? result;
+    let lists = Array.isArray(page) ? page : (page?.items ?? []);
 
     return {
-      output: { lists },
+      output: { lists, totalCount: page?.totalCount },
       message: `Retrieved **${lists.length}** list(s).`
     };
   })

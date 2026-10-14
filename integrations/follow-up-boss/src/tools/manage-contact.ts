@@ -6,12 +6,13 @@ import { spec } from '../spec';
 export let manageContact = SlateTool.create(spec, {
   name: 'Manage Contact',
   key: 'manage_contact',
-  description: `Create, update, or retrieve a contact (person) in Follow Up Boss. When creating, FUB automatically deduplicates by email/phone. Supports assigning agents, lenders, tags, stages, custom fields, and contact details.`,
+  description: `Create, update, or retrieve a contact (person) in Follow Up Boss. Creation checks for an existing email/phone and returns that contact unchanged when found. Supports assigning agents, lenders, tags, stages, custom fields, and contact details.`,
   instructions: [
     'To create a contact, provide at least a firstName or an email/phone.',
     'To update, provide the personId along with the fields to change.',
     'To retrieve, provide a personId with no update fields.',
-    'Tags can be added as a comma-separated string or array.'
+    'Tags are an array and replace the current tag list when updating.',
+    'Use send_event for new leads that should trigger lead routing and automations.'
   ],
   tags: {
     destructive: false,
@@ -32,8 +33,14 @@ export let manageContact = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Lifecycle stage name (e.g., "Lead", "Prospect", "Active Client")'),
-      source: z.string().optional().describe('Lead source'),
-      sourceUrl: z.string().optional().describe('URL where the lead originated'),
+      source: z
+        .string()
+        .optional()
+        .describe('Lead source; can only be set when creating a contact'),
+      sourceUrl: z
+        .string()
+        .optional()
+        .describe('URL where the lead originated; creation only'),
       emails: z
         .array(
           z.object({
@@ -95,21 +102,10 @@ export let manageContact = SlateTool.create(spec, {
     let client = createClient(ctx);
 
     if (
-      ctx.input.personId &&
-      !ctx.input.firstName &&
-      !ctx.input.lastName &&
-      !ctx.input.stage &&
-      !ctx.input.emails &&
-      !ctx.input.phones &&
-      !ctx.input.tags &&
-      !ctx.input.assignedTo &&
-      !ctx.input.customFields &&
-      !ctx.input.source &&
-      !ctx.input.addresses &&
-      !ctx.input.background &&
-      !ctx.input.assignedLenderTo &&
-      !ctx.input.collaborators &&
-      !ctx.input.sourceUrl
+      ctx.input.personId !== undefined &&
+      Object.entries(ctx.input).every(
+        ([key, value]) => key === 'personId' || value === undefined
+      )
     ) {
       let person = await client.getPerson(ctx.input.personId);
       return {
@@ -122,7 +118,7 @@ export let manageContact = SlateTool.create(spec, {
           emails: person.emails,
           phones: person.phones,
           tags: person.tags,
-          assignedTo: person.assignedTo,
+          assignedTo: person.assignedUserId,
           created: person.created,
           updated: person.updated
         },
@@ -142,8 +138,8 @@ export let manageContact = SlateTool.create(spec, {
     if (fields.phones !== undefined) data.phones = fields.phones;
     if (fields.addresses !== undefined) data.addresses = fields.addresses;
     if (fields.tags !== undefined) data.tags = fields.tags;
-    if (fields.assignedTo !== undefined) data.assignedTo = fields.assignedTo;
-    if (fields.assignedLenderTo !== undefined) data.assignedLenderTo = fields.assignedLenderTo;
+    if (fields.assignedTo !== undefined) data.assignedUserId = fields.assignedTo;
+    if (fields.assignedLenderTo !== undefined) data.assignedLenderId = fields.assignedLenderTo;
     if (fields.collaborators !== undefined) data.collaborators = fields.collaborators;
     if (fields.background !== undefined) data.background = fields.background;
     if (fields.customFields) {
@@ -173,7 +169,7 @@ export let manageContact = SlateTool.create(spec, {
         emails: person.emails,
         phones: person.phones,
         tags: person.tags,
-        assignedTo: person.assignedTo,
+        assignedTo: person.assignedUserId,
         created: person.created,
         updated: person.updated
       },

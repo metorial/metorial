@@ -45,14 +45,15 @@ export let getSystemInfo = SlateTool.create(spec, {
       output: {
         userId: result.user_id,
         email: result.email,
-        accountingPeriodStart: result.accounting_period_start,
-        accountingPeriodEnd: result.accounting_period_end,
-        emailsIncluded: result.emails_included,
-        emailsSent: result.emails_sent,
+        accountingPeriodStart:
+          result.accounting_period_start ?? result.accounting?.period_start,
+        accountingPeriodEnd: result.accounting_period_end ?? result.accounting?.period_end,
+        emailsIncluded: result.emails_included ?? result.accounting?.emails_included,
+        emailsSent: result.emails_sent ?? result.accounting?.emails_sent,
         projectId: result.project_id,
         projectName: result.project_name
       },
-      message: `Account: **${result.email}** (User ID: ${result.user_id}).${result.emails_sent !== undefined ? ` Emails sent: ${result.emails_sent}/${result.emails_included ?? 'unlimited'}.` : ''}`
+      message: `Account: **${result.email}** (User ID: ${result.user_id}).`
     };
   })
   .build();

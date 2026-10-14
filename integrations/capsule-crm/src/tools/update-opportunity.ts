@@ -1,6 +1,7 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CapsuleClient } from '../lib/client';
+import { customFieldValuesSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateOpportunity = SlateTool.create(spec, {
@@ -21,21 +22,26 @@ export let updateOpportunity = SlateTool.create(spec, {
         .optional()
         .describe('Updated expected close date (YYYY-MM-DD)'),
       probability: z.number().optional().describe('Updated win probability (0-100)'),
-      ownerId: z.number().optional().describe('New owner user ID'),
-      teamId: z.number().optional().describe('New team ID'),
+      ownerId: z
+        .number()
+        .optional()
+        .describe('New owner user ID. Use list_users to discover IDs.'),
+      teamId: z.number().optional().describe('New team ID. Use list_teams to discover IDs.'),
       lostReason: z
         .string()
         .optional()
         .describe('Name of an existing lost reason configured in Capsule'),
+      fields: customFieldValuesSchema,
       tags: z
         .array(
           z.object({
             tagId: z.number().optional(),
-            name: z.string().optional()
+            name: z.string().optional(),
+            delete: z.boolean().optional().describe('Remove the tag identified by tagId')
           })
         )
         .optional()
-        .describe('Tags to set')
+        .describe('Tags to add or remove; unspecified tags remain unchanged')
     })
   )
   .output(
@@ -74,9 +80,19 @@ export let updateOpportunity = SlateTool.create(spec, {
       if (ctx.input.valueCurrency) opportunity.value.currency = ctx.input.valueCurrency;
     }
 
+    if (ctx.input.fields) {
+      opportunity.fields = ctx.input.fields.map(field => ({
+        definition: { id: field.definitionId },
+        value: field.value
+      }));
+    }
+
     if (ctx.input.tags) {
+      if (ctx.input.tags.some(tag => tag.delete && !tag.tagId)) {
+        throw createApiServiceError('Provide tagId when removing a tag.');
+      }
       opportunity.tags = ctx.input.tags.map(t =>
-        t.tagId ? { id: t.tagId } : { name: t.name }
+        t.tagId ? { id: t.tagId, ...(t.delete ? { _delete: true } : {}) } : { name: t.name }
       );
     }
 
@@ -85,8 +101,8 @@ export let updateOpportunity = SlateTool.create(spec, {
     return {
       output: {
         opportunityId: result.id,
-        name: result.name,
-        updatedAt: result.updatedAt
+        name: result.name ?? undefined,
+        updatedAt: result.updatedAt ?? undefined
       },
       message: `Updated opportunity **${result.name ?? `#${result.id}`}**.`
     };

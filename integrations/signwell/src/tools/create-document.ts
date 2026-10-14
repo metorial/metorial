@@ -26,7 +26,7 @@ let fieldSchema = z.object({
   required: z.boolean().optional().describe('Whether the field is required'),
   x: z.number().describe('X coordinate position on the page'),
   y: z.number().describe('Y coordinate position on the page'),
-  page: z.number().describe('Page number (0-indexed)'),
+  page: z.number().describe('Page number within the corresponding file, starting at 1'),
   recipientId: z.string().describe('ID of the recipient this field is assigned to'),
   apiId: z.string().optional().describe('Custom API identifier for the field'),
   width: z.number().optional().describe('Width of the field'),
@@ -46,10 +46,7 @@ export let createDocument = SlateTool.create(spec, {
     'Set draft to true to create without sending. Omit or set to false to send immediately.',
     'Use applySigningOrder with recipient signingOrder to enforce sequential signing.'
   ],
-  constraints: [
-    'Rate limited to 30 document creation requests per minute.',
-    'Test mode limited to 20 requests per minute.'
-  ],
+  constraints: ['Subject to the account API rate limits.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -81,6 +78,12 @@ export let createDocument = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Enable text tag parsing in the uploaded document'),
+      withSignaturePage: z
+        .boolean()
+        .optional()
+        .describe(
+          'Add a signature page for all recipients instead of placing signature fields'
+        ),
       allowDecline: z.boolean().optional().describe('Allow recipients to decline signing'),
       allowReassign: z
         .boolean()
@@ -94,7 +97,9 @@ export let createDocument = SlateTool.create(spec, {
       fields: z
         .array(z.array(fieldSchema))
         .optional()
-        .describe('Signing fields grouped by page, each group is an array of fields'),
+        .describe(
+          'One field array for each file, in file order; use an empty array for files without fields'
+        ),
       metadata: z
         .record(z.string(), z.string())
         .optional()
@@ -151,29 +156,30 @@ export let createDocument = SlateTool.create(spec, {
       reminders: ctx.input.reminders,
       applySigningOrder: ctx.input.applySigningOrder,
       textTags: ctx.input.textTags,
+      withSignaturePage: ctx.input.withSignaturePage,
       allowDecline: ctx.input.allowDecline,
       allowReassign: ctx.input.allowReassign,
       expiresIn: ctx.input.expiresIn,
       files: ctx.input.files,
       recipients: ctx.input.recipients,
       fields: ctx.input.fields,
-      metadata: ctx.input.metadata as Record<string, string> | undefined,
+      metadata: ctx.input.metadata,
       copiedContacts: ctx.input.copiedContacts
     });
 
     let output = {
       documentId: result.id,
-      name: result.name,
-      status: result.status,
-      embeddedSigningUrl: result.embedded_signing_url,
-      recipients: result.recipients?.map((r: any) => ({
-        recipientId: r.id,
-        name: r.name,
-        email: r.email,
-        status: r.status,
-        embeddedSigningUrl: r.embedded_signing_url
+      name: result.name ?? undefined,
+      status: result.status ?? undefined,
+      embeddedSigningUrl: result.embedded_signing_url ?? undefined,
+      recipients: result.recipients?.map(r => ({
+        recipientId: r.id ?? undefined,
+        name: r.name ?? undefined,
+        email: r.email ?? undefined,
+        status: r.status ?? undefined,
+        embeddedSigningUrl: r.embedded_signing_url ?? undefined
       })),
-      createdAt: result.created_at
+      createdAt: result.created_at ?? undefined
     };
 
     let statusMsg = ctx.input.draft ? 'as draft' : 'and sent to recipients';

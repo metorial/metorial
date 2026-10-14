@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let addressSchema = z.object({
@@ -24,6 +25,7 @@ export let createContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       company: z.string().optional().describe('Company or organization name.'),
       firstName: z.string().optional().describe('First name of the contact person.'),
       lastName: z.string().optional().describe('Last name of the contact person.'),
@@ -55,10 +57,10 @@ export let createContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.input.organizationId ?? ctx.config.organizationId
     });
 
-    let body: any = {};
+    let body: any = { is_client: ctx.input.isClient ?? true };
     if (ctx.input.company) body.company = ctx.input.company;
     if (ctx.input.firstName) body.first_name = ctx.input.firstName;
     if (ctx.input.lastName) body.last_name = ctx.input.lastName;
@@ -66,8 +68,10 @@ export let createContact = SlateTool.create(spec, {
     if (ctx.input.isClient !== undefined) body.is_client = ctx.input.isClient;
     if (ctx.input.isSupplier !== undefined) body.is_supplier = ctx.input.isSupplier;
     if (ctx.input.vatNumber) body.vat_number = ctx.input.vatNumber;
-    if (ctx.input.email) body.email = ctx.input.email;
-    if (ctx.input.phone) body.phone = ctx.input.phone;
+    if (ctx.input.email)
+      body.email = ctx.input.email ? [{ email: ctx.input.email, primary: true }] : [];
+    if (ctx.input.phone)
+      body.phones = ctx.input.phone ? [{ number: ctx.input.phone, primary: true }] : [];
     if (ctx.input.profession) body.profession = ctx.input.profession;
     if (ctx.input.customId) body.custom_id = ctx.input.customId;
     if (ctx.input.addresses) {

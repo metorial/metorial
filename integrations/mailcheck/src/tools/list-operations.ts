@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -41,6 +41,15 @@ Supports pagination for accounts with many operations.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.pageSize !== undefined &&
+      (!Number.isInteger(ctx.input.pageSize) ||
+        ctx.input.pageSize < -2_147_483_648 ||
+        ctx.input.pageSize > 2_147_483_647)
+    ) {
+      throw createApiServiceError('Page size must be a 32-bit integer.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let response = await client.listOperations({
       pageSize: ctx.input.pageSize,
@@ -49,14 +58,14 @@ Supports pagination for accounts with many operations.`,
 
     let operations = (response.operations ?? []).map(op => ({
       operationName: op.name,
-      done: op.done,
+      done: op.done ?? false,
       totalCount: op.metadata?.totalCount,
       processedCount: op.metadata?.processedCount,
       freeLimitReached: op.metadata?.freeLimitReached,
       createTime: op.metadata?.createTime,
       resultUrl: op.result?.response?.url,
-      errorCode: op.result?.code,
-      errorMessage: op.result?.message
+      errorCode: op.result?.error?.code ?? op.result?.code,
+      errorMessage: op.result?.error?.message ?? op.result?.message
     }));
 
     let completedCount = operations.filter(op => op.done).length;

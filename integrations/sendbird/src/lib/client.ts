@@ -1,15 +1,25 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class SendbirdChatClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { applicationId: string; token: string }) {
-    this.axios = createAxios({
+    if (!/^[A-Za-z0-9-]+$/.test(config.applicationId)) {
+      throw createApiServiceError(
+        'Provide the exact Sendbird Application ID from your dashboard.'
+      );
+    }
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide a Sendbird master or secondary API token.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://api-${config.applicationId}.sendbird.com/v3`,
-      headers: {
-        'Api-Token': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'Api-Token', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Sendbird',
+          reason: 'sendbird_api_error'
+        })
     });
   }
 
@@ -353,7 +363,7 @@ export class SendbirdChatClient {
     };
     if (params.userId !== undefined) body.user_id = params.userId;
     if (params.message !== undefined) body.message = params.message;
-    if (params.fileUrl !== undefined) body.file_url = params.fileUrl;
+    if (params.fileUrl !== undefined) body.url = params.fileUrl;
     if (params.fileName !== undefined) body.file_name = params.fileName;
     if (params.fileType !== undefined) body.file_type = params.fileType;
     if (params.fileSize !== undefined) body.file_size = params.fileSize;
@@ -391,8 +401,12 @@ export class SendbirdChatClient {
       includeParentMessageInfo?: boolean;
     }
   ) {
+    if (params.messageTs !== undefined && params.messageId !== undefined) {
+      throw createApiServiceError('Provide only one of messageTs or messageId.');
+    }
     let queryParams: Record<string, unknown> = {};
-    if (params.messageTs !== undefined) queryParams.message_ts = params.messageTs;
+    if (params.messageTs !== undefined || params.messageId === undefined)
+      queryParams.message_ts = params.messageTs ?? Date.now();
     if (params.messageId !== undefined) queryParams.message_id = params.messageId;
     if (params.prevLimit !== undefined) queryParams.prev_limit = params.prevLimit;
     if (params.nextLimit !== undefined) queryParams.next_limit = params.nextLimit;
@@ -401,7 +415,7 @@ export class SendbirdChatClient {
     if (params.senderId) queryParams.sender_id = params.senderId;
     if (params.senderIds) queryParams.sender_ids = params.senderIds.join(',');
     if (params.messageType) queryParams.message_type = params.messageType;
-    if (params.customType) queryParams.custom_type = params.customType;
+    if (params.customType !== undefined) queryParams.custom_types = params.customType;
     if (params.includeReactions !== undefined)
       queryParams.include_reactions = params.includeReactions;
     if (params.includeThreadInfo !== undefined)
@@ -412,6 +426,17 @@ export class SendbirdChatClient {
     let response = await this.axios.get(
       `/${channelType}/${encodeURIComponent(channelUrl)}/messages`,
       { params: queryParams }
+    );
+    return response.data;
+  }
+
+  async getMessage(
+    channelType: 'group_channels' | 'open_channels',
+    channelUrl: string,
+    messageId: number
+  ) {
+    let response = await this.axios.get(
+      `/${channelType}/${encodeURIComponent(channelUrl)}/messages/${messageId}`
     );
     return response.data;
   }
@@ -472,12 +497,15 @@ export class SendbirdChatClient {
       query: params.query
     };
     if (params.channelUrl) queryParams.channel_url = params.channelUrl;
-    if (params.channelCustomType) queryParams.channel_custom_type = params.channelCustomType;
+    if (params.channelCustomType) queryParams.custom_type = params.channelCustomType;
     if (params.limit !== undefined) queryParams.limit = params.limit;
-    if (params.beforeTimestamp !== undefined) queryParams.before = params.beforeTimestamp;
-    if (params.afterTimestamp !== undefined) queryParams.after = params.afterTimestamp;
+    if (params.beforeTimestamp !== undefined)
+      queryParams.message_ts_to = params.beforeTimestamp;
+    if (params.afterTimestamp !== undefined)
+      queryParams.message_ts_from = params.afterTimestamp;
     if (params.token) queryParams.token = params.token;
-    if (params.sortField) queryParams.sort_field = params.sortField;
+    if (params.sortField)
+      queryParams.sort_field = params.sortField === 'created_at' ? 'ts' : params.sortField;
     if (params.userId) queryParams.user_id = params.userId;
 
     let response = await this.axios.get('/search/messages', { params: queryParams });

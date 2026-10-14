@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,10 +7,10 @@ export let manageConversation = SlateTool.create(spec, {
   name: 'Manage Conversation',
   key: 'manage_conversation',
   description: `Manage a WhatsApp conversation by assigning it to an operator or updating its status.
-Use "assign_operator" to route a conversation to a specific team member, or "update_status" to change the conversation state (e.g., open, resolved).`,
+Use "assign_operator" to route a conversation to a specific team member, or "update_status" to change the conversation state (e.g., open, solved, pending, block).`,
   instructions: [
     'For "assign_operator": provide the operator\'s email address.',
-    'For "update_status": provide the new status string (e.g., "open", "resolved").'
+    'For "update_status": provide the new status string (e.g., "open", "solved", "pending", "block").'
   ],
   tags: {
     destructive: false,
@@ -35,7 +35,7 @@ Use "assign_operator" to route a conversation to a specific team member, or "upd
         .string()
         .optional()
         .describe(
-          'New conversation status (e.g. "open", "resolved"). Required for "update_status".'
+          'New conversation status (e.g. "open", "solved", "pending", "block"). Required for "update_status".'
         )
     })
   )
@@ -54,26 +54,41 @@ Use "assign_operator" to route a conversation to a specific team member, or "upd
 
     if (action === 'assign_operator') {
       if (!operatorEmail) {
-        throw new Error('operatorEmail is required for assigning an operator.');
+        throw createApiServiceError('operatorEmail is required for assigning an operator.');
       }
       let result = await client.assignOperator(target, operatorEmail);
+      if (result?.result !== true) {
+        throw createApiServiceError(
+          'Wati returned no confirmation. Check the conversation before retrying.'
+        );
+      }
       return {
-        output: { result: result?.result ?? true },
+        output: { result: result?.result },
         message: `Conversation **${target}** assigned to operator **${operatorEmail}**.`
       };
     }
 
     if (action === 'update_status') {
       if (!status) {
-        throw new Error('status is required for updating conversation status.');
+        throw createApiServiceError('status is required for updating conversation status.');
       }
-      let result = await client.updateConversationStatus(target, status);
+      // Preserve the formerly documented "resolved" alias.
+      let providerStatus = status === 'resolved' ? 'solved' : status;
+      if (!['open', 'solved', 'pending', 'block'].includes(providerStatus)) {
+        throw createApiServiceError('status must be open, solved, pending, or block.');
+      }
+      let result = await client.updateConversationStatus(target, providerStatus);
+      if (result?.result !== true) {
+        throw createApiServiceError(
+          'Wati returned no confirmation. Check the conversation before retrying.'
+        );
+      }
       return {
-        output: { result: result?.result ?? true },
+        output: { result: result?.result },
         message: `Conversation **${target}** status updated to **${status}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

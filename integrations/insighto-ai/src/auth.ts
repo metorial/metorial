@@ -1,9 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
-
-let axios = createAxios({
-  baseURL: 'https://api.insighto.ai'
-});
+import { Client, getObjectResult } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -26,17 +23,15 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let response = await axios.get('/api/v1/user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-      let user = response.data?.data || response.data;
+      let user = getObjectResult(await new Client(ctx.output).getUser());
+      if (!user.id || !user.email) {
+        throw createApiServiceError('Insighto.ai did not return a valid account profile.');
+      }
       return {
         profile: {
           id: user.id,
           email: user.email,
-          name: user.name || user.first_name
+          name: user.name || [user.first_name, user.last_name].filter(Boolean).join(' ')
         }
       };
     }

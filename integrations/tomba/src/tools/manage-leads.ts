@@ -5,6 +5,9 @@ import { spec } from '../spec';
 
 let leadOutputSchema = z.object({
   leadId: z.string().nullable().optional().describe('Lead ID'),
+  listId: z.string().nullable().optional().describe('Lead list ID'),
+  createdAt: z.string().nullable().optional().describe('Creation timestamp'),
+  updatedAt: z.string().nullable().optional().describe('Last update timestamp'),
   email: z.string().nullable().optional().describe('Email address'),
   firstName: z.string().nullable().optional().describe('First name'),
   lastName: z.string().nullable().optional().describe('Last name'),
@@ -21,6 +24,9 @@ let leadOutputSchema = z.object({
 
 let mapLead = (l: any) => ({
   leadId: l.id?.toString(),
+  listId: l.list_id?.toString(),
+  createdAt: l.created_at,
+  updatedAt: l.updated_at,
   email: l.email,
   firstName: l.first_name,
   lastName: l.last_name,
@@ -77,9 +83,9 @@ export let listLeads = SlateTool.create(spec, {
     return {
       output: {
         leads: mapped,
-        total: data.total || mapped.length,
-        page: data.page || ctx.input.page,
-        limit: data.limit || ctx.input.limit
+        total: result.meta?.total ?? data.total ?? mapped.length,
+        page: result.meta?.page ?? data.page ?? ctx.input.page,
+        limit: result.meta?.limit ?? data.limit ?? ctx.input.limit
       },
       message: `Retrieved **${mapped.length}** leads.`
     };
@@ -126,7 +132,9 @@ export let createLead = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      listId: z.string().describe('The lead list ID to add the lead to'),
+      listId: z
+        .string()
+        .describe('Numeric lead list ID. Call list_lead_lists to discover list IDs.'),
       email: z.string().describe('Email address (required, must be unique in the list)'),
       firstName: z.string().optional().describe('First name'),
       lastName: z.string().optional().describe('Last name'),

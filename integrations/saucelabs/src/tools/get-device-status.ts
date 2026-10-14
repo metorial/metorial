@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -41,19 +41,41 @@ export let getDeviceStatus = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let result = await client.listDeviceStatus({
-      state: ctx.input.state,
-      deviceName: ctx.input.deviceName,
-      privateOnly: ctx.input.privateOnly
-    });
-
-    let devices = (result.devices ?? []).map((d: any) => ({
-      descriptor: d.descriptor,
-      deviceName: d.deviceName,
-      state: d.state,
-      isPrivateDevice: d.isPrivateDevice,
-      inUseBy: d.inUseBy
-    }));
+    let namePattern: RegExp | undefined;
+    if (ctx.input.deviceName !== undefined) {
+      try {
+        namePattern = new RegExp(ctx.input.deviceName);
+      } catch {
+        throw createApiServiceError('deviceName must be a valid regular expression.');
+      }
+    }
+    let result = await client.listDeviceStatus();
+    let deviceNames = new Map<string, string>();
+    if (namePattern) {
+      let catalog = await client.listDevices();
+      for (let device of Array.isArray(catalog) ? catalog : []) {
+        deviceNames.set(device.id, device.name);
+      }
+    }
+    let devices = (result.devices ?? [])
+      .map((d: any) => ({
+        descriptor: d.descriptor ?? undefined,
+        deviceName: d.deviceName ?? deviceNames.get(d.descriptor),
+        state: d.state ?? undefined,
+        isPrivateDevice: d.isPrivateDevice ?? undefined,
+        inUseBy: Array.isArray(d.inUseBy)
+          ? d.inUseBy
+              .map((user: { username?: string }) => user.username)
+              .filter(Boolean)
+              .join(', ') || null
+          : (d.inUseBy ?? undefined)
+      }))
+      .filter(
+        (device: z.infer<typeof deviceStatusSchema>) =>
+          (ctx.input.state === undefined || device.state === ctx.input.state) &&
+          (ctx.input.privateOnly !== true || device.isPrivateDevice === true) &&
+          (!namePattern || namePattern.test(device.deviceName ?? device.descriptor ?? ''))
+      );
 
     return {
       output: { devices, totalCount: devices.length },

@@ -38,9 +38,9 @@ export let cancelRun = SlateTool.create(spec, {
         projectToken: run.project_token,
         runToken: run.run_token,
         status: run.status,
-        dataReady: run.data_ready,
+        dataReady: Number(Boolean(run.data_ready)),
         startTime: run.start_time,
-        endTime: run.end_time,
+        endTime: run.end_time ?? '',
         pages: run.pages,
         startUrl: run.start_url
       },

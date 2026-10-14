@@ -29,13 +29,12 @@ export let updateSession = SlateTool.create(spec, {
       sessionId: z.number().describe('Internal session ID.'),
       sessionUuid: z.string().describe('Session UUID.'),
       name: z.string().nullable().describe('Updated session name.'),
-      recordingAccessPolicy: z.any().describe('Updated recording access policy.')
+      recordingAccessPolicy: z.unknown().describe('Updated recording access policy.')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
-      organisationId: ctx.config.organisationId
+      token: ctx.auth.token
     });
 
     let session = await client.updateSession(ctx.input.sessionUuid, {

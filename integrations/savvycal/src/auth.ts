@@ -1,12 +1,29 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let api = createAxios({
-  baseURL: 'https://api.savvycal.com'
+let api = createAuthenticatedAxios({
+  baseURL: 'https://api.savvycal.com',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'SavvyCal',
+      reason: 'savvycal_api_error'
+    })
 });
 
-let oauthApi = createAxios({
-  baseURL: 'https://savvycal.com'
+let oauthApi = createAuthenticatedAxios({
+  baseURL: 'https://savvycal.com',
+  contentType: 'application/x-www-form-urlencoded',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'SavvyCal',
+      reason: 'savvycal_oauth_error'
+    })
 });
 
 export let auth = SlateAuth.create()
@@ -58,23 +75,18 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'SavvyCal',
+          operation: 'token exchange',
+          required: true
+        })
       };
     },
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError('Reconnect SavvyCal to obtain a refresh token.');
       }
 
       let response = await oauthApi.post(
@@ -92,17 +104,13 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
-        }
+        output: normalizeOAuthTokenResponse(response.data, {
+          providerLabel: 'SavvyCal',
+          operation: 'token refresh',
+          previousRefreshToken: ctx.output.refreshToken,
+          required: true
+        })
       };
     },
 

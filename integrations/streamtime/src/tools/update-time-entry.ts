@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { StreamtimeClient } from '../lib/client';
+import { buildTimeEntryBody } from '../lib/time-entries';
 import { spec } from '../spec';
 
 export let updateTimeEntry = SlateTool.create(spec, {
@@ -19,7 +20,18 @@ export let updateTimeEntry = SlateTool.create(spec, {
       hours: z.number().optional().describe('Updated number of hours'),
       date: z.string().optional().describe('Updated date (YYYY-MM-DD)'),
       notes: z.string().optional().describe('Updated notes'),
-      userId: z.number().optional().describe('Updated user ID')
+      userId: z.number().optional().describe('Updated user ID'),
+      jobId: z.number().optional().describe('Updated job ID'),
+      jobItemId: z
+        .number()
+        .optional()
+        .describe('Job item ID; resolves the matching user assignment using userId'),
+      jobItemUserId: z
+        .number()
+        .optional()
+        .describe(
+          'User assignment ID. Call get_job_item with includeUsers to discover IDs. Alternative to jobItemId.'
+        )
     })
   )
   .output(
@@ -31,12 +43,7 @@ export let updateTimeEntry = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StreamtimeClient({ token: ctx.auth.token });
 
-    let body: Record<string, any> = {};
-    if (ctx.input.minutes !== undefined) body.minutes = ctx.input.minutes;
-    if (ctx.input.hours !== undefined) body.hours = ctx.input.hours;
-    if (ctx.input.date !== undefined) body.date = ctx.input.date;
-    if (ctx.input.notes !== undefined) body.notes = ctx.input.notes;
-    if (ctx.input.userId !== undefined) body.userId = ctx.input.userId;
+    let body = await buildTimeEntryBody(client, ctx.input);
 
     let result = await client.updateLoggedTime(ctx.input.loggedTimeId, body);
 

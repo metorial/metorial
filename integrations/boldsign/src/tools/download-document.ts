@@ -1,24 +1,12 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let extractBase64FromDataUri = (value: string) => {
-  let match = value.match(/^data:([^;,]+)?;base64,(.+)$/);
-  if (!match) {
-    throw new Error('Expected BoldSign to return a base64 data URI.');
-  }
-
-  return {
-    mimeType: match[1] || 'application/pdf',
-    content: match[2]!
-  };
-};
-
 export let downloadDocument = SlateTool.create(spec, {
   name: 'Download Document',
   key: 'download_document',
-  description: `Download a signed document PDF or its audit trail. Returns the file as an attachment. Use "document" to download the signed PDF or "auditLog" to download the tamper-proof audit trail.`,
+  description: `Download a signed document PDF or its tamper-proof audit trail. Use "document" for the signed PDF or "auditLog" for the audit trail.`,
   tags: {
     readOnly: true
   }
@@ -43,22 +31,22 @@ export let downloadDocument = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       region: ctx.config.region
     });
 
-    let result =
-      ctx.input.downloadType === 'auditLog'
-        ? await client.downloadAuditLog(ctx.input.documentId, ctx.input.onBehalfOf)
-        : await client.downloadDocument(ctx.input.documentId, ctx.input.onBehalfOf);
-    let attachment = extractBase64FromDataUri(result.downloadUrl);
+    let file = client.getDownloadDetails(
+      ctx.input.documentId,
+      ctx.input.downloadType,
+      ctx.input.onBehalfOf
+    );
+    await ctx.addAttachment({ type: 'url', ...file });
 
     return {
       output: {
         documentId: ctx.input.documentId,
         downloadType: ctx.input.downloadType
       },
-      attachments: [createBase64Attachment(attachment.content, attachment.mimeType)],
       message: `Downloaded ${ctx.input.downloadType === 'auditLog' ? 'audit trail' : 'document'} for **${ctx.input.documentId}**.`
     };
   })

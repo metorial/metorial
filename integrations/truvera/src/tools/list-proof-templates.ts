@@ -13,8 +13,19 @@ export let listProofTemplates = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      offset: z.number().optional().describe('Number of items to skip for pagination'),
-      limit: z.number().optional().describe('Maximum number of items to return (max 64)')
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(0)
+        .optional()
+        .describe('Number of items to skip for pagination'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(1)
+        .max(64)
+        .optional()
+        .describe('Maximum number of items to return (max 64)')
     })
   )
   .output(
@@ -47,7 +58,7 @@ export let listProofTemplates = SlateTool.create(spec, {
 
     let templates = list.map((t: any) => ({
       templateId: t.id || '',
-      templateName: t.name,
+      templateName: t.name ?? t.request?.name,
       totalRequests: t.totalRequests,
       createdAt: t.created,
       updatedAt: t.updated

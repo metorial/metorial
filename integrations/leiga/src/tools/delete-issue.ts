@@ -24,11 +24,7 @@ export let deleteIssueTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.deleteIssue(ctx.input.issueId);
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to delete issue');
-    }
+    await client.deleteIssue(ctx.input.issueId);
 
     return {
       output: { success: true },

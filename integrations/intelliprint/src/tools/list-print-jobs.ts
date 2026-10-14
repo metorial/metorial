@@ -17,11 +17,17 @@ export let listPrintJobs = SlateTool.create(spec, {
     z.object({
       limit: z
         .number()
+        .refine(Number.isSafeInteger, 'Use a whole-number limit')
         .min(1)
         .max(1000)
         .default(10)
         .describe('Number of results to return (1-1000)'),
-      skip: z.number().default(0).describe('Number of results to skip for pagination'),
+      skip: z
+        .number()
+        .refine(Number.isSafeInteger, 'Use a whole-number offset')
+        .min(0)
+        .default(0)
+        .describe('Number of results to skip for pagination'),
       sortField: z
         .enum(['created', 'confirmed_at', 'reference', 'type', 'letters', 'pages', 'sheets'])
         .optional()

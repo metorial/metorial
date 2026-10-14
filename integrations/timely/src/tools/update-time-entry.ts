@@ -1,24 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateTimeEntry = SlateTool.create(spec, {
   name: 'Update Time Entry',
   key: 'update_time_entry',
-  description: `Update an existing time entry in Timely. Modify the duration, date, project, notes, labels, billing status, or hourly rate.`,
+  description: `Call list_accounts to choose a workspace when needed. Update an existing time entry in Timely. Modify the duration, date, project, notes, labels, billing status, or hourly rate.`,
   tags: { destructive: false }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       eventId: z.string().describe('ID of the time entry to update'),
       hours: z.number().optional().describe('Updated hours'),
       minutes: z.number().optional().describe('Updated minutes'),
       day: z.string().optional().describe('Updated date (YYYY-MM-DD)'),
       projectId: z.string().optional().describe('Updated project ID'),
       note: z.string().optional().describe('Updated notes/description'),
-      from: z.string().optional().describe('Updated start time (ISO 8601)'),
-      to: z.string().optional().describe('Updated end time (ISO 8601)'),
+      from: z
+        .string()
+        .optional()
+        .describe('Updated start time (HH:MM, 24-hour format, e.g. 09:00)'),
+      to: z
+        .string()
+        .optional()
+        .describe('Updated end time (HH:MM, 24-hour format, e.g. 17:30)'),
       labelIds: z.array(z.number()).optional().describe('Updated label IDs'),
       hourRate: z.number().optional().describe('Updated hourly rate'),
       estimatedHours: z.number().optional().describe('Updated estimated hours'),
@@ -39,10 +47,7 @@ export let updateTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let event = await client.updateEvent(ctx.input.eventId, {
       hours: ctx.input.hours,

@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageExpense = SlateTool.create(spec, {
   name: 'Manage Expense',
   key: 'manage_expense',
-  description: `Create, update, or delete an expense in Harvest. Expenses are associated with projects and expense categories, and can be marked as billable.`,
+  description: `Create, update, or delete an expense in Harvest. Expenses are associated with projects and expense categories, and can be marked as billable. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +15,7 @@ export let manageExpense = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       expenseId: z.number().optional().describe('Expense ID (required for update/delete)'),
       projectId: z.number().optional().describe('Project ID (required for create)'),
@@ -47,11 +49,12 @@ export let manageExpense = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.expenseId) throw new Error('expenseId is required for delete');
+      if (!ctx.input.expenseId)
+        throw createApiServiceError('expenseId is required for delete');
       await client.deleteExpense(ctx.input.expenseId);
       return {
         output: { expenseId: ctx.input.expenseId, deleted: true },
@@ -61,7 +64,14 @@ export let manageExpense = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.projectId || !ctx.input.expenseCategoryId || !ctx.input.spentDate) {
-        throw new Error('projectId, expenseCategoryId, and spentDate are required for create');
+        throw createApiServiceError(
+          'projectId, expenseCategoryId, and spentDate are required for create'
+        );
+      }
+      if (ctx.input.totalCost === undefined && ctx.input.units === undefined) {
+        throw createApiServiceError(
+          'Provide totalCost for a cost-based category or units for a unit-based expense category.'
+        );
       }
       let exp = await client.createExpense({
         projectId: ctx.input.projectId,
@@ -88,7 +98,7 @@ export let manageExpense = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.expenseId) throw new Error('expenseId is required for update');
+    if (!ctx.input.expenseId) throw createApiServiceError('expenseId is required for update');
     let exp = await client.updateExpense(ctx.input.expenseId, {
       projectId: ctx.input.projectId,
       expenseCategoryId: ctx.input.expenseCategoryId,

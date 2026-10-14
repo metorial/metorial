@@ -54,11 +54,13 @@ export let aiTranslate = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Base64-encoded translated file (for file translation)'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
 
     if (ctx.input.translationType === 'text') {
       let body: Record<string, any> = {
@@ -75,9 +77,13 @@ export let aiTranslate = SlateTool.create(spec, {
         output: {
           translatedText:
             result.translatedText || result.TranslatedText || result.result || '',
+          operationStatus: client.operationStatus,
+          statusUrl: client.statusUrl,
           operationId: result.OperationId || ''
         },
-        message: `Successfully translated text to **${ctx.input.targetLanguage}**.`
+        message: client.message(
+          `Successfully translated text to **${ctx.input.targetLanguage}**.`
+        )
       };
     } else {
       let result = await client.aiTranslateFile({
@@ -91,9 +97,13 @@ export let aiTranslate = SlateTool.create(spec, {
         output: {
           fileName: result.Filename,
           fileContent: result.FileContent,
+          operationStatus: client.operationStatus,
+          statusUrl: client.statusUrl,
           operationId: result.OperationId
         },
-        message: `Successfully translated file to **${ctx.input.targetLanguage}**. Output: **${result.Filename}**`
+        message: client.message(
+          `Successfully translated file to **${ctx.input.targetLanguage}**. Output: **${result.Filename}**`
+        )
       };
     }
   })

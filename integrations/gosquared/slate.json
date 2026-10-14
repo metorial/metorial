@@ -1,18 +1,21 @@
 {
   "name": "@metorial/gosquared",
-  "description": "Track and retrieve real-time and historical web analytics data including visitors, pages, traffic sources, and campaigns. Identify and manage users in a People CRM with profile data, custom properties, smart groups, and activity timelines. Track events, pageviews, and ecommerce transactions. Send and receive live chat messages, manage conversations, and leave agent notes. Search and filter users, create smart groups, and retrieve segmented user data. Manage account settings, sites, shared users, webhooks, and notification triggers.",
+  "description": "Track and retrieve real-time and historical web analytics data including visitors, pages, traffic sources, and campaigns. Identify, search, retrieve, and delete People CRM profiles with custom properties, smart groups, and paginated activity timelines. Track events, pageviews, and ecommerce transactions. Retrieve live chat messages, send agent messages, archive conversations, and leave internal notes. Discover accessible projects and inspect the API key's granted permissions.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
   "skills": [
     "retrieve real-time analytics",
     "query historical analytics",
-    "track user events",
+    "track user events and pageviews",
     "identify and profile users",
     "track ecommerce transactions",
-    "send live chat messages",
-    "manage smart groups",
+    "send and retrieve live chat messages",
+    "archive chat conversations and add internal notes",
+    "create and inspect smart groups",
     "search and filter users",
-    "manage webhooks and triggers",
-    "manage account and sites"
+    "retrieve person activity",
+    "delete People profiles",
+    "list accessible projects",
+    "inspect API key permissions"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/gosquared.png"
 }

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getContactLists = SlateTool.create(spec, {
   name: 'Get Contact Lists',
   key: 'get_contact_lists',
-  description: `Retrieve all saved contact lists from your Findymail account. Useful for managing and organizing your enriched contacts and leads.`,
+  description: `Retrieve saved contact lists and their IDs from your Findymail account. Use a listId with list_contacts to retrieve its saved contacts.`,
   tags: {
     readOnly: true
   }
@@ -20,7 +20,13 @@ export let getContactLists = SlateTool.create(spec, {
             listId: z.string().optional().describe('Unique identifier for the list.'),
             name: z.string().optional().describe('Name of the contact list.'),
             contactCount: z.number().optional().describe('Number of contacts in the list.'),
-            createdAt: z.string().optional().describe('When the list was created.')
+            createdAt: z.string().optional().describe('When the list was created.'),
+            updatedAt: z.string().optional().describe('When the list was last updated.'),
+            sharedWithTeam: z
+              .boolean()
+              .optional()
+              .describe('Whether the list is shared with your team.'),
+            isOwner: z.boolean().optional().describe('Whether you own the list.')
           })
         )
         .describe('All contact lists in the account.'),
@@ -37,7 +43,10 @@ export let getContactLists = SlateTool.create(spec, {
       listId: l?.id?.toString() ?? l?.list_id?.toString() ?? undefined,
       name: l?.name ?? undefined,
       contactCount: l?.contact_count ?? l?.contactCount ?? l?.count ?? undefined,
-      createdAt: l?.created_at ?? l?.createdAt ?? undefined
+      createdAt: l?.created_at ?? l?.createdAt ?? undefined,
+      updatedAt: l?.updated_at ?? undefined,
+      sharedWithTeam: l?.shared_with_team ?? undefined,
+      isOwner: l?.is_owner ?? undefined
     }));
 
     return {

@@ -61,7 +61,7 @@ export let listCustomFields = SlateTool.create(spec, {
 export let createCustomField = SlateTool.create(spec, {
   name: 'Create Custom Field',
   key: 'create_custom_field',
-  description: `Create a new custom field in the Wrike account. Custom fields extend tasks, folders, and projects with additional structured data. Supported types include Text, Numeric, Currency, Percentage, Date, Duration, Checkbox, DropDown, and MultiSelect.`,
+  description: `Create a new custom field in the Wrike account. Custom fields extend tasks, folders, and projects with additional structured data. Supported types include Text, Numeric, Currency, Percentage, Date, Duration, Checkbox, DropDown, and Multiple (multi-select).`,
   tags: {
     destructive: false
   }
@@ -72,7 +72,7 @@ export let createCustomField = SlateTool.create(spec, {
       type: z
         .string()
         .describe(
-          'Field type: Text, Numeric, Currency, Percentage, Date, Duration, Checkbox, DropDown, MultiSelect'
+          'Field type: Text, Numeric, Currency, Percentage, Date, Duration, Checkbox, DropDown, Multiple (multi-select)'
         ),
       spaceId: z
         .string()

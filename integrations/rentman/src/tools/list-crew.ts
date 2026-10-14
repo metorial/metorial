@@ -28,10 +28,20 @@ export let listCrew = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().default(25).describe('Maximum number of results (max 300)'),
+      limit: z
+        .number()
+        .optional()
+        .default(25)
+        .describe('Maximum number of results (max 1500)'),
       offset: z.number().optional().default(0).describe('Number of results to skip'),
       sort: z.string().optional().describe('Sort field with + or - prefix'),
-      fields: z.string().optional().describe('Comma-separated fields to return')
+      fields: z.string().optional().describe('Comma-separated fields to return'),
+      cursor: z
+        .string()
+        .optional()
+        .describe(
+          'Opaque cursor token from a previous nextPageUrl. Pass it unchanged and repeat the original filters, resource IDs, sort, and fields.'
+        )
     })
   )
   .output(
@@ -39,7 +49,8 @@ export let listCrew = SlateTool.create(spec, {
       crew: z.array(crewSchema),
       itemCount: z.number(),
       limit: z.number(),
-      offset: z.number()
+      offset: z.number(),
+      nextPageUrl: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -49,13 +60,14 @@ export let listCrew = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       sort: ctx.input.sort,
-      fields: ctx.input.fields
+      fields: ctx.input.fields,
+      cursor: ctx.input.cursor
     });
 
     let crew = result.data.map((c: any) => ({
       crewId: c.id,
       firstName: c.firstname,
-      surName: c.surname,
+      surName: c.lastname ?? c.surname,
       displayName: c.displayname,
       email: c.email,
       phone: c.phone,
@@ -65,8 +77,8 @@ export let listCrew = SlateTool.create(spec, {
       postalCode: c.postal_code,
       function: c.function,
       tags: c.tags,
-      createdAt: c.created,
-      updatedAt: c.modified
+      createdAt: c.created ?? undefined,
+      updatedAt: c.modified ?? undefined
     }));
 
     return {
@@ -74,7 +86,8 @@ export let listCrew = SlateTool.create(spec, {
         crew,
         itemCount: result.itemCount,
         limit: result.limit,
-        offset: result.offset
+        offset: result.offset,
+        nextPageUrl: result.next_page_url
       },
       message: `Found **${result.itemCount}** crew members. Returned ${crew.length} members (offset: ${result.offset}).`
     };

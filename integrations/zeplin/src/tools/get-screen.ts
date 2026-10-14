@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getScreen = SlateTool.create(spec, {
   name: 'Get Screen',
   key: 'get_screen',
-  description: `Retrieve detailed information about a specific screen in a Zeplin project, including its versions, sections, and variants.`,
+  description: `Retrieve detailed information about a specific screen in a Zeplin project, including its current section, variant, tags, and thumbnail. Use list_screen_versions for its version history.`,
   tags: {
     readOnly: true
   }
@@ -41,12 +41,13 @@ export let getScreen = SlateTool.create(spec, {
         screenId: s.id,
         name: s.name,
         description: s.description,
-        thumbnail: s.thumbnail,
+        thumbnail:
+          s.image?.thumbnails?.medium ?? s.image?.thumbnails?.small ?? s.image?.original_url,
         created: s.created,
         updated: s.updated,
         tags: s.tags,
-        sections: s.sections,
-        variants: s.variants,
+        sections: s.section ? [s.section] : undefined,
+        variants: s.variant ? [s.variant] : undefined,
         versions: s.versions
       },
       message: `Retrieved screen **${s.name}**.`

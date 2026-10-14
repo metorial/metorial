@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { StreamtimeClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ export let manageJobPlan = SlateTool.create(spec, {
     'For updating items, provide the specific resource ID (phaseId, itemId, milestoneId).'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -72,46 +72,49 @@ export let manageJobPlan = SlateTool.create(spec, {
       let body: Record<string, any> = { ...input.additionalFields };
       if (input.name !== undefined) body.name = input.name;
       if (input.description !== undefined) body.description = input.description;
-      if (input.estimatedMinutes !== undefined) body.estimatedMinutes = input.estimatedMinutes;
+      if (input.estimatedMinutes !== undefined)
+        body.totalPlannedMinutes = input.estimatedMinutes;
       if (input.date !== undefined) body.date = input.date;
       return body;
     };
 
     switch (input.action) {
       case 'create_phase': {
-        if (!input.jobId) throw new Error('jobId is required for create_phase');
+        if (!input.jobId) throw createApiServiceError('jobId is required for create_phase');
         result = await client.createJobPhase(input.jobId, buildBody());
         break;
       }
       case 'update_phase': {
-        if (!input.phaseId) throw new Error('phaseId is required for update_phase');
+        if (!input.phaseId)
+          throw createApiServiceError('phaseId is required for update_phase');
         result = await client.updateJobPhase(input.phaseId, buildBody());
         break;
       }
       case 'create_item': {
-        if (!input.jobId) throw new Error('jobId is required for create_item');
+        if (!input.jobId) throw createApiServiceError('jobId is required for create_item');
         result = await client.createJobItem(input.jobId, buildBody());
         break;
       }
       case 'update_item': {
-        if (!input.itemId) throw new Error('itemId is required for update_item');
+        if (!input.itemId) throw createApiServiceError('itemId is required for update_item');
         result = await client.updateJobItem(input.itemId, buildBody());
         break;
       }
       case 'create_milestone': {
-        if (!input.jobId) throw new Error('jobId is required for create_milestone');
+        if (!input.jobId)
+          throw createApiServiceError('jobId is required for create_milestone');
         result = await client.createJobMilestone(input.jobId, buildBody());
         break;
       }
       case 'update_milestone': {
         if (!input.milestoneId)
-          throw new Error('milestoneId is required for update_milestone');
+          throw createApiServiceError('milestoneId is required for update_milestone');
         result = await client.updateJobMilestone(input.milestoneId, buildBody());
         break;
       }
       case 'delete_milestone': {
         if (!input.milestoneId)
-          throw new Error('milestoneId is required for delete_milestone');
+          throw createApiServiceError('milestoneId is required for delete_milestone');
         await client.deleteJobMilestone(input.milestoneId);
         return {
           output: { success: true },
@@ -119,26 +122,34 @@ export let manageJobPlan = SlateTool.create(spec, {
         };
       }
       case 'assign_user_to_item': {
-        if (!input.itemId) throw new Error('itemId is required for assign_user_to_item');
-        if (!input.userId) throw new Error('userId is required for assign_user_to_item');
+        if (!input.itemId)
+          throw createApiServiceError('itemId is required for assign_user_to_item');
+        if (!input.userId)
+          throw createApiServiceError('userId is required for assign_user_to_item');
         result = await client.assignJobItemUser(input.itemId, {
-          userId: input.userId,
-          ...input.additionalFields
+          ...input.additionalFields,
+          userId: input.userId
         });
         break;
       }
       case 'assign_role_to_item': {
-        if (!input.itemId) throw new Error('itemId is required for assign_role_to_item');
-        if (!input.roleId) throw new Error('roleId is required for assign_role_to_item');
+        if (!input.itemId)
+          throw createApiServiceError('itemId is required for assign_role_to_item');
+        if (!input.roleId)
+          throw createApiServiceError('roleId is required for assign_role_to_item');
         result = await client.assignJobItemRole(input.itemId, {
-          roleId: input.roleId,
-          ...input.additionalFields
+          ...input.additionalFields,
+          roleId: input.roleId
         });
         break;
       }
       case 'create_sub_item': {
-        if (!input.itemId) throw new Error('itemId is required for create_sub_item');
-        result = await client.createJobItemSubItem(input.itemId, buildBody());
+        if (!input.itemId)
+          throw createApiServiceError('itemId is required for create_sub_item');
+        let body = buildBody();
+        body.description = input.description ?? input.name ?? body.description;
+        body.name = undefined;
+        result = await client.createJobItemSubItem(input.itemId, body);
         break;
       }
     }

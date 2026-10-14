@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,8 @@ export let discoverInfluencers = SlateTool.create(spec, {
   instructions: [
     'The socialNetwork field is required and determines which platform-specific filters are available.',
     'Use nicheSearch for natural-language AI-powered niche queries (e.g., "home decor", "fitness coach").',
-    'Use similarTo to find influencers similar to a given username.',
+    'Use similarTo with an Instagram username, YouTube channel ID, or TikTok account ID.',
+    'Use get_taxonomy to discover category IDs before filtering by category.',
     'Set sandbox to true for testing without consuming credits (filters are ignored in sandbox mode).'
   ],
   constraints: [
@@ -212,6 +213,44 @@ export let discoverInfluencers = SlateTool.create(spec, {
 
     let input = ctx.input;
 
+    if (
+      input.page !== undefined &&
+      (!Number.isInteger(input.page) || input.page < 1 || input.page > 500)
+    ) {
+      throw createApiServiceError('page must be a whole number from 1 to 500.');
+    }
+    if (
+      input.nicheSearch &&
+      (input.searchKeywords?.length ||
+        input.searchContent?.length ||
+        input.searchDescription?.length)
+    ) {
+      throw createApiServiceError(
+        'nicheSearch cannot be combined with searchKeywords, searchContent, or searchDescription.'
+      );
+    }
+    if (
+      input.nicheSearch &&
+      !['instagram', 'youtube', 'tiktok'].includes(input.socialNetwork)
+    ) {
+      throw createApiServiceError(
+        'nicheSearch is supported for Instagram, YouTube, and TikTok.'
+      );
+    }
+    if (
+      input.qualityScore &&
+      !['instagram', 'youtube', 'tiktok'].includes(input.socialNetwork)
+    ) {
+      throw createApiServiceError(
+        'qualityScore is supported for Instagram, YouTube, and TikTok.'
+      );
+    }
+    if (input.isVerified !== undefined && input.isVerified !== 0 && input.isVerified !== 1) {
+      throw createApiServiceError(
+        'isVerified must be 0 for non-verified accounts or 1 for verified accounts.'
+      );
+    }
+
     let filters: Record<string, any> = {
       social_network: input.socialNetwork
     };
@@ -269,7 +308,7 @@ export let discoverInfluencers = SlateTool.create(spec, {
       }
     }
     if (input.viewsAvg) filters.views_avg = input.viewsAvg;
-    if (input.priceRange) filters['blogger_prices.post_price'] = input.priceRange;
+    if (input.priceRange) filters.blogger_prices = { post_price: input.priceRange };
     if (input.growth) filters.growth = input.growth;
     if (input.category) filters.category = input.category;
     if (input.similarTo) filters.similar = input.similarTo;

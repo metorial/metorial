@@ -2,10 +2,13 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createSignatureRequest,
+  createSignatureRequestInOneCall,
   createSigner,
+  downloadDocument,
   getApplicationContext,
   getSignatureProof,
   getSignatureRequest,
+  getSignatureRequestsStatus,
   getSigner,
   listSignatureProfiles,
   listSignatureRequests,
@@ -21,6 +24,9 @@ export let provider = Slate.create({
   spec,
   tools: [
     createSignatureRequest,
+    createSignatureRequestInOneCall,
+    downloadDocument,
+    getSignatureRequestsStatus,
     getSignatureRequest,
     listSignatureRequests,
     manageSignatureRequest,

@@ -1,5 +1,6 @@
 export * from './directions';
 export * from './geocode';
+export * from './geocode-v6';
 export * from './isochrone';
 export * from './list-fonts';
 export * from './manage-dataset-features';
@@ -13,3 +14,4 @@ export * from './matrix';
 export * from './optimize-route';
 export * from './static-image';
 export * from './tilequery';
+export * from './who-am-i';

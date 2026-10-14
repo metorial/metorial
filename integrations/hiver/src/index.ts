@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  createInboxTag,
   getConversation,
   getInbox,
   listConversations,
@@ -12,6 +13,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    createInboxTag.build(),
     listInboxes.build(),
     getInbox.build(),
     listConversations.build(),

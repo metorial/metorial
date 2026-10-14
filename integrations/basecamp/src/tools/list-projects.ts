@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let projectSchema = z.object({
@@ -17,13 +18,14 @@ let projectSchema = z.object({
 export let listProjectsTool = SlateTool.create(spec, {
   name: 'List Projects',
   key: 'list_projects',
-  description: `List all projects in your Basecamp account. Returns active projects by default; optionally filter by status to see archived or trashed projects.`,
+  description: `Call list_accounts to discover the accountId for this operation. List all projects in your Basecamp account. Returns active projects by default; optionally filter by status to see archived or trashed projects.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       status: z
         .enum(['active', 'archived', 'trashed'])
         .optional()
@@ -39,7 +41,8 @@ export let listProjectsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let statusParam = ctx.input.status === 'active' ? undefined : ctx.input.status;

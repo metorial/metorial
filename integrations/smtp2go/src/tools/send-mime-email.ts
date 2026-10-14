@@ -42,7 +42,7 @@ export let sendMimeEmail = SlateTool.create(spec, {
         failures: data.failures ?? [],
         emailId: data.email_id ?? ''
       },
-      message: `MIME email sent. ${data.succeeded ?? 0} succeeded, ${data.failed ?? 0} failed.`
+      message: `MIME email submission processed. ${data.succeeded ?? 0} succeeded, ${data.failed ?? 0} failed.`
     };
   })
   .build();

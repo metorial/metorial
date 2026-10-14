@@ -54,8 +54,8 @@ export let updateForm = SlateTool.create(spec, {
 
     return {
       output: {
-        formId: form?.key ?? form?.id?.toString(),
-        name: form?.name,
+        formId: form?.key?.toString() ?? form?.id?.toString(),
+        name: form?.name ?? undefined,
         raw: form
       },
       message: `Updated form **${form?.name ?? ctx.input.formId}**.`

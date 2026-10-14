@@ -4,10 +4,10 @@ import { z } from 'zod';
 export let config = SlateConfig.create(
   z.object({
     region: z
-      .enum(['us', 'eu', 'au'])
+      .enum(['us', 'eu', 'au', 'uk'])
       .default('us')
       .describe(
-        'Processing region for templates and documents. Use "eu" for GDPR compliance or "au" for Australia-based processing.'
+        'API processing region: "us" (United States), "eu" (European Union), "uk" (United Kingdom), or "au" (Australia).'
       )
   })
 );

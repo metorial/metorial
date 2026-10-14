@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -54,12 +54,12 @@ export let manageViews = SlateTool.create(spec, {
         break;
 
       case 'get':
-        if (!ctx.input.viewId) throw new Error('viewId is required for get');
+        if (!ctx.input.viewId) throw createApiServiceError('viewId is required for get');
         result = await client.getView(ctx.input.sheetHandle, ctx.input.viewId);
         break;
 
       case 'create':
-        if (!ctx.input.name) throw new Error('name is required for create');
+        if (!ctx.input.name) throw createApiServiceError('name is required for create');
         result = await client.createView(ctx.input.sheetHandle, {
           name: ctx.input.name,
           filterModel: ctx.input.filterModel,
@@ -71,7 +71,7 @@ export let manageViews = SlateTool.create(spec, {
         break;
 
       case 'update':
-        if (!ctx.input.viewId) throw new Error('viewId is required for update');
+        if (!ctx.input.viewId) throw createApiServiceError('viewId is required for update');
         result = await client.updateView(ctx.input.sheetHandle, ctx.input.viewId, {
           name: ctx.input.name,
           filterModel: ctx.input.filterModel,
@@ -83,14 +83,14 @@ export let manageViews = SlateTool.create(spec, {
         break;
 
       case 'delete':
-        if (!ctx.input.viewId) throw new Error('viewId is required for delete');
+        if (!ctx.input.viewId) throw createApiServiceError('viewId is required for delete');
         await client.deleteView(ctx.input.sheetHandle, ctx.input.viewId);
         result = { deleted: true };
         break;
 
       case 'convert_to_linked_sheet':
         if (!ctx.input.viewId)
-          throw new Error('viewId is required for convert_to_linked_sheet');
+          throw createApiServiceError('viewId is required for convert_to_linked_sheet');
         result = await client.createLinkedSheetFromView(
           ctx.input.sheetHandle,
           ctx.input.viewId

@@ -1,11 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import {
   FUNNEL_CREATE_MUTATION,
   FUNNEL_DELETE_MUTATION,
   FUNNEL_SET_FAVOURITE_MUTATION,
-  FUNNEL_UPDATE_MUTATION
+  FUNNEL_UPDATE_MUTATION,
+  normalizeFunnelCompute
 } from '../lib/graphql';
 import { spec } from '../spec';
 
@@ -65,7 +66,8 @@ let filterDataCustomEventPropertySchema = z
     name: z.string().optional(),
     string: filterDataStringSchema.optional(),
     int: filterDataIntSchema.optional(),
-    bool: filterDataBoolSchema.optional()
+    bool: filterDataBoolSchema.optional(),
+    float: filterDataIntSchema.optional().describe('Decimal value comparison')
   })
   .describe('Custom event property filter');
 
@@ -149,18 +151,29 @@ let funnelSchema = z.object({
   createdByLogin: z.string().optional().describe('Login of the user who created the funnel')
 });
 
-let mapFunnel = (f: any) => ({
-  funnelId: f.funnel_id,
-  name: f.name,
-  description: f.description,
-  websiteId: f.website_id,
-  segmentId: f.segment_id,
-  isFavourite: f.is_favourite,
-  isOwner: f.is_owner,
-  isPublic: f.is_public,
-  createdByAgentId: f.created_by_agent_id,
-  createdByLogin: f.created_by_login
-});
+let mapFunnel = (f: unknown) => {
+  if (!isApiErrorRecord(f) || typeof f.funnel_id !== 'string') {
+    throw createApiServiceError(
+      'LiveSession returned no funnel object. The operation could not confirm the requested configuration.'
+    );
+  }
+  let result = funnelSchema.safeParse({
+    funnelId: f.funnel_id,
+    name: f.name,
+    description: f.description,
+    websiteId: f.website_id,
+    segmentId: f.segment_id,
+    isFavourite: f.is_favourite,
+    isOwner: f.is_owner,
+    isPublic: f.is_public,
+    createdByAgentId: f.created_by_agent_id,
+    createdByLogin: f.created_by_login
+  });
+  if (!result.success) {
+    throw createApiServiceError('LiveSession returned an invalid funnel response.');
+  }
+  return result.data;
+};
 
 export let createFunnel = SlateTool.create(spec, {
   name: 'Create Funnel',
@@ -186,7 +199,9 @@ export let createFunnel = SlateTool.create(spec, {
         .describe('Whether the funnel should be publicly visible'),
       compute: z
         .array(computeInputSchema)
-        .describe('Computation settings with steps, date range, and filters')
+        .describe(
+          'Computation settings with steps, date range, and filters; supply exactly one item'
+        )
     })
   )
   .output(funnelSchema)
@@ -199,7 +214,7 @@ export let createFunnel = SlateTool.create(spec, {
         website_id: ctx.input.websiteId,
         segment_id: ctx.input.segmentId,
         is_public: ctx.input.isPublic,
-        compute: ctx.input.compute
+        compute: normalizeFunnelCompute(ctx.input.compute)
       }
     });
 
@@ -241,7 +256,10 @@ export let deleteFunnel = SlateTool.create(spec, {
         funnelId: ctx.input.funnelId,
         deleted: result.data.funnelDelete === true
       },
-      message: `Deleted funnel **${ctx.input.funnelId}**.`
+      message:
+        result.data.funnelDelete === true
+          ? `Deleted funnel **${ctx.input.funnelId}**.`
+          : `LiveSession did not confirm deletion of funnel **${ctx.input.funnelId}**.`
     };
   })
   .build();
@@ -250,6 +268,9 @@ export let updateFunnel = SlateTool.create(spec, {
   name: 'Update Funnel',
   key: 'update_funnel',
   description: `Update an existing conversion funnel's configuration in LiveSession. Modify name, steps, filters, date ranges, and other settings.`,
+  constraints: [
+    'LiveSession public documentation currently describes a conflicting update signature. Configuration updates require provider support for the existing input argument and funnel response.'
+  ],
   tags: {
     destructive: false
   }
@@ -262,7 +283,9 @@ export let updateFunnel = SlateTool.create(spec, {
       websiteId: z.string().optional().describe('Updated website ID'),
       segmentId: z.string().describe('Updated segment ID'),
       isPublic: z.boolean().optional().describe('Updated public visibility'),
-      compute: z.array(computeInputSchema).describe('Updated computation settings')
+      compute: z
+        .array(computeInputSchema)
+        .describe('Updated computation settings; supply exactly one item')
     })
   )
   .output(funnelSchema)
@@ -276,7 +299,7 @@ export let updateFunnel = SlateTool.create(spec, {
         website_id: ctx.input.websiteId,
         segment_id: ctx.input.segmentId,
         is_public: ctx.input.isPublic,
-        compute: ctx.input.compute
+        compute: normalizeFunnelCompute(ctx.input.compute)
       }
     });
 
@@ -322,9 +345,12 @@ export let setFunnelFavourite = SlateTool.create(spec, {
         funnelId: ctx.input.funnelId,
         success: result.data.funnelSetFavourite === true
       },
-      message: ctx.input.isFavourite
-        ? `Marked funnel **${ctx.input.funnelId}** as favourite.`
-        : `Removed funnel **${ctx.input.funnelId}** from favourites.`
+      message:
+        result.data.funnelSetFavourite !== true
+          ? `LiveSession did not confirm the favourite update for funnel **${ctx.input.funnelId}**.`
+          : ctx.input.isFavourite
+            ? `Marked funnel **${ctx.input.funnelId}** as favourite.`
+            : `Removed funnel **${ctx.input.funnelId}** from favourites.`
     };
   })
   .build();

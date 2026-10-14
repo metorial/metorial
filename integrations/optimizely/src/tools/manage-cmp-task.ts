@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CmpClient } from '../lib/cmp-client';
 import { spec } from '../spec';
@@ -33,6 +33,7 @@ Tasks represent content work items that move through workflow stages. Use this t
         .string()
         .optional()
         .describe('Due date in ISO 8601 format (for create/update)'),
+      ownerId: z.string().optional().describe('Task owner user ID (for create/update)'),
       workflowId: z.string().optional().describe('Workflow ID (for create)'),
       customFields: z
         .record(z.string(), z.any())
@@ -41,7 +42,7 @@ Tasks represent content work items that move through workflow stages. Use this t
       commentBody: z.string().optional().describe('Comment text (for add_comment)'),
       status: z.string().optional().describe('Filter by status (for list)'),
       page: z.number().optional().describe('Page number (for list)'),
-      limit: z.number().optional().describe('Items per page (for list)')
+      limit: z.number().optional().describe('Items per page, from 1 to 100 (for list)')
     })
   )
   .output(
@@ -69,47 +70,49 @@ Tasks represent content work items that move through workflow stages. Use this t
         };
       }
       case 'get': {
-        if (!ctx.input.taskId) throw new Error('taskId is required');
+        if (!ctx.input.taskId) throw createApiServiceError('taskId is required');
         let task = await client.getTask(ctx.input.taskId);
         return {
           output: { task },
-          message: `Retrieved CMP task **${task.name || ctx.input.taskId}**.`
+          message: `Retrieved CMP task **${task.title || task.name || ctx.input.taskId}**.`
         };
       }
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required');
+        if (!ctx.input.name) throw createApiServiceError('name is required');
         let task = await client.createTask({
-          name: ctx.input.name,
+          title: ctx.input.name,
           description: ctx.input.description,
           campaign_id: ctx.input.campaignId,
           assignee_id: ctx.input.assigneeId,
-          due_date: ctx.input.dueDate,
+          due_at: ctx.input.dueDate,
           workflow_id: ctx.input.workflowId,
+          owner_id: ctx.input.ownerId,
           custom_fields: ctx.input.customFields
         });
         return {
           output: { task },
-          message: `Created CMP task **${task.name}**.`
+          message: `Created CMP task **${task.title || task.name}**.`
         };
       }
       case 'update': {
-        if (!ctx.input.taskId) throw new Error('taskId is required');
+        if (!ctx.input.taskId) throw createApiServiceError('taskId is required');
         let updateData: Record<string, any> = {};
-        if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
+        if (ctx.input.name !== undefined) updateData.title = ctx.input.name;
         if (ctx.input.description !== undefined)
           updateData.description = ctx.input.description;
         if (ctx.input.assigneeId !== undefined) updateData.assignee_id = ctx.input.assigneeId;
-        if (ctx.input.dueDate !== undefined) updateData.due_date = ctx.input.dueDate;
+        if (ctx.input.dueDate !== undefined) updateData.due_at = ctx.input.dueDate;
         if (ctx.input.customFields !== undefined)
           updateData.custom_fields = ctx.input.customFields;
+        if (ctx.input.ownerId !== undefined) updateData.owner_id = ctx.input.ownerId;
         let task = await client.updateTask(ctx.input.taskId, updateData);
         return {
           output: { task },
-          message: `Updated CMP task **${task.name || ctx.input.taskId}**.`
+          message: `Updated CMP task **${task.title || task.name || ctx.input.taskId}**.`
         };
       }
       case 'delete': {
-        if (!ctx.input.taskId) throw new Error('taskId is required');
+        if (!ctx.input.taskId) throw createApiServiceError('taskId is required');
         await client.deleteTask(ctx.input.taskId);
         return {
           output: {},
@@ -117,10 +120,10 @@ Tasks represent content work items that move through workflow stages. Use this t
         };
       }
       case 'add_comment': {
-        if (!ctx.input.taskId) throw new Error('taskId is required');
-        if (!ctx.input.commentBody) throw new Error('commentBody is required');
+        if (!ctx.input.taskId) throw createApiServiceError('taskId is required');
+        if (!ctx.input.commentBody) throw createApiServiceError('commentBody is required');
         let comment = await client.createTaskComment(ctx.input.taskId, {
-          body: ctx.input.commentBody
+          value: ctx.input.commentBody
         });
         return {
           output: { comment },
@@ -128,7 +131,7 @@ Tasks represent content work items that move through workflow stages. Use this t
         };
       }
       case 'list_comments': {
-        if (!ctx.input.taskId) throw new Error('taskId is required');
+        if (!ctx.input.taskId) throw createApiServiceError('taskId is required');
         let result = await client.listTaskComments(ctx.input.taskId);
         let comments = result.data || result;
         return {

@@ -73,7 +73,7 @@ Filter by form type (xmlns), date received, application, and more. Returns pagin
 
     let forms = result.objects.map(f => ({
       formId: f.id,
-      appId: f.app_id,
+      appId: f.app_id ?? '',
       receivedOn: f.received_on,
       formType: f.type,
       formData: f.form,

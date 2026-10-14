@@ -29,11 +29,11 @@ let placeMetadataSchema = z
 export let lookupPlacekey = SlateTool.create(spec, {
   name: 'Lookup Placekey',
   key: 'lookup_placekey',
-  description: `Look up a unique Placekey identifier for a single physical location. Locations can be specified by address, coordinates, or place name (POI). Providing more input parameters yields a more precise match. Optionally request additional fields like confidence scores, normalized addresses, geocodes, parcel identifiers, and more.`,
+  description: `Look up a unique Placekey identifier for a single physical location using an address or coordinates. Add a place name to an address to match a specific point of interest. Optionally request confidence levels, normalized addresses, geocodes, and parcel identifiers.`,
   instructions: [
-    'Provide at least coordinates (latitude/longitude) or an address (street address, city, region, postal code, country code) to get a result.',
-    'Include a location name to get a POI-specific Placekey that identifies the specific business or place at that location.',
-    'Use the fields parameter to request additional data like geocodes, confidence scores, or normalized addresses.'
+    'Provide latitude and longitude, or a street address, region, country code, and either city or postal code.',
+    'Include an address and location name to match a specific business or place. Coordinates alone return the geographic Where part.',
+    'Use the fields parameter to request additional data like geocodes, confidence levels, or normalized addresses. Each geocode consumes an additional lookup.'
   ],
   constraints: ['Rate limited to 1000 requests per 60 seconds.'],
   tags: {
@@ -48,7 +48,7 @@ export let lookupPlacekey = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Name of the place or business (POI). Including this produces a POI-specific Placekey.'
+          'Name of the place or business (POI). Include an address to match a specific point of interest.'
         ),
       streetAddress: z.string().optional().describe('Street address of the location'),
       city: z.string().optional().describe('City name'),
@@ -58,6 +58,7 @@ export let lookupPlacekey = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Two-letter ISO country code (e.g. "US", "GB")'),
+      queryId: z.string().optional().describe('Custom identifier echoed in the lookup result'),
       placeMetadata: placeMetadataSchema,
       fields: z
         .array(optionalFieldEnum)
@@ -80,7 +81,13 @@ export let lookupPlacekey = SlateTool.create(spec, {
       confidenceScore: z
         .number()
         .optional()
-        .describe('Confidence level of the Placekey match (0-1)'),
+        .describe(
+          'Numeric confidence score when provided; categorical confidence is returned as confidenceLevel'
+        ),
+      confidenceLevel: z
+        .enum(['HIGH', 'MEDIUM', 'LOW'])
+        .optional()
+        .describe('Match confidence returned by the current API'),
       normalizedAddress: z
         .record(z.string(), z.unknown())
         .optional()
@@ -95,7 +102,10 @@ export let lookupPlacekey = SlateTool.create(spec, {
       gers: z
         .string()
         .optional()
-        .describe('Global Entity Reference System identifier (Overture Maps)')
+        .describe(
+          'Global Entity Reference System identifier (Overture Maps), omitted when unavailable'
+        ),
+      error: z.string().optional().describe('Reason the location could not be matched')
     })
   )
   .handleInvocation(async ctx => {
@@ -111,6 +121,7 @@ export let lookupPlacekey = SlateTool.create(spec, {
         region: ctx.input.region,
         postalCode: ctx.input.postalCode,
         isoCountryCode: ctx.input.isoCountryCode,
+        queryId: ctx.input.queryId,
         placeMetadata: ctx.input.placeMetadata
       },
       ctx.input.fields

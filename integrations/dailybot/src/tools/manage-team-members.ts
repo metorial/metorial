@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DailyBotClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,6 +32,12 @@ export let manageTeamMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!(ctx.input.addUserUuids?.length || ctx.input.removeUserUuids?.length)) {
+      throw createApiServiceError('Provide at least one user UUID to add or remove.', {
+        reason: 'dailybot_missing_team_members'
+      });
+    }
+
     let client = new DailyBotClient({ token: ctx.auth.token });
 
     let addedCount = 0;

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listBots = SlateTool.create(spec, {
   name: 'List Bots',
   key: 'list_bots',
-  description: `Lists all bots in your Sendbird application with pagination support. Returns bot details including identity, configuration, and AI settings.`,
+  description: `Lists all bots in your Sendbird application with pagination support. Returns bot details including identity and callback configuration.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,7 +14,14 @@ export let listBots = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      limit: z.number().optional().describe('Maximum number of bots to return per page'),
+      limit: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value >= 1 && value <= 100,
+          'Use a whole number from 1 to 100'
+        )
+        .optional()
+        .describe('Maximum number of bots to return per page (1-100; default 10)'),
       paginationToken: z
         .string()
         .optional()
@@ -26,7 +33,7 @@ export let listBots = SlateTool.create(spec, {
       bots: z
         .array(
           z.object({
-            botUserId: z.string().describe('Unique user ID of the bot'),
+            botUserId: z.string().min(1).max(80).describe('Unique user ID of the bot'),
             botNickname: z.string().describe('Display nickname'),
             botProfileUrl: z.string().optional().describe('Profile image URL'),
             botType: z.string().optional().describe('Category of the bot'),
@@ -48,7 +55,7 @@ export let listBots = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      applicationId: ctx.config.applicationId
+      applicationId: ctx.auth.applicationId ?? ctx.config.applicationId
     });
 
     let result = await client.listBots({
@@ -56,16 +63,16 @@ export let listBots = SlateTool.create(spec, {
       paginationToken: ctx.input.paginationToken
     });
 
-    let bots = (result.bots || []).map((entry: Record<string, unknown>) => {
-      let bot = (entry.bot || {}) as Record<string, unknown>;
+    let bots = result.bots.map(entry => {
+      let bot = entry.bot;
       return {
-        botUserId: bot.bot_userid as string,
-        botNickname: bot.bot_nickname as string,
-        botProfileUrl: bot.bot_profile_url as string | undefined,
-        botType: bot.bot_type as string | undefined,
-        botCallbackUrl: entry.bot_callback_url as string | undefined,
-        isPrivacyMode: entry.is_privacy_mode as boolean | undefined,
-        enableMarkAsRead: entry.enable_mark_as_read as boolean | undefined
+        botUserId: bot.bot_userid,
+        botNickname: bot.bot_nickname,
+        botProfileUrl: bot.bot_profile_url,
+        botType: bot.bot_type,
+        botCallbackUrl: entry.bot_callback_url,
+        isPrivacyMode: entry.is_privacy_mode,
+        enableMarkAsRead: entry.enable_mark_as_read
       };
     });
 

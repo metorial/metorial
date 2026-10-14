@@ -15,7 +15,7 @@ Returns a run ID that can be used with the **Get Task Run** tool to check status
     'Input should be under 15,000 characters for optimal performance.'
   ],
   tags: {
-    readOnly: true
+    readOnly: false
   }
 })
   .input(

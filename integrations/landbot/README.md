@@ -1,6 +1,6 @@
 # <img src="logo.jpeg" height="20"> Landbot
 
-Manage chatbot conversations and customers across web, WhatsApp, Messenger, and API channels. Send text messages, images, and location links to customers. Send WhatsApp message templates for outbound campaigns. Retrieve and update customer profiles, assign customers to bots or agents, and manage WhatsApp opt-ins. Create, update, and track support tickets. Assign customers to specific bot flows and direct them to particular steps. Manage agents, channels, and channel configurations.
+Manage chatbot conversations and customers across web, WhatsApp, Messenger, and API channels. Search customer profiles, read complete conversation transcripts, send outbound text with your account API token, and send approved WhatsApp templates. Create or update individual customer fields, assign customers to bot flows, and unassign conversations. Submit inbound text, image, or location messages to an APIchat channel using its channel token. Existing ticket, agent, and channel tools are also available.
 
 ## License
 

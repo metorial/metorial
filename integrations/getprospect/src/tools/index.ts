@@ -4,6 +4,8 @@ export { deleteCompany } from './delete-company';
 export { deleteLead } from './delete-lead';
 export { findEmail } from './find-email';
 export { getCompany } from './get-company';
+export { getCreditBalances } from './get-credit-balances';
+export { getCurrentUser } from './get-current-user';
 export { getLead } from './get-lead';
 export { createDomain, deleteDomain, getDomains } from './manage-domains';
 export { createNote, deleteNote, getNote, updateNote } from './manage-notes';

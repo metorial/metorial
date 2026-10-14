@@ -6,7 +6,10 @@ import {
   createOpportunity,
   createTask,
   findTask,
+  getCurrentUser,
   getNotifications,
+  listCompanies,
+  listContacts,
   listUsers,
   logTime
 } from './tools';
@@ -20,7 +23,10 @@ export let provider = Slate.create({
     logTime,
     listUsers,
     getNotifications,
-    createContactRecord
+    createContactRecord,
+    getCurrentUser,
+    listContacts,
+    listCompanies
   ],
   triggers: []
 });

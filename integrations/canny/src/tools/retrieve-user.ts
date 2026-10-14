@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CannyClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,6 +32,11 @@ export let retrieveUserTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      [ctx.input.cannyUserId, ctx.input.userId, ctx.input.email].filter(Boolean).length !== 1
+    ) {
+      throw createApiServiceError('Provide exactly one of cannyUserId, userId, or email.');
+    }
     let client = new CannyClient(ctx.auth.token);
     let u = await client.retrieveUser({
       id: ctx.input.cannyUserId,

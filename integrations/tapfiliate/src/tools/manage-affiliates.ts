@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { TapfiliateClient } from '../lib/client';
 import { spec } from '../spec';
@@ -21,7 +21,7 @@ let affiliateSchema = z.object({
 export let createAffiliate = SlateTool.create(spec, {
   name: 'Create Affiliate',
   key: 'create_affiliate',
-  description: `Create a new affiliate in Tapfiliate. Register affiliates with their personal information, company details, and optional metadata. The affiliate will receive a unique referral link.`,
+  description: `Create a new affiliate in Tapfiliate with personal information, company details, and custom fields. Add the affiliate to a program with manage_program_affiliate to obtain their referral link.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -48,7 +48,11 @@ export let createAffiliate = SlateTool.create(spec, {
       metaData: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom key-value metadata to attach')
+        .describe('Custom key-value metadata to attach'),
+      customFields: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Values for your configured affiliate custom fields')
     })
   )
   .output(affiliateSchema)
@@ -59,14 +63,14 @@ export let createAffiliate = SlateTool.create(spec, {
     return {
       output: {
         affiliateId: result.id,
-        firstname: result.firstname,
-        lastname: result.lastname,
-        email: result.email,
+        firstname: result.firstname ?? undefined,
+        lastname: result.lastname ?? undefined,
+        email: result.email ?? undefined,
         company: result.company,
         address: result.address,
         metaData: result.meta_data,
         referralLink: result.referral_link,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `Created affiliate **${result.firstname} ${result.lastname}** (${result.email}) with ID \`${result.id}\`.`
     };
@@ -76,7 +80,7 @@ export let createAffiliate = SlateTool.create(spec, {
 export let getAffiliate = SlateTool.create(spec, {
   name: 'Get Affiliate',
   key: 'get_affiliate',
-  description: `Retrieve detailed information about a specific affiliate including their personal data, referral links, programs, and metadata.`,
+  description: `Retrieve an affiliate's personal data, company, address, and metadata. Use list_program_affiliates for program-specific referral links and approval status.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -95,14 +99,14 @@ export let getAffiliate = SlateTool.create(spec, {
     return {
       output: {
         affiliateId: result.id,
-        firstname: result.firstname,
-        lastname: result.lastname,
-        email: result.email,
+        firstname: result.firstname ?? undefined,
+        lastname: result.lastname ?? undefined,
+        email: result.email ?? undefined,
         company: result.company,
         address: result.address,
         metaData: result.meta_data,
         referralLink: result.referral_link,
-        createdAt: result.created_at
+        createdAt: result.created_at ?? undefined
       },
       message: `Retrieved affiliate **${result.firstname} ${result.lastname}** (${result.email}).`
     };
@@ -140,14 +144,14 @@ export let listAffiliates = SlateTool.create(spec, {
 
     let affiliates = results.map((r: any) => ({
       affiliateId: r.id,
-      firstname: r.firstname,
-      lastname: r.lastname,
-      email: r.email,
+      firstname: r.firstname ?? undefined,
+      lastname: r.lastname ?? undefined,
+      email: r.email ?? undefined,
       company: r.company,
       address: r.address,
       metaData: r.meta_data,
       referralLink: r.referral_link,
-      createdAt: r.created_at
+      createdAt: r.created_at ?? undefined
     }));
 
     return {
@@ -252,9 +256,9 @@ export let manageAffiliateGroup = SlateTool.create(spec, {
 
     if (ctx.input.action === 'assign') {
       if (!ctx.input.groupId) {
-        throw new Error('groupId is required when action is "assign"');
+        throw createApiServiceError('groupId is required when action is "assign"');
       }
-      let _result = await client.setAffiliateGroup(ctx.input.affiliateId, ctx.input.groupId);
+      await client.setAffiliateGroup(ctx.input.affiliateId, ctx.input.groupId);
       return {
         output: { affiliateId: ctx.input.affiliateId, groupId: ctx.input.groupId },
         message: `Assigned affiliate \`${ctx.input.affiliateId}\` to group \`${ctx.input.groupId}\`.`
@@ -272,7 +276,7 @@ export let manageAffiliateGroup = SlateTool.create(spec, {
 export let manageAffiliatePayoutMethod = SlateTool.create(spec, {
   name: 'Manage Affiliate Payout Method',
   key: 'manage_affiliate_payout_method',
-  description: `Get or set the payout method for an affiliate. Supports retrieving the current payout method or setting a new one (e.g., PayPal).`,
+  description: `Get or set a payout method for an affiliate. Call list_affiliate_payout_methods to discover existing method IDs. Without an ID, get returns the primary method or the sole configured method.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -282,13 +286,25 @@ export let manageAffiliatePayoutMethod = SlateTool.create(spec, {
     z.object({
       affiliateId: z.string().describe('ID of the affiliate'),
       action: z.enum(['get', 'set']).describe('Whether to get or set the payout method'),
+      payoutMethodId: z
+        .string()
+        .optional()
+        .describe(
+          'Payout method ID, such as paypal. Call list_affiliate_payout_methods to discover configured IDs.'
+        ),
       payoutMethod: z
         .object({
           type: z.string().optional().describe('Payout method type (e.g., "paypal")'),
           paypalEmail: z
             .string()
             .optional()
-            .describe('PayPal email address (when type is "paypal")')
+            .describe('PayPal email address (when type is "paypal")'),
+          details: z
+            .record(z.string(), z.string())
+            .optional()
+            .describe(
+              'Provider-specific payout fields; use the field IDs from your payout CSV export'
+            )
         })
         .optional()
         .describe('Payout method details (required when action is "set")')
@@ -303,24 +319,94 @@ export let manageAffiliatePayoutMethod = SlateTool.create(spec, {
     let client = new TapfiliateClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'get') {
-      let result = await client.getAffiliatePayoutMethod(ctx.input.affiliateId);
+      let result: Record<string, unknown> | null;
+      let payoutMethodId = ctx.input.payoutMethodId ?? ctx.input.payoutMethod?.type;
+      if (payoutMethodId) {
+        result = await client.getAffiliatePayoutMethod(ctx.input.affiliateId, payoutMethodId);
+      } else {
+        let methods = await client.listAffiliatePayoutMethods(ctx.input.affiliateId);
+        result =
+          methods.find((method: any) => method.primary) ??
+          (methods.length === 1 ? methods[0] : null);
+        if (!result && methods.length > 1) {
+          throw createApiServiceError(
+            'Multiple payout methods are configured without a primary method. Call list_affiliate_payout_methods and provide payoutMethodId.'
+          );
+        }
+      }
       return {
         output: { payoutMethod: result },
         message: `Retrieved payout method for affiliate \`${ctx.input.affiliateId}\`.`
       };
     } else {
       if (!ctx.input.payoutMethod) {
-        throw new Error('payoutMethod is required when action is "set"');
+        throw createApiServiceError('payoutMethod is required when action is "set"');
       }
-      let body: Record<string, any> = {};
-      if (ctx.input.payoutMethod.type) body.type = ctx.input.payoutMethod.type;
-      if (ctx.input.payoutMethod.paypalEmail)
-        body.paypal_email = ctx.input.payoutMethod.paypalEmail;
-      let result = await client.setAffiliatePayoutMethod(ctx.input.affiliateId, body);
+      let payoutMethodId =
+        ctx.input.payoutMethodId ??
+        ctx.input.payoutMethod.type ??
+        (ctx.input.payoutMethod.paypalEmail ? 'paypal' : undefined);
+      if (!payoutMethodId)
+        throw createApiServiceError(
+          'Provide payoutMethodId or payoutMethod.type when setting a payout method.'
+        );
+      if (
+        ctx.input.payoutMethodId &&
+        ctx.input.payoutMethod.type &&
+        ctx.input.payoutMethodId !== ctx.input.payoutMethod.type
+      ) {
+        throw createApiServiceError(
+          'payoutMethodId and payoutMethod.type must identify the same payout method.'
+        );
+      }
+      let body = { ...ctx.input.payoutMethod.details };
+      if (ctx.input.payoutMethod.paypalEmail !== undefined) {
+        if (payoutMethodId !== 'paypal')
+          throw createApiServiceError(
+            'paypalEmail can only be used with the paypal payout method.'
+          );
+        if (
+          body.paypal_address !== undefined &&
+          body.paypal_address !== ctx.input.payoutMethod.paypalEmail
+        ) {
+          throw createApiServiceError(
+            'paypalEmail and details.paypal_address must contain the same address.'
+          );
+        }
+        body.paypal_address = ctx.input.payoutMethod.paypalEmail;
+      }
+      if (Object.keys(body).length === 0)
+        throw createApiServiceError(
+          'Provide payout method details or paypalEmail when setting a payout method.'
+        );
+      let result = await client.setAffiliatePayoutMethod(
+        ctx.input.affiliateId,
+        payoutMethodId,
+        body
+      );
       return {
         output: { payoutMethod: result },
         message: `Updated payout method for affiliate \`${ctx.input.affiliateId}\`.`
       };
     }
+  })
+  .build();
+
+export let listAffiliatePayoutMethods = SlateTool.create(spec, {
+  name: 'List Affiliate Payout Methods',
+  key: 'list_affiliate_payout_methods',
+  description:
+    "List an affiliate's configured payout methods with their IDs, details, and primary status. Use an ID with manage_affiliate_payout_method.",
+  tags: { destructive: false, readOnly: true }
+})
+  .input(z.object({ affiliateId: z.string().describe('Affiliate ID from list_affiliates') }))
+  .output(z.object({ payoutMethods: z.array(z.any()).describe('Configured payout methods') }))
+  .handleInvocation(async ctx => {
+    let client = new TapfiliateClient({ token: ctx.auth.token });
+    let payoutMethods = await client.listAffiliatePayoutMethods(ctx.input.affiliateId);
+    return {
+      output: { payoutMethods },
+      message: `Found **${payoutMethods.length}** payout method(s).`
+    };
   })
   .build();

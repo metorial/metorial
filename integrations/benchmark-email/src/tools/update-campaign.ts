@@ -33,21 +33,21 @@ export let updateCampaign = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let data: Record<string, any> = {};
-    if (ctx.input.name) data.Name = ctx.input.name;
-    if (ctx.input.subject) data.Subject = ctx.input.subject;
-    if (ctx.input.fromName) data.FromName = ctx.input.fromName;
-    if (ctx.input.fromEmail) data.FromEmail = ctx.input.fromEmail;
-    if (ctx.input.replyEmail) data.ReplyEmail = ctx.input.replyEmail;
-    if (ctx.input.htmlContent) data.TemplateContent = ctx.input.htmlContent;
-    if (ctx.input.textContent) data.TemplateText = ctx.input.textContent;
-    if (ctx.input.previewText) data.InboxPreviewText = ctx.input.previewText;
+    let data: Record<string, unknown> = {};
+    if (ctx.input.name !== undefined) data.Name = ctx.input.name;
+    if (ctx.input.subject !== undefined) data.Subject = ctx.input.subject;
+    if (ctx.input.fromName !== undefined) data.FromName = ctx.input.fromName;
+    if (ctx.input.fromEmail !== undefined) data.FromEmail = ctx.input.fromEmail;
+    if (ctx.input.replyEmail !== undefined) data.ReplyEmail = ctx.input.replyEmail;
+    if (ctx.input.htmlContent !== undefined) data.TemplateContent = ctx.input.htmlContent;
+    if (ctx.input.textContent !== undefined) data.TemplateText = ctx.input.textContent;
+    if (ctx.input.previewText !== undefined) data.InboxPreviewText = ctx.input.previewText;
     if (ctx.input.contactListIds) {
       data.ContactLists = ctx.input.contactListIds.map(id => ({ ID: id }));
     }
 
     let result = await client.updateCampaign(ctx.input.campaignId, data);
-    let success = result?.Status === 1;
+    let success = String(result?.Status) === '1';
 
     return {
       output: { success },

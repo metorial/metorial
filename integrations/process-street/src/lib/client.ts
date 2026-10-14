@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAuthenticatedAxios, isApiErrorRecord } from 'slates';
 
 let BASE_URL = 'https://public-api.process.st/api/v1.1';
 
@@ -6,24 +6,50 @@ export class Client {
   private axios;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
-      headers: {
-        'X-API-KEY': config.token,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { name: 'X-API-KEY', value: config.token },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Process Street',
+          reason: 'process_street_api_error',
+          extractUpstreamCode: (_error, response) =>
+            isApiErrorRecord(response?.data) && typeof response.data.errorCode === 'string'
+              ? response.data.errorCode
+              : undefined
+        })
     });
+  }
+
+  async testAuth(): Promise<{ apiKeyLabel: string }> {
+    let response = await this.axios.get('/testAuth');
+    return response.data;
+  }
+
+  async listWorkflowRunsPage(params: {
+    workflowId?: string;
+    status?: string;
+    cursor?: string;
+  }) {
+    let response = await this.axios.get('/workflow-runs/list', {
+      params: { workflowId: params.workflowId, status: params.status, _: params.cursor }
+    });
+    return response.data;
   }
 
   // ---- Workflows ----
 
-  async listWorkflows(params?: { name?: string }) {
-    let response = await this.axios.get('/workflows', { params });
+  async listWorkflows(params?: { name?: string; cursor?: string }) {
+    let response = await this.axios.get('/workflows', {
+      params: { name: params?.name, _: params?.cursor }
+    });
     return response.data;
   }
 
-  async listWorkflowTasks(workflowId: string) {
-    let response = await this.axios.get(`/workflows/${workflowId}/tasks`);
+  async listWorkflowTasks(workflowId: string, cursor?: string) {
+    let response = await this.axios.get(`/workflows/${workflowId}/tasks`, {
+      params: { _: cursor }
+    });
     return response.data;
   }
 
@@ -76,8 +102,10 @@ export class Client {
 
   // ---- Workflow Run Assignees ----
 
-  async listWorkflowRunAssignees(workflowRunId: string) {
-    let response = await this.axios.get(`/workflow-runs/${workflowRunId}/assignees`);
+  async listWorkflowRunAssignees(workflowRunId: string, cursor?: string) {
+    let response = await this.axios.get(`/workflow-runs/${workflowRunId}/assignees`, {
+      params: { _: cursor }
+    });
     return response.data;
   }
 
@@ -95,15 +123,17 @@ export class Client {
 
   // ---- Tasks ----
 
-  async listTasksByAssignee(assigneeEmail: string, workflowId?: string) {
-    let params: Record<string, string> = { assigneeEmail };
+  async listTasksByAssignee(assigneeEmail: string, workflowId?: string, cursor?: string) {
+    let params: Record<string, string | undefined> = { assigneeEmail, _: cursor };
     if (workflowId) params.workflowId = workflowId;
     let response = await this.axios.get('/tasks', { params });
     return response.data;
   }
 
-  async listWorkflowRunTasks(workflowRunId: string) {
-    let response = await this.axios.get(`/workflow-runs/${workflowRunId}/tasks`);
+  async listWorkflowRunTasks(workflowRunId: string, cursor?: string) {
+    let response = await this.axios.get(`/workflow-runs/${workflowRunId}/tasks`, {
+      params: { _: cursor }
+    });
     return response.data;
   }
 
@@ -146,8 +176,10 @@ export class Client {
 
   // ---- Approvals ----
 
-  async listApprovals(workflowRunId: string) {
-    let response = await this.axios.get(`/workflow-runs/${workflowRunId}/approvals`);
+  async listApprovals(workflowRunId: string, cursor?: string) {
+    let response = await this.axios.get(`/workflow-runs/${workflowRunId}/approvals`, {
+      params: { _: cursor }
+    });
     return response.data;
   }
 
@@ -165,26 +197,32 @@ export class Client {
 
   // ---- Form Fields ----
 
-  async listWorkflowFormFields(workflowId: string) {
-    let response = await this.axios.get(`/workflows/${workflowId}/form-fields`);
+  async listWorkflowFormFields(workflowId: string, cursor?: string) {
+    let response = await this.axios.get(`/workflows/${workflowId}/form-fields`, {
+      params: { _: cursor }
+    });
     return response.data;
   }
 
-  async listFormFieldOptions(workflowId: string, formFieldId: string) {
+  async listFormFieldOptions(workflowId: string, formFieldId: string, cursor?: string) {
     let response = await this.axios.get(
-      `/workflows/${workflowId}/form-fields/${formFieldId}/options`
+      `/workflows/${workflowId}/form-fields/${formFieldId}/options`,
+      { params: { _: cursor } }
     );
     return response.data;
   }
 
-  async listFormFieldValues(workflowRunId: string) {
-    let response = await this.axios.get(`/workflow-runs/${workflowRunId}/form-fields`);
+  async listFormFieldValues(workflowRunId: string, cursor?: string) {
+    let response = await this.axios.get(`/workflow-runs/${workflowRunId}/form-fields`, {
+      params: { _: cursor }
+    });
     return response.data;
   }
 
-  async listTaskFormFieldValues(workflowRunId: string, taskId: string) {
+  async listTaskFormFieldValues(workflowRunId: string, taskId: string, cursor?: string) {
     let response = await this.axios.get(
-      `/workflow-runs/${workflowRunId}/tasks/${taskId}/form-fields`
+      `/workflow-runs/${workflowRunId}/tasks/${taskId}/form-fields`,
+      { params: { _: cursor } }
     );
     return response.data;
   }
@@ -207,13 +245,23 @@ export class Client {
 
   // ---- Data Sets ----
 
-  async listDataSets() {
-    let response = await this.axios.get('/data-sets');
+  async listDataSets(cursor?: string) {
+    let response = await this.axios.get('/data-sets', { params: { _: cursor } });
     return response.data;
   }
 
-  async listDataSetRecords(dataSetId: string, params?: { columns?: string }) {
-    let response = await this.axios.get(`/data-sets/${dataSetId}/records`, { params });
+  async listDataSetRecords(
+    dataSetId: string,
+    params?: { columns?: Record<string, string>; cursor?: string }
+  ) {
+    let response = await this.axios.get(`/data-sets/${dataSetId}/records`, {
+      params: {
+        _: params?.cursor,
+        ...Object.fromEntries(
+          Object.entries(params?.columns ?? {}).map(([id, value]) => [`columns[${id}]`, value])
+        )
+      }
+    });
     return response.data;
   }
 
@@ -248,8 +296,8 @@ export class Client {
 
   // ---- Users ----
 
-  async listUsers() {
-    let response = await this.axios.get('/users');
+  async listUsers(cursor?: string) {
+    let response = await this.axios.get('/users', { params: { _: cursor } });
     return response.data;
   }
 

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getCreditBalance = SlateTool.create(spec, {
   name: 'Get Credit Balance',
   key: 'get_credit_balance',
-  description: `Check the remaining credit balance in your FullEnrich workspace. Useful for monitoring usage before starting enrichment batches.`,
+  description: `Check the credits currently spendable with your API key, capped by any key consumption limit. Useful for monitoring usage before starting enrichment batches.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -15,7 +15,7 @@ export let getCreditBalance = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      balance: z.number().describe('Number of credits available in the workspace')
+      balance: z.number().describe('Number of credits currently spendable with this API key')
     })
   )
   .handleInvocation(async ctx => {

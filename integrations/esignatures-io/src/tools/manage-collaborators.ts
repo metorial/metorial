@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -36,6 +36,10 @@ export let manageCollaborators = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Name of the collaborator to add (required for "add")'),
+      collaboratorEmail: z
+        .string()
+        .optional()
+        .describe('Email address of the collaborator to invite for add'),
       collaboratorId: z
         .string()
         .optional()
@@ -53,20 +57,27 @@ export let manageCollaborators = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let { templateId, action, collaboratorName, collaboratorId } = ctx.input;
+    let { templateId, action, collaboratorName, collaboratorEmail, collaboratorId } =
+      ctx.input;
 
     let message: string;
-    let output: any;
+    let output: { status?: string; collaborators?: z.infer<typeof collaboratorSchema>[] };
 
     switch (action) {
       case 'add': {
         if (!collaboratorName) {
-          throw new Error('collaboratorName is required when adding a collaborator');
+          throw createApiServiceError(
+            'collaboratorName is required when adding a collaborator'
+          );
         }
         ctx.progress('Adding collaborator...');
-        let result = await client.addCollaborator(templateId, collaboratorName);
-        let collabs = result?.data || [result];
-        let mapped = (Array.isArray(collabs) ? collabs : [collabs]).map((c: any) => ({
+        let result = await client.addCollaborator(
+          templateId,
+          collaboratorName,
+          collaboratorEmail
+        );
+        let collabs = result.data;
+        let mapped = collabs.map(c => ({
           collaboratorId: c.templateCollaboratorId,
           templateId: c.templateId,
           name: c.name,
@@ -80,8 +91,8 @@ export let manageCollaborators = SlateTool.create(spec, {
       case 'list': {
         ctx.progress('Listing collaborators...');
         let result = await client.listCollaborators(templateId);
-        let collabs = result?.data || result || [];
-        let mapped = (Array.isArray(collabs) ? collabs : [collabs]).map((c: any) => ({
+        let collabs = result.data;
+        let mapped = collabs.map(c => ({
           collaboratorId: c.templateCollaboratorId,
           templateId: c.templateId,
           name: c.name,
@@ -94,11 +105,13 @@ export let manageCollaborators = SlateTool.create(spec, {
       }
       case 'remove': {
         if (!collaboratorId) {
-          throw new Error('collaboratorId is required when removing a collaborator');
+          throw createApiServiceError(
+            'collaboratorId is required when removing a collaborator'
+          );
         }
         ctx.progress('Removing collaborator...');
         let result = await client.removeCollaborator(templateId, collaboratorId);
-        output = { status: result?.status || 'queued' };
+        output = { status: result.status };
         message = `Collaborator **${collaboratorId}** removed from template **${templateId}**.`;
         break;
       }

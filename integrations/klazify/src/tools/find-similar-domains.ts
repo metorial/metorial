@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KlazifyClient } from '../lib/client';
+import { refreshSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let findSimilarDomains = SlateTool.create(spec, {
@@ -14,21 +15,25 @@ export let findSimilarDomains = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      url: z.string().describe('The URL or domain to find competitors and similar domains for')
+      url: z
+        .string()
+        .describe('The URL or domain to find competitors and similar domains for'),
+      refresh: refreshSchema
     })
   )
   .output(
     z.object({
       similarDomains: z
         .array(z.string())
-        .describe('List of competitor and similar domain names')
+        .describe('List of competitor and similar domains or URLs as returned by the provider')
     })
   )
   .handleInvocation(async ctx => {
     let client = new KlazifyClient({ token: ctx.auth.token });
-    let result = await client.similarDomains(ctx.input.url);
+    let result = await client.similarDomains(ctx.input.url, ctx.input.refresh);
 
-    let domains = result.similar_domains ?? result.similar ?? [];
+    let domains =
+      result.similar_domains ?? result.similar ?? result.domain?.similar_domains ?? [];
 
     let output = {
       similarDomains: Array.isArray(domains) ? domains : []

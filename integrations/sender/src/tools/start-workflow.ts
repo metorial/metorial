@@ -14,7 +14,11 @@ export let startWorkflow = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workflowId: z.string().describe('ID of the workflow to start'),
+      workflowId: z
+        .string()
+        .describe(
+          'ID of the workflow to start. Call list_workflows to discover workflow IDs and statuses.'
+        ),
       email: z.string().describe('Email address of the subscriber to enroll in the workflow')
     })
   )

@@ -105,6 +105,34 @@ export let getCall = SlateTool.create(spec, {
       speakers: z.array(speakerSchema).optional().describe('Call speakers with metrics'),
       chapters: z.array(chapterSchema).optional().describe('Auto-generated call chapters'),
       callTopics: z.array(topicSchema).optional().describe('Identified call topics'),
+      callAiTopics: z
+        .array(
+          z.object({
+            topicOccurrenceUuid: z
+              .string()
+              .optional()
+              .describe('UUID of the detected topic occurrence'),
+            sentence: z
+              .string()
+              .optional()
+              .describe('Sentence associated with the detected topics'),
+            startTime: z.number().optional().describe('Start time in seconds'),
+            endTime: z.number().optional().describe('End time in seconds'),
+            aiTopics: z
+              .array(
+                z.object({
+                  topicUuid: z.string().optional(),
+                  name: z.string().optional(),
+                  color: z.string().optional()
+                })
+              )
+              .optional()
+          })
+        )
+        .optional()
+        .describe(
+          'AI-detected topic occurrences; legacy callTopics is retained for compatibility'
+        ),
       prompts: z
         .array(promptCompletionSchema)
         .optional()
@@ -114,6 +142,50 @@ export let getCall = SlateTool.create(spec, {
         .nullable()
         .optional()
         .describe('Simple text transcript with paragraph timestamps'),
+      transcript: z
+        .array(
+          z.object({
+            speakerIndex: z.number().optional().describe('Index of the speaker in speakers'),
+            startTime: z.number().optional().describe('Paragraph start time in seconds'),
+            endTime: z.number().optional().describe('Paragraph end time in seconds'),
+            items: z
+              .array(
+                z.object({
+                  content: z.string().optional().describe('Transcribed word'),
+                  startTime: z.number().optional().describe('Word start time in seconds'),
+                  endTime: z.number().optional().describe('Word end time in seconds')
+                })
+              )
+              .optional()
+          })
+        )
+        .optional()
+        .describe('Full transcript with word-level timestamps'),
+      summary: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('AI-generated summary when available'),
+      customers: z
+        .array(
+          z.object({
+            customerUuid: z.string().optional(),
+            name: z.string().nullable().optional(),
+            email: z.string().nullable().optional(),
+            phoneNumber: z.string().nullable().optional()
+          })
+        )
+        .optional()
+        .describe('External participants'),
+      conversationType: z
+        .object({
+          conversationTypeUuid: z.string().optional(),
+          slug: z.string().optional(),
+          active: z.boolean().optional()
+        })
+        .nullable()
+        .optional()
+        .describe('Conversation type; its UUID can be used to filter list_calls'),
       recordingUrl: z.string().nullable().optional().describe('URL to the call recording'),
       transcriptUrl: z.string().nullable().optional().describe('URL to the transcript'),
       leexiUrl: z.string().nullable().optional().describe('URL to the call in Leexi'),
@@ -179,6 +251,17 @@ export let getCall = SlateTool.create(spec, {
         startTime: t.start_time,
         endTime: t.end_time
       })),
+      callAiTopics: c.call_ai_topics?.map((topic: any) => ({
+        topicOccurrenceUuid: topic.uuid,
+        sentence: topic.sentence,
+        startTime: topic.start_time,
+        endTime: topic.end_time,
+        aiTopics: topic.ai_topics?.map((aiTopic: any) => ({
+          topicUuid: aiTopic.uuid,
+          name: aiTopic.name,
+          color: aiTopic.color
+        }))
+      })),
       prompts: (c.prompts || []).map((p: any) => ({
         promptUuid: p.uuid,
         category: p.category,
@@ -186,6 +269,30 @@ export let getCall = SlateTool.create(spec, {
         completions: p.completions
       })),
       simpleTranscript: c.simple_transcript,
+      transcript: c.transcript?.map((paragraph: any) => ({
+        speakerIndex: paragraph.speaker_index,
+        startTime: paragraph.start_time,
+        endTime: paragraph.end_time,
+        items: paragraph.items?.map((word: any) => ({
+          content: word.content,
+          startTime: word.start_time,
+          endTime: word.end_time
+        }))
+      })),
+      summary: c.summary,
+      customers: c.customers?.map((customer: any) => ({
+        customerUuid: customer.uuid,
+        name: customer.name,
+        email: customer.email,
+        phoneNumber: customer.phone_number
+      })),
+      conversationType: c.conversation_type
+        ? {
+            conversationTypeUuid: c.conversation_type.uuid,
+            slug: c.conversation_type.slug,
+            active: c.conversation_type.active
+          }
+        : c.conversation_type,
       recordingUrl: c.recording_url,
       transcriptUrl: c.transcript_url,
       leexiUrl: c.leexi_url,

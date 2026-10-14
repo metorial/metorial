@@ -30,7 +30,14 @@ Uses the DIF Presentation Exchange (PEX) syntax for querying and filtering crede
         .describe(
           'DIF Presentation Exchange request object with input_descriptors defining required credential fields'
         ),
-      nonce: z.string().optional().describe('Nonce/challenge string to prevent replay attacks')
+      nonce: z
+        .string()
+        .optional()
+        .describe('Nonce/challenge string to prevent replay attacks'),
+      verifierDid: z
+        .string()
+        .optional()
+        .describe('DID of the verifier associated with the proof request')
     })
   )
   .output(
@@ -47,9 +54,16 @@ Uses the DIF Presentation Exchange (PEX) syntax for querying and filtering crede
     });
 
     let result = await client.createProofRequest({
-      name: ctx.input.name,
-      purpose: ctx.input.purpose,
-      request: ctx.input.request,
+      name:
+        ctx.input.name ??
+        (typeof ctx.input.request.name === 'string'
+          ? ctx.input.request.name
+          : 'Credential verification'),
+      did: ctx.input.verifierDid,
+      request: {
+        ...ctx.input.request,
+        ...(ctx.input.purpose !== undefined ? { purpose: ctx.input.purpose } : {})
+      },
       nonce: ctx.input.nonce
     });
 

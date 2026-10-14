@@ -1,9 +1,23 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
+
+export let dataCenterSchema = z.enum([
+  'us-west-1',
+  'us-east-4',
+  'eu-central-1',
+  'asia-south-2'
+]);
 
 let DATA_CENTER_URLS: Record<string, string> = {
   'us-west-1': 'https://api.us-west-1.saucelabs.com',
   'us-east-4': 'https://api.us-east-4.saucelabs.com',
-  'eu-central-1': 'https://api.eu-central-1.saucelabs.com'
+  'eu-central-1': 'https://api.eu-central-1.saucelabs.com',
+  'asia-south-2': 'https://api.asia-south-2.saucelabs.com'
 };
 
 export class SauceLabsClient {
@@ -12,17 +26,22 @@ export class SauceLabsClient {
 
   constructor(opts: { username: string; token: string; dataCenter: string }) {
     this.username = opts.username;
-    let baseURL = DATA_CENTER_URLS[opts.dataCenter] ?? DATA_CENTER_URLS['us-west-1'];
+    let baseURL = DATA_CENTER_URLS[opts.dataCenter];
+    if (!baseURL) {
+      throw createApiServiceError('Select a supported Sauce Labs data center.');
+    }
 
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL,
       auth: {
         username: opts.username,
         password: opts.token
       },
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Sauce Labs',
+          reason: 'sauce_labs_api_error'
+        })
     });
   }
 
@@ -37,7 +56,7 @@ export class SauceLabsClient {
 
   async getJob(jobId: string) {
     let response = await this.http.get(
-      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${jobId}`
+      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${encodeURIComponent(jobId)}`
     );
     return response.data;
   }
@@ -53,16 +72,17 @@ export class SauceLabsClient {
       customData?: Record<string, any>;
     }
   ) {
-    let body: Record<string, any> = {};
-    if (data.name !== undefined) body.name = data.name;
-    if (data.tags !== undefined) body.tags = data.tags;
-    if (data.passed !== undefined) body.passed = data.passed;
-    if (data.build !== undefined) body.build = data.build;
-    if (data.public !== undefined) body.public = data.public;
-    if (data.customData !== undefined) body['custom-data'] = data.customData;
+    let body = pickDefined({
+      name: data.name,
+      tags: data.tags,
+      passed: data.passed,
+      build: data.build,
+      public: data.public,
+      'custom-data': data.customData
+    });
 
     let response = await this.http.put(
-      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${jobId}`,
+      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${encodeURIComponent(jobId)}`,
       body
     );
     return response.data;
@@ -70,18 +90,20 @@ export class SauceLabsClient {
 
   async stopJob(jobId: string) {
     let response = await this.http.put(
-      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${jobId}/stop`
+      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${encodeURIComponent(jobId)}/stop`
     );
     return response.data;
   }
 
   async deleteJob(jobId: string) {
-    await this.http.delete(`/rest/v1/${encodeURIComponent(this.username)}/jobs/${jobId}`);
+    await this.http.delete(
+      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${encodeURIComponent(jobId)}`
+    );
   }
 
   async listJobAssets(jobId: string) {
     let response = await this.http.get(
-      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${jobId}/assets`
+      `/rest/v1/${encodeURIComponent(this.username)}/jobs/${encodeURIComponent(jobId)}/assets`
     );
     return response.data;
   }
@@ -94,7 +116,7 @@ export class SauceLabsClient {
   }
 
   async getRdcJob(jobId: string) {
-    let response = await this.http.get(`/v1/rdc/jobs/${jobId}`);
+    let response = await this.http.get(`/v1/rdc/jobs/${encodeURIComponent(jobId)}`);
     return response.data;
   }
 
@@ -107,17 +129,17 @@ export class SauceLabsClient {
       tags?: string[];
     }
   ) {
-    let response = await this.http.put(`/v1/rdc/jobs/${jobId}`, data);
+    let response = await this.http.put(`/v1/rdc/jobs/${encodeURIComponent(jobId)}`, data);
     return response.data;
   }
 
   async stopRdcJob(jobId: string) {
-    let response = await this.http.put(`/v1/rdc/jobs/${jobId}/stop`);
+    let response = await this.http.put(`/v1/rdc/jobs/${encodeURIComponent(jobId)}/stop`);
     return response.data;
   }
 
   async deleteRdcJob(jobId: string) {
-    await this.http.delete(`/v1/rdc/jobs/${jobId}`);
+    await this.http.delete(`/v1/rdc/jobs/${encodeURIComponent(jobId)}`);
   }
 
   // ============ Builds ============
@@ -126,8 +148,8 @@ export class SauceLabsClient {
     source: 'vdc' | 'rdc',
     params?: {
       status?: string[];
-      start?: string;
-      end?: string;
+      start?: number;
+      end?: number;
       limit?: number;
       offset?: number;
       name?: string;
@@ -139,7 +161,7 @@ export class SauceLabsClient {
   }
 
   async getBuild(source: 'vdc' | 'rdc', buildId: string) {
-    let response = await this.http.get(`/v2/builds/${source}/${buildId}/`);
+    let response = await this.http.get(`/v2/builds/${source}/${encodeURIComponent(buildId)}/`);
     return response.data;
   }
 
@@ -152,7 +174,10 @@ export class SauceLabsClient {
       modified_since?: string;
     }
   ) {
-    let response = await this.http.get(`/v2/builds/${source}/${buildId}/jobs/`, { params });
+    let response = await this.http.get(
+      `/v2/builds/${source}/${encodeURIComponent(buildId)}/jobs/`,
+      { params }
+    );
     return response.data;
   }
 
@@ -164,16 +189,12 @@ export class SauceLabsClient {
   }
 
   async getDevice(deviceId: string) {
-    let response = await this.http.get(`/v1/rdc/devices/${deviceId}`);
+    let response = await this.http.get(`/v1/rdc/devices/${encodeURIComponent(deviceId)}`);
     return response.data;
   }
 
-  async listDeviceStatus(params?: {
-    state?: string;
-    privateOnly?: boolean;
-    deviceName?: string;
-  }) {
-    let response = await this.http.get('/v1/rdc/devices/status', { params });
+  async listDeviceStatus() {
+    let response = await this.http.get('/v1/rdc/devices/status');
     return response.data;
   }
 
@@ -187,23 +208,23 @@ export class SauceLabsClient {
     return response.data;
   }
 
-  async getTunnel(tunnelId: string) {
+  async getTunnel(tunnelId: string, username = this.username) {
     let response = await this.http.get(
-      `/rest/v1/${encodeURIComponent(this.username)}/tunnels/${tunnelId}`
+      `/rest/v1/${encodeURIComponent(username)}/tunnels/${encodeURIComponent(tunnelId)}`
     );
     return response.data;
   }
 
-  async getTunnelJobCount(tunnelId: string) {
+  async getTunnelJobCount(tunnelId: string, username = this.username) {
     let response = await this.http.get(
-      `/rest/v1/${encodeURIComponent(this.username)}/tunnels/${tunnelId}/num_jobs`
+      `/rest/v1/${encodeURIComponent(username)}/tunnels/${encodeURIComponent(tunnelId)}/num_jobs`
     );
     return response.data;
   }
 
   async stopTunnel(tunnelId: string) {
     let response = await this.http.delete(
-      `/rest/v1/${encodeURIComponent(this.username)}/tunnels/${tunnelId}`
+      `/rest/v1/${encodeURIComponent(this.username)}/tunnels/${encodeURIComponent(tunnelId)}`
     );
     return response.data;
   }
@@ -234,8 +255,32 @@ export class SauceLabsClient {
     return response.data;
   }
 
+  async getCurrentUser(allowUsernameFallback = false) {
+    let offset = 0;
+    while (true) {
+      let result = await this.listUsers({ username: this.username, limit: 100, offset });
+      let users = result.results ?? result.users ?? [];
+      let user = users.find(
+        (candidate: { username?: string }) => candidate.username === this.username
+      );
+      if (user) return this.getUser(user.id);
+      if (
+        users.length < 100 ||
+        (typeof result.count === 'number' && offset + users.length >= result.count)
+      ) {
+        if (allowUsernameFallback) return { id: this.username, username: this.username };
+        throw createApiServiceError(
+          'A user profile was not found for the authenticated account. Service accounts may not have an organization user profile.'
+        );
+      }
+      offset += users.length;
+    }
+  }
+
   async getUser(userId: string) {
-    let response = await this.http.get(`/team-management/v1/users/${userId}/`);
+    let response = await this.http.get(
+      `/team-management/v1/users/${encodeURIComponent(userId)}/`
+    );
     return response.data;
   }
 
@@ -253,17 +298,24 @@ export class SauceLabsClient {
   }
 
   async updateUser(userId: string, data: Record<string, any>) {
-    let response = await this.http.patch(`/team-management/v1/users/${userId}`, data);
+    let response = await this.http.patch(
+      `/team-management/v1/users/${encodeURIComponent(userId)}`,
+      data
+    );
     return response.data;
   }
 
   async deactivateUser(userId: string) {
-    let response = await this.http.post(`/team-management/v1/users/${userId}/deactivate/`);
+    let response = await this.http.post(
+      `/team-management/v1/users/${encodeURIComponent(userId)}/deactivate/`
+    );
     return response.data;
   }
 
   async activateUser(userId: string) {
-    let response = await this.http.post(`/team-management/v1/users/${userId}/activate/`);
+    let response = await this.http.post(
+      `/team-management/v1/users/${encodeURIComponent(userId)}/activate/`
+    );
     return response.data;
   }
 
@@ -282,12 +334,16 @@ export class SauceLabsClient {
   }
 
   async getTeam(teamId: string) {
-    let response = await this.http.get(`/team-management/v1/teams/${teamId}/`);
+    let response = await this.http.get(
+      `/team-management/v1/teams/${encodeURIComponent(teamId)}/`
+    );
     return response.data;
   }
 
   async listTeamMembers(teamId: string) {
-    let response = await this.http.get(`/team-management/v1/teams/${teamId}/members/`);
+    let response = await this.http.get(
+      `/team-management/v1/teams/${encodeURIComponent(teamId)}/members/`
+    );
     return response.data;
   }
 
@@ -311,7 +367,7 @@ export class SauceLabsClient {
   }
 
   async deleteStorageFile(fileId: string) {
-    await this.http.delete(`/v1/storage/files/${fileId}`);
+    await this.http.delete(`/v1/storage/files/${encodeURIComponent(fileId)}`);
   }
 
   // ============ Performance ============
@@ -327,7 +383,9 @@ export class SauceLabsClient {
   }
 
   async getPerformanceJobMetrics(jobId: string) {
-    let response = await this.http.get(`/v2/performance/metrics/${jobId}/`);
+    let response = await this.http.get(
+      `/v2/performance/metrics/${encodeURIComponent(jobId)}/`
+    );
     return response.data;
   }
 

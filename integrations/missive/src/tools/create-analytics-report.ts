@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, getApiErrorStatus, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,10 +44,18 @@ Requires a Productive or Business plan; filtering capabilities require Business 
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    let start = Date.parse(ctx.input.start);
+    let end = Date.parse(ctx.input.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      throw createApiServiceError(
+        'Provide valid ISO 8601 start and end dates, with end after start.'
+      );
+    }
+
     let body: Record<string, any> = {
       organization: ctx.input.organizationId,
-      start: ctx.input.start,
-      end: ctx.input.end
+      start: Math.floor(start / 1000),
+      end: Math.floor(end / 1000)
     };
     if (ctx.input.timeZone) body.time_zone = ctx.input.timeZone;
     if (ctx.input.teamIds) body.teams = ctx.input.teamIds;
@@ -57,7 +65,10 @@ Requires a Productive or Business plan; filtering capabilities require Business 
     if (ctx.input.sharedLabelIds) body.shared_labels = ctx.input.sharedLabelIds;
 
     let createData = await client.createAnalyticsReport(body);
-    let reportId = createData.analytics_reports?.id || createData.id;
+    let reportId = createData.reports?.id;
+
+    if (!reportId)
+      throw createApiServiceError('Missive did not return an analytics report ID.');
 
     ctx.info('Report created, polling for completion...');
 
@@ -67,17 +78,23 @@ Requires a Productive or Business plan; filtering capabilities require Business 
       await new Promise(resolve => setTimeout(resolve, 5000));
       try {
         let reportData = await client.getAnalyticsReport(reportId);
-        if (reportData.analytics_reports) {
-          report = reportData.analytics_reports;
-          break;
-        }
-      } catch (e: any) {
-        if (i === maxAttempts - 1) throw e;
+        report = reportData;
+        break;
+      } catch (error) {
+        let upstreamStatus =
+          isApiErrorRecord(error) && isApiErrorRecord(error.data)
+            ? error.data.upstreamStatus
+            : undefined;
+        let status =
+          typeof upstreamStatus === 'number' || typeof upstreamStatus === 'string'
+            ? upstreamStatus
+            : getApiErrorStatus(error);
+        if (String(status) !== '404' || i === maxAttempts - 1) throw error;
       }
     }
 
     if (!report) {
-      throw new Error('Report generation timed out after 60 seconds.');
+      throw createApiServiceError('Report generation timed out after 60 seconds.');
     }
 
     return {

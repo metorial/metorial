@@ -8,7 +8,6 @@ export let stopProjectTracking = SlateTool.create(spec, {
   key: 'stop_project_tracking',
   description: `Stop tracking time for a given project and optionally a specific task in DeskTime. Useful for automating time tracking when finishing work on a project, such as when a ticket is closed or a task is completed.`,
   tags: {
-    destructive: true,
     readOnly: false
   }
 })
@@ -23,6 +22,11 @@ export let stopProjectTracking = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      stopped: z.boolean().describe('Whether DeskTime confirmed that tracking stopped'),
+      requestTime: z
+        .union([z.string(), z.number()])
+        .optional()
+        .describe('DeskTime request timestamp'),
       rawResponse: z.any().describe('API response from DeskTime')
     })
   )
@@ -35,6 +39,12 @@ export let stopProjectTracking = SlateTool.create(spec, {
 
     return {
       output: {
+        stopped: true,
+        requestTime:
+          typeof response.__request_time === 'string' ||
+          typeof response.__request_time === 'number'
+            ? response.__request_time
+            : undefined,
         rawResponse: response
       },
       message: `Stopped tracking time for project **${ctx.input.projectName}**${taskLabel}.`

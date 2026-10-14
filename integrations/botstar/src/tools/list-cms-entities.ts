@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BotstarClient } from '../lib/client';
+import { botIdSchema, botScopeGuidance } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listCmsEntities = SlateTool.create(spec, {
   name: 'List CMS Entities',
   key: 'list_cms_entities',
-  description: `Retrieve all CMS entities for a specific bot. CMS entities are collections of items that share the same attributes (fields). Use entity IDs to manage individual items within each entity.`,
+  description: `Retrieve all CMS entities for a specific bot. CMS entities are collections of items that share the same attributes (fields). Use entity IDs to manage individual items within each entity. ${botScopeGuidance}`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      botId: z.string().describe('ID of the bot'),
+      botId: botIdSchema,
       env: z
         .enum(['draft', 'live'])
         .optional()
@@ -40,7 +41,7 @@ export let listCmsEntities = SlateTool.create(spec, {
     let mapped = (Array.isArray(entities) ? entities : []).map((entity: any) => ({
       entityId: entity.id || entity._id || '',
       name: entity.name || '',
-      fields: entity.fields
+      fields: entity.fields ?? undefined
     }));
 
     return {

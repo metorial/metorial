@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { MailsoftlyClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -27,21 +28,14 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://app.mailsoftly.com/api/v3',
-        headers: {
-          Authorization: ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let response = await client.post('/authentication');
+      let client = new MailsoftlyClient({ token: ctx.output.token });
+      let account = await client.authenticate();
 
       return {
         profile: {
-          id: String(response.data.firm_id ?? response.data.id ?? ''),
-          name: response.data.firm_name ?? response.data.name ?? '',
-          adminName: response.data.admin_name ?? ''
+          id: String(account.firmId),
+          name: account.firmName ?? '',
+          adminName: account.adminName ?? ''
         }
       };
     }

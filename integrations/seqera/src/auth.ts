@@ -1,10 +1,12 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { SeqeraClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string()
+      token: z.string(),
+      baseUrl: z.string().optional()
     })
   )
   .addTokenAuth({
@@ -13,6 +15,13 @@ export let auth = SlateAuth.create()
     key: 'access_token',
 
     inputSchema: z.object({
+      baseUrl: z
+        .string()
+        .url()
+        .default('https://api.cloud.seqera.io')
+        .describe(
+          'Seqera Platform API URL. Use the default for Cloud or the API URL for your Enterprise deployment.'
+        ),
       token: z
         .string()
         .describe(
@@ -23,41 +32,23 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          baseUrl: ctx.input.baseUrl
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let http = createAxios({
-        baseURL: 'https://api.cloud.seqera.io',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/json'
-        }
-      });
-
-      let response = await http.get('/user-info');
-      let data = response.data as {
-        user?: {
-          id?: number;
-          userName?: string;
-          email?: string;
-          firstName?: string;
-          lastName?: string;
-          avatar?: string;
-        };
-      };
-
-      let user = data.user;
+    getProfile: async (ctx: { output: { token: string; baseUrl?: string } }) => {
+      let client = new SeqeraClient({ token: ctx.output.token, baseUrl: ctx.output.baseUrl });
+      let { user } = await client.getUserInfo();
       let name = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.userName;
 
       return {
         profile: {
           id: user?.id != null ? String(user.id) : undefined,
-          email: user?.email,
+          email: user?.email ?? undefined,
           name: name || undefined,
-          imageUrl: user?.avatar
+          imageUrl: user?.avatar ?? undefined
         }
       };
     }

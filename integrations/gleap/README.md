@@ -1,6 +1,12 @@
 # <img src="logo.svg" height="20"> Gleap
 
-Manage customer feedback, bug reports, and support tickets. Create, update, query, and delete tickets with filtering by status, priority, and assignee. Manage user sessions and contacts with custom data attributes. Add messages, agent replies, and internal notes to tickets with file attachments. Create and manage help center collections and articles. Run engagement campaigns including banners, emails, surveys, product tours, tooltips, checklists, modals, push notifications, and WhatsApp messages. Manage AI-powered support content for automated responses. Access project analytics and statistics. Configure message templates, team members, and project settings.
+Manage Gleap tickets, contacts, teammate replies, internal notes, help center collections and articles, engagement campaigns, teams, and AI support content. Discover project teammates before assigning tickets, retrieve the authenticated identity, and read full articles as editor content, HTML, or Markdown.
+
+Connect using the API key and Project ID from Project Settings > Security. Select the project's data region (`eu` by default or `us`). Existing connections without a region continue to use the EU API.
+
+Article searches with `helpCenterDomain` query the published help center and respect its language and audience settings. Password-protected help centers also require `password`.
+
+API reference: [Gleap admin REST API](https://docs.gleap.ai/documentation/server/api-overview).
 
 ## License
 

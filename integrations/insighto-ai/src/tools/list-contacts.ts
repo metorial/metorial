@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getListResult, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let listContacts = SlateTool.create(spec, {
@@ -48,15 +48,15 @@ export let listContacts = SlateTool.create(spec, {
 
     if (ctx.input.contactId) {
       let result = await client.getContact(ctx.input.contactId);
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
           contact: {
             contactId: data.id,
-            firstName: data.first_name,
-            lastName: data.last_name,
-            email: data.email,
-            phone: data.phone
+            firstName: data.first_name ?? undefined,
+            lastName: data.last_name ?? undefined,
+            email: data.email ?? undefined,
+            phone: data.phone ?? undefined
           }
         },
         message: `Retrieved contact **${data.first_name || ''} ${data.last_name || ''}**.`
@@ -64,18 +64,17 @@ export let listContacts = SlateTool.create(spec, {
     }
 
     let result = await client.listContacts({ page: ctx.input.page, size: ctx.input.size });
-    let items = result.data || result.items || result;
-    let list = Array.isArray(items) ? items : [];
+    let { items: list, total } = getListResult(result);
     return {
       output: {
         contacts: list.map((c: any) => ({
           contactId: c.id,
-          firstName: c.first_name,
-          lastName: c.last_name,
-          email: c.email,
-          phone: c.phone
+          firstName: c.first_name ?? undefined,
+          lastName: c.last_name ?? undefined,
+          email: c.email ?? undefined,
+          phone: c.phone ?? undefined
         })),
-        totalCount: result.total || list.length
+        totalCount: total
       },
       message: `Found **${list.length}** contact(s).`
     };

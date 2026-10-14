@@ -1,7 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  continueDomainSearch,
   discoverSubdomains,
+  getAccountUsage,
   getAssociatedDomains,
   getDnsHistory,
   getDomainInfo,
@@ -27,7 +29,9 @@ export let provider = Slate.create({
     searchIps,
     getIpDetails,
     getDomainTags,
-    getSslCertificates
+    getSslCertificates,
+    getAccountUsage,
+    continueDomainSearch
   ],
   triggers: []
 });

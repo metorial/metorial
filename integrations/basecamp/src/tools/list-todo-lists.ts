@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let todoListSchema = z.object({
@@ -16,7 +17,7 @@ let todoListSchema = z.object({
 export let listTodoListsTool = SlateTool.create(spec, {
   name: 'List To-Do Lists',
   key: 'list_todo_lists',
-  description: `List all to-do lists within a project's to-do set. Returns active lists by default.`,
+  description: `Call list_accounts to discover the accountId for this operation. List all to-do lists within a project's to-do set. Returns active lists by default.`,
   instructions: [
     'Use Get Project to find the todoset ID from the project dock (look for the "todoset" dock item).'
   ],
@@ -26,6 +27,7 @@ export let listTodoListsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project (bucket)'),
       todoSetId: z.string().describe('ID of the to-do set (found in project dock)'),
       status: z
@@ -43,7 +45,8 @@ export let listTodoListsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let statusParam = ctx.input.status === 'active' ? undefined : ctx.input.status;

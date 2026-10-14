@@ -26,7 +26,7 @@ export let listUsers = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       region: ctx.config.region
     });
 

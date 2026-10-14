@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ConnecteamClient } from '../lib/client';
 import { spec } from '../spec';
@@ -41,8 +41,8 @@ export let manageForms = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let { action } = ctx.input;
@@ -59,7 +59,7 @@ export let manageForms = SlateTool.create(spec, {
     }
 
     if (action === 'get_form') {
-      if (!ctx.input.formId) throw new Error('formId is required.');
+      if (!ctx.input.formId) throw createApiServiceError('formId is required.');
       let result = await client.getForm(ctx.input.formId);
       return {
         output: { result },
@@ -68,7 +68,7 @@ export let manageForms = SlateTool.create(spec, {
     }
 
     if (action === 'list_submissions') {
-      if (!ctx.input.formId) throw new Error('formId is required.');
+      if (!ctx.input.formId) throw createApiServiceError('formId is required.');
       let result = await client.getFormSubmissions(ctx.input.formId, {
         userIds: ctx.input.userIds,
         submittingStartTimestamp: ctx.input.submittingStartTimestamp,
@@ -83,8 +83,9 @@ export let manageForms = SlateTool.create(spec, {
     }
 
     if (action === 'get_submission') {
-      if (!ctx.input.formId) throw new Error('formId is required.');
-      if (!ctx.input.formSubmissionId) throw new Error('formSubmissionId is required.');
+      if (!ctx.input.formId) throw createApiServiceError('formId is required.');
+      if (!ctx.input.formSubmissionId)
+        throw createApiServiceError('formSubmissionId is required.');
       let result = await client.getFormSubmission(
         ctx.input.formId,
         ctx.input.formSubmissionId
@@ -95,6 +96,6 @@ export let manageForms = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

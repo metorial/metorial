@@ -52,7 +52,7 @@ export let trafficFlow = SlateTool.create(spec, {
         confidence: flow.confidence,
         roadClosure: flow.roadClosure
       },
-      message: `Traffic flow at (${ctx.input.lat}, ${ctx.input.lon}): **${flow.currentSpeed || 'N/A'} km/h** (free flow: ${flow.freeFlowSpeed || 'N/A'} km/h).`
+      message: `Traffic flow at (${ctx.input.lat}, ${ctx.input.lon}): **${flow.currentSpeed ?? 'N/A'} km/h** (free flow: ${flow.freeFlowSpeed ?? 'N/A'} km/h).`
     };
   })
   .build();
@@ -131,13 +131,13 @@ export let trafficIncidents = SlateTool.create(spec, {
         incidentType: inc.type,
         severity: props.iconCategory,
         magnitudeOfDelay: props.magnitudeOfDelay,
-        from: props.from,
-        to: props.to,
+        from: props.from ?? undefined,
+        to: props.to ?? undefined,
         lengthInMeters: props.length,
         delayInSeconds: props.delay,
         roadNumbers: props.roadNumbers,
-        startTime: props.startTime,
-        endTime: props.endTime,
+        startTime: props.startTime ?? undefined,
+        endTime: props.endTime ?? undefined,
         description: description || undefined
       };
     });

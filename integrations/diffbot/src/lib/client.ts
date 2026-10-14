@@ -1,16 +1,71 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
-let extractApi = createAxios({
-  baseURL: 'https://api.diffbot.com'
-});
+let createDiffbotApi = (baseURL: string) => {
+  let api = createAuthenticatedAxios({
+    baseURL,
+    timeout: 120_000,
+    contentType: false,
+    errorAdapter: error =>
+      buildApiServiceError(error, {
+        providerLabel: 'Diffbot',
+        reason: 'diffbot_api_error',
+        detailKeys: ['error', 'message', 'errorCode', 'code']
+      })
+  });
+  api.interceptors.response.use(response => {
+    let documents = Array.isArray(response.data) ? response.data : [response.data];
+    for (let data of documents) {
+      if (
+        isApiErrorRecord(data) &&
+        (data.error === true ||
+          typeof data.error === 'string' ||
+          (typeof data.errorCode === 'number' && data.errorCode >= 400) ||
+          (baseURL === 'https://nl.diffbot.com' &&
+            Array.isArray(data.errors) &&
+            data.errors.length > 0))
+      ) {
+        throw buildApiServiceError(
+          { response: { status: response.status, data } },
+          {
+            providerLabel: 'Diffbot',
+            reason: 'diffbot_api_error',
+            detailKeys: ['error', 'message', 'errorCode', 'code'],
+            extractUpstreamCode: () =>
+              data.errorCode !== undefined ? String(data.errorCode) : undefined
+          }
+        );
+      }
+    }
+    return response;
+  });
+  return api;
+};
 
-let kgApi = createAxios({
-  baseURL: 'https://kg.diffbot.com'
-});
+let extractApi = createDiffbotApi('https://api.diffbot.com');
+let kgApi = createDiffbotApi('https://kg.diffbot.com');
+let nlApi = createDiffbotApi('https://nl.diffbot.com');
+let webApi = createDiffbotApi('https://llm.diffbot.com');
 
-let nlApi = createAxios({
-  baseURL: 'https://nl.diffbot.com'
-});
+// Keep the original match envelope while exposing identifiers at the existing
+// entity field level. Older responses that already contain entity fields work too.
+export let withEntityFields = (entry: any) =>
+  isApiErrorRecord(entry?.entity) ? { ...entry.entity, ...entry } : entry;
+
+export let withJobStatus = (job: any) => {
+  let { jobStatus, ...details } = job;
+  let statusDetails = isApiErrorRecord(jobStatus) ? jobStatus : undefined;
+  let message = typeof jobStatus === 'string' ? jobStatus : statusDetails?.message;
+  return {
+    ...details,
+    ...(typeof message === 'string' ? { jobStatus: message } : {}),
+    ...(statusDetails ? { jobStatusDetails: statusDetails } : {})
+  };
+};
 
 export type ExtractType =
   | 'analyze'
@@ -90,6 +145,11 @@ export class DiffbotClient {
   private token: string;
 
   constructor(config: { token: string }) {
+    if (!config.token?.trim()) {
+      throw createApiServiceError(
+        'A Diffbot API token is required. Reconnect with a valid token.'
+      );
+    }
     this.token = config.token;
   }
 
@@ -101,11 +161,11 @@ export class DiffbotClient {
     };
 
     if (options.fields) params.fields = options.fields;
-    if (options.timeout) params.timeout = options.timeout;
+    if (options.timeout !== undefined) params.timeout = options.timeout;
     if (options.paging !== undefined) params.paging = options.paging;
     if (options.discussion !== undefined) params.discussion = options.discussion;
 
-    if (options.body) {
+    if (options.body !== undefined) {
       let response = await extractApi.post(endpoint, options.body, {
         params,
         headers: {
@@ -167,6 +227,7 @@ export class DiffbotClient {
     if (options.employer) params.employer = options.employer;
     if (options.title) params.title = options.title;
     if (options.location) params.location = options.location;
+    if (options.description) params.description = options.description;
 
     let response = await kgApi.get('/kg/v3/enhance/combine', { params });
     return response.data;
@@ -177,39 +238,51 @@ export class DiffbotClient {
       token: this.token
     };
 
-    if (options.lang) params.lang = options.lang;
-    if (options.tagMode) params.tagMode = options.tagMode;
-
-    let response = await nlApi.post('/v1/', options.content, {
-      params,
-      headers: {
-        'Content-Type': 'text/plain'
+    let response = await nlApi.post(
+      '/v1/',
+      [
+        {
+          content: options.content,
+          ...(options.lang ? { lang: options.lang } : {})
+        }
+      ],
+      {
+        params,
+        headers: { 'Content-Type': 'application/json' }
       }
-    });
-    return response.data;
+    );
+    let result = Array.isArray(response.data) ? response.data[0] : response.data;
+    if (!isApiErrorRecord(result)) {
+      throw createApiServiceError('Diffbot returned no text analysis result.');
+    }
+    return result;
   }
 
   async createCrawl(options: CrawlCreateOptions): Promise<any> {
     let params: Record<string, any> = {
-      token: this.token,
       name: options.name,
       seeds: options.seeds.join(' ')
     };
 
-    if (options.apiType) params.apiUrl = `https://api.diffbot.com/v3/${options.apiType}`;
+    params.apiUrl = `https://api.diffbot.com/v3/${options.apiType ?? 'analyze'}`;
     if (options.maxToCrawl !== undefined) params.maxToCrawl = options.maxToCrawl;
     if (options.maxToProcess !== undefined) params.maxToProcess = options.maxToProcess;
     if (options.maxHops !== undefined) params.maxHops = options.maxHops;
-    if (options.urlCrawlPattern) params.urlCrawlPattern = options.urlCrawlPattern;
-    if (options.urlProcessPattern) params.urlProcessPattern = options.urlProcessPattern;
+    if (options.urlCrawlPattern) params.urlCrawlRegEx = options.urlCrawlPattern;
+    if (options.urlProcessPattern) params.urlProcessRegEx = options.urlProcessPattern;
     if (options.repeat !== undefined) params.repeat = options.repeat;
     if (options.repeatFrequency !== undefined)
-      params.repeatFrequency = options.repeatFrequency;
+      params.repeat = options.repeat === 0 ? 0 : options.repeatFrequency;
     if (options.notifyWebhook) params.notifyWebhook = options.notifyWebhook;
     if (options.onlyProcessIfNew !== undefined)
       params.onlyProcessIfNew = options.onlyProcessIfNew ? 1 : 0;
 
-    let response = await extractApi.post('/v3/crawl', null, { params });
+    let body = new URLSearchParams();
+    for (let [key, value] of Object.entries(params)) body.set(key, String(value));
+    let response = await extractApi.post('/v3/crawl', body.toString(), {
+      params: { token: this.token },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
     return response.data;
   }
 
@@ -233,17 +306,18 @@ export class DiffbotClient {
   }
 
   async deleteCrawl(crawlName: string): Promise<any> {
-    let response = await extractApi.delete('/v3/crawl', {
+    let response = await extractApi.get('/v3/crawl', {
       params: {
         token: this.token,
-        name: crawlName
+        name: crawlName,
+        delete: 1
       }
     });
     return response.data;
   }
 
   async pauseCrawl(crawlName: string): Promise<any> {
-    let response = await extractApi.put('/v3/crawl', null, {
+    let response = await extractApi.get('/v3/crawl', {
       params: {
         token: this.token,
         name: crawlName,
@@ -254,7 +328,7 @@ export class DiffbotClient {
   }
 
   async resumeCrawl(crawlName: string): Promise<any> {
-    let response = await extractApi.put('/v3/crawl', null, {
+    let response = await extractApi.get('/v3/crawl', {
       params: {
         token: this.token,
         name: crawlName,
@@ -265,7 +339,7 @@ export class DiffbotClient {
   }
 
   async restartCrawl(crawlName: string): Promise<any> {
-    let response = await extractApi.put('/v3/crawl', null, {
+    let response = await extractApi.get('/v3/crawl', {
       params: {
         token: this.token,
         name: crawlName,
@@ -289,15 +363,22 @@ export class DiffbotClient {
 
   async createBulkJob(options: BulkCreateOptions): Promise<any> {
     let params: Record<string, any> = {
-      token: this.token,
       name: options.name,
       urls: options.urls.join(' ')
     };
 
-    if (options.apiType) params.apiUrl = `https://api.diffbot.com/v3/${options.apiType}`;
+    params.apiUrl = `https://api.diffbot.com/v3/${options.apiType ?? 'analyze'}`;
     if (options.notifyWebhook) params.notifyWebhook = options.notifyWebhook;
 
-    let response = await extractApi.post('/v3/bulk', null, { params });
+    let body = new URLSearchParams();
+    for (let [key, value] of Object.entries(params)) body.set(key, String(value));
+    for (let [key, value] of Object.entries(options.customHeaders ?? {})) {
+      body.append('customHeaders', `${key}:${value}`);
+    }
+    let response = await extractApi.post('/v3/bulk', body.toString(), {
+      params: { token: this.token },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
     return response.data;
   }
 
@@ -321,10 +402,11 @@ export class DiffbotClient {
   }
 
   async deleteBulkJob(jobName: string): Promise<any> {
-    let response = await extractApi.delete('/v3/bulk', {
+    let response = await extractApi.get('/v3/bulk', {
       params: {
         token: this.token,
-        name: jobName
+        name: jobName,
+        delete: 1
       }
     });
     return response.data;
@@ -339,6 +421,31 @@ export class DiffbotClient {
     if (num !== undefined) params.num = num;
 
     let response = await extractApi.get('/v3/bulk/data', { params });
+    return response.data;
+  }
+
+  async getAccount(days?: number): Promise<any> {
+    let response = await extractApi.get('/v4/account', {
+      params: { token: this.token, days }
+    });
+    // Tokens and child tokens are credentials, not account profile data.
+    let { token: _token, childTokens: _childTokens, ...account } = response.data;
+    return account;
+  }
+
+  async searchWeb(options: {
+    queries: string[];
+    size?: number;
+    maxTokens?: number;
+  }): Promise<any> {
+    let params = new URLSearchParams();
+    for (let query of options.queries) params.append('text', query);
+    if (options.size !== undefined) params.set('size', String(options.size));
+    if (options.maxTokens !== undefined) params.set('maxTokens', String(options.maxTokens));
+    let response = await webApi.get('/api/v1/web_search', {
+      params,
+      headers: { Authorization: `Bearer ${this.token}` }
+    });
     return response.data;
   }
 }

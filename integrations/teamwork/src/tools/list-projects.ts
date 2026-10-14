@@ -66,7 +66,7 @@ export let listProjects = SlateTool.create(spec, {
     return {
       output: {
         projects,
-        totalCount: result.STATUS === 'OK' ? projects.length : undefined
+        totalCount: undefined
       },
       message: `Found **${projects.length}** project(s).`
     };

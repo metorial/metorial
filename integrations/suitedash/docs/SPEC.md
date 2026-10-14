@@ -1,83 +1,86 @@
-Now let me look at the Zapier integration to understand what API actions are available:Now let me look at the Make.com integration for more detail on available API actions:Now I have enough information to compile the specification.
+# SuiteDash integration specification
 
-# Slates Specification for Suitedash
+## Sources
 
-## Overview
+Verified on 2026-10-14 against the public official documents:
 
-SuiteDash is an all-in-one business management platform that combines CRM, client portal, project management, invoicing, file sharing, documents and eSigning, email marketing, support tickets, and a learning management system (LMS) into a single white-labeled platform. It provides a Secure API (REST) for programmatic access to core CRM, project, and marketing data, along with configurable webhooks for event-driven integrations.
+- [Secure API help](https://help.suitedash.com/article/550-secure-api)
+- [Interactive API reference](https://app.suitedash.com/secure-api/swagger)
+- [OpenAPI document](https://app.suitedash.com/secure-api/swagger/json-file)
+- [Contact roles](https://help.suitedash.com/article/6-difference-between-lead-prospect-client)
+- [Contact requirements](https://help.suitedash.com/article/65-creating-a-new-contact)
+- [Company requirements](https://help.suitedash.com/article/67-understanding-companies)
 
 ## Authentication
 
-SuiteDash uses API key-based authentication via two credentials passed as HTTP headers:
+Requests use the account Public ID and Secret Key in `X-Public-ID` and
+`X-Secret-Key` headers. Create keys under Flyout Menu > Integrations > Secure API.
+Access requires an Admin or Super Admin account. Monthly API limits depend on the
+account plan. A 403 response indicates that the account is inactive; another key
+will not resolve it.
 
-- **X-Public-ID**: A unique public identifier for your SuiteDash account.
-- **X-Secret-Key**: A secret key you generate within your account.
+## CRM tools
 
-To obtain these credentials, navigate to **Integrations > Secure API** in your SuiteDash account. Click the green "Authorize" button and paste your Public ID and one of the Secret Keys you created inside your account.
+| Tool | Official request | Result |
+| --- | --- | --- |
+| `create_contact` | `POST /contact` | Complete provider response in `contact` |
+| `update_contact` | `PUT /contact/{identifier}` | Complete provider response in `contact` |
+| `list_contacts` | `GET /contacts?page={page}` | Contact records, total pages, and total items |
+| `get_contact` | `GET /contact/{identifier}` | Complete provider response in `contact` |
+| `create_company` | `POST /company` | Complete provider response in `company` |
+| `update_company` | `PUT /company/{identifier}` | Complete provider response in `company` |
+| `list_companies` | `GET /companies?page={page}` | Company records, total pages, and total items |
+| `get_company` | `GET /company/{identifier}` | Complete provider response in `company` |
+| `get_metadata` | `GET /contact/meta` | Contact attribute definitions in `metadata` |
+| `get_company_metadata` | `GET /company/meta` | Company attribute definitions in `metadata` |
+| `subscribe_marketing_audience` | `POST /marketing/subscribe` | Complete provider response in `result`, including each subscriber outcome |
 
-You can create multiple secret keys by clicking **+ Add Secret Key**, naming each one, and saving. These credentials are found under **Integrations > Secure API**.
+Contact lookups accept a UID or email. Company lookups accept a UID or exact name.
+Identifiers are encoded as individual URL path segments. Updates retain the
+existing `contactUid` and `companyUid` inputs.
 
-Both values must be included as HTTP headers (`X-Public-ID` and `X-Secret-Key`) with every API request.
+Contact inputs retain the roles `lead`, `prospect`, and `client`; requests map
+these to the provider's `Lead`, `Prospect`, and `Client` values. Company roles
+already use the provider's title case. Creating a Prospect or Client contact
+requires an email address. Creating a Prospect or Client company requires a
+primary contact email. When creating a primary contact, first and last names are
+required. Set `createPrimaryContactIfNotExists` to false to select an existing
+contact by email without creating one.
 
-**Access restrictions**: Only Super Admins and Admins have access to the Secure API. Access can be further restricted to Super Admins only via Platform Branding settings.
+Contact `customFields` values retain their existing arbitrary JSON types. Direct
+custom field UUID keys are sent under the documented `custom_fields` object;
+provider-shaped nested `custom_fields` and other supplied attributes pass through.
+Explicit nested custom field values take precedence over duplicate direct UUID
+keys. Call `get_metadata` to discover the account-specific field identifiers.
+Company metadata describes public, private, and target custom fields, but the
+current company write tools expose their existing standard fields only.
 
-**Interactive documentation**: SuiteDash provides a live Swagger-based interactive API documentation at `https://app.suitedash.com/secure-api/swagger` which can be used to explore and test all available endpoints after authorizing with your credentials.
+An omitted list page fetches all pages. An explicit page must be a positive whole
+number. The existing numeric input type is preserved. Provider `totalItems` maps
+to the existing `total` output. Idle companies are excluded by the provider.
 
-## Features
+## Marketing subscriptions
 
-### Contact Management
+The existing `contactIdentifiers` array accepts emails and contact UIDs. UIDs are
+resolved through `GET /contact/{identifier}` before submitting an email-based
+subscriber. Contacts without an email cannot be subscribed. The existing string
+`audienceIdentifier` accepts a positive numeric audience ID, which is sent as an
+integer in each subscriber's `audiences` array. The provider expects a JSON array
+of subscribers, not a contacts/audience object.
 
-Create, retrieve, update, and list contacts in the CRM. The API exposes CRM Company and Contact Custom Fields, allowing full access to custom data schemas unique to your account. Contacts can be assigned roles, associated with companies, and managed with custom field values.
+HTTP 200 may represent partial success. The complete response and individual
+errors remain in `result`, and the message reports successful and failed items.
+Do not assume that every submitted contact subscribed successfully.
 
-### Company Management
+## Limits and verification
 
-Create, retrieve, update, and list company records. Companies serve as the organizational grouping for contacts. When creating a contact, a company can be automatically created if no exact match exists.
+There is no documented self/account identity endpoint in the inspected OpenAPI
+reference. Project and Worlds endpoints exist but are outside this CRM-focused
+refresh. Existing contact role-update input is retained; `ContactUpdate` omits a
+role property, so changing an existing contact's role requires provider runtime
+confirmation rather than assuming the capability was removed. Metadata responses
+can be nullable in the provider schema. The existing `get_metadata` retains its
+object output contract; the new `get_company_metadata` preserves a nullable response.
 
-### Project Management
-
-Create, update, and retrieve projects. Project Custom Fields are also accessible through the API's metadata schema. Projects can be associated with contacts and companies.
-
-### Task Management
-
-Create, update, and find tasks. Tasks can be searched by name or ID and are tied to projects.
-
-### Marketing Audiences
-
-Subscribe contacts to Marketing Audiences for targeted email campaigns. The API allows adding contacts to specific marketing audience lists.
-
-### Metadata Retrieval
-
-Retrieve the full schema of custom fields, meta attributes, and marketing audiences configured in your account via the `/contact/meta` endpoint. Once you have the complete schema you can use the GET, POST, and PUSH endpoints to build a complete 2-way data sync.
-
-### Behavior Settings
-
-The API supports configurable behavior for unknown/missing items — you can choose to either fail the request or treat it as successful. The "treat as successful" option is recommended when integrating with automation tools to prevent false failures.
-
-## Events
-
-SuiteDash supports webhooks in two categories: dedicated Billing and Project webhooks configured through the UI, and general-purpose automation webhooks.
-
-### Billing Webhooks
-
-Billing webhooks can be enabled under Integrations > Webhooks > Billing. Available events:
-
-- **Subscription Created** — fires when a new subscription is created.
-- **Subscription Canceled** — fires when a subscription is canceled.
-- **Subscription Expired** — fires when a subscription expires.
-- **Subscription Unpaid** — fires when a subscription becomes unpaid.
-
-Each webhook allows you to toggle which data fields are included in the payload, and you can reorder the fields. Multiple endpoint URLs can be configured per webhook event.
-
-### Project Webhooks
-
-Project webhooks can be enabled under Integrations > Webhooks > Projects. Available events:
-
-- **Project Created** — fires when a new project is created.
-- **Project Updated** — fires when a project is updated.
-- **Project Deleted** — fires when a project is deleted.
-
-Similar to billing webhooks, you can customize which data fields are sent and their order in the payload.
-
-### Automation Webhooks
-
-Automations can fire a webhook to your endpoint. A webhook notification is a message indicating that a specific event has occurred. When the event occurs, a notification is sent via HTTPS POST to the destination URL of your choice. You can assign any string to be used as an event signifier. These are triggered by SuiteDash's no-code automation engine, which can respond to various internal events (e.g., form submissions, task completions, proposal acceptance). Multiple webhook notifications can be added to a single automation.
+Local builds, formatting, and schema checks do not establish provider acceptance.
+No live provider calls, E2E tests, or tool-use evals were run for this refresh.

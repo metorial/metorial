@@ -1,15 +1,28 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
 
 export class FluxguardClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string) {
-    this.http = createAxios({
+    if (!token.trim()) {
+      throw createApiServiceError(
+        'Provide a Fluxguard API key from your organization settings.'
+      );
+    }
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.fluxguard.com',
-      headers: {
-        'x-api-key': token,
-        'Content-Type': 'application/json'
-      }
+      timeout: 30000,
+      authHeader: { name: 'x-api-key', value: token.trim() },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Fluxguard',
+          reason: 'fluxguard_api_error'
+        })
     });
   }
 
@@ -31,26 +44,20 @@ export class FluxguardClient {
     categoryName?: string;
     siteNickname?: string;
   }) {
-    let body: Record<string, any> = { url: params.url };
-    if (params.siteId) body.siteId = params.siteId;
-    if (params.sessionId) body.sessionId = params.sessionId;
-    if (params.categories) body.categories = params.categories;
-    if (params.categoryId) body.categoryId = params.categoryId;
-    if (params.categoryName) body.categoryName = params.categoryName;
-    if (params.siteNickname) body.siteNickname = params.siteNickname;
-
-    let response = await this.http.post('/add-page', body);
+    let response = await this.http.post('/add-page', pickDefined(params));
     return response.data;
   }
 
   async getPage(siteId: string, sessionId: string, pageId: string) {
-    let response = await this.http.get(`/site/${siteId}/session/${sessionId}/page/${pageId}`);
+    let response = await this.http.get(
+      `/site/${encodeURIComponent(siteId)}/session/${encodeURIComponent(sessionId)}/page/${encodeURIComponent(pageId)}`
+    );
     return response.data;
   }
 
   async deletePage(siteId: string, sessionId: string, pageId: string) {
     let response = await this.http.delete(
-      `/site/${siteId}/session/${sessionId}/page/${pageId}`
+      `/site/${encodeURIComponent(siteId)}/session/${encodeURIComponent(sessionId)}/page/${encodeURIComponent(pageId)}`
     );
     return response.data;
   }
@@ -58,14 +65,16 @@ export class FluxguardClient {
   // ─── Sites ────────────────────────────────────────────────
 
   async deleteSite(siteId: string) {
-    let response = await this.http.delete(`/site/${siteId}`);
+    let response = await this.http.delete(`/site/${encodeURIComponent(siteId)}`);
     return response.data;
   }
 
   // ─── Crawls ───────────────────────────────────────────────
 
   async startCrawl(siteId: string, sessionId: string) {
-    let response = await this.http.post(`/site/${siteId}/session/${sessionId}/crawl`);
+    let response = await this.http.post(
+      `/site/${encodeURIComponent(siteId)}/session/${encodeURIComponent(sessionId)}/crawl`
+    );
     return response.data;
   }
 

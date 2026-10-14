@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URLS: Record<string, string> = {
   'us-central': 'https://llmwhisperer-api.us-central.unstract.com/api/v2',
@@ -45,9 +45,30 @@ export interface WhisperStatusResponse {
 
 export interface WhisperRetrieveResponse {
   resultText: string;
-  confidenceMetadata: any;
-  metadata: any;
+  confidenceMetadata: unknown;
+  metadata: unknown;
   webhookMetadata: string;
+}
+
+export interface WhisperDetailResponse {
+  whisperHash: string;
+  mode: string;
+  tag: string;
+  completedAt: string | null;
+  processingStartedAt: string | null;
+  processingTimeInSeconds: number | null;
+  processedPages: number | null;
+  requestedPages: number | null;
+  totalPages: number | null;
+  uploadFileSizeInKb: number | null;
+}
+
+export interface TagUsageResponse {
+  tag: string;
+  startDate: string | null;
+  endDate: string | null;
+  subscriptionId: string | number | null;
+  usage: Array<{ pagesProcessed: number; serviceType: string }>;
 }
 
 export interface HighlightEntry {
@@ -80,16 +101,26 @@ export class Client {
   private baseUrl: string;
 
   constructor(config: { token: string; region: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError(
+        'An LLMWhisperer API key is required. Reconnect with a valid key.'
+      );
+    }
     this.token = config.token;
     this.baseUrl = BASE_URLS[config.region] ?? BASE_URLS['us-central']!;
   }
 
   private getAxios() {
-    return createAxios({
+    return createAuthenticatedAxios({
       baseURL: this.baseUrl,
-      headers: {
-        'unstract-key': this.token
-      }
+      timeout: 120_000,
+      authHeader: { name: 'unstract-key', value: this.token },
+      contentType: false,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'LLMWhisperer',
+          reason: 'llmwhisperer_api_error'
+        })
     });
   }
 
@@ -176,9 +207,51 @@ export class Client {
 
     return {
       resultText: response.data.result_text,
-      confidenceMetadata: response.data.confidence_metadata,
-      metadata: response.data.metadata,
-      webhookMetadata: response.data.webhook_metadata
+      confidenceMetadata: response.data.confidence_metadata ?? null,
+      metadata: response.data.metadata ?? null,
+      webhookMetadata: response.data.webhook_metadata ?? ''
+    };
+  }
+
+  async getWhisperDetails(whisperHash: string): Promise<WhisperDetailResponse> {
+    let response = await this.getAxios().get('/whisper-detail', {
+      params: { whisper_hash: whisperHash }
+    });
+
+    return {
+      whisperHash: response.data.whisper_hash,
+      mode: response.data.mode,
+      tag: response.data.tag ?? '',
+      completedAt: response.data.completed_at ?? null,
+      processingStartedAt: response.data.processing_started_at ?? null,
+      processingTimeInSeconds: response.data.processing_time_in_seconds ?? null,
+      processedPages: response.data.processed_pages ?? null,
+      requestedPages: response.data.requested_pages ?? null,
+      totalPages: response.data.total_pages ?? null,
+      uploadFileSizeInKb: response.data.upload_file_size_in_kb ?? null
+    };
+  }
+
+  async getTagUsage(
+    tag: string,
+    fromDate?: string,
+    toDate?: string
+  ): Promise<TagUsageResponse> {
+    let response = await this.getAxios().get('/usage', {
+      params: { tag, from_date: fromDate, to_date: toDate }
+    });
+
+    return {
+      tag: response.data.tag,
+      startDate: response.data.start_date ?? null,
+      endDate: response.data.end_date ?? null,
+      subscriptionId: response.data.subscription_id ?? null,
+      usage: (response.data.usage ?? []).map(
+        (entry: { pages_processed: number; service_type: string }) => ({
+          pagesProcessed: entry.pages_processed,
+          serviceType: entry.service_type
+        })
+      )
     };
   }
 
@@ -284,7 +357,7 @@ export class Client {
 
     if (options.mode) params.mode = options.mode;
     if (options.outputMode) params.output_mode = options.outputMode;
-    if (options.pageSeparator !== undefined) params.page_seperator = options.pageSeparator;
+    if (options.pageSeparator !== undefined) params.page_separator = options.pageSeparator;
     if (options.pagesToExtract) params.pages_to_extract = options.pagesToExtract;
     if (options.medianFilterSize !== undefined)
       params.median_filter_size = options.medianFilterSize;

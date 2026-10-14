@@ -45,11 +45,7 @@ export let getCustomer = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      apiKey: ctx.auth.apiKey,
-      apiSecret: ctx.auth.apiSecret
-    });
+    let client = new Client(ctx.auth);
 
     let customer = await client.getCustomer(ctx.input.customerId);
 
@@ -60,7 +56,11 @@ export let getCustomer = SlateTool.create(spec, {
     if (ctx.input.includePolicies) {
       let policiesResult = await client.getCustomerPolicies(ctx.input.customerId);
       let raw = policiesResult.policies || policiesResult.data || policiesResult || [];
-      policies = Array.isArray(raw) ? raw : [];
+      policies = Array.isArray(raw)
+        ? raw
+        : raw && typeof raw === 'object' && raw.id !== undefined
+          ? [raw]
+          : [];
       extras.push(`${policies.length} policy/policies`);
     }
 

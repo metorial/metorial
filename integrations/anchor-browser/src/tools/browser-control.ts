@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -74,6 +74,14 @@ export let browserControl = SlateTool.create(spec, {
 
     switch (input.action) {
       case 'click':
+        if (input.selector && (input.x !== undefined || input.y !== undefined)) {
+          throw createApiServiceError(
+            'Provide either a selector or x/y coordinates for click, not both.'
+          );
+        }
+        if (!input.selector && (input.x === undefined || input.y === undefined)) {
+          throw createApiServiceError('Provide a selector or both x and y for click.');
+        }
         _result = await client.mouseClick(input.sessionId, {
           x: input.x,
           y: input.y,
@@ -85,6 +93,9 @@ export let browserControl = SlateTool.create(spec, {
         break;
 
       case 'double_click':
+        if (input.x === undefined || input.y === undefined) {
+          throw createApiServiceError('x and y are required for double_click.');
+        }
         _result = await client.mouseDoubleClick(input.sessionId, {
           x: input.x,
           y: input.y,
@@ -99,7 +110,9 @@ export let browserControl = SlateTool.create(spec, {
           input.endX === undefined ||
           input.endY === undefined
         ) {
-          throw new Error('startX, startY, endX, endY are required for drag_drop.');
+          throw createApiServiceError(
+            'startX, startY, endX, endY are required for drag_drop.'
+          );
         }
         _result = await client.dragDrop(input.sessionId, {
           startX: input.startX,
@@ -111,17 +124,20 @@ export let browserControl = SlateTool.create(spec, {
         break;
 
       case 'scroll':
+        if (input.x === undefined || input.y === undefined || input.deltaY === undefined) {
+          throw createApiServiceError('x, y, and deltaY are required for scroll.');
+        }
         _result = await client.scroll(input.sessionId, {
           x: input.x,
           y: input.y,
           deltaX: input.deltaX,
-          deltaY: input.deltaY ?? 0,
+          deltaY: input.deltaY,
           steps: input.scrollSteps
         });
         break;
 
       case 'type_text':
-        if (!input.text) throw new Error('text is required for type_text.');
+        if (!input.text) throw createApiServiceError('text is required for type_text.');
         _result = await client.typeText(input.sessionId, {
           text: input.text,
           delay: input.typingDelay
@@ -130,7 +146,7 @@ export let browserControl = SlateTool.create(spec, {
 
       case 'keyboard_shortcut':
         if (!input.keys || input.keys.length === 0)
-          throw new Error('keys is required for keyboard_shortcut.');
+          throw createApiServiceError('keys is required for keyboard_shortcut.');
         _result = await client.keyboardShortcut(input.sessionId, {
           keys: input.keys,
           holdTime: input.holdTime
@@ -138,12 +154,13 @@ export let browserControl = SlateTool.create(spec, {
         break;
 
       case 'navigate':
-        if (!input.url) throw new Error('url is required for navigate.');
+        if (!input.url) throw createApiServiceError('url is required for navigate.');
         _result = await client.navigate(input.sessionId, { url: input.url });
         break;
 
       case 'set_clipboard':
-        if (!input.text) throw new Error('text is required for set_clipboard.');
+        if (input.text === undefined)
+          throw createApiServiceError('text is required for set_clipboard.');
         _result = await client.setClipboard(input.sessionId, { text: input.text });
         break;
 
@@ -152,17 +169,14 @@ export let browserControl = SlateTool.create(spec, {
         return {
           output: {
             success: true,
-            clipboardText:
-              typeof clipResult === 'string'
-                ? clipResult
-                : ((clipResult as any)?.text ?? JSON.stringify(clipResult))
+            clipboardText: clipResult.text
           },
           message: `Retrieved clipboard content from session **${input.sessionId}**.`
         };
       }
 
       default:
-        throw new Error(`Unknown action: ${input.action}`);
+        throw createApiServiceError(`Unknown action: ${input.action}`);
     }
 
     return {

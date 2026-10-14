@@ -4,11 +4,13 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let nameResultSchema = z.object({
+  status: z.string().optional().describe('Provider query status; OK indicates success'),
   phone: z.string().optional().describe('The queried phone number'),
   name: z.string().optional().describe('Name associated with the phone number')
 });
 
 let mapResult = (raw: Record<string, string>) => ({
+  status: raw.status,
   phone: raw.phone,
   name: raw.name
 });

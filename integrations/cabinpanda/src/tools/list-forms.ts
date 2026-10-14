@@ -31,11 +31,11 @@ export let listForms = SlateTool.create(spec, {
     let client = new CabinPandaClient({ token: ctx.auth.token });
     let forms = await client.listForms();
 
-    let mappedForms = (Array.isArray(forms) ? forms : []).map((form: any) => ({
-      formId: form?.key ?? form?.id?.toString(),
-      name: form?.name,
-      status: form?.status,
-      createdAt: form?.created_at,
+    let mappedForms = forms.map((form: any) => ({
+      formId: form?.key?.toString() ?? form?.id?.toString(),
+      name: form?.name ?? undefined,
+      status: form?.status ?? undefined,
+      createdAt: form?.created_at ?? undefined,
       raw: form
     }));
 

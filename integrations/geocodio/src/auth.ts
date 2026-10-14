@@ -12,7 +12,7 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      apiKey: z.string().describe('Geocodio API key from the Geocodio dashboard')
+      apiKey: z.string().trim().min(1).describe('Geocodio API key from the Geocodio dashboard')
     }),
     getOutput: async ctx => {
       return {

@@ -29,6 +29,7 @@ Use **countrycode** or **bounds** to narrow results to a specific region. Use **
     z.object({
       query: z
         .string()
+        .min(2)
         .describe(
           'Address, place name, or location to geocode (e.g., "Berlin", "1600 Pennsylvania Ave NW, Washington DC")'
         ),
@@ -51,6 +52,9 @@ Use **countrycode** or **bounds** to narrow results to a specific region. Use **
         ),
       limit: z
         .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isInteger, 'The result limit must be a whole number')
         .optional()
         .describe('Maximum number of results to return (default: 10, max: 100)'),
       minConfidence: z
@@ -74,7 +78,9 @@ Use **countrycode** or **bounds** to narrow results to a specific region. Use **
       roadinfo: z
         .boolean()
         .optional()
-        .describe('Include road and driving information in results')
+        .describe(
+          'Match the nearest road rather than an address and include driving information'
+        )
     })
   )
   .output(
@@ -103,12 +109,6 @@ Use **countrycode** or **bounds** to narrow results to a specific region. Use **
       addressOnly: ctx.input.addressOnly,
       roadinfo: ctx.input.roadinfo
     });
-
-    if (response.status.code !== 200) {
-      throw new Error(
-        `OpenCage API error: ${response.status.message} (code: ${response.status.code})`
-      );
-    }
 
     let results = response.results.map(mapGeocodeResult);
 

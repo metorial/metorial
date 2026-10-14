@@ -1,4 +1,43 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
+
+export let recurringIntervalNames: Record<number, string> = {
+  1: 'weekly',
+  2: 'biweekly',
+  3: 'semimonthly',
+  4: 'every_4_weeks',
+  5: 'monthly',
+  6: 'bimonthly',
+  7: 'quarterly',
+  8: 'semiannually',
+  9: 'annually',
+  10: 'biennially',
+  11: 'every_4_months'
+};
+
+let mapRecurringScheduleInput = (data: Record<string, any>) => {
+  if (typeof data.time_interval !== 'string') return data;
+
+  let value = data.time_interval.toLowerCase();
+  let entry = Object.entries(recurringIntervalNames).find(([, name]) => name === value);
+  let interval = entry ? Number(entry[0]) : Number(value);
+  if (!Number.isInteger(interval) || !(interval in recurringIntervalNames)) {
+    throw createApiServiceError(
+      'timeInterval must be a supported recurrence name or a numeric interval code from 1 to 11.'
+    );
+  }
+  return { ...data, time_interval: interval };
+};
+
+let parseRecipients = (recipients: string) => {
+  let addresses = recipients
+    .split(',')
+    .map(address => address.trim())
+    .filter(Boolean);
+  if (addresses.length === 0) {
+    throw createApiServiceError('Provide at least one recipient email address.');
+  }
+  return addresses;
+};
 
 export interface ClientConfig {
   token: string;
@@ -9,8 +48,24 @@ export class Client {
   private axios;
 
   constructor(config: ClientConfig) {
-    this.axios = createAxios({
+    if (
+      config.subdomain.length > 63 ||
+      !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(config.subdomain)
+    ) {
+      throw createApiServiceError(
+        'Provide the Clientary subdomain without a URL or domain suffix.'
+      );
+    }
+    if (!config.token.trim()) {
+      throw createApiServiceError('Provide a Clientary API token.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://${config.subdomain}.clientary.com/api/v2`,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Clientary',
+          reason: 'clientary_api_error'
+        }),
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json'
@@ -69,12 +124,14 @@ export class Client {
   }
 
   async createContact(clientId: number, data: Record<string, any>) {
-    let response = await this.axios.post(`/clients/${clientId}/contacts`, { contact: data });
+    let response = await this.axios.post(`/clients/${clientId}/contacts`, {
+      client_user: data
+    });
     return response.data;
   }
 
   async updateContact(contactId: number, data: Record<string, any>) {
-    let response = await this.axios.put(`/contacts/${contactId}`, { contact: data });
+    let response = await this.axios.put(`/contacts/${contactId}`, { client_user: data });
     return response.data;
   }
 
@@ -156,12 +213,12 @@ export class Client {
     }
   ) {
     let body: Record<string, any> = {
-      recipients: data.recipients
+      recipients: parseRecipients(data.recipients)
     };
     if (data.subject) body.subject = data.subject;
     if (data.message) body.message = data.message;
-    if (data.sendCopy !== undefined) body.send_copy = data.sendCopy;
-    if (data.attachPdf !== undefined) body.attach_pdf = data.attachPdf;
+    if (data.sendCopy !== undefined) body.send_copy = data.sendCopy ? 1 : 0;
+    if (data.attachPdf !== undefined) body.attach_pdf = data.attachPdf ? 1 : 0;
     let response = await this.axios.post(`/invoices/${invoiceId}/messages`, body);
     return response.data;
   }
@@ -204,7 +261,7 @@ export class Client {
     data: { recipients: string; subject?: string; message?: string }
   ) {
     let body: Record<string, any> = {
-      recipients: data.recipients
+      recipients: parseRecipients(data.recipients)
     };
     if (data.subject) body.subject = data.subject;
     if (data.message) body.message = data.message;
@@ -259,12 +316,14 @@ export class Client {
   }
 
   async createHour(projectId: number, data: Record<string, any>) {
-    let response = await this.axios.post(`/projects/${projectId}/hours`, { hour: data });
+    let response = await this.axios.post(`/projects/${projectId}/hours`, {
+      project_item: data
+    });
     return response.data;
   }
 
   async updateHour(hourId: number, data: Record<string, any>) {
-    let response = await this.axios.put(`/hours/${hourId}`, { hour: data });
+    let response = await this.axios.put(`/hours/${hourId}`, { project_item: data });
     return response.data;
   }
 
@@ -357,6 +416,9 @@ export class Client {
     invoiceId: number,
     data: { amount?: number; note?: string; paymentProfileId?: number }
   ) {
+    if (data.amount === undefined && data.paymentProfileId === undefined) {
+      throw createApiServiceError('Provide amount or paymentProfileId to apply a payment.');
+    }
     let body: Record<string, any> = {};
     if (data.amount !== undefined) body.amount = data.amount;
     if (data.note) body.note = data.note;
@@ -385,13 +447,20 @@ export class Client {
   }
 
   async createRecurringSchedule(data: Record<string, any>) {
-    let response = await this.axios.post('/recurring', { recurring_schedule: data });
+    if (data.action === 2 && data.payment_profile_id === undefined) {
+      throw createApiServiceError(
+        'Autobill requires paymentProfileId. Use list_payment_profiles to find a client payment profile.'
+      );
+    }
+    let response = await this.axios.post('/recurring', {
+      recurring_schedule: mapRecurringScheduleInput(data)
+    });
     return response.data;
   }
 
   async updateRecurringSchedule(scheduleId: number, data: Record<string, any>) {
     let response = await this.axios.put(`/recurring/${scheduleId}`, {
-      recurring_schedule: data
+      recurring_schedule: mapRecurringScheduleInput(data)
     });
     return response.data;
   }
@@ -422,7 +491,7 @@ export class Client {
 
   async createPaymentProfile(clientId: number, data: Record<string, any>) {
     let response = await this.axios.post(`/clients/${clientId}/payment_profiles`, {
-      payment_profile: data
+      stripe_payment_profile: data
     });
     return response.data;
   }

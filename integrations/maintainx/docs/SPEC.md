@@ -1,79 +1,32 @@
-Let me get the actual API documentation from MaintainX.Let me try to fetch the actual API docs page to get the full list of resources.Now let me try to fetch the actual API reference to get more detail on the available endpoints and webhooks.Now I have enough information to compile the specification. Let me create it based on all the research.
+# MaintainX specification
 
-# Slates Specification for Maintainx
+MaintainX is a maintenance management platform for work orders, assets, inventory, purchasing, and team communication.
 
-## Overview
+## API and authentication
 
-MaintainX is a mobile-first maintenance-management and asset-management platform providing work-order tracking, preventive maintenance, inspections, parts and inventory management, and real-time communication tools for field teams. It is a cloud-based computerized maintenance management system (CMMS) for web and mobile that helps organizations centralize maintenance data, communication, and workflows.
+Use the current REST API at `https://api.getmaintainx.com/v1` with an API key in the `Authorization: Bearer` header. Keys are generated from Settings > Integrations > API Keys > New Key.
 
-## Authentication
+`GET /organizations` discovers accessible organization IDs and names. Connections with one accessible organization persist its ID. Other connections use `list_organizations` and an optional per-tool `organizationId`; the selected ID is sent through `x-organization-id`. The previous saved configuration ID remains a fallback for existing connections. The public reference has no current-user or self-profile endpoint; connection profiles identify accessible organization context instead of treating an arbitrary organization member as the token owner.
 
-MaintainX uses **API Key (Bearer Token)** authentication for its REST API.
+## Supported workflows
 
-To obtain an API key, log in to your MaintainX account, click Settings > Integrations > New Key, then click Generate Key and copy the API Key to a safe place.
+- Create, retrieve, list, and update work orders. Numeric user IDs and the optional team ID are translated into the provider's assignee objects. Work-order type and procedure template fields use the provider's documented names. Status changes use `PATCH /workorders/{id}/status`; creation with a non-OPEN status and updates combining status with other fields make two requests and can partially succeed.
+- Create and list work requests, with request status and priority filters.
+- Create, retrieve, list, update, and delete assets, and record asset operational status. Manufacturer and model names are translated into the provider's nested request objects. Asset status objects are returned as the existing status text field.
+- Create and list locations. Coordinates remain accepted input fields for compatibility, but a supplied coordinate returns an actionable validation error because the current create-location contract does not define them.
+- Create and list parts. Stock quantity maps to `availableQuantity`; cost is in cents. Existing `area` and `minimumQuantity` fields use provider-documented legacy fields. `nonStock` is absent from the documented request and returns a validation error when supplied.
+- List meters and record readings using `readingValue` and `readingDate`. Reading IDs are strings in the current response: `readingIdText` preserves the full ID while the older numeric `readingId` remains optional. Manual meters are limited to 10 reading-creation requests per 24 hours; automated meters require the Enterprise plan.
+- Create and list purchase orders. Every supplied item needs a quantity, mapped to `quantityOrdered`; description maps to `note`. Omitted vendor is sent as `null`, which the API permits. Unit costs are in cents.
+- Create and list vendors. A single email or phone input becomes the provider's `emails` or `phoneNumbers` array. Address and website are absent from the documented create-vendor request and return validation errors when supplied. Vendor listing provides IDs and names; contact details are not provided by that endpoint.
+- List users, teams, categories, and conversations. Category labels map to the existing public name field. Use `list_conversations` to obtain IDs for `send_message`.
 
-All API requests must include the API key as a Bearer token in the `Authorization` header:
+List endpoints retain provider cursors with pages of up to 200 records. Repeated query parameters serialize as `expand=asset&expand=location`. Work-order status and priority filters use the provider's plural array parameters. There is no documented server-side work-order type filter, so the existing type input filters the current response page; an empty matching page may still have a `nextCursor`.
 
-```
-Authorization: Bearer <your_api_key>
-```
+The integration exposes no triggers or downloadable exports. MaintainX documents a webhook subscription API, but it is outside this integration's current tools.
 
-The base URL for the API is `https://api.getmaintainx.com/v1/`.
+## Official sources
 
-**Multi-Organization Support:** The API supports a "Multi-Organization Token." If you are working with one of these, you also need to provide your Organisation ID via the `x-organization-ids` header. If you don't know your MaintainX Org IDs, your MaintainX representative can provide them.
-
-## Features
-
-### Work Order Management
-
-Create, retrieve, update, and list work orders. Work orders can be reactive (one-off) or preventive (recurring/scheduled). Preventive work orders are for scheduled maintenance or other recurring scheduled work. Reactive work orders are for responding to one-off events like machine breakdowns or urgent repairs. You can update work order status, add comments, assign categories, set priorities, and manage custom fields (extra fields). Work orders support assignees, assets, locations, procedures, and due dates.
-
-### Work Requests
-
-You can create work requests that can then be reviewed and converted into work orders. This enables a request-then-approve workflow for maintenance tasks.
-
-### Asset Management
-
-Create, retrieve, and manage assets including their metadata, descriptions, and custom fields. Track assets over time with meters and readings (like PSI and mileage). Instantly see the historical performance of assets using barcodes and QR codes. Assets support hierarchical relationships (parent/child).
-
-### Locations
-
-The Locations feature provides all of the locations you have created and added to Assets, Work Orders, Vendors, and Teams. You can create locations in advance or add them as you create and assign Assets and Work Orders.
-
-### Parts and Inventory
-
-Monitor your parts inventory, and get alerts when stocks run low. The API allows managing parts records, tracking stock levels, and associating parts with work orders and assets.
-
-### Meters and Readings
-
-Meters are checked by technicians who record readings in MaintainX. Meters help prevent emergency maintenance issues by allowing you to monitor equipment performance. Meters are a tool to support condition-based or predictive maintenance. There are manual meters (checked by a technician) and automated meters (where readings are automatically transferred via the REST API or from an integrated data source, such as a sensor).
-
-### Purchase Orders
-
-A purchase order specifies the types, quantities, and prices for items your organization buys. Usually, a purchase order is for parts defined in your parts inventory that you purchase from a vendor. Purchase orders don't have to have a vendor defined, and you can add items that aren't in your parts inventory.
-
-### Vendors
-
-Vendors can be managed and listed. You can add new vendors, supplying information like email addresses, phone numbers, files, locations, and assets.
-
-### Users and Teams
-
-A user is a person in your MaintainX organization with an account and an assigned role. Each role has a different set of permissions. A team consists of users with similar roles or functions in a MaintainX organization. They work on assigned tasks, share information, and can be associated with specific locations, assets, or functions.
-
-### Messaging
-
-You can create new messages in conversations. This enables programmatic communication within MaintainX threads, for example adding messages to work order conversations.
-
-### Categories
-
-Categories help delineate Work Orders according to your own needs and purposes. You can add existing categories to work orders via the API.
-
-### Reporting / Data Export
-
-The API supports exporting data in CSV format (e.g., work orders, assets) for use in BI tools like Power BI. Endpoints are available at paths such as `/v1/workorders/workorders.csv`.
-
-## Events
-
-The MaintainX API does not provide a native webhook subscription mechanism for receiving real-time push notifications about changes. Integration platforms like Zapier use polling-based triggers (e.g., "Triggers when a new work order is created") rather than native MaintainX webhooks. There is no documented webhook registration or event subscription API in MaintainX's official REST API.
-
-The provider does not support events.
+- [REST API reference](https://api.getmaintainx.com/v1/docs)
+- [Current OpenAPI specification](https://api.getmaintainx.com/v1/openapi.json)
+- [Getting started](https://help.getmaintainx.com/build/getting-started)
+- [Authentication](https://help.getmaintainx.com/build/authentication)

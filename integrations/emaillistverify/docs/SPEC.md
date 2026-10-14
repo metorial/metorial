@@ -1,69 +1,35 @@
-Let me fetch the API documentation to get more details on the bulk verification and other features.Now let me fetch the enrichment API page and the OAS YAML for more details:Now I have enough information to compile the specification. Let me also check the OAS 3.0 doc:Now I have comprehensive information. Let me compile the specification.
+# EmailListVerify Specification
 
-# Slates Specification for Emaillistverify
-
-## Overview
-
-EmailListVerify is an email verification and validation service that checks whether email addresses are valid, deliverable, and safe to send to. It offers single and bulk email verification, email finding by name and domain, domain search, and email enrichment. The service detects invalid addresses, spam traps, disposable emails, catch-all domains, and syntax errors.
+EmailListVerify verifies mailbox deliverability, enriches email metadata, finds candidate business addresses, and processes bulk email lists.
 
 ## Authentication
 
-The API uses API key-based authentication. You can retrieve your API key by visiting the **API** section of your dashboard.
+Use an API key from the dashboard's API section. The current production API base is `https://api.emaillistverify.com/api`. Requests authenticate using the `x-api-key` header; the provider also accepts a `secret` query parameter.
 
-The API key is passed as a query parameter named `secret` on every request. The base URL for API requests is `https://apps.emaillistverify.com/api`.
+## Tools
 
-**Example:**
+- `verify_email`: GET `/verifyEmail` returns a plain-text deliverability result. Insufficient credits are reported as an error rather than a deliverability result.
+- `enrich_email`: GET `/verifyEmailDetailed` maps `result` to status, combines `firstName` and `lastName` into fullName, and exposes `esp`, `isFree`, and `isNoReply`.
+- `find_email` and `domain_search`: POST `/findContact` accepts a JSON object with domain and optional firstName/lastName. Returned candidates include confidence and the deliverability result when available. A search with a name costs five credits; domain-only searches cost ten.
+- `upload_bulk_file`: POST `/verifyApiFile` uploads a file under the multipart field `file_contents`. Existing text/CSV inputs remain supported. Optional standard/high quality and Deep Scan settings are passed as form fields.
+- `check_bulk_status`: GET `/getApiFileInfo` is retained as a documented compatibility endpoint because it exposes the existing line-count output fields. It handles waiting/errored states and both documented pipe-delimited forms. Finished jobs offer all results and the deliverable subset as CSV downloads.
+- `get_credits`: GET `/credits` returns on-demand balance and nullable subscription balance/expiration without consuming credits.
+- `check_disposable`: POST `/checkDisposable` accepts domain as a query parameter and returns disposability and mail-server diagnostics.
+- `download_bulk_results`: GET `/maillists/{id}/progress` confirms completion, then provides a CSV/XLSX download from GET `/maillists/{id}`. Optional status filters select a subset of the results.
 
-```
-GET https://apps.emaillistverify.com/api/verifyEmail?secret=YOUR_API_KEY&[email protected]
-```
+## Results and processing
 
-To obtain your API key: navigate to the dashboard after logging in, click the API section in the dashboard menu, and copy the API key displayed on the API section page.
+Deliverability results include ok, email_disabled, dead_server, invalid_mx, disposable, spamtrap, ok_for_all, smtp_protocol, antispam_system, unknown, and invalid_syntax. Candidates with uncertain confidence or verification results should be assessed before use.
 
-No OAuth or additional scopes are required. An active account with available verification credits is needed to make API calls.
+Standard verification costs one credit per unique email; high quality costs two. Automatic Deep Scan costs three credits per unresolved email re-verified. The provider accepts bulk files up to 100 MB and 1,000,000 rows. The text input tool supports CSV and TXT contents, with one email per row.
 
-## Features
+The existing optional timeout fields are retained for compatibility. The current API specification does not document them, so no timeout effect or default is guaranteed.
 
-### Single Email Verification
+The API has no profile/self endpoint suitable for an identity tool. Credit balance provides a useful credential and account-capacity check.
 
-Allows you to verify email addresses automatically by sending a validation request and receiving a structured result in real time. The API checks syntax, domain validity, MX records, mailbox existence, disposable email detection, spam trap detection, and catch-all domain detection.
+## Sources
 
-- **Parameters:** Email address to verify; optional `timeout` parameter (maximum seconds to attempt verification, defaults to 30).
-- Possible response statuses include: `ok` (passed all tests), `fail` (failed one or more tests), `unknown` (cannot be accurately tested), and `incorrect` (syntax error or no email provided).
+- [Official API documentation](https://api.emaillistverify.com/api-doc)
+- [Official OpenAPI JSON](https://api.emaillistverify.com/api-doc-json)
 
-### Detailed Email Verification (Email Enrichment)
-
-Provides enriched data about an email address beyond simple verification, via the `/api/verifyEmailDetailed` endpoint. Returns structured profile information including:
-
-- Full name, gender
-- Email service provider (ESP)
-- Whether it is a free or no-reply email address
-
-Useful for CRM enrichment, lead scoring, and contact segmentation.
-
-### Bulk Email Verification
-
-The API provides the ability to check individual email addresses and can accept an email list through file upload. Users upload a CSV or text file of email addresses, receive a file/job ID, then poll for status and download results when processing is complete.
-
-- **Workflow:** Upload file → receive job ID → check status via job ID → download results (verified list and full results).
-- The uploaded file could fail if it has incorrect formatting or a broken upload.
-- Credits are consumed per email verified; processing fails if the account balance is zero.
-
-### Email Finder
-
-Discovers valid, verified business emails by name and domain. You can query by name + domain or company, and you can also use first name + last name + domain for better accuracy.
-
-- If you only have the domain to search with, you will receive functional emails such as 'contact@' or 'support@'.
-- EmailListVerify provides a confidence score for all discovered email addresses.
-- Only charges for email addresses returned with medium confidence or higher.
-
-### Domain Search
-
-Finds verified email addresses linked to any domain. Domain search returns only functional email addresses like "contact@" or "support@".
-
-- Each result comes with a confidence score.
-- All emails are verified using the core verification technology to filter out bad or outdated addresses.
-
-## Events
-
-The provider does not support events. EmailListVerify does not offer webhooks, event subscriptions, or any built-in push notification mechanism through its API.
+Current contracts were audited on 2026-10-13. No live provider verification was performed for this refresh.

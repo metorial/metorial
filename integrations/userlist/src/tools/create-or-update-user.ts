@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type UserPayload } from '../lib/client';
 import { spec } from '../spec';
 
 export let createOrUpdateUser = SlateTool.create(spec, {
@@ -71,7 +71,7 @@ Set a property to \`null\` to remove it. Supports custom properties, company rel
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let payload: Record<string, unknown> = {};
+    let payload: UserPayload = {};
     if (ctx.input.identifier) payload.identifier = ctx.input.identifier;
     if (ctx.input.email) payload.email = ctx.input.email;
     if (ctx.input.signedUpAt) payload.signed_up_at = ctx.input.signedUpAt;

@@ -10,7 +10,14 @@ export let createMailbox = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      name: z.string().describe('Name of the new mailbox')
+      name: z.string().min(1).describe('Name of the new mailbox'),
+      preset: z.string().optional().describe('Parser type or preset configured in Parsio'),
+      mlModel: z
+        .string()
+        .optional()
+        .describe('OCR or AI model supported by the selected parser'),
+      hasRawData: z.boolean().optional().describe('Whether to retain raw document data'),
+      parseSig: z.boolean().optional().describe('Whether to parse email signatures')
     })
   )
   .output(
@@ -22,13 +29,13 @@ export let createMailbox = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let mb = await client.createMailbox({ name: ctx.input.name });
+    let mb = await client.createMailbox(ctx.input);
 
     return {
       output: {
         mailboxId: mb._id || mb.id,
-        name: mb.name,
-        email: mb.email
+        name: mb.name ?? undefined,
+        email: mb.email ?? undefined
       },
       message: `Created mailbox **${mb.name || ctx.input.name}**.`
     };

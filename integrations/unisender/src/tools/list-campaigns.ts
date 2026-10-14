@@ -13,11 +13,19 @@ export let listCampaigns = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      from: z.string().optional().describe('Start date filter (YYYY-MM-DD)'),
-      to: z.string().optional().describe('End date filter (YYYY-MM-DD)'),
+      from: z
+        .string()
+        .optional()
+        .describe(
+          'Start of the campaign date range in UTC (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)'
+        ),
+      to: z
+        .string()
+        .optional()
+        .describe('End of the campaign date range in UTC (YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)'),
       limit: z.number().optional().describe('Maximum number of campaigns to return'),
       offset: z.number().optional().describe('Offset for pagination'),
-      status: z.string().optional().describe('Filter by status')
+      status: z.string().optional().describe('Filter the returned page by campaign status')
     })
   )
   .output(

@@ -33,13 +33,13 @@ let ticketSchema = z.object({
 export let createTicket = SlateTool.create(spec, {
   name: 'Create Ticket',
   key: 'create_ticket',
-  description: `Create a new HelpDesk ticket. At minimum, a subject and requester email are required. Optionally set initial status, priority, team assignment, agent assignment, tags, followers, CC recipients, and custom field values.`,
+  description: `Create a new HelpDesk ticket. A subject, requester email, and first message are required. Optionally set initial status, priority, team assignment, agent assignment, tags, followers, CC recipients, and custom field values.`,
   instructions: [
-    'The subject and requesterEmail fields are required.',
+    'The subject, requesterEmail, and message fields are required.',
     'Status defaults to "open" if not specified.',
     'Priority defaults to "medium" if not specified.',
     'Tags, followers, and ccRecipients accept arrays of strings.',
-    'Custom fields should be provided as a key-value map where keys are custom field IDs.'
+    'Custom fields should be provided as a key-value map where keys are custom field API keys.'
   ],
   tags: {
     destructive: false,
@@ -49,6 +49,14 @@ export let createTicket = SlateTool.create(spec, {
   .input(
     z.object({
       subject: z.string().describe('Subject line for the new ticket'),
+      message: z
+        .string()
+        .optional()
+        .describe('First plain-text message. Required to create a ticket.'),
+      isPrivate: z
+        .boolean()
+        .optional()
+        .describe('Whether the first message is an internal note (defaults to false)'),
       requesterEmail: z
         .string()
         .email()
@@ -76,7 +84,7 @@ export let createTicket = SlateTool.create(spec, {
       customFields: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom field values as a map of field ID to value')
+        .describe('Custom field values as a map of field API key to value')
     })
   )
   .output(
@@ -89,6 +97,8 @@ export let createTicket = SlateTool.create(spec, {
 
     let ticket = await client.createTicket({
       subject: ctx.input.subject,
+      message: ctx.input.message !== undefined ? { text: ctx.input.message } : undefined,
+      isPrivate: ctx.input.isPrivate,
       requester: {
         email: ctx.input.requesterEmail,
         name: ctx.input.requesterName

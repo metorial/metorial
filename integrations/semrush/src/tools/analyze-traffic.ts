@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SemrushTrendsClient } from '../lib/trends-client';
 import { spec } from '../spec';
@@ -65,12 +65,19 @@ Requires a Trends API subscription.`,
   )
   .handleInvocation(async ctx => {
     let client = new SemrushTrendsClient({
-      token: ctx.auth.token
+      token: ctx.auth.token,
+      authType: ctx.auth.authType
     });
 
     let targetsArray = Array.isArray(ctx.input.targets)
       ? ctx.input.targets
       : [ctx.input.targets];
+    if (!targetsArray.length || targetsArray.some(target => !target.trim())) {
+      throw createApiServiceError('Provide at least one non-empty domain.');
+    }
+    if (ctx.input.reportType !== 'summary' && targetsArray.length !== 1) {
+      throw createApiServiceError('Only traffic summary supports multiple domains.');
+    }
     let singleTarget = targetsArray[0]!;
 
     let results: Record<string, unknown>[];
@@ -156,7 +163,7 @@ Requires a Trends API subscription.`,
         break;
 
       default:
-        throw new Error(`Unknown report type: ${ctx.input.reportType}`);
+        throw createApiServiceError(`Unknown report type: ${ctx.input.reportType}`);
     }
 
     return {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BusinessClient } from '../lib/client';
+import { pageSchema, sizeSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listBots = SlateTool.create(spec, {
@@ -18,8 +19,8 @@ Supports searching, sorting, filtering by workspace, and pagination.`,
       sortBy: z.string().optional().describe('Field to sort by (e.g. created_at, updated_at)'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
       workspaceId: z.string().optional().describe('Filter bots by workspace ID'),
-      page: z.number().optional().describe('Page number (starts at 1)'),
-      size: z.number().optional().describe('Number of results per page (1-100, default 50)')
+      page: pageSchema,
+      size: sizeSchema
     })
   )
   .output(
@@ -38,13 +39,13 @@ Supports searching, sorting, filtering by workspace, and pagination.`,
           })
         )
         .describe('List of bots'),
-      total: z.number().describe('Total number of bots'),
-      page: z.number().describe('Current page number'),
-      pages: z.number().describe('Total number of pages')
+      total: z.number().optional().describe('Total number of bots'),
+      page: z.number().optional().describe('Current page number'),
+      pages: z.number().optional().describe('Total number of pages')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(ctx.auth.token, ctx.auth.credentialType);
 
     let result = await client.listBots({
       searchQuery: ctx.input.searchQuery,
@@ -69,11 +70,11 @@ Supports searching, sorting, filtering by workspace, and pagination.`,
     return {
       output: {
         bots,
-        total: result.total,
-        page: result.page,
-        pages: result.pages
+        total: result.total ?? undefined,
+        page: result.page ?? undefined,
+        pages: result.pages ?? undefined
       },
-      message: `Found **${result.total}** bots (page ${result.page}/${result.pages}).`
+      message: `Returned **${bots.length}** bots${result.total == null ? '' : ` of ${result.total} total`}.`
     };
   })
   .build();

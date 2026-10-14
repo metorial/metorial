@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { folderIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createProject = SlateTool.create(spec, {
@@ -13,7 +14,8 @@ export let createProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      title: z.string().optional().describe('Project title (max 200 characters)')
+      title: z.string().max(200).optional().describe('Project title (max 200 characters)'),
+      folderId: folderIdSchema.optional()
     })
   )
   .output(
@@ -28,7 +30,7 @@ export let createProject = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let project = await client.createProject(ctx.input.title);
+    let project = await client.createProject(ctx.input.title, ctx.input.folderId);
 
     return {
       output: {

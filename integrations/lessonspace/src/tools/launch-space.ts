@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,8 @@ export let launchSpace = SlateTool.create(spec, {
   description: `Creates a new virtual classroom space or retrieves an existing one, and generates a join URL for a user. Use this to set up a teaching session with configured recording, transcription, features, and user roles. Returns the join URL that can be embedded in an iframe or used for redirection.`,
   instructions: [
     'The space `spaceId` uniquely identifies the space. Using the same ID retrieves the existing space rather than creating a new one.',
-    'To create a join link for multiple users, call this tool once per user with the same `spaceId` but different `user` configurations.'
+    'To create a join link for multiple users, call this tool once per user with the same `spaceId` but different `user` configurations.',
+    'Join links expire after seven days by default. A custom validity window must be no longer than seven days. Keep join URLs private to the intended user.'
   ],
   tags: {
     destructive: false,
@@ -70,6 +71,22 @@ export let launchSpace = SlateTool.create(spec, {
             .optional()
             .describe(
               'Whether the user has leader privileges (e.g., muting others, forcing view follow).'
+            ),
+          singleUse: z
+            .boolean()
+            .optional()
+            .describe(
+              'Allow the join link to be redeemed by only one user, while permitting that user to reconnect.'
+            ),
+          ghost: z
+            .boolean()
+            .optional()
+            .describe('Join as an invisible spectator without camera or microphone.'),
+          customJwtParameters: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe(
+              'Additional signed link parameters, such as kickOnExp. Do not include passwords, API keys, or other sensitive data.'
             )
         })
         .optional()
@@ -110,11 +127,15 @@ export let launchSpace = SlateTool.create(spec, {
       notBefore: z
         .string()
         .optional()
-        .describe('ISO 8601 timestamp. Users cannot access the space before this time.'),
+        .describe(
+          'ISO 8601 timestamp. Earliest time this user’s join link can be used. Defaults to now.'
+        ),
       notAfter: z
         .string()
         .optional()
-        .describe('ISO 8601 timestamp. Users cannot access the space after this time.')
+        .describe(
+          'ISO 8601 timestamp. Latest time this user’s join link can be used. Defaults to seven days from now; does not end the session.'
+        )
     })
   )
   .output(
@@ -132,13 +153,35 @@ export let launchSpace = SlateTool.create(spec, {
       sessionId: z
         .string()
         .describe('ID of the upcoming session. Changes only after a session starts and ends.'),
-      userId: z.number().describe('Internal Lessonspace user ID for the joining user.')
+      userId: z.number().describe('Internal Lessonspace user ID for the joining user.'),
+      roomSettings: z
+        .record(z.string(), z.unknown())
+        .nullable()
+        .optional()
+        .describe('Provider-confirmed settings that apply to the room after launch.')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.notBefore !== undefined || ctx.input.notAfter !== undefined) {
+      let now = Date.now();
+      let start = ctx.input.notBefore !== undefined ? Date.parse(ctx.input.notBefore) : now;
+      let end =
+        ctx.input.notAfter !== undefined
+          ? Date.parse(ctx.input.notAfter)
+          : now + 7 * 24 * 60 * 60_000;
+      if (
+        !Number.isFinite(start) ||
+        !Number.isFinite(end) ||
+        end < start ||
+        end - start > 7 * 24 * 60 * 60_000
+      ) {
+        throw createApiServiceError(
+          'Provide valid notBefore and notAfter timestamps in order, with a join-link validity window of at most seven days.'
+        );
+      }
+    }
     let client = new Client({
-      token: ctx.auth.token,
-      organisationId: ctx.config.organisationId
+      token: ctx.auth.token
     });
 
     let result = await client.launchSpace({
@@ -154,7 +197,10 @@ export let launchSpace = SlateTool.create(spec, {
             id: ctx.input.user.userId,
             name: ctx.input.user.name,
             email: ctx.input.user.email,
-            leader: ctx.input.user.leader
+            leader: ctx.input.user.leader,
+            singleUse: ctx.input.user.singleUse,
+            ghost: ctx.input.user.ghost,
+            customJwtParameters: ctx.input.user.customJwtParameters
           }
         : undefined,
       features: ctx.input.features,
@@ -182,7 +228,8 @@ export let launchSpace = SlateTool.create(spec, {
         roomId: result.roomId,
         secret: result.secret,
         sessionId: result.sessionId,
-        userId: result.userId
+        userId: result.userId,
+        roomSettings: result.roomSettings
       },
       message: `Space **${ctx.input.name || ctx.input.spaceId}** launched successfully. Join URL: ${result.clientUrl}`
     };

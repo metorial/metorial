@@ -1,20 +1,32 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class BlazeMeterClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(params: { token: string; apiKeyId?: string; apiKeySecret?: string }) {
+  constructor(params: {
+    token: string;
+    apiKeyId?: string;
+    apiKeySecret?: string;
+    runscopeToken?: string;
+  }) {
+    if (params.runscopeToken || !params.token) {
+      throw createApiServiceError(
+        'A BlazeMeter API key connection is required for this operation.'
+      );
+    }
     let authHeader =
       params.apiKeyId && params.apiKeySecret
         ? `Basic ${Buffer.from(`${params.apiKeyId}:${params.apiKeySecret}`).toString('base64')}`
         : `Basic ${params.token}`;
 
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://a.blazemeter.com/api/v4',
-      headers: {
-        Authorization: authHeader,
-        'Content-Type': 'application/json'
-      }
+      authHeader: { value: authHeader },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'BlazeMeter',
+          reason: 'blazemeter_api_error'
+        })
     });
   }
 
@@ -217,7 +229,7 @@ export class BlazeMeterClient {
   // ─── Schedules ───────────────────────────────────────────────
 
   async listSchedules(testId: number): Promise<any[]> {
-    let response = await this.axios.get(`/tests/${testId}/schedules`);
+    let response = await this.axios.get('/schedules', { params: { testId } });
     return response.data?.result || [];
   }
 
@@ -229,12 +241,76 @@ export class BlazeMeterClient {
       enabled?: boolean;
     }
   ): Promise<any> {
-    let response = await this.axios.post(`/tests/${testId}/schedules`, params);
-    return response.data?.result;
+    if (!params.cronExpression?.trim()) {
+      throw createApiServiceError(
+        'cronExpression is required to create a performance test schedule.'
+      );
+    }
+    if (params.nextRun !== undefined) {
+      throw createApiServiceError(
+        'nextRun is calculated by BlazeMeter. Use cronExpression to select the run times.'
+      );
+    }
+    let response = await this.axios.post('/schedules', {
+      testId,
+      cron: params.cronExpression
+    });
+    let schedule = response.data?.result;
+    if (!schedule?.id) {
+      throw createApiServiceError('BlazeMeter did not return the created schedule ID.');
+    }
+    if (params.enabled !== undefined && params.enabled !== schedule.enabled) {
+      let scheduleKey = String(schedule.id);
+      try {
+        let updated = await this.axios.patch(`/schedules/${encodeURIComponent(scheduleKey)}`, {
+          enabled: params.enabled
+        });
+        let result = updated.data?.result;
+        if (String(result?.id) !== scheduleKey || result?.enabled !== params.enabled) {
+          throw createApiServiceError(
+            `BlazeMeter did not confirm the requested enabled state for schedule ${scheduleKey}.`
+          );
+        }
+        return result;
+      } catch (updateError) {
+        let cleanupConfirmed = false;
+        try {
+          await this.deleteSchedule(scheduleKey);
+          cleanupConfirmed = true;
+        } catch {
+          // A failed or unconfirmed deletion leaves a resource requiring explicit recovery.
+        }
+        let error = createApiServiceError(
+          cleanupConfirmed
+            ? `Could not set the requested enabled state for schedule ${scheduleKey}. The newly created schedule was deleted; creation can be retried.`
+            : `Created schedule ${scheduleKey} for test ${testId}, but its requested enabled state and deletion could not be confirmed. It may still be active. Use manage_schedule with action "list" and testId ${testId}, then delete scheduleKey "${scheduleKey}" before retrying creation.`,
+          {
+            reason: cleanupConfirmed
+              ? 'blazemeter_schedule_creation_rolled_back'
+              : 'blazemeter_schedule_creation_partial',
+            parent: updateError
+          }
+        );
+        error.data.scheduleKey = scheduleKey;
+        error.data.testId = testId;
+        error.data.requestedEnabled = params.enabled;
+        error.data.cleanupConfirmed = cleanupConfirmed;
+        throw error;
+      }
+    }
+    return schedule;
   }
 
-  async deleteSchedule(testId: number, scheduleId: number): Promise<void> {
-    await this.axios.delete(`/tests/${testId}/schedules/${scheduleId}`);
+  async deleteSchedule(scheduleId: string | number): Promise<void> {
+    let response = await this.axios.delete(
+      `/schedules/${encodeURIComponent(String(scheduleId))}`
+    );
+    if (response.status !== 204) {
+      throw createApiServiceError(
+        `BlazeMeter did not confirm deletion of schedule ${scheduleId}. List schedules before retrying.`,
+        { reason: 'blazemeter_schedule_deletion_unconfirmed', upstreamStatus: response.status }
+      );
+    }
   }
 
   // ─── Private Locations ───────────────────────────────────────

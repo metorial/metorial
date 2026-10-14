@@ -1,9 +1,9 @@
-# No Crm.io
+# noCRM.io
 
-Manage leads, prospects, and sales pipelines for sales teams. Create, update, assign, filter, and delete leads with statuses, pipeline steps, tags, amounts, and reminders. Add comments and attachments to leads, track full action history, and send emails from leads using templates. Create and manage prospecting lists, convert prospects into leads, and search prospects by email or field. Handle post-sales processes with task management. Create and manage client folders, users, and teams. Configure pipelines, steps, activity types, categories, tags, and custom fields. Assign leads via direct, random, round-robin, or weighted round-robin methods. Detect duplicate leads and manage webhooks for lead, prospect, task, and account events.
+Manage leads, prospects, and sales pipelines for sales teams. Create, update, assign, filter, duplicate, and delete leads with statuses, pipeline steps, tags, amounts, and reminders. Manage lead comments, page through action history, and request template or custom emails. Create prospecting lists, inspect their columns and prospects, update prospect fields, and convert prospects into leads. List post-sales processes and their task progress. Manage client folders and teams, discover users and their activation status, and retrieve pipeline, activity, category, tag, and field configuration.
 
 
-API contracts are based on the [official noCRM.io API reference](https://www.nocrm.io/api). Includes read-only tools for finding duplicate leads and listing unassigned leads. Configure the account subdomain during authentication. Email requests are asynchronous; an accepted request does not confirm delivery.
+API contracts are based on the [official noCRM.io API reference](https://www.nocrm.io/api). Includes read-only tools for verifying connection identity, finding duplicate leads, and listing unassigned leads. Configure the account subdomain during authentication. Identity includes the signed-in user for email/password connections; API keys identify the account. Email requests are asynchronous; an accepted request does not confirm delivery.
 
 ## License
 

@@ -67,6 +67,12 @@ export let exportReportPdf = SlateTool.create(spec, {
     let result = response?.result;
 
     if (result?.pdfUrl) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: await client.getPdfContent(result.pdfUrl),
+        mimeType: 'application/pdf',
+        filename: `${ctx.input.platform}-report.pdf`
+      });
       return {
         output: {
           pdfUrl: result.pdfUrl,

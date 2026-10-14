@@ -1,11 +1,17 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class TombaClient {
   private http;
 
   constructor(credentials: { apiKey: string; apiSecret: string }) {
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.tomba.io/v1',
+      timeout: 180_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Tomba',
+          reason: 'tomba_api_error'
+        }),
       headers: {
         'X-Tomba-Key': credentials.apiKey,
         'X-Tomba-Secret': credentials.apiSecret
@@ -22,6 +28,7 @@ export class TombaClient {
     limit?: number;
     country?: string;
     department?: string;
+    type?: 'all' | 'personal' | 'generic';
   }) {
     let response = await this.http.get('/domain-search', { params });
     return response.data;
@@ -116,6 +123,11 @@ export class TombaClient {
     return response.data;
   }
 
+  async emailFormats(domain: string) {
+    let response = await this.http.get('/email-format', { params: { domain } });
+    return response.data;
+  }
+
   // ─── Email Sources ───────────────────────────────────────
 
   async emailSources(email: string) {
@@ -150,8 +162,14 @@ export class TombaClient {
     linkedin?: string;
     notes?: string;
   }) {
+    let listId = Number(lead.listId);
+    if (!Number.isSafeInteger(listId) || listId < 1) {
+      throw createApiServiceError(
+        'List ID must be a positive integer. Use list_lead_lists to find a list ID.'
+      );
+    }
     let response = await this.http.post('/leads/', {
-      list_id: lead.listId,
+      list_id: listId,
       email: lead.email,
       first_name: lead.firstName,
       last_name: lead.lastName,

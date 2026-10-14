@@ -99,7 +99,35 @@ export let extractEntitiesTool = SlateTool.create(spec, {
 
     let result = await client.extractEntities(ctx.input.content, ctx.input.language, options);
 
-    let entities = result.entities ?? [];
+    let entities = (result.entitiesResponse ?? result.entities ?? []).map(
+      (entity: {
+        type: string;
+        mention: string;
+        normalized?: string | null;
+        count?: number | null;
+        entityId?: string | null;
+        confidence?: number | null;
+        linkingConfidence?: number | null;
+        salience?: number | null;
+        mentionOffsets?: { startOffset: number; endOffset: number }[] | null;
+        dbpediaTypes?: string[] | null;
+        DPediaTypes?: { DPpediaType?: string }[] | null;
+      }) => ({
+        type: entity.type,
+        mention: entity.mention,
+        normalized: entity.normalized ?? undefined,
+        count: entity.count ?? undefined,
+        entityId: entity.entityId ?? undefined,
+        confidence: entity.confidence ?? undefined,
+        linkingConfidence: entity.linkingConfidence ?? undefined,
+        salience: entity.salience ?? undefined,
+        mentionOffsets: entity.mentionOffsets ?? undefined,
+        dbpediaTypes:
+          entity.dbpediaTypes ??
+          entity.DPediaTypes?.flatMap(type => (type.DPpediaType ? [type.DPpediaType] : [])) ??
+          undefined
+      })
+    );
 
     return {
       output: {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoreClient } from '../lib/client';
 import { spec } from '../spec';
@@ -157,6 +157,15 @@ export let managePullZone = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ['get', 'update', 'delete'].includes(ctx.input.action) &&
+      (ctx.input.pullZoneId === undefined ||
+        ctx.input.pullZoneId <= 0 ||
+        !Number.isInteger(ctx.input.pullZoneId))
+    )
+      throw createApiServiceError('A positive pullZoneId is required for this action.');
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim())
+      throw createApiServiceError('A name is required to create a pull zone.');
     let client = new CoreClient({ token: ctx.auth.token });
 
     switch (ctx.input.action) {

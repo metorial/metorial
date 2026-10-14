@@ -1,8 +1,30 @@
 # <img src="https://provider-logos.metorial-cdn.com/productboard.jpg" height="20"> Productboard
 
-Manage product roadmaps, feedback, and feature prioritization. Create, read, update, and delete features, notes (feedback), releases, objectives, key results, and initiatives. Organize product hierarchy including products, components, and features with custom fields. Collect and manage user feedback and notes from any source. Plan delivery timelines with releases and release groups. Align product work with strategic goals through objectives and initiatives. Manage companies and users associated with feedback. Integrate with external tools via plugin integrations for two-way sync workflows.
+Read current Productboard entity records, discover workspace entity configurations, and inspect the connected OAuth user.
 
-## Tools
+## API availability
+
+Productboard made API v2 generally available on April 9, 2026 and announced that API v1 endpoints would become unavailable after **July 8, 2026**. See the [official sunset announcement](https://developer.productboard.com/v1.0.0/changelog/2026-04-09).
+
+`list_entity_configurations` and `list_entities` use API v2. `get_current_user` uses the current OAuth token information endpoint and requires an OAuth connection. The entity tools also support API token connections. Existing OAuth connections may need to reconnect to grant `entities:read`; personally identifying entity fields can be redacted because extra PII scopes are not requested.
+
+Every other tool in this package still targets API v1 and is unavailable under the announced sunset. Their keys and input contracts are retained for compatibility; this release does not migrate their create, update, delete, notes, hierarchy, release, objective, initiative, user, company, or custom-field operations to API v2.
+
+## Current tools
+
+### List Entity Configurations
+
+Discover available entity types, fields, filters, and validation rules. Use returned types with `list_entities`. Continue with the returned `pageCursor` when another page is available.
+
+### List Entities
+
+Read one page of current entity records, optionally filtered by type, name, archived state, or parent. Results expose IDs, types, fields, and links. Pass the returned `pageCursor` with the same filters to read the next page. The provider controls page size.
+
+### Get Current User
+
+Inspect the connected OAuth user's name and email, workspace, application ID, granted scopes, and token lifetime. API token connections receive an actionable validation error without making a provider request.
+
+## Legacy API v1 tools (unavailable)
 
 ### Create Feature
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageCollectionTool = SlateTool.create(spec, {
   description: `Create, update, or delete a Postman collection. When creating, provide the collection info and optionally a workspace ID. When updating, provide the full collection definition that will replace the existing one. When deleting, provide only the collection ID.`,
   instructions: [
     'When creating a collection, the schema field in info should be "https://schema.getpostman.com/json/collection/v2.1.0/collection.json".',
-    'Updating replaces the entire collection — include the full definition.'
+    'Updating replaces the entire collection — include the full definition. Pass get_collection output collection into definition to retain provider fields and structured descriptions.'
   ],
   tags: {
     destructive: true
@@ -28,13 +28,28 @@ export let manageCollectionTool = SlateTool.create(spec, {
               description: z.string().optional(),
               schema: z.string().optional()
             })
+            .passthrough()
             .optional(),
           item: z.array(z.any()).optional(),
           variable: z.array(z.any()).optional(),
-          auth: z.any().optional()
+          auth: z.any().optional(),
+          event: z
+            .array(z.any())
+            .optional()
+            .describe('Collection-level pre-request and test scripts'),
+          protocolProfileBehavior: z.record(z.string(), z.any()).optional()
         })
+        .passthrough()
         .optional()
-        .describe('Collection definition (required for create and update)')
+        .describe(
+          'Collection definition for create and update; use either collection or definition'
+        ),
+      definition: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Complete collection JSON from get_collection; alternative to collection that preserves provider fields'
+        )
     })
   )
   .output(
@@ -46,12 +61,17 @@ export let manageCollectionTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let { action, collectionId, workspaceId, collection } = ctx.input;
+    let { action, collectionId, workspaceId } = ctx.input;
+    if (ctx.input.collection && ctx.input.definition) {
+      throw createApiServiceError('Provide either collection or definition, not both.');
+    }
+    let collection = ctx.input.definition ?? ctx.input.collection;
 
     if (action === 'create') {
-      if (!collection?.info?.name)
-        throw new Error('Collection info with name is required for create.');
+      if (typeof collection?.info?.name !== 'string' || !collection.info.name.trim())
+        throw createApiServiceError('Collection info with name is required for create.');
       let payload = {
+        ...collection,
         info: {
           ...collection.info,
           schema:
@@ -70,9 +90,11 @@ export let manageCollectionTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!collectionId) throw new Error('collectionId is required for update.');
-      if (!collection) throw new Error('Collection definition is required for update.');
+      if (!collectionId) throw createApiServiceError('collectionId is required for update.');
+      if (typeof collection?.info?.name !== 'string' || !collection.info.name.trim())
+        throw createApiServiceError('Collection info with name is required for update.');
       let payload = {
+        ...collection,
         info: collection.info
           ? {
               ...collection.info,
@@ -92,7 +114,7 @@ export let manageCollectionTool = SlateTool.create(spec, {
       };
     }
 
-    if (!collectionId) throw new Error('collectionId is required for delete.');
+    if (!collectionId) throw createApiServiceError('collectionId is required for delete.');
     let result = await client.deleteCollection(collectionId);
     return {
       output: { collectionId: result.id, name: undefined, uid: result.uid },

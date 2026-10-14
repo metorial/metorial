@@ -1,11 +1,22 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { normalizePublicApiBaseUrl, PublicClient } from './lib/public-client';
+
+type AuthOutput = {
+  token?: string;
+  brand?: string;
+  publicApiToken?: string;
+  publicApiBaseUrl?: string;
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      token: z.string(),
-      brand: z.string()
+      token: z.string().optional(),
+      brand: z.string().optional(),
+      publicApiToken: z.string().optional(),
+      publicApiBaseUrl: z.string().optional()
     })
   )
   .addCustomAuth({
@@ -33,28 +44,49 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: {
-      output: { token: string; brand: string };
-      input: { token: string; brand: string };
-    }) => {
-      let client = createAxios({
-        baseURL: 'https://my.agiled.app/api/v1',
-        headers: {
-          Accept: 'application/json',
-          Brand: ctx.output.brand
-        }
-      });
-
-      let response = await client.get(`/users?api_token=${ctx.output.token}`);
-      let users = response.data?.data;
-      let currentUser = Array.isArray(users) && users.length > 0 ? users[0] : null;
+    getProfile: async (ctx: { output: AuthOutput }) => {
+      let client = new Client(ctx.output);
+      await client.listUsers(1, 1);
 
       return {
         profile: {
-          id: currentUser?.id?.toString(),
-          name: currentUser?.name,
-          email: currentUser?.email,
-          imageUrl: currentUser?.image_url
+          id: ctx.output.brand,
+          name: ctx.output.brand
+        }
+      };
+    }
+  })
+  .addCustomAuth({
+    type: 'auth.custom',
+    name: 'Public API Key',
+    key: 'public_api_key',
+    inputSchema: z.object({
+      publicApiToken: z.string().describe('Public API key created in Settings → API.'),
+      publicApiBaseUrl: z
+        .string()
+        .describe(
+          'API base URL shown in Settings → API, such as https://api.agiled.ai/public/v1. This is the API URL, not your workspace or docs URL.'
+        )
+    }),
+    getOutput: async ctx => {
+      let publicApiBaseUrl = normalizePublicApiBaseUrl(ctx.input.publicApiBaseUrl);
+      let client = new PublicClient({
+        publicApiToken: ctx.input.publicApiToken,
+        publicApiBaseUrl
+      });
+      await client.getCurrentUser();
+      return { output: { publicApiToken: ctx.input.publicApiToken, publicApiBaseUrl } };
+    },
+    getProfile: async (ctx: { output: AuthOutput }) => {
+      let context = await new PublicClient(ctx.output).getCurrentUser();
+      let organizationId = context.organization_id;
+      return {
+        profile: {
+          id: typeof organizationId === 'string' ? organizationId : undefined,
+          name:
+            typeof organizationId === 'string'
+              ? `Agiled workspace ${organizationId}`
+              : 'Agiled'
         }
       };
     }

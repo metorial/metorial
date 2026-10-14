@@ -4,10 +4,19 @@ import {
   getFormResponses,
   getTemplateRespondents,
   listDocuments,
-  sendTemplate
+  sendReminder,
+  sendTemplate,
+  voidDocument
 } from './tools';
 export let provider = Slate.create({
   spec,
-  tools: [listDocuments, sendTemplate, getTemplateRespondents, getFormResponses],
+  tools: [
+    listDocuments,
+    sendTemplate,
+    getTemplateRespondents,
+    getFormResponses,
+    sendReminder,
+    voidDocument
+  ],
   triggers: []
 });

@@ -15,7 +15,12 @@ export let domainDiscovery = SlateTool.create(spec, {
   .input(
     z.object({
       keyword: z.string().describe('Keyword to search for in registered domain names'),
-      page: z.number().optional().describe('Page number for paginated results')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Page number must be a safe integer.')
+        .min(1)
+        .optional()
+        .describe('Page number for paginated results')
     })
   )
   .output(

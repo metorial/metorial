@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -24,22 +25,8 @@ export let auth = SlateAuth.create()
       };
     },
     getProfile: async (ctx: { output: { token: string }; input: { apiKey: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.unione.io/en/transactional/api/v1'
-      });
-
-      let response = await axios.post(
-        '/system/info.json',
-        {},
-        {
-          headers: {
-            'X-API-KEY': ctx.output.token,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      let data = response.data;
+      let client = new Client({ token: ctx.output.token });
+      let data = await client.getSystemInfo();
 
       return {
         profile: {

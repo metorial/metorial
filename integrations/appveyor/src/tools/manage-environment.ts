@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -38,7 +38,9 @@ export let manageEnvironment = SlateTool.create(spec, {
       providerSettings: z
         .record(z.string(), z.unknown())
         .optional()
-        .describe('Provider-specific settings'),
+        .describe(
+          'Provider settings keyed by name. Values may be plain values or objects with value and isEncrypted fields.'
+        ),
       environmentVariables: z
         .array(
           z.object({
@@ -71,7 +73,7 @@ export let manageEnvironment = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     switch (ctx.input.action) {
@@ -85,7 +87,7 @@ export let manageEnvironment = SlateTool.create(spec, {
 
       case 'get': {
         if (ctx.input.environmentId === undefined) {
-          throw new Error('environmentId is required for get');
+          throw createApiServiceError('environmentId is required for get');
         }
         let environment = await client.getEnvironmentSettings(ctx.input.environmentId);
         return {
@@ -96,14 +98,25 @@ export let manageEnvironment = SlateTool.create(spec, {
 
       case 'create': {
         if (!ctx.input.environmentName || !ctx.input.provider) {
-          throw new Error('environmentName and provider are required for create');
+          throw createApiServiceError('environmentName and provider are required for create');
         }
         let settings: Record<string, unknown> = {};
         if (ctx.input.providerSettings) {
-          settings.providerSettings = ctx.input.providerSettings;
+          settings.providerSettings = Object.entries(ctx.input.providerSettings).map(
+            ([name, value]) => ({
+              name,
+              value:
+                typeof value === 'object' && value !== null && 'value' in value
+                  ? value
+                  : { value, isEncrypted: false }
+            })
+          );
         }
         if (ctx.input.environmentVariables) {
-          settings.environmentVariables = ctx.input.environmentVariables;
+          settings.environmentVariables = ctx.input.environmentVariables.map(variable => ({
+            name: variable.name,
+            value: { value: variable.value, isEncrypted: variable.isEncrypted ?? false }
+          }));
         }
         let environment = await client.addEnvironment({
           name: ctx.input.environmentName,
@@ -118,7 +131,7 @@ export let manageEnvironment = SlateTool.create(spec, {
 
       case 'update': {
         if (!ctx.input.environmentSettings) {
-          throw new Error('environmentSettings is required for update');
+          throw createApiServiceError('environmentSettings is required for update');
         }
         let environment = await client.updateEnvironment(ctx.input.environmentSettings);
         return {
@@ -129,7 +142,7 @@ export let manageEnvironment = SlateTool.create(spec, {
 
       case 'delete': {
         if (ctx.input.environmentId === undefined) {
-          throw new Error('environmentId is required for delete');
+          throw createApiServiceError('environmentId is required for delete');
         }
         await client.deleteEnvironment(ctx.input.environmentId);
         return {
@@ -139,7 +152,7 @@ export let manageEnvironment = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

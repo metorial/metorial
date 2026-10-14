@@ -1,4 +1,4 @@
-# Slates Specification for Securitytrails
+# SecurityTrails Specification
 
 ## Overview
 
@@ -49,6 +49,12 @@ Find domains that are related to a given domain, generally those owned by the sa
 ### Domain Search (Filter & DSL)
 
 Filter and search specific records using DSL — a powerful SQL-like query interface to the data. Searchable fields include IPv4 address, nameserver, WHOIS email, WHOIS organization, WHOIS name, SOA email, TLD, apex domain, keyword, WHOIS city, postal code, street, and telephone. All filters are combined using AND fashion and work in combination. Statistics (TLD count, hostname count, domain count) can also be retrieved for any search query.
+
+Provide exactly one DSL query or filter object, including when requesting statistics. DSL searches support scrolling: request `scroll: true` in `search_domains`, then use `continue_domain_search` with the returned `scrollId` to fetch subsequent batches. Scroll identifiers are short-lived and are separate from the SQL query API's identifiers.
+
+### Account Usage
+
+Retrieve API usage for the account associated with the connected API key using `get_account_usage`.
 
 ### IP Intelligence
 

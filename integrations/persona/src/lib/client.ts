@@ -1,19 +1,27 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let BASE_URL = 'https://withpersona.com/api/v1';
+let BASE_URL = 'https://api.withpersona.com/api/v1';
 
 export class PersonaClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(opts: { token: string }) {
-    this.axios = createAxios({
+    if (!opts.token.trim()) {
+      throw createApiServiceError('Provide a non-empty Persona API key.');
+    }
+    this.axios = createAuthenticatedAxios({
       baseURL: BASE_URL,
+      authHeader: { value: `Bearer ${opts.token}` },
       headers: {
-        Authorization: `Bearer ${opts.token}`,
-        'Content-Type': 'application/json',
         Accept: 'application/json',
-        'Key-Inflection': 'snake'
-      }
+        'Key-Inflection': 'kebab'
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Persona',
+          reason: 'persona_api_error',
+          detailKeys: ['details', 'detail', 'title', 'message']
+        })
     });
   }
 
@@ -40,6 +48,7 @@ export class PersonaClient {
 
   async createInquiry(body: {
     inquiryTemplateId?: string;
+    inquiryTemplateVersionId?: string;
     templateId?: string;
     referenceId?: string;
     accountId?: string;
@@ -49,6 +58,8 @@ export class PersonaClient {
   }): Promise<any> {
     let attributes: Record<string, any> = {};
     if (body.inquiryTemplateId) attributes['inquiry-template-id'] = body.inquiryTemplateId;
+    if (body.inquiryTemplateVersionId)
+      attributes['inquiry-template-version-id'] = body.inquiryTemplateVersionId;
     if (body.templateId) attributes['template-id'] = body.templateId;
     if (body.referenceId) attributes['reference-id'] = body.referenceId;
     if (body.accountId) attributes['account-id'] = body.accountId;
@@ -58,7 +69,8 @@ export class PersonaClient {
     let res = await this.axios.post('/inquiries', {
       data: {
         attributes
-      }
+      },
+      meta: { 'auto-create-inquiry-session': true }
     });
     return res.data;
   }
@@ -101,8 +113,7 @@ export class PersonaClient {
 
   async generateInquiryLink(inquiryId: string, expiresIn?: number): Promise<any> {
     let body: Record<string, any> = {};
-    if (expiresIn)
-      body.meta = { 'auto-create-account-reference-id': undefined, 'expires-in': expiresIn };
+    if (expiresIn !== undefined) body.meta = { 'expires-in-seconds': expiresIn };
     let res = await this.axios.post(`/inquiries/${inquiryId}/generate-one-time-link`, body);
     return res.data;
   }
@@ -370,14 +381,18 @@ export class PersonaClient {
     return res.data;
   }
 
-  async createCase(attributes: {
-    caseName?: string;
-    caseTemplateId?: string;
-    creatorId?: string;
-    [key: string]: any;
-  }): Promise<any> {
+  async createCase(
+    attributes: {
+      caseName?: string;
+      caseTemplateId?: string;
+      creatorId?: string;
+      [key: string]: any;
+    },
+    objectIds?: string[]
+  ): Promise<any> {
     let res = await this.axios.post('/cases', {
-      data: { attributes }
+      data: { attributes },
+      meta: objectIds === undefined ? undefined : { 'object-ids': objectIds }
     });
     return res.data;
   }
@@ -395,15 +410,15 @@ export class PersonaClient {
   }
 
   async setCaseStatus(caseId: string, status: string): Promise<any> {
-    let res = await this.axios.patch(`/cases/${caseId}/set-status`, {
+    let res = await this.axios.post(`/cases/${caseId}/set-status`, {
       meta: { status }
     });
     return res.data;
   }
 
-  async assignCase(caseId: string, assigneeId: string): Promise<any> {
+  async assignCase(caseId: string, assigneeEmailAddress: string): Promise<any> {
     let res = await this.axios.post(`/cases/${caseId}/assign`, {
-      meta: { 'assignee-id': assigneeId }
+      meta: { 'user-email-address': assigneeEmailAddress }
     });
     return res.data;
   }
@@ -539,6 +554,21 @@ export class PersonaClient {
 
   async getEvent(eventId: string): Promise<any> {
     let res = await this.axios.get(`/events/${eventId}`);
+    return res.data;
+  }
+
+  async listInquiryTemplates(params?: {
+    pageAfter?: string;
+    pageBefore?: string;
+    pageSize?: number;
+  }): Promise<any> {
+    let res = await this.axios.get('/inquiry-templates', {
+      params: {
+        'page[after]': params?.pageAfter,
+        'page[before]': params?.pageBefore,
+        'page[size]': params?.pageSize
+      }
+    });
     return res.data;
   }
 

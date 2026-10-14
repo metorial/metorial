@@ -61,15 +61,18 @@ export let listSalesOpportunities = SlateTool.create(spec, {
 
     let salesOpportunities = result.data.map((o: any) => ({
       salesOpportunityId: o.id,
-      label: o.label,
-      customerId: typeof o.customer === 'object' ? o.customer?.id : o.customer,
-      customerName: typeof o.customer === 'object' ? o.customer?.name : undefined,
-      salesOpportunityValue: o.salesOpportunityValue,
-      currency: o.currency,
-      stage: o.stage,
-      status: o.status,
-      salesDate: o.salesDate,
-      creationDate: o.creationDate
+      label: o.label ?? undefined,
+      customerId: (typeof o.customer === 'object' ? o.customer?.id : o.customer) ?? undefined,
+      customerName:
+        (typeof o.customer === 'object'
+          ? (o.customer?.name ?? o.customer?.label)
+          : undefined) ?? undefined,
+      salesOpportunityValue: o.salesOpportunityValue ?? undefined,
+      currency: o.currency ?? undefined,
+      stage: (typeof o.stage === 'object' ? o.stage?.key : o.stage) ?? undefined,
+      status: o.status ?? undefined,
+      salesDate: o.salesDate ?? undefined,
+      creationDate: o.creationDate ?? undefined
     }));
 
     return {

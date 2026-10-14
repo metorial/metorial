@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'leadfeeder',
   name: 'Leadfeeder',
   description:
-    'B2B website visitor identification tool that tracks which companies visit your website, providing company-level data, visit behavior, and IP-to-company enrichment.',
+    'Access B2B website leads, visit behavior, custom feeds, downloadable exports, and IP-to-company enrichment using existing Leadfeeder legacy API credentials.',
   metadata: {},
   config,
   auth

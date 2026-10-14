@@ -1,12 +1,32 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let authAxios = createAxios({
-  baseURL: 'https://wakatime.com'
+let authAxios = createAuthenticatedAxios({
+  baseURL: 'https://wakatime.com',
+  timeout: 30_000,
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'WakaTime',
+      reason: 'wakatime_oauth_failed',
+      operation: 'OAuth token request'
+    })
 });
 
-let apiAxios = createAxios({
-  baseURL: 'https://api.wakatime.com/api/v1'
+let apiAxios = createAuthenticatedAxios({
+  baseURL: 'https://wakatime.com/api/v1',
+  timeout: 30_000,
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'WakaTime',
+      reason: 'wakatime_profile_failed',
+      operation: 'profile request'
+    })
 });
 
 export let auth = SlateAuth.create()
@@ -14,7 +34,8 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      authType: z.enum(['oauth', 'api_key']).optional()
     })
   )
   .addOauth({
@@ -45,19 +66,9 @@ export let auth = SlateAuth.create()
         scope: 'read_orgs'
       },
       {
-        title: 'Write Organizations',
-        description: 'Modify organizations and dashboard members',
-        scope: 'write_orgs'
-      },
-      {
         title: 'Read Private Leaderboards',
         description: 'Access private leaderboards',
         scope: 'read_private_leaderboards'
-      },
-      {
-        title: 'Write Private Leaderboards',
-        description: 'Create and modify private leaderboards',
-        scope: 'write_private_leaderboards'
       },
       {
         title: 'Read Heartbeats',
@@ -107,25 +118,24 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'WakaTime',
+            operation: 'authorization code exchange'
+          }),
+          authType: 'oauth' as const
         }
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError('No refresh token is available. Reconnect with OAuth.');
       }
 
       let response = await authAxios.post(
@@ -133,7 +143,6 @@ export let auth = SlateAuth.create()
         new URLSearchParams({
           client_id: ctx.clientId,
           client_secret: ctx.clientSecret,
-          redirect_uri: '',
           grant_type: 'refresh_token',
           refresh_token: ctx.output.refreshToken
         }).toString(),
@@ -144,23 +153,20 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-
-      let expiresAt: string | undefined;
-      if (data.expires_in) {
-        expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-      }
-
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
+          ...normalizeOAuthTokenResponse(response.data, {
+            providerLabel: 'WakaTime',
+            operation: 'token refresh',
+            previousRefreshToken: ctx.output.refreshToken,
+            refreshTokenFallbackMode: 'falsy'
+          }),
+          authType: 'oauth' as const
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: any; scopes: string[] }) => {
+    getProfile: async (ctx: { output: { token: string } }) => {
       let response = await apiAxios.get('/users/current', {
         headers: {
           Authorization: `Bearer ${ctx.output.token}`
@@ -172,49 +178,40 @@ export let auth = SlateAuth.create()
       return {
         profile: {
           id: user.id,
-          email: user.email,
+          email: user.email ?? undefined,
           name: user.display_name || user.username,
-          imageUrl: user.photo
+          imageUrl: user.photo ?? undefined
         }
       };
     }
   })
   .addTokenAuth({
     type: 'auth.token',
-    name: 'API Key',
+    name: 'API Key (Heartbeats Only)',
     key: 'api_key',
 
     inputSchema: z.object({
       token: z
         .string()
-        .describe('Your WakaTime API Key (found at https://wakatime.com/api-key)')
+        .describe(
+          'Your write-only WakaTime API key from https://wakatime.com/api-key. Use OAuth to read activity or manage external durations.'
+        )
     }),
 
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          authType: 'api_key' as const
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let encoded = Buffer.from(ctx.output.token).toString('base64');
-
-      let response = await apiAxios.get('/users/current', {
-        headers: {
-          Authorization: `Basic ${encoded}`
-        }
-      });
-
-      let user = response.data.data;
-
+    getProfile: async () => {
       return {
         profile: {
-          id: user.id,
-          email: user.email,
-          name: user.display_name || user.username,
-          imageUrl: user.photo
+          id: 'wakatime-api-key',
+          name: 'WakaTime heartbeat API key'
         }
       };
     }

@@ -1,4 +1,4 @@
-# Slates Specification for Starton
+# Starton API Specification
 
 ## Overview
 
@@ -68,7 +68,15 @@ Starton Wallet uses a KMS (Key Management System). You can create wallets on Sta
 
 ### Token Data
 
-Get token balances and transfers and deploy your own tokens through one single API.
+Use `get_balance` to retrieve a blockchain address's native currency balance, including the raw amount, decimal precision, symbol, and human-readable amount.
+
+### Discovery Tools
+
+- `list_networks` returns supported network names, chain IDs, testnet status, and enabled relayer and monitoring services.
+- `list_kms` returns KMS identifiers and names without returning provider credentials. Creating a wallet with `manage_wallets` requires a KMS identifier.
+- List tools use zero-based pages and return the provider's total matching item count when available.
+
+Deployment and write operations are asynchronous. Use the returned transaction ID with `get_transactions` to inspect their state. IPFS uploads similarly return a pin status; queued or pinning responses do not confirm that the content is ready.
 
 ## Events
 

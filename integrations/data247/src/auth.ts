@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -17,6 +17,9 @@ export let auth = SlateAuth.create()
         .describe('Your Data247 API key. Generate one from your Data247 account.')
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('A Data247 API key is required.');
+      }
       return {
         output: {
           token: ctx.input.apiKey

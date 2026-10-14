@@ -1,5 +1,6 @@
 export * from './create-feature';
 export * from './create-note';
+export * from './current-api';
 export * from './delete-feature';
 export * from './delete-note';
 export * from './get-feature';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getInvoice = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let getInvoice = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       invoiceId: z.string().describe('The unique ID of the invoice to retrieve.')
     })
   )
@@ -24,7 +26,7 @@ export let getInvoice = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.input.organizationId ?? ctx.config.organizationId
     });
 
     let invoice = await client.getInvoice(ctx.input.invoiceId);

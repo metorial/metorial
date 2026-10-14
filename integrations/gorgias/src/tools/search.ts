@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let searchGorgias = SlateTool.create(spec, {
   name: 'Search',
   key: 'search',
-  description: `Search across tickets, customers, and other resources using a unified search interface. Returns matching results with pagination support.`,
+  description: `Search across tickets, customers, and other resources using a unified search interface. Returns matching results from one search request.`,
   tags: {
     readOnly: true
   }
@@ -15,10 +15,16 @@ export let searchGorgias = SlateTool.create(spec, {
     z.object({
       query: z.string().describe('Search query string'),
       type: z
-        .enum(['ticket', 'customer'])
+        .enum(['ticket', 'customer', 'customer_profile'])
         .optional()
-        .describe('Limit search to a specific resource type'),
-      limit: z.number().optional().describe('Maximum number of results'),
+        .describe('Search resource type; defaults to customer'),
+      limit: z
+        .number()
+        .min(1)
+        .max(50)
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('Maximum number of results'),
       cursor: z.string().optional().describe('Pagination cursor')
     })
   )
@@ -45,7 +51,7 @@ export let searchGorgias = SlateTool.create(spec, {
     });
 
     let results = (searchResult.data || []).map((r: any) => ({
-      resourceType: r.type || r.object || 'unknown',
+      resourceType: r.type || r.object || ctx.input.type || 'customer',
       resourceId: r.id,
       title: r.subject || r.name || r.email || null,
       excerpt: r.excerpt || r.body_text || null

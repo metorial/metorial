@@ -34,7 +34,12 @@ export let sendBulkEmail = SlateTool.create(spec, {
     z.object({
       from: emailAddressSchema.describe('Sender email address and optional name'),
       to: z.array(emailAddressSchema).min(1).describe('List of recipient email addresses'),
-      subject: z.string().describe('Email subject line'),
+      subject: z
+        .string()
+        .optional()
+        .describe(
+          'Email subject line. Required for text/html content; templates supply their own subject.'
+        ),
       cc: z.array(emailAddressSchema).optional().describe('CC recipients'),
       bcc: z.array(emailAddressSchema).optional().describe('BCC recipients'),
       replyTo: emailAddressSchema.optional().describe('Reply-to address'),
@@ -62,8 +67,7 @@ export let sendBulkEmail = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new MailtrapClient({
-      token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      token: ctx.auth.token
     });
 
     let result = await client.sendBulkEmail({
@@ -94,7 +98,7 @@ export let sendBulkEmail = SlateTool.create(spec, {
         success: result.success,
         messageIds: result.message_ids || []
       },
-      message: `Bulk email sent to **${ctx.input.to.map(r => r.email).join(', ')}** with subject "${ctx.input.subject}". Message IDs: ${(result.message_ids || []).join(', ')}`
+      message: `Bulk email sent to **${ctx.input.to.map(r => r.email).join(', ')}** with subject "${ctx.input.subject ?? 'template subject'}". Message IDs: ${(result.message_ids || []).join(', ')}`
     };
   })
   .build();

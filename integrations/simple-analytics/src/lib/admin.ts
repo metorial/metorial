@@ -1,3 +1,4 @@
+import { pickDefined } from 'slates';
 import { buildAdminClient, type ClientConfig } from './client';
 
 export let listWebsites = async (config: ClientConfig) => {
@@ -15,12 +16,12 @@ export interface AddWebsiteParams {
 
 export let addWebsite = async (config: ClientConfig, params: AddWebsiteParams) => {
   let client = buildAdminClient(config);
-  let body: Record<string, unknown> = {
-    hostname: params.hostname
-  };
-  if (params.timezone) body.timezone = params.timezone;
-  if (params.isPublic !== undefined) body.public = params.isPublic;
-  if (params.label) body.label = params.label;
+  let body = pickDefined({
+    hostname: params.hostname,
+    timezone: params.timezone,
+    public: params.isPublic,
+    label: params.label
+  });
 
   let response = await client.post('/api/websites/add', body);
   return response.data;

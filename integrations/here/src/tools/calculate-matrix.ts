@@ -46,6 +46,26 @@ Useful for logistics, fleet management, and finding the closest location among m
         .optional()
         .describe('Region definition type (default autoCircle)'),
       regionMargin: z.number().optional().describe('Margin in meters for autoCircle region'),
+      regionCenter: coordinateSchema
+        .optional()
+        .describe('Center required for a circle region'),
+      regionRadius: z
+        .number()
+        .optional()
+        .describe('Positive radius in meters required for a circle region'),
+      regionBounds: z
+        .object({
+          west: z.number(),
+          south: z.number(),
+          east: z.number(),
+          north: z.number()
+        })
+        .optional()
+        .describe('Bounds required for a boundingBox region'),
+      regionOuter: z
+        .array(coordinateSchema)
+        .optional()
+        .describe('3 to 100 vertices required for a polygon region'),
       avoidFeatures: z.array(z.string()).optional().describe('Road features to avoid')
     })
   )
@@ -54,6 +74,10 @@ Useful for logistics, fleet management, and finding the closest location among m
       matrixId: z.string().optional().describe('Matrix computation identifier'),
       numOrigins: z.number().describe('Number of origin points'),
       numDestinations: z.number().describe('Number of destination points'),
+      errorCodes: z
+        .array(z.number())
+        .optional()
+        .describe('Per-pair provider error codes; zero indicates a successful route'),
       travelTimes: z
         .array(z.number().nullable())
         .optional()
@@ -82,6 +106,10 @@ Useful for logistics, fleet management, and finding the closest location among m
       departureTime: ctx.input.departureTime,
       regionType: ctx.input.regionType,
       regionMargin: ctx.input.regionMargin,
+      regionCenter: ctx.input.regionCenter,
+      regionRadius: ctx.input.regionRadius,
+      regionBounds: ctx.input.regionBounds,
+      regionOuter: ctx.input.regionOuter,
       avoidFeatures: ctx.input.avoidFeatures
     });
 
@@ -94,8 +122,13 @@ Useful for logistics, fleet management, and finding the closest location among m
         matrixId: response.matrixId,
         numOrigins,
         numDestinations,
-        travelTimes: matrix.travelTimes,
-        distances: matrix.distances
+        travelTimes: matrix.travelTimes?.map((value: number, index: number) =>
+          matrix.errorCodes?.[index] ? null : value
+        ),
+        distances: matrix.distances?.map((value: number, index: number) =>
+          matrix.errorCodes?.[index] ? null : value
+        ),
+        errorCodes: matrix.errorCodes
       },
       message: `Computed **${numOrigins}×${numDestinations}** route matrix (${numOrigins * numDestinations} pairs).`
     };

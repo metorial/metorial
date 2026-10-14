@@ -1,8 +1,54 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 
 let http = createAxios({
-  baseURL: 'https://rest.moceanapi.com'
+  baseURL: 'https://rest.moceanapi.com',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
 });
+
+http.interceptors.response.use(
+  response => {
+    let result = response.data;
+    let operation = `${response.config.method?.toUpperCase() || 'REQUEST'} ${response.config.url}`;
+    if (!result || typeof result !== 'object') {
+      throw createApiServiceError(`Mocean API ${operation} returned an invalid response.`);
+    }
+    if (result.success === false || result.success === 'false') {
+      throw createApiServiceError(
+        `Mocean API ${operation} failed: ${result.err_msg || 'Operation was not successful'}`
+      );
+    }
+    let expectedVerificationResult =
+      response.config.url === '/rest/2/verify/check' && [15, 16, 17].includes(result?.status);
+
+    if (
+      typeof result?.status === 'number' &&
+      result.status !== 0 &&
+      !expectedVerificationResult
+    ) {
+      throw createApiServiceError(
+        `Mocean API ${operation} failed: ${result.err_msg || `status ${result.status}`}${result.hint ? ` (${result.hint})` : ''}`,
+        { upstreamCode: String(result.status) }
+      );
+    }
+
+    let outcomes = result?.messages ?? result?.calls;
+    if (Array.isArray(outcomes) && !outcomes.some(outcome => outcome.status === 0)) {
+      throw createApiServiceError(
+        `Mocean API ${operation} failed: ${outcomes.map(outcome => outcome.err_msg || `status ${outcome.status}`).join('; ') || 'No results returned'}`,
+        {
+          upstreamCode:
+            outcomes[0]?.status === undefined ? undefined : String(outcomes[0].status)
+        }
+      );
+    }
+
+    return response;
+  },
+  error =>
+    Promise.reject(
+      buildApiServiceError(error, { providerLabel: 'Mocean', reason: 'mocean_api_error' })
+    )
+);
 
 export class MoceanClient {
   private token: string;
@@ -10,6 +56,9 @@ export class MoceanClient {
   private apiSecret?: string;
 
   constructor(config: { token: string; apiKey?: string; apiSecret?: string }) {
+    if (!config.token && !(config.apiKey && config.apiSecret)) {
+      throw createApiServiceError('Connect a Mocean API token or both an API key and secret.');
+    }
     this.token = config.token;
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret;
@@ -152,6 +201,11 @@ export class MoceanClient {
     channel?: 'sms' | 'telegram';
   }) {
     let channel = params.channel || 'sms';
+    if (channel === 'telegram' && !params.from) {
+      throw createApiServiceError(
+        'A Telegram bot username in from is required for Telegram verification.'
+      );
+    }
     let body: Record<string, any> = {
       ...this.getAuthParams(),
       'mocean-to': params.to,
@@ -236,7 +290,7 @@ export class MoceanClient {
     if (params.eventUrl) body['mocean-event-url'] = params.eventUrl;
 
     let response = await http.post('/rest/2/send-message/whatsapp', body, {
-      headers: this.getHeaders()
+      headers: { ...this.getHeaders(), 'Content-Type': 'application/json' }
     });
 
     return response.data;
@@ -258,7 +312,7 @@ export class MoceanClient {
   }
 
   async getTemplate(templateId: string) {
-    let response = await http.get(`/template/whatsapp/${templateId}`, {
+    let response = await http.get(`/template/whatsapp/${encodeURIComponent(templateId)}`, {
       headers: this.getBasicAuthHeaders()
     });
 
@@ -281,18 +335,13 @@ export class MoceanClient {
     return response.data;
   }
 
-  async editTemplate(params: {
-    name: string;
-    templateId: string;
-    components?: any[];
-    category?: string;
-  }) {
+  async editTemplate(params: { templateId: string; components?: any[]; category?: string }) {
     let body: Record<string, any> = {};
     if (params.components) body.components = params.components;
     if (params.category) body.category = params.category;
 
     let response = await http.post(
-      `/template/whatsapp/message_templates?name=${encodeURIComponent(params.name)}&hsm-id=${encodeURIComponent(params.templateId)}`,
+      `/template/whatsapp/${encodeURIComponent(params.templateId)}`,
       body,
       {
         headers: {
@@ -318,6 +367,26 @@ export class MoceanClient {
   }
 
   // ==================== Account ====================
+
+  async reportSmsConversion(params: {
+    messageId: string;
+    delivered: boolean;
+    timestamp?: string;
+  }) {
+    let body = {
+      ...this.getAuthParams(),
+      'mocean-msgid': params.messageId,
+      'mocean-delivered': String(params.delivered),
+      'mocean-timestamp': params.timestamp,
+      'mocean-resp-format': 'json'
+    };
+
+    let response = await http.post('/rest/2/conversion', body, {
+      headers: this.getHeaders()
+    });
+
+    return response.data;
+  }
 
   async getBalance() {
     let params: Record<string, any> = {

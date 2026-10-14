@@ -69,8 +69,16 @@ export interface DocupilotTemplateSchema {
 }
 
 export interface DocupilotGenerateResponse {
-  file_url?: string;
-  file_name?: string;
+  file_url?: string | null;
+  file_name?: string | null;
+  data?: { file_url?: string | null; file_name?: string | null } | null;
+}
+
+export interface DocupilotUser {
+  id?: number | string | null;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 export interface DocupilotTemplateDelivery {

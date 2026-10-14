@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NeedleClient } from '../lib/client';
 import { spec } from '../spec';
@@ -41,15 +41,22 @@ export let listConnectors = SlateTool.create(spec, {
     let client = new NeedleClient(ctx.auth.token);
     let connectors = await client.listConnectors();
 
-    let mapped = connectors.map(c => ({
-      connectorId: c.id,
-      name: c.name,
-      type: c.type,
-      collectionId: c.collection_id,
-      createdAt: c.created_at,
-      updatedAt: c.updated_at,
-      status: c.status
-    }));
+    let mapped = connectors.map(c => {
+      if (c.collection_id === undefined) {
+        throw createApiServiceError(
+          `Needle did not return a collection ID for connector ${c.id}. View connector collection assignments in the Needle dashboard; use list_connector_files with this connector ID to inspect its files.`
+        );
+      }
+      return {
+        connectorId: c.id,
+        name: c.name,
+        type: c.type,
+        collectionId: c.collection_id,
+        createdAt: c.created_at ?? undefined,
+        updatedAt: c.updated_at ?? undefined,
+        status: c.status ?? undefined
+      };
+    });
 
     return {
       output: { connectors: mapped },

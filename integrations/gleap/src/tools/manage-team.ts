@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GleapClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageTeam = SlateTool.create(spec, {
   key: 'manage_team',
   description: `Create, update, or delete teams within a project. Teams can be used to organize agents and assign tickets.`,
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -16,7 +16,12 @@ export let manageTeam = SlateTool.create(spec, {
       action: z.enum(['create', 'update', 'delete', 'list']).describe('Action to perform'),
       teamId: z.string().optional().describe('Team ID (required for update and delete)'),
       name: z.string().optional().describe('Team name (required for create)'),
-      teamData: z.record(z.string(), z.any()).optional().describe('Additional team data')
+      teamData: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Additional team data; create requires assignmentMethod (random, balanced, manual, circular) and members (user ID array)'
+        )
     })
   )
   .output(
@@ -35,7 +40,8 @@ export let manageTeam = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     if (ctx.input.action === 'list') {
@@ -49,11 +55,11 @@ export let manageTeam = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('Name is required when creating a team');
+        throw createApiServiceError('Name is required when creating a team');
       }
       let team = await client.createTeam({
-        name: ctx.input.name,
-        ...(ctx.input.teamData || {})
+        ...(ctx.input.teamData || {}),
+        name: ctx.input.name
       });
       return {
         output: { team },
@@ -63,7 +69,7 @@ export let manageTeam = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.teamId) {
-        throw new Error('teamId is required when updating a team');
+        throw createApiServiceError('teamId is required when updating a team');
       }
       let updateData: Record<string, any> = { ...(ctx.input.teamData || {}) };
       if (ctx.input.name) {
@@ -78,7 +84,7 @@ export let manageTeam = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.teamId) {
-        throw new Error('teamId is required when deleting a team');
+        throw createApiServiceError('teamId is required when deleting a team');
       }
       await client.deleteTeam(ctx.input.teamId);
       return {
@@ -87,6 +93,6 @@ export let manageTeam = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

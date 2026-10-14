@@ -1,6 +1,6 @@
-# <img src="logo.jpeg" height="20"> Bigmailer
+# <img src="logo.jpeg" height="20"> BigMailer
 
-Manage multi-brand email marketing and transactional email sending. Create and manage brands, contacts, lists, suppression lists, custom fields, and senders. Send transactional emails with merge tags and field values. Create and list bulk marketing campaigns with A/B testing support. Upsert contacts with email validation, manage contact subscriptions across lists, and track bounces and complaints.
+Manage multi-brand email marketing and transactional email sending. Discover account identity and brands, manage contacts, lists, custom fields, and senders, and send transactional emails with merge tags. Create bulk campaigns and retrieve their content, scheduling, status, and delivery metrics. Discover transactional campaign IDs before sending. Upsert contacts with email validation and manage subscriptions, bounces, and complaints.
 
 ## License
 

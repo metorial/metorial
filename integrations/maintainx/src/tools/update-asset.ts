@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateAsset = SlateTool.create(spec, {
   name: 'Update Asset',
   key: 'update_asset',
-  description: `Updates an existing asset in MaintainX. Can modify name, description, metadata, location, and associations. Only provided fields will be updated.`,
+  description: `Updates an existing asset in MaintainX. Can modify name, description, metadata, location, and associations. Only provided fields will be updated. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +15,7 @@ export let updateAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       assetId: z.number().describe('ID of the asset to update'),
       name: z.string().optional().describe('New name'),
       description: z.string().optional().describe('New description'),
@@ -35,10 +37,7 @@ export let updateAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let updateData: Record<string, any> = {};
     if (ctx.input.name !== undefined) updateData.name = ctx.input.name;

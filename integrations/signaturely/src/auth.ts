@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,24 +30,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.signaturely.com/api/v1'
-      });
-
-      let response = await axios.get('/user/by-api', {
-        headers: {
-          Authorization: `Api-Key ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      let user = response.data;
+      let user = await new Client({ token: ctx.output.token }).getUser();
 
       return {
         profile: {
-          id: user.id?.toString(),
-          email: user.email,
-          name: user.name || user.fullName
+          id: user.id,
+          email: user.email ?? undefined,
+          name: user.name ?? user.fullName ?? undefined
         }
       };
     }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DromoClient } from '../lib/client';
+import { createDownloadAttachment } from '../lib/files';
 import { spec } from '../spec';
 
 export let getUpload = SlateTool.create(spec, {
@@ -23,10 +24,13 @@ export let getUpload = SlateTool.create(spec, {
       userName: z.string().describe('Name of the user who performed the import'),
       userEmail: z.string().describe('Email of the user who performed the import'),
       createdDate: z.string().describe('ISO-8601 timestamp of when the import was created'),
-      importType: z.string().describe('Type of import (e.g., EMBEDDED, HEADLESS)'),
+      importType: z.string().optional().describe('Type of import when supplied by Dromo'),
       status: z.string().describe('Current status of the upload'),
       numDataRows: z.number().describe('Number of data rows in the upload'),
-      developmentMode: z.boolean().describe('Whether the import was done in development mode'),
+      developmentMode: z
+        .boolean()
+        .optional()
+        .describe('Whether the import was done in development mode, when supplied by Dromo'),
       hasData: z.boolean().describe('Whether data is available for retrieval'),
       fieldOrder: z.array(z.string()).describe('Ordered list of field keys'),
       downloadUrl: z.string().optional().describe('Pre-signed URL to download the data')
@@ -35,33 +39,36 @@ export let getUpload = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DromoClient({ token: ctx.auth.token });
     let meta = await client.getUploadMetadata(ctx.input.uploadId);
+    let filename = meta.raw_upload?.filename ?? meta.filename ?? '';
+    let status = meta.upload_status ?? meta.status;
+    let numDataRows = meta.total_num_rows ?? meta.num_data_rows ?? 0;
+    let hasData = meta.has_data ?? (status === 'PROCESSED' && Boolean(meta.storage_key));
 
     let downloadUrl: string | undefined;
-    if (meta.has_data) {
-      try {
-        let urlResponse = await client.getUploadDownloadUrl(ctx.input.uploadId);
-        downloadUrl = urlResponse.url;
-      } catch {
-        // Download URL may not be available
-      }
+    if (hasData) {
+      let urlResponse = await client.getUploadDownloadUrl(ctx.input.uploadId);
+      downloadUrl = urlResponse.url;
+      await ctx.addAttachment(
+        createDownloadAttachment(downloadUrl, 'upload', ctx.input.uploadId)
+      );
     }
 
     return {
       output: {
         uploadId: meta.id,
-        filename: meta.filename,
+        filename,
         userName: meta.user?.name ?? '',
         userEmail: meta.user?.email ?? '',
         createdDate: meta.created_date,
         importType: meta.import_type,
-        status: meta.status,
-        numDataRows: meta.num_data_rows,
+        status,
+        numDataRows,
         developmentMode: meta.development_mode,
-        hasData: meta.has_data,
+        hasData,
         fieldOrder: meta.field_order,
-        downloadUrl: downloadUrl ?? meta.download_url
+        downloadUrl
       },
-      message: `Retrieved upload **${meta.filename}** with ${meta.num_data_rows} rows (status: ${meta.status}).`
+      message: `Retrieved upload **${filename || meta.id}** with ${numDataRows} rows (status: ${status}).`
     };
   })
   .build();

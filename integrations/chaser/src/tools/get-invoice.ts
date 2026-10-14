@@ -41,11 +41,14 @@ export let getInvoice = SlateTool.create(spec, {
         date: result.date || '',
         dueDate: result.dueDate || '',
         fullyPaidDate: result.fullyPaidDate ?? null,
+        expectPaymentDate: result.expectPaymentDate,
         customerExternalId: result.customerExternalId || '',
         customerName: result.customerName ?? null,
         payments: result.payments,
         invoicePdfLink: result.invoicePdfLink ?? null,
-        invoicePdfLinkUpdatedAt: result.invoicePdfLinkUpdatedAt ?? null
+        invoicePdfLinkSource: result.invoicePdfLinkSource,
+        invoicePdfLinkUpdatedAt: result.invoicePdfLinkUpdatedAt ?? null,
+        chasing: result.chasing
       },
       message: `Retrieved invoice **${result.invoiceNumber}** (${result.invoiceId}), status: ${result.status}, amount due: ${result.amountDue} ${result.currencyCode}.`
     };

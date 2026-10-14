@@ -3,8 +3,10 @@ import { spec } from './spec';
 import {
   contentWorkflow,
   executeGraphql,
+  getBatchStatus,
   getContentHistory,
   getContentItem,
+  getCurrentUser,
   getLocales,
   getPage,
   getSitemap,
@@ -23,6 +25,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
+    getBatchStatus,
     getContentItem,
     listContent,
     getPage,

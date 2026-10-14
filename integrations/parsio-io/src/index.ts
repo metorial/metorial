@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  cloneTemplates,
   createMailbox,
   createWebhook,
   deleteMailbox,
@@ -10,11 +11,13 @@ import {
   getMailbox,
   getParsedData,
   getTemplate,
+  getWebhook,
   listDocuments,
   listMailboxes,
   listTemplates,
   listWebhooks,
   manageTemplates,
+  parseDocumentSync,
   reparseDocument,
   skipDocuments,
   submitDocument,
@@ -31,6 +34,7 @@ export let provider = Slate.create({
     listDocuments,
     getDocument,
     submitDocument,
+    parseDocumentSync,
     reparseDocument,
     skipDocuments,
     getParsedData,
@@ -38,7 +42,9 @@ export let provider = Slate.create({
     listTemplates,
     getTemplate,
     manageTemplates,
+    cloneTemplates,
     listWebhooks,
+    getWebhook,
     createWebhook,
     deleteWebhooks
   ],

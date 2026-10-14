@@ -20,7 +20,7 @@ export let listContacts = SlateTool.create(spec, {
       nameContains: z
         .string()
         .optional()
-        .describe('Filter by first or last name containing this value'),
+        .describe('Filter by first name containing this value'),
       customerId: z.number().optional().describe('Filter contacts by customer ID')
     })
   )
@@ -64,15 +64,18 @@ export let listContacts = SlateTool.create(spec, {
 
     let contacts = result.data.map((c: any) => ({
       contactId: c.id,
-      firstName: c.firstName,
-      lastName: c.lastName,
-      label: c.label,
-      position: c.position,
-      emails: c.emails,
-      phones: c.phones,
-      customerId: typeof c.customer === 'object' ? c.customer?.id : c.customer,
-      customerName: typeof c.customer === 'object' ? c.customer?.name : undefined,
-      creationDate: c.creationDate
+      firstName: c.firstName ?? undefined,
+      lastName: c.lastName ?? undefined,
+      label: c.label ?? undefined,
+      position: c.position ?? undefined,
+      emails: c.emails ?? undefined,
+      phones: c.phones ?? undefined,
+      customerId: (typeof c.customer === 'object' ? c.customer?.id : c.customer) ?? undefined,
+      customerName:
+        (typeof c.customer === 'object'
+          ? (c.customer?.name ?? c.customer?.label)
+          : undefined) ?? undefined,
+      creationDate: c.creationDate ?? undefined
     }));
 
     return {

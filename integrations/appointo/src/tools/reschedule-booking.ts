@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { getAppointoRecord, mapBooking } from '../lib/bookings';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -48,13 +49,13 @@ export let rescheduleBooking = SlateTool.create(spec, {
       override: ctx.input.override
     });
 
-    let booking = result?.booking ?? result?.data ?? result;
+    let booking = getAppointoRecord(result, 'booking');
 
     return {
       output: {
-        bookingId: booking?.id ?? booking?.booking_id ?? ctx.input.bookingId,
-        status: booking?.status,
-        ...booking
+        ...mapBooking(booking),
+        bookingId: booking.id ?? booking.booking_id ?? ctx.input.bookingId,
+        status: booking.status ?? result?.response?.status
       },
       message: `Booking **#${ctx.input.bookingId}** rescheduled to ${ctx.input.timestring}${ctx.input.customerIds ? ` for ${ctx.input.customerIds.length} customer(s)` : ''}.`
     };

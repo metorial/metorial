@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -33,6 +33,10 @@ export let updateComment = SlateTool.create(spec, {
     let data: Record<string, unknown> = {};
     if (ctx.input.body !== undefined) data.body = ctx.input.body;
     if (ctx.input.isPinned !== undefined) data.is_pinned = ctx.input.isPinned;
+
+    if (Object.keys(data).length === 0) {
+      throw createApiServiceError('Provide at least one field to update.');
+    }
 
     let comment = await client.updateComment(ctx.input.commentId, data);
 

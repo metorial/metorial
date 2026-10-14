@@ -29,6 +29,10 @@ export let checkPortedStatus = SlateTool.create(spec, {
         .optional()
         .describe('Reliability of the porting date: exact, estimate, or unknown'),
       status: z.number().optional().describe('Status code (0 = success)'),
+      responseStatus: z
+        .string()
+        .optional()
+        .describe('Provider request status when returned as text'),
       statusMessage: z.string().optional().describe('Status message')
     })
   )
@@ -41,7 +45,8 @@ export let checkPortedStatus = SlateTool.create(spec, {
         ported: result.ported,
         portedDate: result.ported_date,
         portedDateType: result.ported_date_type,
-        status: result.status,
+        status: typeof result.status === 'number' ? result.status : undefined,
+        responseStatus: typeof result.status === 'string' ? result.status : undefined,
         statusMessage: result.status_message
       },
       message: result.ported

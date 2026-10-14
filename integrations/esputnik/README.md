@@ -1,6 +1,12 @@
 # Esputnik
 
-Manage contacts, segments, and omnichannel marketing campaigns across Email, SMS, Viber, Web Push, Mobile Push, App Inbox, Telegram, and In-App channels. Add, update, delete, and search contacts with custom fields and subscription management. Create and manage dynamic and static audience segments. Send bulk broadcasts or individual triggered messages with dynamic content. Generate custom events to trigger automated workflows for abandoned carts, transactional emails, and post-purchase follow-ups. Manage orders, upload promotional codes, configure product feeds, and retrieve personalized product recommendations. Track message delivery statuses and contact activity via webhooks. Retrieve account information, billing history, and organization balance.
+Manage contacts, discover custom fields, monitor bulk imports, browse segments, and change static segment membership. Send one-off email and SMS messages or prepared messages with personalized content, then check delivery using the returned request IDs. Generate events for automated workflows, submit and delete orders, manage email unsubscribes, and retrieve account identity and balance.
+
+Authenticate with an API key generated in Settings → API. Requests use the [eSputnik API](https://docs.esputnik.com/reference/getting-started-with-your-api).
+
+Bulk imports are asynchronous. Use `get_contact_import_status` with the `asyncSessionId` returned by `bulk_upsert_contacts`. Set `contactFields` and `customFieldsIDs` explicitly when updating only selected fields; fields omitted from the selected update list remain unchanged, while selected fields missing from a contact can be cleared. Call `get_additional_fields` to discover custom field IDs and valid values.
+
+Segment lists and membership reads support pages of up to 500 entries. Call `list_segments` to discover segment IDs. Prepared-message sends accept up to 1,000 recipients; each queued recipient has its own request ID for `get_message_status`. Direct SMS sends require `text` and `from`; `templateId` uses a prepared SMS message and its configured sender unless `from` overrides it. A successful send queues the message and does not confirm delivery.
 
 ## License
 

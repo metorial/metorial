@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -59,6 +59,25 @@ This is an async operation — a task ID is returned immediately for status poll
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.autoPrompt && ctx.input.prompt !== undefined) {
+      throw createApiServiceError('Use either prompt or autoPrompt, not both.');
+    }
+    if (!ctx.input.autoPrompt && !ctx.input.prompt) {
+      throw createApiServiceError('Provide prompt or set autoPrompt to true.');
+    }
+    if (ctx.input.autoPromptGuidelines !== undefined && !ctx.input.autoPrompt) {
+      throw createApiServiceError('autoPromptGuidelines requires autoPrompt to be true.');
+    }
+    for (let [field, value, maximum] of [
+      ['prompt', ctx.input.prompt, 5000],
+      ['negativePrompt', ctx.input.negativePrompt, 5000],
+      ['autoPromptGuidelines', ctx.input.autoPromptGuidelines, 1000]
+    ] as const) {
+      if (value !== undefined && (value.length < 3 || value.length > maximum)) {
+        throw createApiServiceError(`${field} must contain 3–${maximum} characters.`);
+      }
+    }
+
     let options: Record<string, unknown> = {};
 
     if (ctx.input.autoPrompt) {
@@ -71,7 +90,7 @@ This is an async operation — a task ID is returned immediately for status poll
     }
 
     if (ctx.input.negativePrompt) options.negative_prompt = ctx.input.negativePrompt;
-    if (ctx.input.duration) options.duration = Number.parseInt(ctx.input.duration, 10);
+    if (ctx.input.duration) options.duration = ctx.input.duration;
     if (ctx.input.guidanceScale !== undefined)
       options.guidance_scale = ctx.input.guidanceScale;
 

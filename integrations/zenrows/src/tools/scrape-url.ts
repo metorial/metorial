@@ -13,15 +13,18 @@ export let scrapeUrl = SlateTool.create(spec, {
     'Use **mode** "auto" to let ZenRows automatically determine the optimal scraping configuration.',
     'Use **cssExtractor** as a JSON string to extract specific elements, e.g. \'{"links": "a @href", "title": "h1"}\'.',
     'Use **responseType** "markdown" for LLM-friendly output.',
-    'For POST/PUT requests, set **method**, **postBody**, and **postContentType** accordingly.'
+    'For POST/PUT requests, set **method**, **postBody**, and **postContentType** accordingly.',
+    'Set **jsRender** to true for screenshots or PDFs. These formats also provide a downloadable file.',
+    'Use **headers** to forward custom target headers such as Referer or Cookie.'
   ],
   constraints: [
     'Session IDs keep the same IP for up to 10 minutes (values 1-99999).',
     'Screenshot quality only applies when screenshotFormat is "jpeg".',
-    'proxyCountry requires premiumProxy to be enabled.'
+    'proxyCountry requires premiumProxy or mode "auto" and cannot be used with screenshots.',
+    'Screenshots and PDFs cannot be combined with outputs. screenshotFullpage and screenshotSelector are mutually exclusive.'
   ],
   tags: {
-    readOnly: true,
+    readOnly: false,
     destructive: false
   }
 })
@@ -122,7 +125,13 @@ export let scrapeUrl = SlateTool.create(spec, {
       postContentType: z
         .string()
         .optional()
-        .describe('Content-Type header for POST/PUT requests')
+        .describe('Content-Type header for POST/PUT requests'),
+      headers: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          'Custom target request headers. Providing headers enables custom header forwarding.'
+        )
     })
   )
   .output(
@@ -131,7 +140,7 @@ export let scrapeUrl = SlateTool.create(spec, {
       content: z
         .string()
         .describe(
-          'The scraped page content (HTML, Markdown, plaintext, JSON, or base64-encoded image depending on configuration)'
+          'The scraped page content as text, including the original JSON envelope when requested. Screenshots and PDFs also provide a downloadable file.'
         ),
       headers: z.record(z.string(), z.string()).describe('Response headers from the request')
     })
@@ -165,15 +174,32 @@ export let scrapeUrl = SlateTool.create(spec, {
       outputs: ctx.input.outputs,
       method: ctx.input.method,
       postBody: ctx.input.postBody,
-      postContentType: ctx.input.postContentType
+      postContentType: ctx.input.postContentType,
+      headers: ctx.input.headers
     });
+
+    if (result.file) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(new Uint8Array(result.file.bytes), {
+          headers: { 'Content-Type': result.file.mimeType }
+        }),
+        filename: result.file.filename
+      });
+    }
 
     let contentPreview =
       result.content.length > 200 ? `${result.content.substring(0, 200)}...` : result.content;
 
     return {
-      output: result,
-      message: `Scraped **${ctx.input.url}** — status **${result.statusCode}**, received ${result.content.length} characters.\n\nPreview:\n\`\`\`\n${contentPreview}\n\`\`\``
+      output: {
+        statusCode: result.statusCode,
+        content: result.content,
+        headers: result.headers
+      },
+      message: result.file
+        ? `Scraped **${ctx.input.url}** — status **${result.statusCode}**. Prepared **${result.file.filename}** for download.`
+        : `Scraped **${ctx.input.url}** — status **${result.statusCode}**, received ${result.content.length} characters.\n\nPreview:\n\`\`\`\n${contentPreview}\n\`\`\``
     };
   })
   .build();

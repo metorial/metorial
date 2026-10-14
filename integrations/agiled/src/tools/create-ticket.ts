@@ -12,6 +12,7 @@ export let createTicket = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       subject: z.string().describe('Ticket subject'),

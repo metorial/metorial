@@ -1,24 +1,32 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listDidcommConnections = SlateTool.create(spec, {
   name: 'List DIDComm Connections',
   key: 'list_didcomm_connections',
   description: `Retrieve DIDComm connections established in a Paradym project. Connections are used for credential issuance, verification, and secure messaging between parties.`,
+  instructions: ['Call list_projects to choose the projectId for this operation.'],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      pageBefore: z.string().optional().describe('Cursor for fetching the previous page'),
+      projectId: projectIdSchema,
       pageSize: z.number().optional().describe('Number of connections to return per page'),
       pageAfter: z.string().optional().describe('Cursor for fetching the next page of results')
     })
   )
   .output(
     z.object({
+      metadata: z
+        .any()
+        .optional()
+        .describe('Provider pagination metadata, including next and previous page URLs'),
       connections: z
         .array(
           z.object({
@@ -36,17 +44,18 @@ export let listDidcommConnections = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      projectId: ctx.config.projectId
+      projectId: ctx.input.projectId ?? ctx.config.projectId
     });
 
     let result = await client.listDidcommConnections({
       pageSize: ctx.input.pageSize,
+      pageBefore: ctx.input.pageBefore,
       pageAfter: ctx.input.pageAfter
     });
 
     let connections = (result.data ?? []).map((c: any) => ({
       connectionId: c.id,
-      displayName: c.displayName,
+      displayName: c.displayName ?? undefined,
       ourDid: c.ourDid,
       theirDid: c.theirDid,
       status: c.status,
@@ -54,7 +63,7 @@ export let listDidcommConnections = SlateTool.create(spec, {
     }));
 
     return {
-      output: { connections },
+      output: { connections, metadata: result.meta },
       message: `Found **${connections.length}** DIDComm connection(s).`
     };
   })

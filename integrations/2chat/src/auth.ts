@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { TwoChatClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,21 +30,16 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.p.2chat.io/open',
-        headers: {
-          'X-User-API-Key': ctx.output.token
-        }
-      });
-
-      let response = await axios.get('/info');
-      let data = response.data;
+      let data = await new TwoChatClient({ token: ctx.output.token }).getAccountInfo();
 
       return {
         profile: {
-          id: data.id || data.uuid,
-          email: data.email,
-          name: data.name || data.account_name
+          id:
+            data.id !== undefined && data.id !== null
+              ? String(data.id)
+              : (data.uuid ?? undefined),
+          email: data.email ?? undefined,
+          name: data.name ?? data.account_name ?? undefined
         }
       };
     }

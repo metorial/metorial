@@ -1,6 +1,8 @@
-# Click Send
+# ClickSend
 
-Send and receive SMS, MMS, voice (text-to-speech), transactional email, fax, and physical post (letters and postcards) worldwide. Manage contacts and contact lists, purchase dedicated phone numbers, register sender IDs, and create inbound automation rules for auto-replies and webhook forwarding. Schedule messages for future delivery, run bulk SMS and MMS campaigns, upload files for fax and post operations, and track delivery receipts and messaging statistics. Manage subaccounts, check account balance, and export message history for reporting.
+Send SMS, MMS, voice calls, transactional email, and physical letters. Manage contacts and contact lists, discover dedicated numbers and email sender IDs, check the authenticated account and balance, review SMS history and delivery receipts, and retrieve incoming SMS replies.
+
+SMS receipt and inbound-message listing require matching POLL rules in the ClickSend dashboard. Transactional email and Post are available only to existing customers who have access to those services. New customers may need ClickSend approval to send URLs in SMS messages.
 
 ## License
 

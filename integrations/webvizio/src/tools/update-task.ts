@@ -48,6 +48,10 @@ export let updateTask = SlateTool.create(spec, {
       timeLogs: z
         .array(
           z.object({
+            id: z
+              .number()
+              .optional()
+              .describe('Existing time log ID to update; omit to create a new entry'),
             user: z.string().describe('Email of the user who logged time'),
             date: z.string().describe('Date of the time log in ISO8601 format'),
             time: z.number().describe('Duration in minutes')

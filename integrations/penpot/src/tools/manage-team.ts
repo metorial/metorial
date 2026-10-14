@@ -1,12 +1,12 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { makeClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageTeamTool = SlateTool.create(spec, {
   name: 'Manage Team',
   key: 'manage_team',
-  description: `Create, rename, or delete a team. Also retrieve team details, members, invitations, and statistics. Use **action** to specify the operation.`,
+  description: `Create, rename, or delete a team. Also retrieve team details and members, invite teammates, and manage member roles. Use **action** to specify the operation.`,
   instructions: [
     'To create a team, set action to "create" and provide a name.',
     'To rename, set action to "rename" with teamId and name.',
@@ -64,12 +64,12 @@ export let manageTeamTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ baseUrl: ctx.config.baseUrl, token: ctx.auth.token });
+    let client = makeClient(ctx);
     let { action, teamId, name, invitations, memberId, role } = ctx.input;
 
     switch (action) {
       case 'create': {
-        if (!name) throw new Error('name is required for create action');
+        if (!name) throw createApiServiceError('name is required for create action');
         let team = await client.createTeam(name);
         return {
           output: { team },
@@ -78,7 +78,7 @@ export let manageTeamTool = SlateTool.create(spec, {
       }
       case 'rename': {
         if (!teamId || !name)
-          throw new Error('teamId and name are required for rename action');
+          throw createApiServiceError('teamId and name are required for rename action');
         let team = await client.updateTeam(teamId, name);
         return {
           output: { team },
@@ -86,7 +86,7 @@ export let manageTeamTool = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!teamId) throw new Error('teamId is required for delete action');
+        if (!teamId) throw createApiServiceError('teamId is required for delete action');
         await client.deleteTeam(teamId);
         return {
           output: {},
@@ -94,7 +94,7 @@ export let manageTeamTool = SlateTool.create(spec, {
         };
       }
       case 'get': {
-        if (!teamId) throw new Error('teamId is required for get action');
+        if (!teamId) throw createApiServiceError('teamId is required for get action');
         let team = await client.getTeam({ id: teamId });
         return {
           output: { team },
@@ -102,7 +102,7 @@ export let manageTeamTool = SlateTool.create(spec, {
         };
       }
       case 'get_members': {
-        if (!teamId) throw new Error('teamId is required for get_members action');
+        if (!teamId) throw createApiServiceError('teamId is required for get_members action');
         let members = await client.getTeamMembers(teamId);
         return {
           output: { members },
@@ -111,7 +111,7 @@ export let manageTeamTool = SlateTool.create(spec, {
       }
       case 'invite': {
         if (!teamId || !invitations?.length)
-          throw new Error('teamId and invitations are required for invite action');
+          throw createApiServiceError('teamId and invitations are required for invite action');
         let result = await client.createTeamInvitations(teamId, invitations);
         return {
           output: { invitationResult: result },
@@ -120,7 +120,9 @@ export let manageTeamTool = SlateTool.create(spec, {
       }
       case 'update_role': {
         if (!teamId || !memberId || !role)
-          throw new Error('teamId, memberId, and role are required for update_role action');
+          throw createApiServiceError(
+            'teamId, memberId, and role are required for update_role action'
+          );
         await client.updateTeamMemberRole(teamId, memberId, role);
         return {
           output: {},
@@ -129,7 +131,9 @@ export let manageTeamTool = SlateTool.create(spec, {
       }
       case 'remove_member': {
         if (!teamId || !memberId)
-          throw new Error('teamId and memberId are required for remove_member action');
+          throw createApiServiceError(
+            'teamId and memberId are required for remove_member action'
+          );
         await client.deleteTeamMember(teamId, memberId);
         return {
           output: {},

@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Stannp
 
-Send physical postcards, letters, greetings cards, and self-mailers programmatically. Manage recipients and groups, create and track bulk mail campaigns, validate addresses, send SMS messages, and generate QR codes. Upload design templates and artwork, check account balance, and monitor mailpiece delivery status. Supports US, UK, Canada, and worldwide destinations.
+Send postcards and letters, manage recipients and mailing groups, create and schedule bulk campaigns, validate addresses, check account balance, and track delivery. Review a downloadable campaign sample PDF and discover available booking dates before scheduling dispatch. Supports US and UK/EU accounts.
 
 ## License
 

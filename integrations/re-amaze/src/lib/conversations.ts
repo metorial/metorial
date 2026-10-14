@@ -4,6 +4,14 @@ import { z } from 'zod';
 export let conversationStatusDescription =
   'Status code: 0=Open, 1=Responded, 2=Done, 3=Spam, 4=Archived, 5=On Hold, 6=Auto-Done, 7=AI Agent Assigned, 8=AI Agent Done, 9=AI-identified Spam';
 
+export let validateConversationStatus = (status: number | undefined) => {
+  if (status !== undefined && (!Number.isInteger(status) || status < 0 || status > 9)) {
+    throw createApiServiceError(
+      'Conversation status must be a whole-number code from 0 to 9.'
+    );
+  }
+};
+
 export let personSchema = z.object({
   name: z.string().nullable().optional(),
   email: z.string().nullable().optional(),

@@ -1,5 +1,4 @@
-import crypto from 'crypto';
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface AuthConfig {
   token: string;
@@ -14,37 +13,122 @@ export interface PaginatedResult<T> {
   entityCount: number;
 }
 
+let activityPayload = (data: Record<string, any>) => {
+  let {
+    activityDateTime,
+    activityTypeId,
+    isCheckin,
+    geocodeLatitude,
+    geocodeLongitude,
+    ...fields
+  } = data;
+  return {
+    ...fields,
+    ...(activityDateTime !== undefined ? { date: activityDateTime } : {}),
+    ...(activityTypeId !== undefined ? { typeId: activityTypeId } : {}),
+    ...(isCheckin !== undefined ? { checkin: isCheckin } : {}),
+    ...(geocodeLatitude !== undefined ? { latitude: geocodeLatitude } : {}),
+    ...(geocodeLongitude !== undefined ? { longitude: geocodeLongitude } : {})
+  };
+};
+
+let calendarPayload = (data: Record<string, any>) => {
+  let { ownerId, activityTypeId, isTask, notificationMinutes, ...fields } = data;
+  return {
+    ...fields,
+    ...(ownerId !== undefined ? { salesRepId: ownerId } : {}),
+    ...(activityTypeId !== undefined ? { typeId: activityTypeId } : {}),
+    ...(isTask !== undefined ? { task: isTask } : {}),
+    ...(notificationMinutes !== undefined ? { reminder: notificationMinutes } : {})
+  };
+};
+
+let contactPayload = (data: Record<string, any>) => {
+  let { gender, genderId, useCompanyAddress, ...fields } = data;
+  let genderValue = genderId;
+  if (genderValue === undefined && gender !== undefined) {
+    let genders: Record<string, number> = { male: 0, female: 1, '0': 0, '1': 1 };
+    genderValue = genders[String(gender).toLowerCase()];
+    if (genderValue === undefined) {
+      throw createApiServiceError(
+        'Gender must be male, female, 0, or 1. Use genderId for a numeric gender value.'
+      );
+    }
+  }
+  return {
+    ...fields,
+    ...(genderValue !== undefined ? { gender: genderValue } : {}),
+    ...(useCompanyAddress !== undefined ? { UseCompanyAddress: useCompanyAddress } : {})
+  };
+};
+
+let opportunityPayload = (data: Record<string, any>) => {
+  let { typeId, salesProbability, ...fields } = data;
+  if (
+    salesProbability !== undefined &&
+    (!Number.isInteger(salesProbability) ||
+      salesProbability < 0 ||
+      salesProbability > 100 ||
+      salesProbability % 10 !== 0)
+  ) {
+    throw createApiServiceError(
+      'Win probability must be a percentage from 0 to 100 in increments of 10.'
+    );
+  }
+  return {
+    ...fields,
+    ...(typeId !== undefined ? { type_id: typeId } : {}),
+    ...(salesProbability !== undefined ? { salesProbability: salesProbability / 10 } : {})
+  };
+};
+
 export class Client {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private authConfig: AuthConfig;
+
+  static async login(publicKey: string, privateKey: string): Promise<string> {
+    let axios = createAuthenticatedAxios({
+      baseURL: 'https://api.forcemanager.com/api/v4',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ForceManager',
+          reason: 'forcemanager_login_error',
+          operation: 'login'
+        })
+    });
+    let response = await axios.post('/login', { username: publicKey, password: privateKey });
+    let token = response.data?.token;
+    if (typeof token !== 'string' || !token.trim()) {
+      throw createApiServiceError(
+        'ForceManager login did not return a session token. Check your API keys.'
+      );
+    }
+    return token;
+  }
 
   constructor(authConfig: AuthConfig) {
     this.authConfig = authConfig;
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.forcemanager.com/api/v4',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ForceManager',
+          reason: 'forcemanager_api_error'
+        }),
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json'
       }
     });
 
-    this.axios.interceptors.request.use(config => {
-      config.headers.set('X-FM-API-Version', '4');
-
-      if (this.authConfig.authMethod === 'hmac') {
-        let timestamp = Math.floor(Date.now() / 1000).toString();
-        let signature = crypto
-          .createHash('sha1')
-          .update(timestamp + this.authConfig.publicKey + this.authConfig.privateKey)
-          .digest('hex');
-
-        config.headers.set('X-FM-PublicKey', this.authConfig.publicKey);
-        config.headers.set('X-FM-UnixTimestamp', timestamp);
-        config.headers.set('X-FM-Signature', signature);
-      } else {
-        config.headers.set('X-Session-Key', this.authConfig.token);
+    this.axios.interceptors.request.use(async config => {
+      if (!this.authConfig.token) {
+        this.authConfig = {
+          ...this.authConfig,
+          token: await Client.login(this.authConfig.publicKey, this.authConfig.privateKey)
+        };
       }
-
+      config.headers.set('X-Session-Key', this.authConfig.token);
       return config;
     });
   }
@@ -56,20 +140,30 @@ export class Client {
     params?: Record<string, any>,
     page?: number
   ): Promise<PaginatedResult<T>> {
-    let headers: Record<string, string> = {};
-    if (page !== undefined) {
-      headers['X-FM-Page'] = page.toString();
+    let currentPage = page ?? 0;
+    if (!Number.isInteger(currentPage) || currentPage < 0) {
+      throw createApiServiceError('Page must be a non-negative integer.');
     }
-
-    let response = await this.axios.get(`/${entity}`, { params, headers });
-
-    let nextPage = response.headers['x-fm-next-page'];
-    let entityCount = response.headers['x-fm-entity-count'];
+    let { q, count, ...filters } = params ?? {};
+    let conditions = Object.entries(filters).map(([key, value]) =>
+      typeof value === 'string'
+        ? `${key} LIKE '%${value.replaceAll("'", "''")}%'`
+        : `${key}=${value}`
+    );
+    if (q) conditions.unshift(`(${q})`);
+    let response = await this.axios.get(`/${entity}`, {
+      params: {
+        page: currentPage,
+        ...(conditions.length ? { where: conditions.join(' AND ') } : {})
+      },
+      headers: count !== undefined ? { Count: String(count) } : undefined
+    });
+    let records: T[] = Array.isArray(response.data) ? response.data : [];
 
     return {
-      records: Array.isArray(response.data) ? response.data : [],
-      nextPage: nextPage !== undefined ? Number.parseInt(nextPage, 10) : null,
-      entityCount: entityCount ? Number.parseInt(entityCount, 10) : 0
+      records,
+      nextPage: records.length ? currentPage + 1 : null,
+      entityCount: records.length
     };
   }
 
@@ -99,23 +193,23 @@ export class Client {
   // ---- Accounts (Companies) ----
 
   async listCompanies(params?: Record<string, any>, page?: number) {
-    return this.list('companies', params, page);
+    return this.list('accounts', params, page);
   }
 
   async getCompany(companyId: number | string) {
-    return this.getById('companies', companyId);
+    return this.getById('accounts', companyId);
   }
 
   async createCompany(data: Record<string, any>) {
-    return this.create('companies', data);
+    return this.create('accounts', data);
   }
 
   async updateCompany(companyId: number | string, data: Record<string, any>) {
-    return this.update('companies', companyId, data);
+    return this.update('accounts', companyId, data);
   }
 
   async deleteCompany(companyId: number | string) {
-    return this.remove('companies', companyId);
+    return this.remove('accounts', companyId);
   }
 
   // ---- Contacts ----
@@ -129,11 +223,11 @@ export class Client {
   }
 
   async createContact(data: Record<string, any>) {
-    return this.create('contacts', data);
+    return this.create('contacts', contactPayload(data));
   }
 
   async updateContact(contactId: number | string, data: Record<string, any>) {
-    return this.update('contacts', contactId, data);
+    return this.update('contacts', contactId, contactPayload(data));
   }
 
   async deleteContact(contactId: number | string) {
@@ -151,11 +245,11 @@ export class Client {
   }
 
   async createActivity(data: Record<string, any>) {
-    return this.create('activities', data);
+    return this.create('activities', activityPayload(data));
   }
 
   async updateActivity(activityId: number | string, data: Record<string, any>) {
-    return this.update('activities', activityId, data);
+    return this.update('activities', activityId, activityPayload(data));
   }
 
   async deleteActivity(activityId: number | string) {
@@ -173,11 +267,11 @@ export class Client {
   }
 
   async createOpportunity(data: Record<string, any>) {
-    return this.create('opportunities', data);
+    return this.create('opportunities', opportunityPayload(data));
   }
 
   async updateOpportunity(opportunityId: number | string, data: Record<string, any>) {
-    return this.update('opportunities', opportunityId, data);
+    return this.update('opportunities', opportunityId, opportunityPayload(data));
   }
 
   async deleteOpportunity(opportunityId: number | string) {
@@ -209,67 +303,80 @@ export class Client {
   // ---- Sales Orders ----
 
   async listSalesOrders(params?: Record<string, any>, page?: number) {
-    return this.list('salesorder', params, page);
+    return this.list('salesorders', params, page);
   }
 
   async getSalesOrder(salesOrderId: number | string) {
-    return this.getById('salesorder', salesOrderId);
+    return this.getById('salesorders', salesOrderId);
   }
 
   async createSalesOrder(data: Record<string, any>) {
-    return this.create('salesorder', data);
+    let { salesForecastDate, ...fields } = data;
+    return this.create('salesorders', {
+      ...fields,
+      ...(salesForecastDate !== undefined ? { salesForcecastDate: salesForecastDate } : {})
+    });
   }
 
   async updateSalesOrder(salesOrderId: number | string, data: Record<string, any>) {
-    return this.update('salesorder', salesOrderId, data);
+    let { salesForecastDate, ...fields } = data;
+    return this.update('salesorders', salesOrderId, {
+      ...fields,
+      ...(salesForecastDate !== undefined ? { salesForcecastDate: salesForecastDate } : {})
+    });
   }
 
   async deleteSalesOrder(salesOrderId: number | string) {
-    return this.remove('salesorder', salesOrderId);
+    return this.remove('salesorders', salesOrderId);
   }
 
   // ---- Sales Order Lines ----
 
   async listSalesOrderLines(params?: Record<string, any>, page?: number) {
-    return this.list('salesorderline', params, page);
+    return this.list('salesordersLines', params, page);
   }
 
   async getSalesOrderLine(lineId: number | string) {
-    return this.getById('salesorderline', lineId);
+    return this.getById('salesordersLines', lineId);
   }
 
   async createSalesOrderLine(data: Record<string, any>) {
-    return this.create('salesorderline', data);
+    let { salesOrderId, ...fields } = data;
+    return this.create('salesOrdersLines', { ...fields, salesorderId: salesOrderId });
   }
 
   async updateSalesOrderLine(lineId: number | string, data: Record<string, any>) {
-    return this.update('salesorderline', lineId, data);
+    let { salesOrderId, ...fields } = data;
+    return this.update('salesordersLines', lineId, {
+      ...fields,
+      ...(salesOrderId !== undefined ? { salesorderId: salesOrderId } : {})
+    });
   }
 
   async deleteSalesOrderLine(lineId: number | string) {
-    return this.remove('salesorderline', lineId);
+    return this.remove('salesordersLines', lineId);
   }
 
   // ---- Calendar ----
 
   async listCalendarEntries(params?: Record<string, any>, page?: number) {
-    return this.list('calendars', params, page);
+    return this.list('calendar', params, page);
   }
 
   async getCalendarEntry(entryId: number | string) {
-    return this.getById('calendars', entryId);
+    return this.getById('calendar', entryId);
   }
 
   async createCalendarEntry(data: Record<string, any>) {
-    return this.create('calendars', data);
+    return this.create('calendar', calendarPayload(data));
   }
 
   async updateCalendarEntry(entryId: number | string, data: Record<string, any>) {
-    return this.update('calendars', entryId, data);
+    return this.update('calendar', entryId, calendarPayload(data));
   }
 
   async deleteCalendarEntry(entryId: number | string) {
-    return this.remove('calendars', entryId);
+    return this.remove('calendar', entryId);
   }
 
   // ---- Users ----
@@ -285,26 +392,73 @@ export class Client {
   // ---- External ID Mapping ----
 
   async getInternalId(entityType: string, externalId: string): Promise<any> {
-    let response = await this.axios.get('/internalid', {
-      params: { type: entityType, externalid: externalId }
+    let entities: Record<string, string> = {
+      company: 'accounts',
+      companies: 'accounts',
+      account: 'accounts',
+      accounts: 'accounts',
+      contact: 'contacts',
+      contacts: 'contacts',
+      activity: 'activities',
+      activities: 'activities',
+      opportunity: 'opportunities',
+      opportunities: 'opportunities',
+      product: 'products',
+      products: 'products',
+      salesorder: 'salesorders',
+      salesorders: 'salesorders',
+      user: 'users',
+      users: 'users',
+      calendar: 'calendar',
+      calendars: 'calendar',
+      salesorderline: 'salesordersLines',
+      salesorderslines: 'salesordersLines'
+    };
+    let entity = entities[entityType.toLowerCase()];
+    if (!entity) {
+      throw createApiServiceError(
+        'Unsupported entity type. Use account, contact, activity, opportunity, product, salesorder, user, calendar, or salesorderline.'
+      );
+    }
+    let result = await this.list(entity, {
+      q: `extId='${externalId.replaceAll("'", "''")}'`,
+      count: 1
     });
-    return response.data;
+    return result.records[0] ?? null;
   }
 
   // ---- List of Values ----
 
-  async getValues(resourceName: string, query?: string): Promise<any[]> {
-    let params: Record<string, any> = { resourcename: resourceName };
-    if (query) {
-      params.q = query;
-    }
-    let response = await this.axios.get('/values', { params });
-    return Array.isArray(response.data) ? response.data : [];
+  async getValues(resourceName: string, query?: string, page?: number) {
+    let resources: Record<string, string> = {
+      AccountType: 'accountTypes',
+      AccountStatus: 'accountStatuses',
+      ActivityType: 'activityTypes',
+      OpportunityStatus: 'opportunityStatuses',
+      OpportunityType: 'opportunityTypes',
+      ContactType: 'contactTypes',
+      Branch: 'branches',
+      Segment: 'accountSegments',
+      Country: 'countries',
+      Currency: 'currencies',
+      Timezone: 'timezones',
+      ProductCategory: 'productCategories',
+      ProductFamily: 'productFamilies',
+      SalesOrderStatus: 'salesorderStatuses',
+      Rate: 'rates'
+    };
+    let endpoint =
+      resources[resourceName] ??
+      Object.values(resources).find(value => value === resourceName);
+    return this.list(
+      endpoint ?? `list/${encodeURIComponent(resourceName)}`,
+      { q: query },
+      page
+    );
   }
 
-  async getValuesInfo(): Promise<any[]> {
-    let response = await this.axios.get('/values/info');
-    return Array.isArray(response.data) ? response.data : [];
+  async getValuesInfo(page?: number) {
+    return this.list('list', undefined, page);
   }
 
   // ---- Querying with date filter (for polling) ----

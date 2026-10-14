@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, getAppcircleList } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageTestingGroups = SlateTool.create(spec, {
@@ -39,16 +39,16 @@ export let manageTestingGroups = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'list': {
         let groups = await client.listTestingGroups();
-        let items = Array.isArray(groups) ? groups : [];
+        let items = getAppcircleList(groups, 'list');
         return { output: items, message: `Found **${items.length}** testing group(s).` };
       }
       case 'get': {
-        if (!ctx.input.groupId) throw new Error('groupId is required');
+        if (!ctx.input.groupId) throw createApiServiceError('groupId is required');
         let group = await client.getTestingGroup(ctx.input.groupId);
         return { output: group, message: `Retrieved testing group **${ctx.input.groupId}**.` };
       }
       case 'create': {
-        if (!ctx.input.groupName) throw new Error('groupName is required');
+        if (!ctx.input.groupName) throw createApiServiceError('groupName is required');
         let created = await client.createTestingGroup({ name: ctx.input.groupName });
         return {
           output: created,
@@ -56,7 +56,7 @@ export let manageTestingGroups = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.groupId) throw new Error('groupId is required');
+        if (!ctx.input.groupId) throw createApiServiceError('groupId is required');
         await client.deleteTestingGroup(ctx.input.groupId);
         return {
           output: { success: true },
@@ -65,7 +65,7 @@ export let manageTestingGroups = SlateTool.create(spec, {
       }
       case 'add_testers': {
         if (!ctx.input.groupId || !ctx.input.emails?.length)
-          throw new Error('groupId and emails are required');
+          throw createApiServiceError('groupId and emails are required');
         let result = await client.addTestersToGroup(ctx.input.groupId, ctx.input.emails);
         return {
           output: result,
@@ -74,7 +74,7 @@ export let manageTestingGroups = SlateTool.create(spec, {
       }
       case 'remove_testers': {
         if (!ctx.input.groupId || !ctx.input.emails?.length)
-          throw new Error('groupId and emails are required');
+          throw createApiServiceError('groupId and emails are required');
         await client.removeTestersFromGroup(ctx.input.groupId, ctx.input.emails);
         return {
           output: { success: true },

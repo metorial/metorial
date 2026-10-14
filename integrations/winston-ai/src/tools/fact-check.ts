@@ -10,7 +10,7 @@ export let factCheck = SlateTool.create(spec, {
 
 Accepts plain text, a publicly accessible file URL (.pdf, .doc, .docx), or a website URL. Supports 38+ languages with auto-detection. Extracts up to 12 claims per request.`,
   instructions: [
-    'Provide exactly one of: text, fileUrl, or websiteUrl. If multiple are provided, websiteUrl takes priority over fileUrl, which takes priority over text.'
+    'Provide text, fileUrl, or websiteUrl. If multiple are provided, websiteUrl takes priority over fileUrl, which takes priority over text.'
   ],
   constraints: [
     'Text must be between 300 and 10,000 characters.',

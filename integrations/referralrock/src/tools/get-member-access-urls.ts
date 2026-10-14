@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
@@ -44,6 +44,26 @@ export let getMemberAccessUrls = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let selectors = [
+      ctx.input.memberId,
+      ctx.input.referralCode,
+      ctx.input.emailAddress,
+      ctx.input.externalId
+    ];
+    if (
+      selectors.filter(value => value !== undefined).length !== 1 ||
+      !selectors.some(value => value?.trim())
+    ) {
+      throw createApiServiceError(
+        'Provide exactly one of memberId, referralCode, emailAddress, or externalId.'
+      );
+    }
+    let expiry = ctx.input.expireInMinutes;
+    if (expiry !== undefined && (!Number.isInteger(expiry) || expiry < 5 || expiry > 43200)) {
+      throw createApiServiceError(
+        'expireInMinutes must be a whole number between 5 and 43200.'
+      );
+    }
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
     let result = await client.getMemberAccessUrls({

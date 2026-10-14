@@ -20,7 +20,9 @@ export let getProjectReport = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project'),
+      projectId: z
+        .string()
+        .describe('The ID of the project. Call list_projects to discover available projects.'),
       reportType: z
         .enum(['time_entries', 'time_summary'])
         .describe('Type of report to generate'),

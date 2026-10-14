@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -23,7 +23,7 @@ export let createStory = SlateTool.create(spec, {
       workflowStateId: z
         .number()
         .optional()
-        .describe('ID of the workflow state to place the story in'),
+        .describe('Required by Shortcut. Call list_workflows to discover workflow state IDs.'),
       epicId: z
         .number()
         .optional()
@@ -89,6 +89,11 @@ export let createStory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.workflowStateId === undefined) {
+      throw createApiServiceError(
+        'workflowStateId is required to create a story. Call list_workflows to choose a state.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let params: Record<string, any> = {

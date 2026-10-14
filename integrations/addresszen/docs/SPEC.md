@@ -1,4 +1,4 @@
-# Slates Specification for Addresszen
+# AddressZen API Specification
 
 ## Overview
 
@@ -6,15 +6,15 @@ AddressZen is an address verification and data validation platform that provides
 
 ## Authentication
 
-Most requests require an API key for authentication. Authenticate by passing an `api_key` as part of the query string.
+Lookup and validation requests require an API key. The integration sends `Authorization: Bearer <API_KEY>`. Private key details, usage, CSV logs, and updates require a separate account Management Key, sent as the Bearer token on those requests. Configure it as the optional management credential on the connection.
 
 For example:
 
 ```
-https://api.addresszen.com/v1/autocomplete/addresses?api_key=YOUR_API_KEY&q=parkside
+https://api.addresszen.com/v1/autocomplete/addresses?api_key=YOUR_API_KEY&query=parkside
 ```
 
-Alternatively, authentication can be transmitted via the `Authorization` header using the following scheme:
+The older authorization scheme remains supported by the provider but is deprecated:
 
 ```
 Authorization: api_key="YOUR_API_KEY"
@@ -42,7 +42,7 @@ Address verification takes a complete address and validates it against authorita
 - Accepts a full address string as input, or an address with specific components like ZIP code, city, and state.
 - Returns standardized address components (line 1, line 2, city, state, ZIP code, etc.).
 - Use cases include cleaning existing address databases, validating form submissions, verifying shipping addresses before fulfillment, and CRM integration.
-- Currently focused on US address verification.
+- Defaults to US CASS verification. Other licensed countries can be selected with an ISO alpha-3 `context` code. A no-match result has a count of zero and does not consume balance.
 
 ### Email Validation
 
@@ -61,6 +61,16 @@ The API allows programmatic management of API keys, including:
 - Updating key settings.
 - Retrieving usage statistics for a range of days.
 - Exporting lookup logs as CSV.
+
+Usage and log date ranges are capped at 90 days. Tools accept ISO 8601 date strings and convert them to the UNIX milliseconds required by the API. Usage can be filtered by up to three tags; the documented CSV endpoint has no tag filter. CSV logs are available as a download.
+
+`get_current_key_info` exposes connected-key availability and licensed country codes. `update_key_settings` changes only supplied settings, including lookup caps, allowed URLs, and personal-data retention.
+
+## Official References
+
+- https://docs.addresszen.com/docs/api/
+- https://openapi.addresszen.com/
+- https://openapi.addresszen.com/openapi.json
 
 ### Request Tagging
 

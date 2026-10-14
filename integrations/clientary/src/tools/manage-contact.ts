@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let contactSchema = z.object({
+export let contactSchema = z.object({
   contactId: z.number().describe('Unique ID of the contact'),
   clientId: z.number().optional().describe('ID of the associated client'),
   name: z.string().describe('Contact full name'),
@@ -48,18 +48,18 @@ export let createContact = SlateTool.create(spec, {
     if (ctx.input.extension) data.ext = ctx.input.extension;
 
     let result = await client.createContact(ctx.input.clientId, data);
-    let c = result.contact || result;
+    let c = result.contact || result.client_user || result;
 
     return {
       output: {
         contactId: c.id,
-        clientId: c.client_id,
+        clientId: c.client_id ?? undefined,
         name: c.name,
-        email: c.email,
-        phone: c.phone,
-        mobile: c.mobile,
+        email: c.email ?? undefined,
+        phone: c.phone ?? undefined,
+        mobile: c.mobile ?? undefined,
         title: c.title,
-        extension: c.ext
+        extension: c.ext ?? undefined
       },
       message: `Created contact **${c.name}** (ID: ${c.id}) for client ID ${ctx.input.clientId}.`
     };
@@ -99,18 +99,18 @@ export let updateContact = SlateTool.create(spec, {
     if (ctx.input.extension !== undefined) data.ext = ctx.input.extension;
 
     let result = await client.updateContact(ctx.input.contactId, data);
-    let c = result.contact || result;
+    let c = result.contact || result.client_user || result;
 
     return {
       output: {
         contactId: c.id,
-        clientId: c.client_id,
+        clientId: c.client_id ?? undefined,
         name: c.name,
-        email: c.email,
-        phone: c.phone,
-        mobile: c.mobile,
+        email: c.email ?? undefined,
+        phone: c.phone ?? undefined,
+        mobile: c.mobile ?? undefined,
         title: c.title,
-        extension: c.ext
+        extension: c.ext ?? undefined
       },
       message: `Updated contact **${c.name}** (ID: ${c.id}).`
     };
@@ -148,22 +148,55 @@ export let listContacts = SlateTool.create(spec, {
 
     let contacts = (result.contacts || []).map((c: any) => ({
       contactId: c.id,
-      clientId: c.client_id,
+      clientId: c.client_id ?? undefined,
       name: c.name,
-      email: c.email,
-      phone: c.phone,
-      mobile: c.mobile,
+      email: c.email ?? undefined,
+      phone: c.phone ?? undefined,
+      mobile: c.mobile ?? undefined,
       title: c.title,
-      extension: c.ext
+      extension: c.ext ?? undefined
     }));
 
     return {
       output: {
         contacts,
-        totalCount: result.total_count,
-        pageCount: result.page_count
+        totalCount: result.total_count ?? undefined,
+        pageCount: result.page_count ?? undefined
       },
       message: `Retrieved ${contacts.length} contact(s).`
+    };
+  })
+  .build();
+
+export let getContact = SlateTool.create(spec, {
+  name: 'Get Contact',
+  key: 'get_contact',
+  description: 'Retrieve a Clientary contact by ID, including its client and contact details.',
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      contactId: z.number().describe('Contact ID. Use list_contacts to find contacts.')
+    })
+  )
+  .output(contactSchema)
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, subdomain: ctx.config.subdomain });
+    let result = await client.getContact(ctx.input.contactId);
+    let c = result.contact || result.client_user || result;
+
+    return {
+      output: {
+        contactId: c.id,
+        clientId: c.client_id ?? undefined,
+        name: c.name,
+        email: c.email ?? undefined,
+        phone: c.phone ?? undefined,
+        mobile: c.mobile ?? undefined,
+        title: c.title,
+        extension: c.ext ?? undefined
+      },
+      message: `Retrieved contact **${c.name}** (ID: ${c.id}).`
     };
   })
   .build();

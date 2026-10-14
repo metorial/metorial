@@ -1,17 +1,16 @@
 {
   "name": "@metorial/capsule-crm",
-  "description": "Manage contacts, sales pipelines, projects, and tasks in Capsule CRM. Create, update, delete, and search people and organisations with addresses, phone numbers, emails, and custom fields. Track sales opportunities through configurable pipelines with milestones, expected close dates, and deal values. Manage projects with boards and stages. Create and assign tasks with due dates and recurrence. Log activity history and communication notes against contacts, opportunities, and projects, including file attachments. Define tags and custom fields to categorise records. Set up automated workflow tracks with sequential tasks. Manage users, teams, goals, filters, and lost reasons.",
+  "description": "Manage Capsule CRM contacts, sales opportunities, projects, tasks, and notes. Search contacts and opportunities, set custom field values, move deals through pipeline milestones, link projects to opportunities, assign records to users or teams, and manage tag definitions. Inspect the connected user and discover users, teams, pipelines, and milestones.",
   "categories": ["crm-and-sales-tools", "task-and-project-management"],
   "skills": [
     "manage contacts and organisations",
     "track sales opportunities",
-    "manage sales pipelines",
+    "discover sales pipelines and milestones",
     "create and assign tasks",
-    "manage projects and boards",
+    "manage projects",
     "log activity history",
-    "tag and filter records",
-    "define custom fields",
-    "automate workflow tracks"
+    "manage tags and custom field values",
+    "discover users and teams"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/capsule-crm.png"
 }

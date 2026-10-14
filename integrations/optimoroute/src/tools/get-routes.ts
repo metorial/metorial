@@ -98,7 +98,10 @@ export let getRoutes = SlateTool.create(spec, {
       load2: r.load2,
       load3: r.load3,
       load4: r.load4,
-      stops: r.stops || [],
+      stops: (Array.isArray(r.stops) ? r.stops : []).map((stop: Record<string, unknown>) => ({
+        ...stop,
+        orderId: stop.id ?? stop.orderId
+      })),
       routePolyline: r.routePolyline
     }));
 

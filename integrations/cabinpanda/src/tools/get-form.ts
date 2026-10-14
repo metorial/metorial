@@ -34,13 +34,13 @@ export let getForm = SlateTool.create(spec, {
 
     return {
       output: {
-        formId: form?.key ?? form?.id?.toString(),
-        name: form?.name,
-        status: form?.status,
+        formId: form?.key?.toString() ?? form?.id?.toString(),
+        name: form?.name ?? undefined,
+        status: form?.status ?? undefined,
         fields: form?.fields,
         settings: form?.settings,
-        createdAt: form?.created_at,
-        updatedAt: form?.updated_at,
+        createdAt: form?.created_at ?? undefined,
+        updatedAt: form?.updated_at ?? undefined,
         raw: form
       },
       message: `Retrieved form **${form?.name ?? ctx.input.formId}**.`

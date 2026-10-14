@@ -16,15 +16,26 @@ export let updateCardTool = SlateTool.create(spec, {
       cardId: z.number().describe('ID of the card to update'),
       title: z.string().optional().describe('New card title'),
       description: z.string().optional().describe('New card description (supports HTML)'),
-      ownerUserId: z.number().optional().describe('New owner user ID'),
-      typeId: z.number().optional().describe('New card type ID'),
+      ownerUserId: z
+        .number()
+        .optional()
+        .describe('New owner user ID. Call list_users to discover users.'),
+      typeId: z
+        .number()
+        .optional()
+        .describe('New card type ID. Call list_card_types to discover valid types.'),
       size: z.number().optional().describe('New card size estimate'),
       priority: z
         .number()
         .optional()
-        .describe('New priority (0=None, 1=Low, 2=Average, 3=High, 4=Critical)'),
+        .describe(
+          'New priority (1=Critical, 2=High, 3=Average, 4=Low; values above 4 are treated as Low)'
+        ),
       color: z.string().optional().describe('New card color as hex code'),
-      deadline: z.string().optional().describe('New deadline in YYYY-MM-DD format'),
+      deadline: z
+        .string()
+        .optional()
+        .describe('New deadline as an ISO 8601 datetime including a timezone offset'),
       columnId: z.number().optional().describe('Move to this column ID'),
       laneId: z.number().optional().describe('Move to this lane ID'),
       workflowId: z.number().optional().describe('Move to this workflow ID'),
@@ -43,10 +54,7 @@ export let updateCardTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      subdomain: ctx.auth.subdomain
-    });
+    let client = new Client(ctx.auth);
 
     let { cardId, ...updateData } = ctx.input;
     let card = await client.updateCard(cardId, updateData);

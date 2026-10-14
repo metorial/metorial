@@ -84,7 +84,7 @@ export let createConnector = SlateTool.create(spec, {
         connectorId: connector.id,
         startItemId: connector.startItem?.id,
         endItemId: connector.endItem?.id,
-        shape: connector.shape
+        shape: connector.shape ?? undefined
       },
       message: `Created connector (ID: ${connector.id}) from item ${ctx.input.startItemId} to item ${ctx.input.endItemId}.`
     };
@@ -153,7 +153,7 @@ export let getConnectors = SlateTool.create(spec, {
     return {
       output: {
         connectors,
-        cursor: result.cursor
+        cursor: result.cursor ?? undefined
       },
       message: `Found **${connectors.length}** connector(s) on board ${ctx.input.boardId}.`
     };
@@ -195,8 +195,8 @@ let mapConnector = (connector: any) => ({
   connectorId: connector.id,
   startItemId: connector.startItem?.id,
   endItemId: connector.endItem?.id,
-  shape: connector.shape,
+  shape: connector.shape ?? undefined,
   captionContent: connector.captions?.[0]?.content,
-  createdAt: connector.createdAt,
-  modifiedAt: connector.modifiedAt
+  createdAt: connector.createdAt ?? undefined,
+  modifiedAt: connector.modifiedAt ?? undefined
 });

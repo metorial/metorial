@@ -1,6 +1,8 @@
 # <img src="logo.png" height="20"> Timely
 
-Track and manage time entries for projects, clients, and team members. Create, update, and delete time entries (events) with hours, notes, labels, and billing status. Manage projects with budgets, hourly rates, and user assignments. Create and organize clients, labels (tags), and teams. Plan upcoming work with task forecasts. Start and stop real-time timers. Lock days to prevent unauthorized edits. Generate reports filtered by date range, users, projects, labels, and teams with metrics for duration, cost, profit, and profitability. Manage user roles, permissions, and capacity settings. Configure webhooks for real-time notifications on time entries, projects, labels, and forecasts.
+Discover Timely workspaces and your current user profile. Track and manage time entries for projects, clients, and team members, including timers, notes, labels, and billing status. Manage projects with budgets, hourly rates, and user assignments. Create and organize clients, labels, and teams. Plan upcoming work with task forecasts, lock days to prevent edits, and retrieve time reports filtered by date range, users, projects, labels, and teams.
+
+Call `list_accounts` to find workspace IDs, then pass `accountId` to workspace tools. A sole workspace is selected automatically; existing saved workspace IDs remain usable. Timely permissions and plan features determine which operations are available.
 
 ## License
 

@@ -8,12 +8,14 @@ export let verifyEmail = SlateTool.create(spec, {
   key: 'verify_email',
   description: `Verify whether an email address is valid, deliverable, and safe to send to. Checks syntax, domain validity, MX records, mailbox existence, disposable email detection, spam trap detection, and catch-all domain detection.
 
-Returns a verification status: **ok** (passed all tests), **fail** (failed one or more tests), **unknown** (cannot be accurately tested), or **incorrect** (syntax error or no email provided).`,
+Returns the provider's verification status, including **ok** (deliverable), **email_disabled**, **dead_server**, **invalid_mx**, **disposable**, **spamtrap**, **ok_for_all** (catch-all), **smtp_protocol**, **antispam_system**, **unknown**, or **invalid_syntax**.`,
   instructions: [
     'Provide the full email address to verify.',
-    'Use the optional timeout parameter to control how long the verification attempt lasts (defaults to 30 seconds).'
+    'The optional timeout field is retained for older API behavior; the current API does not document or guarantee it.'
   ],
-  constraints: ['Each verification consumes one credit from your account balance.'],
+  constraints: [
+    'A verification costs one credit. Results that cannot be verified, such as unknown or invalid_syntax, are not charged.'
+  ],
   tags: {
     readOnly: true,
     destructive: false
@@ -25,13 +27,17 @@ Returns a verification status: **ok** (passed all tests), **fail** (failed one o
       timeout: z
         .number()
         .optional()
-        .describe('Maximum seconds to attempt verification (defaults to 30)')
+        .describe('Legacy timeout in seconds; the current API may ignore this value')
     })
   )
   .output(
     z.object({
       email: z.string().describe('The email address that was verified'),
-      status: z.string().describe('Verification status: ok, fail, unknown, or incorrect')
+      status: z
+        .string()
+        .describe(
+          'Provider deliverability status, such as ok, email_disabled, disposable, or unknown'
+        )
     })
   )
   .handleInvocation(async ctx => {

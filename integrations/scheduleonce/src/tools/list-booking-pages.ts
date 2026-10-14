@@ -7,7 +7,7 @@ let bookingPageSchema = z.object({
   bookingPageId: z.string().describe('Unique booking page identifier'),
   name: z.string().describe('Booking page name'),
   url: z.string().describe('Public URL of the booking page'),
-  published: z.boolean().describe('Whether the booking page is published')
+  published: z.boolean().describe('Whether the booking page is active and accepts bookings')
 });
 
 export let listBookingPages = SlateTool.create(spec, {
@@ -24,6 +24,9 @@ Booking pages are the legacy scheduling interface. Use this to look up booking p
     z.object({
       limit: z
         .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe integer.')
+        .min(1)
+        .max(100)
         .optional()
         .describe('Number of booking pages to return (1-100, default 10)'),
       cursor: z.string().optional().describe('Cursor for pagination')
@@ -31,7 +34,12 @@ Booking pages are the legacy scheduling interface. Use this to look up booking p
   )
   .output(
     z.object({
-      count: z.number().describe('Total number of booking pages'),
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextCursor: z
+        .string()
+        .nullable()
+        .describe('Pass this ID as cursor to fetch the next page'),
+      count: z.number().describe('Number of booking pages returned in this page'),
       bookingPages: z.array(bookingPageSchema).describe('List of booking pages')
     })
   )
@@ -47,15 +55,17 @@ Booking pages are the legacy scheduling interface. Use this to look up booking p
       bookingPageId: bp.id,
       name: bp.name,
       url: bp.url,
-      published: bp.published
+      published: bp.active ?? bp.published ?? false
     }));
 
     return {
       output: {
         count: result.count,
+        hasMore: result.has_more,
+        nextCursor: result.has_more ? (result.data.at(-1)?.id ?? null) : null,
         bookingPages
       },
-      message: `Found **${result.count}** booking page(s). Returned **${bookingPages.length}** in this page.`
+      message: `Returned **${bookingPages.length}** booking page(s) in this page.`
     };
   })
   .build();

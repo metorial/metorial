@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -19,6 +19,14 @@ export let auth = SlateAuth.create()
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiToken.trim()) {
+        throw createApiServiceError(
+          'Enter a GoDial API access token from External API settings.',
+          {
+            reason: 'godial_missing_api_token'
+          }
+        );
+      }
       return {
         output: {
           token: ctx.input.apiToken

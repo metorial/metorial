@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listFields = SlateTool.create(spec, {
   name: 'List Custom Fields',
   key: 'list_fields',
-  description: `List all custom fields defined for a brand. Returns field names, data types, merge tag names, and sample values used for test campaigns.`,
+  description: `List a page of custom fields defined for a brand. Returns field names, data types, merge tag names, and sample values used for test campaigns.`,
   tags: {
     readOnly: true
   }
@@ -18,6 +18,7 @@ export let listFields = SlateTool.create(spec, {
         .number()
         .min(1)
         .max(100)
+        .refine(Number.isSafeInteger, 'Limit must be a safe whole number')
         .optional()
         .describe('Number of fields to return (1-100). Defaults to 10.'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response')
@@ -27,7 +28,7 @@ export let listFields = SlateTool.create(spec, {
     z.object({
       hasMore: z.boolean().describe('Whether more fields exist beyond this page'),
       cursor: z.string().describe('Cursor for fetching the next page'),
-      total: z.number().describe('Total number of fields'),
+      total: z.number().optional().describe('Total count, only when supplied by BigMailer'),
       fields: z.array(
         z.object({
           fieldId: z.string().describe('Field unique identifier'),
@@ -63,7 +64,7 @@ export let listFields = SlateTool.create(spec, {
         total: result.total,
         fields
       },
-      message: `Found **${result.total}** field(s). Returned **${fields.length}** field(s)${result.has_more ? ' (more available)' : ''}.`
+      message: `Returned **${fields.length}** field(s)${result.has_more ? ' (more available)' : ''}.`
     };
   })
   .build();

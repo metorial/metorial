@@ -1,6 +1,8 @@
-# Saucelabs
+# Sauce Labs
 
-Manage automated and manual testing of web and mobile applications across 700+ browser, OS, and device combinations. Create, monitor, and delete test jobs on virtual and real devices. Manage builds to group related test jobs. Upload mobile app binaries for distribution and testing. Run and manage API tests, performance tests, and visual snapshot comparisons. Control Sauce Connect proxy tunnels for testing behind firewalls. Manage accounts, teams, and user access keys. Query platform availability and supported browser/device combinations.
+Inspect and manage test jobs on virtual and real devices, browse test builds and their results, find real devices and check their availability, monitor Sauce Connect tunnels, and browse uploaded app files. Read organization users, teams, and concurrency limits, and inspect the authenticated user profile.
+
+Connect using your Sauce Labs username, access key, and account data center. Existing connections retain their previously selected region. Available API operations depend on account permissions and regional product availability.
 
 ## License
 

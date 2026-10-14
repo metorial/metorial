@@ -20,8 +20,8 @@ export let listSignatureProfiles = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new IgnisignClient({
       token: ctx.auth.token,
-      appId: ctx.config.appId,
-      appEnv: ctx.config.appEnv
+      appId: ctx.auth.appId ?? ctx.config.appId,
+      appEnv: ctx.auth.appEnv ?? ctx.config.appEnv
     });
 
     let profiles = await client.listSignatureProfiles();

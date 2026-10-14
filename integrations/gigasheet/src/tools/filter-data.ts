@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -63,6 +63,16 @@ export let filterData = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GigasheetClient({ token: ctx.auth.token });
 
+    if (
+      !Number.isSafeInteger(ctx.input.startRow) ||
+      ctx.input.startRow < 0 ||
+      !Number.isSafeInteger(ctx.input.endRow) ||
+      ctx.input.endRow <= ctx.input.startRow
+    ) {
+      throw createApiServiceError(
+        'startRow and endRow must be nonnegative whole numbers, with endRow greater than startRow.'
+      );
+    }
     let filterModel = ctx.input.filterModel;
 
     if (ctx.input.savedFilterHandle) {
@@ -70,7 +80,14 @@ export let filterData = SlateTool.create(spec, {
         ctx.input.savedFilterHandle,
         ctx.input.sheetHandle
       );
-      filterModel = savedFilter;
+      if (
+        !savedFilter.filterModel ||
+        typeof savedFilter.filterModel !== 'object' ||
+        Array.isArray(savedFilter.filterModel)
+      ) {
+        throw createApiServiceError('The saved filter did not include a valid filterModel.');
+      }
+      filterModel = savedFilter.filterModel as Record<string, unknown>;
     }
 
     let result = await client.filterData(ctx.input.sheetHandle, {

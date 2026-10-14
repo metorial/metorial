@@ -6,10 +6,7 @@ import { spec } from '../spec';
 export let toggleCampaignStatus = SlateTool.create(spec, {
   name: 'Toggle Campaign Status',
   key: 'toggle_campaign_status',
-  description: `Pause or resume a HeyReach LinkedIn outreach campaign. Use this to control whether a campaign is actively running or paused. Campaigns cannot be created via the API — only their status can be toggled.`,
-  constraints: [
-    'Campaigns must be created in the HeyReach UI first before they can be managed via API.'
-  ],
+  description: `Pause or resume a HeyReach LinkedIn outreach campaign. Use this to control whether a campaign is actively running or paused.`,
   tags: {
     destructive: false
   }

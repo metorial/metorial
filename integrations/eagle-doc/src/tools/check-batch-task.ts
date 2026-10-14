@@ -14,7 +14,8 @@ When the task status is "Finished", the results contain extracted data for each 
     'Poll periodically until status is "Finished" or "Error".'
   ],
   tags: {
-    readOnly: true
+    readOnly: false,
+    destructive: true
   }
 })
   .input(
@@ -63,7 +64,7 @@ When the task status is "Finished", the results contain extracted data for each 
         finishedTime: result.finishedTime,
         numberOfFiles: result.numberOfFiles,
         numberOfPages: result.numberOfPages,
-        results: result.results || result.result,
+        results: result.results ?? result.result,
         messages: result.messages
       },
       message: `Batch task **${result.id}** status: **${result.status}**.${result.status === 'Finished' ? ` ${result.numberOfFiles || 0} file(s) processed.` : ''}${ctx.input.deleteAfterRetrieval && result.status === 'Finished' ? ' Task deleted.' : ''}`

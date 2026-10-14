@@ -27,8 +27,8 @@ export let getProfile = SlateTool.create(spec, {
     return {
       output: {
         userId: profile?.id?.toString(),
-        name: profile?.name,
-        email: profile?.email,
+        name: profile?.name ?? undefined,
+        email: profile?.email ?? undefined,
         raw: profile
       },
       message: `Retrieved profile for **${profile?.name ?? profile?.email ?? 'user'}**.`

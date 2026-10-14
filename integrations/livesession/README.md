@@ -1,6 +1,12 @@
 # <img src="logo.svg" height="20"> Livesession
 
-Access and manage product analytics data from LiveSession's session replay platform. Retrieve user session data including visitor information, geolocation, and custom parameters. Create, update, delete, and compute conversion funnels with multi-step filters and flexible date ranges. Manage custom metrics, dashboards, alerts, websites, and webhook configurations. Export user and event data to CSV or JSON.
+Access product analytics data from LiveSession. List recorded sessions with replay links, visitor information, geolocation, custom parameters, and event statistics. Create and compute conversion funnels, manage alerts and webhook destinations, discover or create websites, and compute custom-event session metrics as histograms.
+
+Authenticate with a Personal Access Token from LiveSession Settings > API Tokens. Grant the scopes needed for your workflows; the token's website selection determines accessible data.
+
+Funnel compute settings retain their array input and accept one configuration per funnel. Webhook updates can resolve omitted website and URL values when the token has `webhooks:read`. The existing funnel update tool is retained, but the public GraphQL reference currently describes an incompatible update signature; configuration updates depend on provider support for the existing API behavior.
+
+See the [API documentation](https://livesession.dev/docs/api/quickstart) and [integration capabilities](docs/SPEC.md).
 
 ## License
 

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/client';
+import { createClient, parseCost } from '../lib/client';
 import { spec } from '../spec';
 
 export let generateImage = SlateTool.create(spec, {
@@ -84,22 +84,54 @@ export let generateImage = SlateTool.create(spec, {
     });
 
     let images = (result.data ?? []).map((img: any) => ({
-      url: img.url,
-      base64: img.b64_json,
+      url: img.url ?? undefined,
+      base64: img.b64_json ?? undefined,
       revisedPrompt: img.revised_prompt
     }));
 
+    for (let [index, image] of images.entries()) {
+      if (image.url) {
+        await ctx.addAttachment({ type: 'url', url: image.url });
+      } else if (image.base64) {
+        let content = Buffer.from(image.base64, 'base64');
+        let mimeType = content
+          .subarray(0, 8)
+          .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+          ? 'image/png'
+          : content[0] === 255 && content[1] === 216
+            ? 'image/jpeg'
+            : content.subarray(0, 3).toString() === 'GIF'
+              ? 'image/gif'
+              : content.subarray(0, 4).toString() === 'RIFF' &&
+                  content.subarray(8, 12).toString() === 'WEBP'
+                ? 'image/webp'
+                : undefined;
+        if (!mimeType) {
+          throw createApiServiceError('APIpie AI returned unrecognized generated image data.');
+        }
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(content, { headers: { 'Content-Type': mimeType } }),
+          filename: `generated-image-${index + 1}.${mimeType.split('/')[1]}`
+        });
+      } else {
+        throw createApiServiceError(
+          'APIpie AI returned an image without a URL or image data.'
+        );
+      }
+    }
+    let cost = parseCost(result.usage?.cost);
     let imageCount = images.length;
 
     return {
       output: {
         images,
-        cost: result.usage?.cost,
+        cost,
         latencyMs: result.usage?.latency_ms,
         modelUsed: result.usage?.model_used,
         imageSize: result.usage?.image_size
       },
-      message: `Generated **${imageCount}** image${imageCount !== 1 ? 's' : ''} using **${result.usage?.model_used ?? ctx.input.model}**${result.usage?.cost ? ` ($${result.usage.cost.toFixed(4)})` : ''}.${images[0]?.url ? `\n\n![Generated Image](${images[0].url})` : ''}`
+      message: `Generated **${imageCount}** image${imageCount !== 1 ? 's' : ''} using **${result.usage?.model_used ?? ctx.input.model}**${cost !== undefined ? ` ($${cost.toFixed(4)})` : ''}.${images[0]?.url ? `\n\n![Generated Image](${images[0].url})` : ''}`
     };
   })
   .build();

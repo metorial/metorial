@@ -1,5 +1,10 @@
 export { getSystemInfo } from './get-system-info';
 export {
+  createConfirmedEmail,
+  deleteConfirmedEmail,
+  listConfirmedEmails
+} from './manage-confirmed-email';
+export {
   deleteDomain,
   getDomainDnsRecords,
   listDomains,

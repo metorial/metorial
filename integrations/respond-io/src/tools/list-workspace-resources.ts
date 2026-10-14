@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, nextCursorId } from '../lib/client';
 import { spec } from '../spec';
 
 export let listWorkspaceResources = SlateTool.create(spec, {
@@ -13,6 +13,13 @@ export let listWorkspaceResources = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum results to return (1-100)'),
+      cursorId: z.string().optional().describe('Cursor ID returned by the previous page'),
       resourceType: z
         .enum(['channels', 'users'])
         .describe('Type of workspace resource to list')
@@ -20,6 +27,7 @@ export let listWorkspaceResources = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      nextCursorId: z.string().optional().describe('Cursor ID for fetching the next page'),
       channels: z
         .array(
           z.object({
@@ -50,38 +58,44 @@ export let listWorkspaceResources = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.resourceType === 'channels') {
-      let result = await client.listChannels();
+      let result = await client.listChannels(ctx.input.limit, ctx.input.cursorId);
       let data = result?.data || result;
-      let channelsList = Array.isArray(data) ? data : data?.channels || data?.data || [];
+      let channelsList = Array.isArray(data)
+        ? data
+        : data?.items || data?.channels || data?.data || [];
 
       let channels = channelsList.map((c: any) => ({
         channelId: String(c.id || ''),
-        channelName: c.name,
-        channelType: c.type || c.platform
+        channelName: c.name ?? undefined,
+        channelType: c.source ?? c.type ?? c.platform ?? undefined
       }));
 
       return {
         output: {
-          channels
+          channels,
+          nextCursorId: nextCursorId(data)
         },
         message: `Found **${channels.length}** connected channel(s).`
       };
     }
 
-    let result = await client.listUsers();
+    let result = await client.listUsers(ctx.input.limit, ctx.input.cursorId);
     let data = result?.data || result;
-    let usersList = Array.isArray(data) ? data : data?.users || data?.data || [];
+    let usersList = Array.isArray(data)
+      ? data
+      : data?.items || data?.users || data?.data || [];
 
     let users = usersList.map((u: any) => ({
       userId: String(u.id || ''),
       userName: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
-      userEmail: u.email,
-      userRole: u.role
+      userEmail: u.email ?? undefined,
+      userRole: u.role ?? undefined
     }));
 
     return {
       output: {
-        users
+        users,
+        nextCursorId: nextCursorId(data)
       },
       message: `Found **${users.length}** workspace user(s).`
     };

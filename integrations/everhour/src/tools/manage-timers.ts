@@ -43,15 +43,15 @@ export let startTimer = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
-        durationSeconds: result.duration,
-        todaySeconds: result.today,
-        startedAt: result.startedAt,
-        userDate: result.userDate,
-        comment: result.comment,
-        taskId: result.task?.id,
-        taskName: result.task?.name,
-        userId: result.user?.id,
-        userName: result.user?.name
+        durationSeconds: result.duration ?? undefined,
+        todaySeconds: result.today ?? undefined,
+        startedAt: result.startedAt ?? undefined,
+        userDate: result.userDate ?? undefined,
+        comment: result.comment ?? undefined,
+        taskId: result.task?.id ?? undefined,
+        taskName: result.task?.name ?? undefined,
+        userId: result.user?.id ?? undefined,
+        userName: result.user?.name ?? undefined
       },
       message: `Started timer on task **${result.task?.name || ctx.input.taskId}**.`
     };
@@ -71,15 +71,15 @@ export let stopTimer = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
-        durationSeconds: result.duration,
-        todaySeconds: result.today,
-        startedAt: result.startedAt,
-        userDate: result.userDate,
-        comment: result.comment,
-        taskId: result.task?.id,
-        taskName: result.task?.name,
-        userId: result.user?.id,
-        userName: result.user?.name
+        durationSeconds: result.duration ?? undefined,
+        todaySeconds: result.today ?? undefined,
+        startedAt: result.startedAt ?? undefined,
+        userDate: result.userDate ?? undefined,
+        comment: result.comment ?? undefined,
+        taskId: result.task?.id ?? undefined,
+        taskName: result.task?.name ?? undefined,
+        userId: result.user?.id ?? undefined,
+        userName: result.user?.name ?? undefined
       },
       message: `Stopped timer. Tracked **${Math.round((result.duration || 0) / 60)} minutes**.`
     };
@@ -111,18 +111,20 @@ export let getRunningTimers = SlateTool.create(spec, {
 
     if (ctx.input.teamWide) {
       let timers = await client.getTeamTimers();
-      let mapped = (Array.isArray(timers) ? timers : []).map((t: any) => ({
-        status: t.status || 'active',
-        durationSeconds: t.duration,
-        todaySeconds: t.today,
-        startedAt: t.startedAt,
-        userDate: t.userDate,
-        comment: t.comment,
-        taskId: t.task?.id,
-        taskName: t.task?.name,
-        userId: t.user?.id,
-        userName: t.user?.name
-      }));
+      let mapped = timers
+        .filter((t: any) => t.status === 'active')
+        .map((t: any) => ({
+          status: t.status,
+          durationSeconds: t.duration ?? undefined,
+          todaySeconds: t.today ?? undefined,
+          startedAt: t.startedAt ?? undefined,
+          userDate: t.userDate ?? undefined,
+          comment: t.comment ?? undefined,
+          taskId: t.task?.id ?? undefined,
+          taskName: t.task?.name ?? undefined,
+          userId: t.user?.id ?? undefined,
+          userName: t.user?.name ?? undefined
+        }));
       return {
         output: { timers: mapped },
         message: `Found **${mapped.length}** active timer(s) across the team.`
@@ -130,7 +132,7 @@ export let getRunningTimers = SlateTool.create(spec, {
     }
 
     let timer = await client.getCurrentTimer();
-    if (!timer?.status) {
+    if (timer?.status !== 'active') {
       return {
         output: { timers: [] },
         message: `No active timer running.`
@@ -142,15 +144,15 @@ export let getRunningTimers = SlateTool.create(spec, {
         timers: [
           {
             status: timer.status,
-            durationSeconds: timer.duration,
-            todaySeconds: timer.today,
-            startedAt: timer.startedAt,
-            userDate: timer.userDate,
-            comment: timer.comment,
-            taskId: timer.task?.id,
-            taskName: timer.task?.name,
-            userId: timer.user?.id,
-            userName: timer.user?.name
+            durationSeconds: timer.duration ?? undefined,
+            todaySeconds: timer.today ?? undefined,
+            startedAt: timer.startedAt ?? undefined,
+            userDate: timer.userDate ?? undefined,
+            comment: timer.comment ?? undefined,
+            taskId: timer.task?.id ?? undefined,
+            taskName: timer.task?.name ?? undefined,
+            userId: timer.user?.id ?? undefined,
+            userName: timer.user?.name ?? undefined
           }
         ]
       },

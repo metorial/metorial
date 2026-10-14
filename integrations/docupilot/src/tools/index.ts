@@ -2,6 +2,7 @@ export * from './copy-template';
 export * from './create-template';
 export * from './delete-template';
 export * from './generate-document';
+export * from './get-current-user';
 export * from './get-template';
 export * from './list-content-blocks';
 export * from './list-envelopes';

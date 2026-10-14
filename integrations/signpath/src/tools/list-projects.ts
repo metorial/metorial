@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SignPathClient } from '../lib/client';
+import { createSignPathClient } from '../lib/client';
 import { spec } from '../spec';
 
 let signingPolicySchema = z.object({
@@ -18,7 +18,7 @@ let artifactConfigSchema = z.object({
 export let listProjects = SlateTool.create(spec, {
   name: 'List Projects',
   key: 'list_projects',
-  description: `List all projects in the organization. Returns project details including their signing policies and artifact configurations. Use this to discover available projects and their slugs for signing request submission.`,
+  description: `List all projects in the organization. Returns project summaries and signing policies. Use get_project for artifact configurations and complete project details. Use this to discover available projects and their slugs for signing request submission.`,
   tags: {
     readOnly: true
   }
@@ -45,11 +45,7 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SignPathClient({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createSignPathClient(ctx);
 
     let projects = await client.listProjects();
 
@@ -57,16 +53,16 @@ export let listProjects = SlateTool.create(spec, {
       slug: p.slug || '',
       name: p.name || '',
       description: p.description || '',
-      isActive: p.isActive ?? true,
+      isActive: p.isActive ?? p.status !== 'Inactive',
       signingPolicies: (p.signingPolicies || []).map(sp => ({
         slug: sp.slug || '',
         name: sp.name || '',
-        isActive: sp.isActive ?? true
+        isActive: sp.isActive ?? sp.status !== 'Inactive'
       })),
       artifactConfigurations: (p.artifactConfigurations || []).map(ac => ({
         slug: ac.slug || '',
         name: ac.name || '',
-        isActive: ac.isActive ?? true
+        isActive: ac.isActive ?? ac.status !== 'Inactive'
       }))
     }));
 

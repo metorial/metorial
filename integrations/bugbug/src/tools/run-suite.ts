@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let runSuite = SlateTool.create(spec, {
   name: 'Run Suite',
   key: 'run_suite',
-  description: `Execute a test suite in the BugBug cloud. All tests in the suite will run sequentially. Optionally specify a profile and override variables to customize the run environment.`,
+  description: `Execute a test suite in the BugBug cloud. Execution order follows the suite configuration. Optionally specify a profile and override variables to customize the run environment.`,
   instructions: [
     'The suite will run asynchronously in the cloud. Use the Get Suite Run tool to check progress and results.',
     'Profiles let you run the same suite against different environments or configurations.'
@@ -42,10 +42,10 @@ export let runSuite = SlateTool.create(spec, {
 
     return {
       output: {
-        suiteRunId: result.suiteRunId,
+        suiteRunId: result.id,
         status: result.status
       },
-      message: `Suite run started with ID **${result.suiteRunId}**. Status: **${result.status}**.`
+      message: `Suite run started with ID **${result.id}**. Status: **${result.status}**.`
     };
   })
   .build();

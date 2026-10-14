@@ -1,6 +1,4 @@
-Now let me get more details on the CMP webhook events and the ODP/Campaign API capabilities:Now I have enough information to write the specification. Let me compile all the research:
-
-# Slates Specification for Optimizely
+# Optimizely API Specification
 
 ## Overview
 
@@ -22,7 +20,9 @@ Two authentication methods are supported:
 
 ### Content Marketing Platform (CMP)
 
-**Base URL:** `https://api.cmp.optimizely.com`
+**API Base URL:** `https://api.cmp.optimizely.com`
+
+**OAuth endpoints:** Authorization: `https://accounts.cmp.optimizely.com/o/oauth2/v1/auth`; token exchange/refresh: `https://accounts.cmp.optimizely.com/o/oauth2/v1/token`. User authorization requests the space-delimited `openid profile offline_access` scopes.
 
 Optimizely CMP supports the client credentials flow, an OAuth 2.0 flow designed for machine-to-machine authentication that enables your application to securely access resources on behalf of itself, rather than on behalf of a user.
 
@@ -36,10 +36,11 @@ To use CMS (SaaS) REST API, you must authenticate calls with a bearer JSON Web T
 
 ```
 POST https://api.cms.optimizely.com/oauth/token
-grant_type=client_credentials&client_id={ID}&client_secret={SECRET}
+Content-Type: application/json
+{ "grant_type": "client_credentials", "client_id": "{ID}", "client_secret": "{SECRET}" }
 ```
 
-The token is valid for 300 seconds (five minutes). An optional `act_as` parameter allows impersonating a specific user.
+The connection renews the short-lived token using the stored client credentials and token response expiry. An optional `act_as` parameter allows impersonating a specific user.
 
 ### Optimizely Data Platform (ODP)
 
@@ -153,3 +154,13 @@ Event types use a subject/action model:
 - **`bulk.completed`:** A bulk content synchronization job chunk has finished processing.
 
 Filters events by subject and action. Use an asterisk (\*) as a wildcard. You can also apply content filters (e.g., by status or custom fields) to receive only specific notifications.
+
+## Current API workflows
+
+- `get_current_user` retrieves the connected Experimentation, CMP, or Campaign user. CMS and ODP do not expose a suitable current-user endpoint in the audited references.
+- `list_environments` discovers Feature Experimentation environment keys with provider pagination.
+- `list_events` discovers Experimentation metric event IDs.
+- CMS content uses `/v1/content` and version resources. Creation includes `initialVersion.displayName`; version edits use merge patch; publishing uses the version `:publish` operation. Container listings require `parentKey`; edits and publication need an explicit version when version discovery is ambiguous.
+- CMP list requests translate page numbers to `offset` and `page_size`; tasks and campaigns use `title`, task dates use `due_at`, and comments use `value`. Use `assetType` to select documented type-specific asset reads and supported mutations.
+- Campaign uses `https://api.campaign.episerver.net/rest/{clientId}`. Supply `campaignId` for Smart Campaign message list/get/create/update/start; `contentText` contains the documented plain-text content. Recipients use form fields and string IDs, with `recipientAddress` available alongside the original numeric ID.
+- ODP REST hosts depend on the account region. Upload requests contain arrays while retaining the documented identifiers and attribute/data objects.

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listActions = SlateTool.create(spec, {
   name: 'List Actions',
   key: 'list_actions',
-  description: `List actions (interactions and tasks) with optional filtering by constituent, date, or list. Actions track interactions required to secure gifts and cultivate relationships.`,
+  description: `List actions (interactions and tasks) for one constituent, or across constituents with date or saved-list filters. Actions track interactions required to secure gifts and cultivate relationships.`,
   tags: {
     readOnly: true
   }
@@ -23,21 +23,67 @@ export let listActions = SlateTool.create(spec, {
         .optional()
         .describe('Filter actions modified on or after this date (ISO 8601).'),
       listId: z.string().optional().describe('Filter by list ID.'),
-      sort: z.string().optional().describe('Sort fields (comma-separated).'),
+      sort: z
+        .string()
+        .optional()
+        .describe('Legacy unsupported sort field. Use sortToken for stable pagination.'),
+      sortToken: z
+        .string()
+        .optional()
+        .describe('Stable pagination token from the previous response nextLink.'),
+      continuationToken: z
+        .string()
+        .optional()
+        .describe(
+          'Continuation token from the previous response nextLink for action list platform pages. Only supported when constituentId is omitted.'
+        ),
       limit: z
         .number()
         .optional()
         .describe('Number of records to return (default 500, max 5000).'),
-      offset: z.number().optional().describe('Number of records to skip for pagination.')
+      offset: z
+        .number()
+        .optional()
+        .describe(
+          'Number of records to skip for pagination. Deprecated by the provider for new Action lists; use continuationToken from nextLink instead.'
+        )
     })
   )
   .output(
     z.object({
       count: z.number().describe('Total number of matching actions.'),
-      actions: z.array(z.any()).describe('Array of action records.')
+      actions: z.array(z.any()).describe('Array of action records.'),
+      nextLink: z
+        .string()
+        .optional()
+        .describe('Provider URL for the next page, including its pagination token.')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.sort !== undefined) {
+      throw createApiServiceError(
+        'Blackbaud action lists do not support sort fields. Use sortToken from nextLink for stable pagination.'
+      );
+    }
+
+    if (ctx.input.constituentId && ctx.input.continuationToken !== undefined) {
+      throw createApiServiceError(
+        'Blackbaud single-constituent action lists do not support continuationToken. Omit the token, or omit constituentId to page across constituents.'
+      );
+    }
+
+    if (
+      ctx.input.constituentId &&
+      (ctx.input.dateAdded ||
+        ctx.input.lastModified ||
+        ctx.input.listId ||
+        ctx.input.sortToken)
+    ) {
+      throw createApiServiceError(
+        'Blackbaud constituent action lists do not support date, saved-list, or sort-token filters. Omit constituentId to use these filters, or omit the filters to list one constituent’s actions.'
+      );
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       subscriptionKey: ctx.auth.subscriptionKey
@@ -48,7 +94,8 @@ export let listActions = SlateTool.create(spec, {
       dateAdded: ctx.input.dateAdded,
       lastModified: ctx.input.lastModified,
       listId: ctx.input.listId,
-      sort: ctx.input.sort,
+      sortToken: ctx.input.sortToken,
+      continuationToken: ctx.input.continuationToken,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -57,7 +104,7 @@ export let listActions = SlateTool.create(spec, {
     let count = result?.count || 0;
 
     return {
-      output: { count, actions },
+      output: { count, actions, nextLink: result?.next_link },
       message: `Retrieved **${actions.length}** of ${count} action(s).`
     };
   })
@@ -77,12 +124,13 @@ export let createAction = SlateTool.create(spec, {
       category: z
         .string()
         .describe(
-          'Action category (e.g., "Phone Call", "Meeting", "Email", "Task", "Letter").'
+          'Action category (e.g., "Phone Call", "Meeting", "Email", "Task/Other", "Mailing").'
         ),
       date: z.string().describe('Action date (YYYY-MM-DD).'),
       type: z.string().optional().describe('Action type.'),
       summary: z.string().optional().describe('Brief summary of the action.'),
       description: z.string().optional().describe('Detailed description of the action.'),
+      completed: z.boolean().optional().describe('Whether the action is complete.'),
       status: z
         .string()
         .optional()
@@ -119,6 +167,7 @@ export let createAction = SlateTool.create(spec, {
     if (ctx.input.type) actionData.type = ctx.input.type;
     if (ctx.input.summary) actionData.summary = ctx.input.summary;
     if (ctx.input.description) actionData.description = ctx.input.description;
+    if (ctx.input.completed !== undefined) actionData.completed = ctx.input.completed;
     if (ctx.input.status) actionData.status = ctx.input.status;
     if (ctx.input.priority) actionData.priority = ctx.input.priority;
     if (ctx.input.direction) actionData.direction = ctx.input.direction;
@@ -127,7 +176,7 @@ export let createAction = SlateTool.create(spec, {
     if (ctx.input.endTime) actionData.end_time = ctx.input.endTime;
     if (ctx.input.location) actionData.location = ctx.input.location;
     if (ctx.input.fundraiserIds?.length) {
-      actionData.fundraisers = ctx.input.fundraiserIds.map(id => ({ fundraiser_id: id }));
+      actionData.fundraisers = ctx.input.fundraiserIds;
     }
 
     let result = await client.createAction(actionData);
@@ -160,6 +209,7 @@ export let updateAction = SlateTool.create(spec, {
       priority: z.string().optional().describe('Updated priority.'),
       direction: z.string().optional().describe('Updated direction.'),
       outcome: z.string().optional().describe('Updated outcome.'),
+      completed: z.boolean().optional().describe('Whether the action is complete.'),
       completedDate: z.string().optional().describe('Completed date (YYYY-MM-DD).'),
       location: z.string().optional().describe('Updated location.')
     })
@@ -186,6 +236,7 @@ export let updateAction = SlateTool.create(spec, {
     if (ctx.input.priority) updateData.priority = ctx.input.priority;
     if (ctx.input.direction) updateData.direction = ctx.input.direction;
     if (ctx.input.outcome) updateData.outcome = ctx.input.outcome;
+    if (ctx.input.completed !== undefined) updateData.completed = ctx.input.completed;
     if (ctx.input.completedDate) updateData.completed_date = ctx.input.completedDate;
     if (ctx.input.location) updateData.location = ctx.input.location;
 

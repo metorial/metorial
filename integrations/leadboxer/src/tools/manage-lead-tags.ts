@@ -36,8 +36,7 @@ export let manageLeadTags = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new LeadBoxerClient({
-      token: ctx.auth.token,
-      datasetId: ctx.config.datasetId
+      token: ctx.auth.token
     });
 
     let apiAction: 'add' | 'remove' | undefined;

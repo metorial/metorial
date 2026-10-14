@@ -2,10 +2,13 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getCampaignAnalytics,
+  getCurrentUser,
+  getSubscriberImport,
   importSubscribers,
   listCampaigns,
   listEmailLists,
   listSubscribers,
+  listTransactionalTemplates,
   manageCampaign,
   manageEmailList,
   manageSegment,
@@ -20,6 +23,7 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser.build(),
     listEmailLists.build(),
     manageEmailList.build(),
     listSubscribers.build(),
@@ -31,10 +35,12 @@ export let provider = Slate.create({
     getCampaignAnalytics.build(),
     manageTemplate.build(),
     sendTransactionalEmail.build(),
+    listTransactionalTemplates.build(),
     manageTag.build(),
     manageSegment.build(),
     manageSuppression.build(),
-    importSubscribers.build()
+    importSubscribers.build(),
+    getSubscriberImport.build()
   ],
   triggers: []
 });

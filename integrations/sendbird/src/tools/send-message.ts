@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendbirdChatClient } from '../lib/client';
 import { spec } from '../spec';
@@ -60,6 +60,21 @@ export let sendMessage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.messageType !== 'ADMM' && !ctx.input.userId?.trim()) {
+      throw createApiServiceError('Provide userId for text and file messages.');
+    }
+    if (ctx.input.messageType === 'FILE' && !ctx.input.fileUrl?.trim()) {
+      throw createApiServiceError('Provide fileUrl for a file message.');
+    }
+    if (ctx.input.messageType !== 'FILE' && !ctx.input.message?.trim()) {
+      throw createApiServiceError('Provide message text for text and admin messages.');
+    }
+    if (
+      ctx.input.fileSize !== undefined &&
+      (!Number.isSafeInteger(ctx.input.fileSize) || ctx.input.fileSize < 0)
+    ) {
+      throw createApiServiceError('fileSize must be a non-negative whole number of bytes.');
+    }
     let client = new SendbirdChatClient({
       applicationId: ctx.config.applicationId,
       token: ctx.auth.token
@@ -84,7 +99,7 @@ export let sendMessage = SlateTool.create(spec, {
       output: {
         messageId: result.message_id,
         messageType: result.type ?? ctx.input.messageType,
-        message: result.message,
+        message: result.message ?? undefined,
         channelUrl: result.channel_url ?? ctx.input.channelUrl,
         channelType: result.channel_type ?? ctx.input.channelType,
         createdAt: result.created_at ?? 0,

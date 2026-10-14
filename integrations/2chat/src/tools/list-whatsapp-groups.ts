@@ -58,11 +58,16 @@ export let listWhatsAppGroups = SlateTool.create(spec, {
         ctx.input.fromNumber,
         ctx.input.groupUuid
       );
-      let participants = (result.participants || result.data || []).map((p: any) => ({
-        phoneNumber: p.phone_number || p.number,
-        isAdmin: p.is_admin ?? p.admin ?? false,
-        displayName: p.display_name || p.name
-      }));
+      let participants = (result.data?.participants ?? result.participants ?? []).map(
+        (p: any) => ({
+          phoneNumber: p.phone_number || p.number,
+          isAdmin:
+            typeof p.wa_is_admin === 'boolean' || typeof p.wa_is_super_admin === 'boolean'
+              ? p.wa_is_admin === true || p.wa_is_super_admin === true
+              : (p.is_admin ?? p.admin ?? undefined),
+          displayName: p.wa_pushname ?? p.display_name ?? p.name ?? undefined
+        })
+      );
 
       return {
         output: { participants },
@@ -73,9 +78,9 @@ export let listWhatsAppGroups = SlateTool.create(spec, {
     let result = await client.listGroups(ctx.input.fromNumber);
     let groups = (result.groups || result.data || []).map((g: any) => ({
       groupUuid: g.uuid || g.group_uuid,
-      groupName: g.name || g.group_name,
-      participantCount: g.participant_count || g.size,
-      createdAt: g.created_at
+      groupName: g.wa_group_name ?? g.name ?? g.group_name ?? undefined,
+      participantCount: g.participant_count ?? g.size ?? undefined,
+      createdAt: g.wa_created_at ?? g.created_at ?? undefined
     }));
 
     return {

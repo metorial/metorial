@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 let BASE_URL = 'https://api.whoisfreaks.com';
 
@@ -6,21 +6,31 @@ export class WhoisFreaksClient {
   private apiKey: string;
 
   constructor(config: { token: string }) {
-    this.apiKey = config.token;
+    if (!config.token.trim()) {
+      throw createApiServiceError('A WhoisFreaks API key is required.');
+    }
+    this.apiKey = config.token.trim();
   }
 
   private createAxiosInstance() {
-    return createAxios({ baseURL: BASE_URL });
+    return createAuthenticatedAxios({
+      baseURL: BASE_URL,
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'WhoisFreaks',
+          reason: 'whoisfreaks_api_error'
+        })
+    });
   }
 
   // ─── Domain WHOIS ───────────────────────────────────────────────
 
   async liveWhoisLookup(domainName: string) {
     let http = this.createAxiosInstance();
-    let response = await http.get('/v1.0/whois', {
+    let response = await http.get('/v2.0/whois/live', {
       params: {
         apiKey: this.apiKey,
-        whois: 'live',
         domainName
       }
     });
@@ -30,7 +40,7 @@ export class WhoisFreaksClient {
   async bulkWhoisLookup(domainNames: string[]) {
     let http = this.createAxiosInstance();
     let response = await http.post(
-      '/v1.0/bulkwhois',
+      '/v2.0/bulkwhois/live',
       {
         domainNames
       },
@@ -42,13 +52,13 @@ export class WhoisFreaksClient {
     return response.data;
   }
 
-  async historicalWhoisLookup(domainName: string) {
+  async historicalWhoisLookup(domainName: string, page?: number) {
     let http = this.createAxiosInstance();
-    let response = await http.get('/v1.0/whois', {
+    let response = await http.get('/v2.0/whois/history', {
       params: {
         apiKey: this.apiKey,
-        whois: 'historical',
-        domainName
+        domainName,
+        page
       }
     });
     return response.data;
@@ -61,11 +71,11 @@ export class WhoisFreaksClient {
     company?: string;
     mode?: 'mini' | 'default';
     page?: number;
+    exact?: boolean;
   }) {
     let http = this.createAxiosInstance();
-    let queryParams: Record<string, string | number> = {
-      apiKey: this.apiKey,
-      whois: 'reverse'
+    let queryParams: Record<string, string | number | boolean> = {
+      apiKey: this.apiKey
     };
 
     if (params.keyword) queryParams.keyword = params.keyword;
@@ -73,9 +83,10 @@ export class WhoisFreaksClient {
     if (params.owner) queryParams.owner = params.owner;
     if (params.company) queryParams.company = params.company;
     if (params.mode) queryParams.mode = params.mode;
-    if (params.page) queryParams.page = params.page;
+    if (params.page !== undefined) queryParams.page = params.page;
+    if (params.exact !== undefined) queryParams.exact = params.exact;
 
-    let response = await http.get('/v1.0/whois', { params: queryParams });
+    let response = await http.get('/v2.0/whois/reverse', { params: queryParams });
     return response.data;
   }
 
@@ -83,7 +94,7 @@ export class WhoisFreaksClient {
 
   async ipWhoisLookup(ip: string) {
     let http = this.createAxiosInstance();
-    let response = await http.get('/v1.0/whois/ip', {
+    let response = await http.get('/v1.0/ip-whois', {
       params: {
         apiKey: this.apiKey,
         ip
@@ -94,7 +105,7 @@ export class WhoisFreaksClient {
 
   async asnWhoisLookup(asn: string) {
     let http = this.createAxiosInstance();
-    let response = await http.get('/v1.0/whois/asn', {
+    let response = await http.get('/v2.0/asn-whois', {
       params: {
         apiKey: this.apiKey,
         asn
@@ -105,12 +116,13 @@ export class WhoisFreaksClient {
 
   // ─── DNS ────────────────────────────────────────────────────────
 
-  async liveDnsLookup(domainName: string, type: string) {
+  async liveDnsLookup(domainName: string | undefined, type: string, ipAddress?: string) {
     let http = this.createAxiosInstance();
-    let response = await http.get('/v1.0/dns/live', {
+    let response = await http.get('/v2.0/dns/live', {
       params: {
         apiKey: this.apiKey,
         domainName,
+        ipAddress,
         type
       }
     });
@@ -126,27 +138,35 @@ export class WhoisFreaksClient {
     };
     if (page) params.page = page;
 
-    let response = await http.get('/v1.0/dns/historical', { params });
+    let response = await http.get('/v2.0/dns/historical', { params });
     return response.data;
   }
 
-  async reverseDnsLookup(type: string, value: string, page?: number) {
+  async reverseDnsLookup(
+    type: string,
+    value: string,
+    page?: number,
+    exact?: boolean,
+    sort?: 'asc' | 'desc'
+  ) {
     let http = this.createAxiosInstance();
-    let params: Record<string, string | number> = {
+    let params: Record<string, string | number | boolean> = {
       apiKey: this.apiKey,
       type,
       value
     };
-    if (page) params.page = page;
+    if (page !== undefined) params.page = page;
+    if (exact !== undefined) params.exact = exact;
+    if (sort !== undefined) params.sort = sort;
 
-    let response = await http.get('/v1.0/dns/reverse', { params });
+    let response = await http.get('/v2.1/dns/reverse', { params });
     return response.data;
   }
 
   async bulkDnsLookup(domainNames: string[], type: string) {
     let http = this.createAxiosInstance();
     let response = await http.post(
-      '/v1.0/bulkdns',
+      '/v2.0/dns/bulk/live',
       {
         domainNames
       },
@@ -163,13 +183,20 @@ export class WhoisFreaksClient {
 
   // ─── Subdomains ─────────────────────────────────────────────────
 
-  async subdomainLookup(domainName: string, page?: number) {
+  async subdomainLookup(
+    domainName: string,
+    page?: number,
+    filters?: { after?: string; before?: string; status?: 'active' | 'inactive' }
+  ) {
     let http = this.createAxiosInstance();
     let params: Record<string, string | number> = {
       apiKey: this.apiKey,
-      domainName
+      domain: domainName
     };
-    if (page) params.page = page;
+    if (page !== undefined) params.page = page;
+    if (filters?.after) params.after = filters.after;
+    if (filters?.before) params.before = filters.before;
+    if (filters?.status) params.status = filters.status;
 
     let response = await http.get('/v1.0/subdomains', { params });
     return response.data;
@@ -189,17 +216,17 @@ export class WhoisFreaksClient {
       apiKey: this.apiKey,
       domain
     };
-    if (options?.suggest) params.sug = true;
+    if (options?.suggest !== undefined) params.sug = options.suggest;
     if (options?.count) params.count = options.count;
 
-    let response = await http.get('/v1.0/domain/availability', { params });
+    let response = await http.get('/v2.0/domain/availability', { params });
     return response.data;
   }
 
   async bulkDomainAvailability(domainNames: string[]) {
     let http = this.createAxiosInstance();
     let response = await http.post(
-      '/v1.0/bulk-domain-availability',
+      '/v2.0/domain/availability',
       {
         domainNames
       },
@@ -237,8 +264,8 @@ export class WhoisFreaksClient {
       apiKey: this.apiKey,
       domainName
     };
-    if (options?.chain) params.chain = true;
-    if (options?.sslRaw) params.sslRaw = true;
+    if (options?.chain !== undefined) params.chain = options.chain;
+    if (options?.sslRaw !== undefined) params.sslRaw = options.sslRaw;
 
     let response = await http.get('/v1.0/ssl/live', { params });
     return response.data;
@@ -260,7 +287,7 @@ export class WhoisFreaksClient {
   async bulkIpGeolocation(ips: string[]) {
     let http = this.createAxiosInstance();
     let response = await http.post(
-      '/v1.0/bulk-geolocation',
+      '/v1.0/geolocation',
       {
         ips
       },
@@ -269,6 +296,26 @@ export class WhoisFreaksClient {
         headers: { 'Content-Type': 'application/json' }
       }
     );
+    return response.data;
+  }
+
+  async accountUsage() {
+    let http = this.createAxiosInstance();
+    let response = await http.get('/v1.0/whoisapi/usage', { params: { apiKey: this.apiKey } });
+    return response.data;
+  }
+
+  async ipReputation(ip: string) {
+    let http = this.createAxiosInstance();
+    let response = await http.get('/v2.0/security', { params: { apiKey: this.apiKey, ip } });
+    return response.data;
+  }
+
+  async domainReputation(domainName: string) {
+    let http = this.createAxiosInstance();
+    let response = await http.get('/v1/domain/security', {
+      params: { apiKey: this.apiKey, domainName }
+    });
     return response.data;
   }
 }

@@ -1,7 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  deleteDocumentSubmission,
   getAmlScreening,
+  getDocumentFraudResult,
   getKybReport,
   getVerification,
   listVerifications,
@@ -11,7 +13,8 @@ import {
   requestIdentityVerification,
   requestKybReport,
   requestProofOfAddress,
-  runAmlScreening
+  runAmlScreening,
+  submitDocument
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -26,7 +29,10 @@ export let provider = Slate.create({
     requestBackgroundCheck,
     requestCreditCheck,
     requestKybReport,
-    getKybReport
+    getKybReport,
+    submitDocument,
+    getDocumentFraudResult,
+    deleteDocumentSubmission
   ],
   triggers: []
 });

@@ -43,7 +43,7 @@ export let queryEntitiesTool = SlateTool.create(spec, {
         .array(z.any())
         .optional()
         .describe(
-          'Ordering rules (e.g., [["Task/Priority", "q/desc"], ["Task/Name", "q/asc"]])'
+          'Ordering rules (e.g., [[["Task/Priority"], "q/desc"], [["Task/Name"], "q/asc"]])'
         ),
       limit: z
         .number()

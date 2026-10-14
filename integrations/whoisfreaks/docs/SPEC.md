@@ -1,8 +1,8 @@
-# Slates Specification for Whoisfreaks
+# WhoisFreaks Integration Specification
 
 ## Overview
 
-WhoisFreaks is a domain and IP intelligence platform that provides WHOIS, DNS, IP geolocation, subdomain discovery, SSL certificate, and security lookup data through APIs. The API allows users to retrieve information about domain names, IP addresses, and WHOIS data. It also offers domain monitoring, brand monitoring, and domain availability checking services.
+WhoisFreaks is a domain and IP intelligence platform that provides WHOIS, DNS, IP geolocation, subdomain discovery, SSL certificate, and security lookup data through APIs. The API allows users to retrieve information about domain names, IP addresses, and WHOIS data. This integration exposes lookup APIs, reputation assessments, domain availability checks, and account credit usage.
 
 ## Authentication
 
@@ -49,7 +49,7 @@ Use the Subdomains Lookup API to retrieve each subdomain with complete details s
 
 ### Domain Availability
 
-The Domain Availability API checks if a domain is available for registration or not. It also suggests other domains and their availability for registration. Supports bulk checks of up to 100 domains per request with custom TLD lists.
+The Domain Availability API checks if a domain is available for registration or not. It also suggests other domains and their availability for registration. Supports bulk checks of up to 100 domain names per request.
 
 - **Domain Discovery**: Domain Discover API finds all registered domains containing an exact keyword across 800M+ domains, 1500+ TLDs, and 9000+ SLDs.
 
@@ -59,24 +59,34 @@ Access ASN WHOIS, verify SSL certificate details, and check real-time domain ava
 
 ### IP Geolocation
 
-The IP Location API returns detailed IP-based data, including country, region, city, ZIP code, latitude/longitude, timezone, ISP, ASN, and organization. It also detects VPN/proxy usage, threat indicators, and parses user-agent data for device-level insights. Supports bulk lookups of up to 100 IPs per request.
+The IP Location API returns detailed IP-based data, including country, region, city, ZIP code, latitude/longitude, timezone, ISP, ASN, and organization. Supports bulk lookups of up to 100 IPs per request.
 
 ### Security Lookup
 
 Gain instant threat intelligence by identifying IPs associated with VPNs, Tor, proxies, bots, and other high-risk sources.
 
-### Domain Monitoring
+### Domain Reputation
 
-Monitor your domains' WHOIS continuously. Choose a check frequency from every 10 minutes up to every 24 hours. Track only the WHOIS fields that matter most. Focus on key domain status and registration updates to get relevant alerts.
+Assess a domain's risk verdict, trust score, domain-generation analysis, threat intelligence matches, and supporting security signals.
 
-### Brand Monitoring
+### API Usage
 
-Tracks newly registered and dropped domains, along with real-time updates on domain WHOIS registration data across a spectrum of keywords—from exact matches to typo variants. Enables typo-squatting detection to identify and generate results. Results can be retrieved in JSON format via API.
+Retrieve subscription status, API credits, served requests, surcharge usage, and request limits for the connected API key.
 
-### Newly Registered & Expiring Domains Data Feeds
+## Pagination and Compatibility
 
-Discover and retrieve the latest WHOIS data for newly registered domain names across 1528 TLDs. Also provides a detailed list of expiring and dropped domains, along with backlink insights.
+Historical WHOIS, historical DNS, reverse WHOIS, reverse DNS, and subdomain queries return one page at a time. Pass `page` to retrieve subsequent results and inspect the provider's pagination metadata. Response bodies are preserved, including partial lookup failures and provider-specific fields.
 
-## Events
+The existing `domain_discovery` tool is retained for compatibility. Its `/v1.0/domain-discovery` endpoint is not described in the current official API reference, so its availability remains unverified.
 
-The provider does not support webhooks or event subscriptions through its API. Domain monitoring and brand monitoring features provide alerts via email and Telegram notifications, but there is no webhook or programmatic event subscription mechanism available.
+## Scope
+
+Monitoring configuration, typosquatting, downloadable databases and domain feeds, bulk reputation, and custom-TLD availability requests are not exposed by this integration.
+
+## API References
+
+- https://whoisfreaks.com/documentation
+- https://whoisfreaks.com/integrations/typescript
+- https://whoisfreaks.com/documentation/credit-usage
+- https://whoisfreaks.com/documentation/ip-security-api
+- https://whoisfreaks.com/documentation/domain-reputation-api

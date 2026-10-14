@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -15,13 +15,16 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Your Metatext AI API key. Obtain it from the Settings page at https://app.metatext.ai'
+          'Your Metatext AI Inference API key. Contact support@metatext.io if you need a key.'
         )
     }),
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim()) {
+        throw createApiServiceError('Provide a non-empty Metatext AI API key.');
+      }
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey.trim()
         }
       };
     }

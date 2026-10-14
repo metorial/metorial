@@ -34,10 +34,6 @@ export let addSubtaskTool = SlateTool.create(spec, {
       estimatePoint: ctx.input.estimatePoint
     });
 
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to add subtask');
-    }
-
     return {
       output: { success: true, raw: response.data },
       message: `Added subtask **"${ctx.input.summary}"** to issue #${ctx.input.issueId}.`
@@ -54,7 +50,7 @@ export let updateSubtaskTool = SlateTool.create(spec, {
     z.object({
       subtaskId: z.number().describe('The subtask ID to update'),
       summary: z.string().optional().describe('New subtask summary'),
-      status: z.string().optional().describe('New subtask status'),
+      status: z.string().optional().describe('Numeric Leiga status ID as a string'),
       assigneeId: z.number().optional().describe('New assignee user ID'),
       dueDate: z.string().optional().describe('New due date (ISO 8601)'),
       estimatePoint: z.number().optional().describe('New estimate in story points')
@@ -68,7 +64,7 @@ export let updateSubtaskTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.updateSubtask({
+    await client.updateSubtask({
       subtaskId: ctx.input.subtaskId,
       summary: ctx.input.summary,
       status: ctx.input.status,
@@ -76,10 +72,6 @@ export let updateSubtaskTool = SlateTool.create(spec, {
       dueDate: ctx.input.dueDate,
       estimatePoint: ctx.input.estimatePoint
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to update subtask');
-    }
 
     return {
       output: { success: true },
@@ -98,7 +90,13 @@ export let deleteSubtaskTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      subtaskId: z.number().describe('The subtask ID to delete')
+      subtaskId: z
+        .number()
+        .describe('The subtask ID to delete; call list_subtasks to discover IDs'),
+      issueId: z
+        .number()
+        .optional()
+        .describe('Parent issue ID. Required by Leiga when deleting a subtask.')
     })
   )
   .output(
@@ -109,11 +107,7 @@ export let deleteSubtaskTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.deleteSubtask(ctx.input.subtaskId);
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to delete subtask');
-    }
+    await client.deleteSubtask(ctx.input.subtaskId, ctx.input.issueId);
 
     return {
       output: { success: true },

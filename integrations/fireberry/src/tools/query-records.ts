@@ -13,7 +13,8 @@ Supports complex filtering with operators (=, !=, >, <, >=, <=, start-with, not-
     "Use single quotes for string values with whitespace: (accountname start-with 'Bob D')",
     'Use % prefix with start-with for substring/contains matching: (accountname start-with %search)',
     'Combine statements with AND or OR: (field1 = value1) AND (field2 > 10)',
-    'The objectType can be a number (e.g., 1 for accounts) or system name.'
+    'The objectType can be a number (e.g., 1 for accounts) or system name. Call list_objects to discover available object types.',
+    'Use query_records_v3 for structured filters, aggregation, or pagination beyond the legacy limits.'
   ],
   constraints: ['Maximum page size is 50.', 'Maximum page number is 10.'],
   tags: {

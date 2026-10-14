@@ -1,6 +1,8 @@
-# Docugenerate
+# DocuGenerate
 
-Generate documents from reusable Word templates by merging them with dynamic JSON or spreadsheet data. Create and manage templates (DOCX, DOC, ODT, TXT), generate documents in multiple output formats (PDF, DOCX, DOC, ODT, TXT, HTML, PNG), and manage generated documents. Supports PDF attachments, PDF merging, template versioning, configurable tag delimiters, enhanced syntax for complex expressions, and multi-region processing for data compliance.
+Create reusable templates from public DOCX, DOC, ODT, RTF, TXT, or SQL files, then generate downloadable documents by merging templates with JSON data. Manage template settings, folders, and source files; download originals, PDF previews, PNG thumbnails, and generated documents. Generation supports PDF, Word, OpenDocument, text, HTML, PNG, and ZIP output, plus PDF attachments and merging. API processing regions include the United States, European Union, United Kingdom, and Australia.
+
+Multiple data objects produce a combined file by default. Set `singleFile` to false for a ZIP archive and use `outputName` to customize each generated filename. Template version history requires an eligible provider plan. The API supports changing its setting, while version restoration and deletion remain web-app operations.
 
 ## License
 

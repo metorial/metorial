@@ -1,6 +1,6 @@
 # Dovetail
 
-Manage user research projects, notes, and qualitative data in Dovetail. Create and organize research projects, notes, insights, highlights, and documents. Tag and code qualitative data for thematic analysis. Manage research contacts and feedback channels with topics and data points. Import and export files across entities. Search across workspace data using AI-powered semantic search and generate AI summaries of research findings. Navigate workspace folders and retrieve attached files.
+Manage Dovetail research projects, data, notes, docs, contacts, and feedback channels. Read metadata, prepare downloadable content exports, import files, browse workspace folders, run full-text keyword searches, and generate AI summaries. Creating research data requires a project; document content and publishing cannot be patched through the metadata API.
 
 ## License
 

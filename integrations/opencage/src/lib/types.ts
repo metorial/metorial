@@ -18,7 +18,7 @@ export interface GeocodeParams {
 export interface GeocodeResponse {
   documentation: string;
   licenses: Array<{ name: string; url: string }>;
-  rate: {
+  rate?: {
     limit: number;
     remaining: number;
     reset: number;
@@ -46,8 +46,9 @@ export interface GeocodeResult {
     northeast: { lat: number; lng: number };
     southwest: { lat: number; lng: number };
   };
-  components: Record<string, string | number>;
+  components: Record<string, string | number | string[]>;
   confidence: number;
+  distance_from_q?: { meters: number };
   formatted: string;
   geometry: {
     lat: number;

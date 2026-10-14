@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ProjectClient } from '../lib/client';
 import { spec } from '../spec';
@@ -36,15 +36,16 @@ export let getProjectModel = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.projectId || !ctx.auth.projectToken) {
-      throw new Error(
+    if (!ctx.auth.projectId || !(ctx.auth.projectToken || ctx.auth.projectSecretToken)) {
+      throw createApiServiceError(
         'Project ID and project token are required to retrieve the project model'
       );
     }
 
     let client = new ProjectClient({
       projectId: ctx.auth.projectId,
-      projectToken: ctx.auth.projectToken
+      projectToken: ctx.auth.projectToken,
+      projectSecretToken: ctx.auth.projectSecretToken
     });
 
     let result = await client.getProjectModel({

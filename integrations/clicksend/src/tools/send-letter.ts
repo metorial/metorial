@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClickSendClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,18 +11,21 @@ let addressSchema = z.object({
   addressState: z.string().describe('State or province'),
   addressPostalCode: z.string().describe('Postal or ZIP code'),
   addressCountry: z.string().describe('Two-letter ISO country code (e.g., US, AU, GB)'),
-  returnAddressId: z.number().optional().describe('ID of a saved return address'),
+  returnAddressId: z
+    .number()
+    .optional()
+    .describe('Required by ClickSend: ID of a saved return address from your account.'),
   schedule: z.number().optional().describe('Unix timestamp for scheduled dispatch')
 });
 
 export let sendLetterTool = SlateTool.create(spec, {
   name: 'Send Letter',
   key: 'send_letter',
-  description: `Send physical letters via ClickSend's print-and-mail service. Upload an A4 PDF (via URL) and specify recipient addresses — the letter will be printed, enveloped, stamped, and dispatched automatically to addresses worldwide.`,
+  description: `Send physical letters via ClickSend's print-and-mail service. Upload an A4 PDF (via URL) and specify recipient addresses — the letter will be printed, enveloped, stamped, and dispatched automatically to addresses worldwide. Post is available only to existing customers with access to this service.`,
   instructions: [
     'The file URL must point to a valid A4-formatted PDF document',
-    'Letters are printed in black and white by default; set colour to 1 for color printing',
-    'Set duplex to 1 for double-sided printing'
+    'Letters are printed in black and white by default; set colour to true for color printing',
+    'Set duplex to true for double-sided printing'
   ],
   tags: {
     destructive: false,
@@ -57,6 +60,7 @@ export let sendLetterTool = SlateTool.create(spec, {
       letters: z
         .array(
           z.object({
+            letterId: z.string().optional().describe('Letter ID for tracking'),
             recipientName: z.string().describe('Recipient name'),
             addressLine1: z.string().describe('Recipient street address'),
             city: z.string().describe('Recipient city'),
@@ -73,6 +77,13 @@ export let sendLetterTool = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
+    if (ctx.input.recipients.some(recipient => !recipient.returnAddressId)) {
+      throw createApiServiceError(
+        'Each letter recipient requires a returnAddressId from a saved ClickSend return address.',
+        { reason: 'missing_return_address' }
+      );
+    }
+
     ctx.progress('Sending letters...');
 
     let result = await client.sendLetter({
@@ -85,6 +96,7 @@ export let sendLetterTool = SlateTool.create(spec, {
 
     let sentLetters = result.data?.recipients || [];
     let mappedLetters = sentLetters.map((letter: any) => ({
+      letterId: letter.message_id?.toString() || undefined,
       recipientName: letter.address_name || '',
       addressLine1: letter.address_line_1 || '',
       city: letter.address_city || '',
@@ -93,17 +105,19 @@ export let sendLetterTool = SlateTool.create(spec, {
     }));
 
     let totalPrice = sentLetters.reduce(
-      (sum: number, letter: any) => sum + (Number.parseFloat(letter.price) || 0),
+      (sum: number, letter: any) => sum + (Number.parseFloat(letter.post_price) || 0),
       0
     );
+
+    let queuedCount = sentLetters.filter((letter: any) => letter.status === 'SUCCESS').length;
 
     return {
       output: {
         totalPrice,
-        queuedCount: mappedLetters.length,
+        queuedCount,
         letters: mappedLetters
       },
-      message: `Queued **${mappedLetters.length}** letter(s) for dispatch. Total cost: **$${totalPrice.toFixed(2)}**`
+      message: `Queued **${queuedCount}** letter(s) for dispatch. Total cost: **$${totalPrice.toFixed(2)}**`
     };
   })
   .build();

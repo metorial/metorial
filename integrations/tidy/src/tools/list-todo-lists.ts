@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTidyId } from '../lib/format';
 import { spec } from '../spec';
 
 export let listToDoLists = SlateTool.create(spec, {
@@ -38,8 +39,8 @@ export let listToDoLists = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listToDoLists(ctx.input.addressId);
     let lists = (result.data ?? result ?? []).map((list: any) => ({
-      toDoListId: list.id,
-      addressId: list.address_id ?? null,
+      toDoListId: formatTidyId(list.id),
+      addressId: list.address_id == null ? null : formatTidyId(list.address_id),
       title: list.title ?? list.name ?? null,
       items: list.items ?? list.to_dos ?? null,
       createdAt: list.created_at ?? null

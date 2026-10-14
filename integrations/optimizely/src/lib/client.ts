@@ -1,16 +1,24 @@
 import { createAxios } from 'slates';
+import { optimizelyErrorMapping } from './api-errors';
 
 export class ExperimentationClient {
   private axios: ReturnType<typeof createAxios>;
 
   constructor(token: string) {
     this.axios = createAxios({
+      errorMapping: optimizelyErrorMapping,
+      timeout: 30000,
       baseURL: 'https://api.optimizely.com/v2',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  async getCurrentUser() {
+    let response = await this.axios.get('/me');
+    return response.data;
   }
 
   // Projects
@@ -67,6 +75,8 @@ export class ExperimentationClient {
     variations?: Array<{ name: string; weight?: number; actions?: any }>;
     metrics?: Array<{ aggregator?: string; event_id?: number; scope?: string }>;
     audience_conditions?: string;
+    page_ids?: number[];
+    url_targeting?: Record<string, unknown>;
   }) {
     let response = await this.axios.post('/experiments', data);
     return response.data;
@@ -123,14 +133,14 @@ export class ExperimentationClient {
 
   // Events (custom)
   async listEvents(projectId: number, params?: { page?: number; per_page?: number }) {
-    let response = await this.axios.get('/pages', {
+    let response = await this.axios.get('/events', {
       params: { project_id: projectId, ...params }
     });
     return response.data;
   }
 
   async getEvent(eventId: number) {
-    let response = await this.axios.get(`/pages/${eventId}`);
+    let response = await this.axios.get(`/events/${eventId}`);
     return response.data;
   }
 
@@ -168,6 +178,8 @@ export class FlagsClient {
 
   constructor(token: string) {
     this.axios = createAxios({
+      errorMapping: optimizelyErrorMapping,
+      timeout: 30000,
       baseURL: 'https://api.optimizely.com/flags/v1',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -176,13 +188,26 @@ export class FlagsClient {
     });
   }
 
-  async listFlags(projectId: number) {
-    let response = await this.axios.get(`/projects/${projectId}/flags`);
+  async listEnvironments(
+    projectId: number,
+    params?: { per_page?: number; page_token?: string; archived?: boolean }
+  ) {
+    let response = await this.axios.get(`/projects/${projectId}/environments`, { params });
+    return response.data;
+  }
+
+  async listFlags(
+    projectId: number,
+    params?: { per_page?: number; page_token?: string; page_number?: number }
+  ) {
+    let response = await this.axios.get(`/projects/${projectId}/flags`, { params });
     return response.data;
   }
 
   async getFlag(projectId: number, flagKey: string) {
-    let response = await this.axios.get(`/projects/${projectId}/flags/${flagKey}`);
+    let response = await this.axios.get(
+      `/projects/${projectId}/flags/${encodeURIComponent(flagKey)}`
+    );
     return response.data;
   }
 
@@ -199,18 +224,31 @@ export class FlagsClient {
     flagKey: string,
     data: { name?: string; description?: string; archived?: boolean }
   ) {
-    let response = await this.axios.patch(`/projects/${projectId}/flags/${flagKey}`, data);
-    return response.data;
+    let operations = Object.entries(data)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => ({
+        op: 'replace',
+        path: `/${flagKey.replace(/~/g, '~0').replace(/\//g, '~1')}/${key}`,
+        value
+      }));
+    if (operations.length > 0) {
+      await this.axios.patch(`/projects/${projectId}/flags`, operations, {
+        headers: { 'Content-Type': 'application/json-patch+json' }
+      });
+    }
+    return this.getFlag(projectId, flagKey);
   }
 
   async deleteFlag(projectId: number, flagKey: string) {
-    let response = await this.axios.delete(`/projects/${projectId}/flags/${flagKey}`);
+    let response = await this.axios.delete(
+      `/projects/${projectId}/flags/${encodeURIComponent(flagKey)}`
+    );
     return response.data;
   }
 
   async listRulesets(projectId: number, flagKey: string, environmentKey: string) {
     let response = await this.axios.get(
-      `/projects/${projectId}/flags/${flagKey}/environments/${environmentKey}/ruleset`
+      `/projects/${projectId}/flags/${encodeURIComponent(flagKey)}/environments/${encodeURIComponent(environmentKey)}/ruleset`
     );
     return response.data;
   }
@@ -222,28 +260,27 @@ export class FlagsClient {
     data: Record<string, any>
   ) {
     let response = await this.axios.patch(
-      `/projects/${projectId}/flags/${flagKey}/environments/${environmentKey}/ruleset`,
-      data
+      `/projects/${projectId}/flags/${encodeURIComponent(flagKey)}/environments/${encodeURIComponent(environmentKey)}/ruleset`,
+      Object.entries(data).map(([key, value]) => ({
+        op: 'replace',
+        path: `/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`,
+        value
+      })),
+      { headers: { 'Content-Type': 'application/json-patch+json' } }
     );
     return response.data;
   }
 
   async enableFlag(projectId: number, flagKey: string, environmentKey: string) {
-    let response = await this.axios.patch(
-      `/projects/${projectId}/flags/${flagKey}/environments/${environmentKey}/ruleset`,
-      {
-        enabled: true
-      }
+    let response = await this.axios.post(
+      `/projects/${projectId}/flags/${encodeURIComponent(flagKey)}/environments/${encodeURIComponent(environmentKey)}/ruleset/enabled`
     );
     return response.data;
   }
 
   async disableFlag(projectId: number, flagKey: string, environmentKey: string) {
-    let response = await this.axios.patch(
-      `/projects/${projectId}/flags/${flagKey}/environments/${environmentKey}/ruleset`,
-      {
-        enabled: false
-      }
+    let response = await this.axios.post(
+      `/projects/${projectId}/flags/${encodeURIComponent(flagKey)}/environments/${encodeURIComponent(environmentKey)}/ruleset/disabled`
     );
     return response.data;
   }

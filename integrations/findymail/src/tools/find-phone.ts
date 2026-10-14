@@ -23,7 +23,8 @@ export let findPhone = SlateTool.create(spec, {
   .output(
     z.object({
       phone: z.string().optional().describe('The direct phone number found.'),
-      found: z.boolean().describe('Whether a phone number was found.')
+      found: z.boolean().describe('Whether a phone number was found.'),
+      lineType: z.string().optional().describe('Phone line type, such as Mobile or Landline.')
     })
   )
   .handleInvocation(async ctx => {
@@ -36,7 +37,8 @@ export let findPhone = SlateTool.create(spec, {
     return {
       output: {
         phone,
-        found: !!phone
+        found: !!phone,
+        lineType: result?.line_type ?? undefined
       },
       message: phone
         ? `Found phone number **${phone}**.`

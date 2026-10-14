@@ -13,7 +13,13 @@ export let getAgent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('ID of the agent to retrieve')
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent to retrieve')
     })
   )
   .output(

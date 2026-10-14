@@ -24,6 +24,9 @@ Event types represent the different services or meeting types you offer, each wi
     z.object({
       limit: z
         .number()
+        .refine(Number.isSafeInteger, 'Limit must be a safe integer.')
+        .min(1)
+        .max(100)
         .optional()
         .describe('Number of event types to return (1-100, default 10)'),
       cursor: z.string().optional().describe('Cursor for pagination')
@@ -31,7 +34,12 @@ Event types represent the different services or meeting types you offer, each wi
   )
   .output(
     z.object({
-      count: z.number().describe('Total number of event types'),
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextCursor: z
+        .string()
+        .nullable()
+        .describe('Pass this ID as cursor to fetch the next page'),
+      count: z.number().describe('Number of event types returned in this page'),
       eventTypes: z.array(eventTypeSchema).describe('List of event types')
     })
   )
@@ -53,9 +61,11 @@ Event types represent the different services or meeting types you offer, each wi
     return {
       output: {
         count: result.count,
+        hasMore: result.has_more,
+        nextCursor: result.has_more ? (result.data.at(-1)?.id ?? null) : null,
         eventTypes
       },
-      message: `Found **${result.count}** event type(s). Returned **${eventTypes.length}** in this page.`
+      message: `Returned **${eventTypes.length}** event type(s) in this page.`
     };
   })
   .build();

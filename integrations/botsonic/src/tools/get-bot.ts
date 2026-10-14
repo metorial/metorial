@@ -42,13 +42,13 @@ export let getBot = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(ctx.auth.token, ctx.auth.credentialType);
 
     let bot = await client.getBot(ctx.input.botId, ctx.input.workspaceId);
 
     let apiKey: any;
     if (ctx.input.includeApiKey) {
-      apiKey = await client.getBotApiKey(ctx.input.botId);
+      apiKey = await client.getBotApiKey(ctx.input.botId, ctx.input.workspaceId);
     }
 
     return {

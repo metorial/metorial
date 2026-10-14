@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DockClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageProfile = SlateTool.create(spec, {
   description: `Create, retrieve, update, list, or delete organization profiles. Profiles provide context for an issuer DID, including name, description, and logo that appear on issued credentials.`,
   instructions: [
     'To create a profile, set action to "create" and provide a name and the associated DID.',
-    'To update a profile, set action to "update" and provide the profileId with the fields to change.'
+    'To update a profile, set action to "update" and provide the issuer DID as profileId with the fields to change.'
   ],
   tags: {
     destructive: false,
@@ -24,7 +24,9 @@ export let manageProfile = SlateTool.create(spec, {
       profileId: z
         .string()
         .optional()
-        .describe('Profile ID (required for get, update, delete)'),
+        .describe(
+          'Issuer DID identifying the profile, returned by list (required for get, update, delete)'
+        ),
       name: z.string().optional().describe('Organization name (required for create)'),
       did: z.string().optional().describe('Associated DID (required for create)'),
       description: z.string().optional().describe('Organization description'),
@@ -51,8 +53,8 @@ export let manageProfile = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'create': {
-        if (!ctx.input.name) throw new Error('name is required for create action');
-        if (!ctx.input.did) throw new Error('did is required for create action');
+        if (!ctx.input.name) throw createApiServiceError('name is required for create action');
+        if (!ctx.input.did) throw createApiServiceError('did is required for create action');
         let result = await client.createProfile({
           name: ctx.input.name,
           did: ctx.input.did,
@@ -65,7 +67,8 @@ export let manageProfile = SlateTool.create(spec, {
         };
       }
       case 'get': {
-        if (!ctx.input.profileId) throw new Error('profileId is required for get action');
+        if (!ctx.input.profileId)
+          throw createApiServiceError('profileId is required for get action');
         let result = await client.getProfile(ctx.input.profileId);
         return {
           output: { profile: result },
@@ -83,7 +86,15 @@ export let manageProfile = SlateTool.create(spec, {
         };
       }
       case 'update': {
-        if (!ctx.input.profileId) throw new Error('profileId is required for update action');
+        if (!ctx.input.profileId)
+          throw createApiServiceError('profileId is required for update action');
+        if (
+          ctx.input.name === undefined &&
+          ctx.input.description === undefined &&
+          ctx.input.logo === undefined
+        ) {
+          throw createApiServiceError('Provide name, description, or logo for update action.');
+        }
         let result = await client.updateProfile(ctx.input.profileId, {
           name: ctx.input.name,
           description: ctx.input.description,
@@ -95,7 +106,8 @@ export let manageProfile = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.profileId) throw new Error('profileId is required for delete action');
+        if (!ctx.input.profileId)
+          throw createApiServiceError('profileId is required for delete action');
         await client.deleteProfile(ctx.input.profileId);
         return {
           output: { deleted: true },

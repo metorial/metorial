@@ -1,5 +1,6 @@
 export * from './confirm-poe';
 export * from './create-job';
+export * from './download-job-results';
 export * from './get-account-info';
 export * from './get-job-results';
 export * from './get-job-status';

@@ -8,6 +8,10 @@ Manage projects, task lists, and tasks with support for assignees, due dates, pr
 
 Retrieve the latest activity feed from Teamwork. Shows recent actions across the site or within a specific project, including task updates, comments, file uploads, and more.
 
+### Get Current User
+
+Retrieve the authenticated person ID, profile, company, and administrator status.
+
 ### Get Project
 
 Retrieve detailed information about a specific Teamwork project by its ID, including status, dates, company, and description.
@@ -15,6 +19,10 @@ Retrieve detailed information about a specific Teamwork project by its ID, inclu
 ### Get Task
 
 Retrieve detailed information about a specific Teamwork task, including its status, assignees, dates, priority, and estimated time.
+
+### List Milestones
+
+Find milestones across accessible projects or within one project, with status filtering and pagination. Returns IDs for later changes.
 
 ### List People
 

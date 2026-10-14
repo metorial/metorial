@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -47,7 +47,7 @@ export let manageTemplate = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!templateId) throw new Error('templateId is required for get action');
+      if (!templateId) throw createApiServiceError('templateId is required for get action');
       let template = await client.getTemplate(templateId);
       return {
         output: { template, success: true },
@@ -56,7 +56,7 @@ export let manageTemplate = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!templateId) throw new Error('templateId is required for update action');
+      if (!templateId) throw createApiServiceError('templateId is required for update action');
       let updateData: Record<string, any> = {};
       if (name !== undefined) updateData.name = name;
       if (subject !== undefined) updateData.subject = subject;
@@ -69,7 +69,7 @@ export let manageTemplate = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!templateId) throw new Error('templateId is required for delete action');
+      if (!templateId) throw createApiServiceError('templateId is required for delete action');
       await client.deleteTemplate(templateId);
       return {
         output: { success: true },
@@ -77,6 +77,6 @@ export let manageTemplate = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

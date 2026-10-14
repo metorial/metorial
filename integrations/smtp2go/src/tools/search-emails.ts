@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let searchEmails = SlateTool.create(spec, {
   name: 'Search Sent Emails',
   key: 'search_emails',
-  description: `Search and retrieve sent emails and their delivery records. Filter by date range, email ID, sender/recipient keywords, and status. Supports pagination with continuation tokens.`,
+  description: `This legacy API endpoint is deprecated by SMTP2GO; prefer Search Email Activity. Search and retrieve sent emails and their delivery records. Filter by date range, email ID, sender/recipient keywords, and status. Supports pagination with continuation tokens.`,
   tags: {
     readOnly: true
   }
@@ -17,6 +17,9 @@ export let searchEmails = SlateTool.create(spec, {
       endDate: z.string().optional().describe('End date in ISO-8601 format'),
       limit: z
         .number()
+        .min(1)
+        .max(5000)
+        .refine(Number.isSafeInteger, 'Limit must be a whole number')
         .optional()
         .describe('Maximum number of results to return (default 5000)'),
       continueToken: z
@@ -31,8 +34,14 @@ export let searchEmails = SlateTool.create(spec, {
       username: z.string().optional().describe('Filter by SMTP username or API key'),
       openedOnly: z.boolean().optional().describe('Only return emails that were opened'),
       clickedOnly: z.boolean().optional().describe('Only return emails that had clicks'),
-      sortBy: z.enum(['email_ts', 'delivered_at']).optional().describe('Sort field'),
-      sortDir: z.enum(['asc', 'desc']).optional().describe('Sort direction')
+      sortBy: z
+        .enum(['email_ts', 'delivered_at'])
+        .optional()
+        .describe('Sort field within this returned page'),
+      sortDir: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe('Sort direction within this returned page')
     })
   )
   .output(
@@ -80,10 +89,24 @@ export let searchEmails = SlateTool.create(spec, {
       totalClicks: e.total_clicks
     }));
 
+    if (ctx.input.sortBy) {
+      let field: 'emailTimestamp' | 'deliveredAt' =
+        ctx.input.sortBy === 'email_ts' ? 'emailTimestamp' : 'deliveredAt';
+      emails.sort(
+        (
+          a: { emailTimestamp: string; deliveredAt?: string },
+          b: { emailTimestamp: string; deliveredAt?: string }
+        ) => {
+          let order = (a[field] ?? '').localeCompare(b[field] ?? '');
+          return ctx.input.sortDir === 'desc' ? -order : order;
+        }
+      );
+    }
+
     return {
       output: {
         count: data.count ?? emails.length,
-        continueToken: data.continue_token,
+        continueToken: data.continue_token ?? undefined,
         emails
       },
       message: `Found **${data.count ?? emails.length}** sent emails.`

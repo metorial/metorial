@@ -4,6 +4,7 @@ export * from './get-collection';
 export * from './get-environment';
 export * from './get-user';
 export * from './get-workspace';
+export * from './import-openapi';
 export * from './list-collections';
 export * from './list-environments';
 export * from './list-workspaces';

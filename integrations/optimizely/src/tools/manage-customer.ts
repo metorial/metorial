@@ -38,7 +38,7 @@ Also supports querying customer segments.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new OdpClient(ctx.auth.token);
+    let client = new OdpClient(ctx.auth.token, ctx.auth.odpRegion);
 
     switch (ctx.input.action) {
       case 'get': {
@@ -53,8 +53,8 @@ Also supports querying customer segments.`,
       }
       case 'upsert': {
         let identifiers: Record<string, string> = {
-          [ctx.input.identifierField]: ctx.input.identifierValue,
-          ...ctx.input.additionalIdentifiers
+          ...ctx.input.additionalIdentifiers,
+          [ctx.input.identifierField]: ctx.input.identifierValue
         };
         let customer = await client.upsertCustomer({
           identifiers,

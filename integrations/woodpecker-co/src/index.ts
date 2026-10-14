@@ -20,7 +20,8 @@ import {
   replyToMessage,
   searchProspects,
   updateCampaign,
-  updateProspectStatus
+  updateProspectStatus,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -44,7 +45,8 @@ export let provider = Slate.create({
     manageManualTasks,
     generateReport,
     getReport,
-    listUsers
+    listUsers,
+    whoAmI
   ],
   triggers: []
 });

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -51,6 +51,13 @@ To **create** a webhook, provide a URL and events to subscribe to. To **update**
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.webhookId) {
+      if (
+        ctx.input.url === undefined &&
+        ctx.input.events === undefined &&
+        ctx.input.enabled === undefined
+      ) {
+        throw createApiServiceError('Provide at least one field to update the webhook.');
+      }
       ctx.progress(`Updating webhook ${ctx.input.webhookId}`);
       let webhook = await client.updateWebhook(ctx.input.webhookId, {
         url: ctx.input.url,
@@ -63,8 +70,16 @@ To **create** a webhook, provide a URL and events to subscribe to. To **update**
         message: `Updated webhook \`${webhook.webhookId}\`. URL: ${webhook.url}. Enabled: **${webhook.enabled}**. Events: ${webhook.events.join(', ')}.`
       };
     } else {
-      if (!ctx.input.url || !ctx.input.events) {
-        throw new Error('Both url and events are required when creating a new webhook.');
+      if (!ctx.input.url || !ctx.input.events?.length) {
+        throw createApiServiceError(
+          'Both url and events are required when creating a new webhook.'
+        );
+      }
+
+      if (ctx.input.enabled !== undefined) {
+        throw createApiServiceError(
+          'Create the webhook first, then update its enabled state using the returned webhook ID.'
+        );
       }
 
       ctx.progress('Creating new webhook');

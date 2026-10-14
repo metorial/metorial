@@ -37,6 +37,10 @@ export let getContact = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .optional()
         .describe('Custom contact attributes'),
+      activity: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Contact activity timestamps returned by Endorsal'),
       archived: z.boolean().optional().describe('Whether the contact is archived'),
       added: z.number().optional().describe('Timestamp when contact was added'),
       testimonials: z
@@ -93,6 +97,7 @@ export let getContact = SlateTool.create(spec, {
         website: contact.website,
         avatar: contact.avatar,
         customAttributes: contact.customAttributes,
+        activity: contact.activity,
         archived: contact.archived,
         added: contact.added,
         testimonials

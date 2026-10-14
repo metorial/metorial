@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MopinionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -35,7 +35,7 @@ export let manageDeployment = SlateTool.create(spec, {
     let { action, deploymentKey, name } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('Name is required when creating a deployment');
+      if (!name) throw createApiServiceError('Name is required when creating a deployment');
 
       let result = await client.addDeployment({ key: deploymentKey, name });
       let created = result.data || result;
@@ -64,6 +64,6 @@ export let manageDeployment = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

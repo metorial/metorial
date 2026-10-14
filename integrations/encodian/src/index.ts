@@ -11,6 +11,7 @@ import {
   convertDocument,
   emailProcess,
   excelOperations,
+  getOperationStatus,
   imageMetadata,
   imageProcess,
   ocrDocument,
@@ -51,7 +52,8 @@ export let provider = Slate.create({
     emailProcess,
     utilitySecurity,
     utilityText,
-    subscriptionStatus
+    subscriptionStatus,
+    getOperationStatus
   ],
   triggers: []
 });

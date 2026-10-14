@@ -1,21 +1,17 @@
 {
   "name": "@metorial/magnetic",
-  "description": "Manage contacts, companies, opportunities, tasks, time tracking, and invoicing for professional services firms. Create and find contacts with detailed profiles and activity logs. Create opportunities/jobs in the CRM pipeline with owners, amounts, and due dates. Create and search tasks linked to projects, assign owners, set priorities, and add comments. Log time against tasks for billable hour tracking. Retrieve users and notifications. Export and import financial data including invoices, expenses, customers, and purchase orders.",
-  "categories": [
-    "crm-and-sales-tools",
-    "financial-data-and-stock-market",
-    "task-and-project-management"
-  ],
+  "description": "Create contacts and contact activity records, discover existing contacts and companies, and create opportunities or jobs. Create and search tasks, assign owners, and log additional time against tasks. Retrieve the connected user's profile, account users, and notifications.",
+  "categories": ["crm-and-sales-tools", "task-and-project-management"],
   "skills": [
     "manage contacts and companies",
     "create CRM opportunities",
     "create and find tasks",
     "log time on tasks",
-    "add comments to tasks",
+    "discover contacts and companies",
+    "retrieve connected user profile",
     "retrieve user list",
     "create contact activity records",
-    "retrieve notifications",
-    "sync financial data"
+    "retrieve notifications"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/magnetic.png"
 }

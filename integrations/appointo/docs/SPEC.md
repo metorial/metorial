@@ -1,4 +1,4 @@
-# Slates Specification for Appointo
+# Appointo Integration Specification
 
 ## Overview
 
@@ -33,6 +33,7 @@ Retrieve the list of products (services) configured in Appointo. Products repres
 Create, fetch, reschedule, cancel, and update bookings.
 
 - **Fetching bookings** supports filtering by status (`past` or `upcoming`), searching by product name, customer name, email, phone, or order name.
+- **Fetching cancelled bookings** supports time-status filters and searching for cancellation follow-up.
 - **Creating bookings** requires an appointment ID, timeslot, and customer details (name and email). Optionally specify quantity for group bookings.
 - **Rescheduling** can target the entire booking or specific customers within a booking. An override option allows forceful rescheduling to a given timeslot.
 - **Canceling** can target the entire booking or specific customers.
@@ -43,9 +44,9 @@ Create, fetch, reschedule, cancel, and update bookings.
 
 Manage appointment types and their availability settings.
 
-- Retrieve appointment details, optionally filtered by product.
+- Retrieve appointment details, optionally filtered by product or a search term.
 - **Check calendar availability** for a given appointment within a date range, with the option to filter by specific team members.
-- **Update appointment configuration** including timezone, duration, interval, capacity, buffer times, reminders (email, SMS, WhatsApp), location settings, cancellation/rescheduling policies, date range restrictions, team member assignment rules, weekly availability slots with per-slot surge pricing and capacity overrides, and date-specific overrides.
+- **Update appointment configuration** including timezone, duration, interval, capacity, buffer times, reminders (email, SMS, WhatsApp), location settings, cancellation/rescheduling permissions and cutoff durations, date range restrictions, team member assignment rules, weekly availability slots with per-slot surge pricing and capacity overrides, and date-specific overrides. When updating date overrides, send the complete set of existing and new overrides to keep.
 
 ### Subscription Contracts
 
@@ -68,3 +69,10 @@ Fires when an existing booking is rescheduled to a different time.
 Fires when a booking is canceled.
 
 **Note:** These triggers are available exclusively through the Zapier integration using a dedicated Zapier token. Appointo does not appear to offer native webhook registration endpoints in its API.
+
+## API References
+
+- [Products](https://api-docs.appointo.me/reference/api-reference/products)
+- [Bookings](https://api-docs.appointo.me/reference/api-reference/bookings)
+- [Appointments](https://api-docs.appointo.me/reference/api-reference/appointments)
+- [Subscription contracts](https://api-docs.appointo.me/reference/api-reference/subscription-contracts)

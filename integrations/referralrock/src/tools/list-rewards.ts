@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getResponseRecords, ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
 
 let rewardSchema = z.object({
@@ -38,7 +38,39 @@ export let listRewards = SlateTool.create(spec, {
     z.object({
       programId: z.string().optional().describe('Filter by program ID'),
       memberId: z.string().optional().describe('Filter by member ID'),
-      referralId: z.string().optional().describe('Filter by referral ID'),
+      referralId: z
+        .string()
+        .optional()
+        .describe('Filter by referral ID; applied before pagination'),
+      query: z
+        .string()
+        .optional()
+        .describe('Recipient email, ID, external ID, or member referral code'),
+      status: z
+        .enum(['Pending', 'Processing', 'Issued'])
+        .optional()
+        .describe('Reward status filter'),
+      sort: z
+        .enum([
+          'Create_Dt_Asc',
+          'Create_Dt_Desc',
+          'Reward_Action_Desc',
+          'Reward_Action_Asc',
+          'Recipient_Name_Desc',
+          'Recipient_Name_Asc',
+          'Complete_Dt_Desc',
+          'Complete_Dt_Asc'
+        ])
+        .optional()
+        .describe('Case-sensitive sort order'),
+      dateFrom: z
+        .string()
+        .optional()
+        .describe('Rewards created after this date in ISO 8601 format'),
+      dateTo: z
+        .string()
+        .optional()
+        .describe('Rewards created before this date in ISO 8601 format'),
       offset: z.number().optional().describe('Starting index for pagination (0-based)'),
       count: z.number().optional().describe('Maximum number of rewards to return')
     })
@@ -57,11 +89,16 @@ export let listRewards = SlateTool.create(spec, {
       programId: ctx.input.programId,
       memberId: ctx.input.memberId,
       referralId: ctx.input.referralId,
+      query: ctx.input.query,
+      status: ctx.input.status,
+      sort: ctx.input.sort,
+      dateFrom: ctx.input.dateFrom,
+      dateTo: ctx.input.dateTo,
       offset: ctx.input.offset,
       count: ctx.input.count
     });
 
-    let rewards = ((result.rewards as Record<string, unknown>[]) || []).map(r => ({
+    let rewards = getResponseRecords(result.rewards, 'reward list').map(r => ({
       rewardId: r.id as string,
       programId: r.programId as string | undefined,
       programName: r.programName as string | undefined,

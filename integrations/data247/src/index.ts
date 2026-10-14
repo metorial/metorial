@@ -7,6 +7,8 @@ import {
   dncCheck,
   fraudDetection,
   genderLookup,
+  getAccountInfo,
+  getUsage,
   ipGeolocation,
   nameLookup,
   profileDataLookup,
@@ -16,6 +18,7 @@ import {
   smsGatewayLookup,
   verifyEmail,
   verifyPhone,
+  verifyPhoneOwner,
   verifyPostalAddress,
   zipcodeLookup
 } from './tools';
@@ -39,7 +42,10 @@ export let provider = Slate.create({
     ipGeolocation,
     dncCheck,
     fraudDetection,
-    checkBalance
+    checkBalance,
+    getAccountInfo,
+    getUsage,
+    verifyPhoneOwner
   ],
   triggers: []
 });

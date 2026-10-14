@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendloopClient } from '../lib/client';
 import { spec } from '../spec';
@@ -40,7 +40,7 @@ export let manageSegments = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new SendloopClient({
       token: ctx.auth.token,
-      subdomain: ctx.config.subdomain
+      subdomain: ctx.auth.subdomain || ctx.config.subdomain
     });
 
     let { action, listId, segmentId, segmentName, rules } = ctx.input;
@@ -57,7 +57,7 @@ export let manageSegments = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!segmentId) throw new Error('Segment ID is required for get action');
+      if (!segmentId) throw createApiServiceError('Segment ID is required for get action');
       let result = await client.getSegment(listId, segmentId);
       let segment = result.Segment || result;
 
@@ -68,7 +68,8 @@ export let manageSegments = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!segmentName) throw new Error('Segment name is required for create action');
+      if (!segmentName)
+        throw createApiServiceError('Segment name is required for create action');
       let result = await client.createSegment(listId, { segmentName, rules });
 
       return {
@@ -81,7 +82,7 @@ export let manageSegments = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!segmentId) throw new Error('Segment ID is required for delete action');
+      if (!segmentId) throw createApiServiceError('Segment ID is required for delete action');
       await client.deleteSegment(listId, segmentId);
 
       return {
@@ -90,6 +91,6 @@ export let manageSegments = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

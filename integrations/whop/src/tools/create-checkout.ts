@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WhopClient } from '../lib/client';
+import { companyIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createCheckout = SlateTool.create(spec, {
@@ -10,7 +11,8 @@ export let createCheckout = SlateTool.create(spec, {
 Use **mode** \`payment\` with either an existing \`planId\` or an inline \`plan\` definition, or use \`setup\` mode to save a payment method.`,
   instructions: [
     'For payment mode with existing plan: provide planId.',
-    'For payment mode with new inline plan: provide plan object with companyId and currency at minimum.',
+    'For payment mode with new inline plan: provide plan with companyId, currency, and either productId or product (including title and externalIdentifier).',
+    'An inline product externalIdentifier finds or creates a product: a matching product is updated with the supplied title; otherwise a product is created. Use productId to select an existing product without updating it.',
     'For setup mode: provide companyId.'
   ]
 })
@@ -20,8 +22,30 @@ Use **mode** \`payment\` with either an existing \`planId\` or an inline \`plan\
       planId: z.string().optional().describe('Existing plan ID (for payment mode)'),
       plan: z
         .object({
-          companyId: z.string().describe('Company ID'),
-          productId: z.string().optional().describe('Product ID'),
+          companyId: z
+            .string()
+            .describe(
+              'Company/account ID. Call list_accounts to discover authorized accounts.'
+            ),
+          productId: z
+            .string()
+            .optional()
+            .describe('Product ID. Required unless product is supplied.'),
+          product: z
+            .object({
+              title: z
+                .string()
+                .describe('Product title to create, or apply to a matching existing product'),
+              externalIdentifier: z
+                .string()
+                .describe(
+                  'Unique external product identifier. A matching existing product is updated; otherwise a product is created.'
+                )
+            })
+            .optional()
+            .describe(
+              'Find or create the inline plan product by externalIdentifier. Updates a matching existing product; otherwise creates one. Use productId to select a product without updating it.'
+            ),
           currency: z.string().describe('ISO currency code (e.g. usd)'),
           initialPrice: z.number().optional().describe('Initial price'),
           renewalPrice: z.number().optional().describe('Renewal price'),
@@ -31,12 +55,7 @@ Use **mode** \`payment\` with either an existing \`planId\` or an inline \`plan\
         })
         .optional()
         .describe('Inline plan definition (for payment mode without planId)'),
-      companyId: z
-        .string()
-        .optional()
-        .describe(
-          'Company ID (required for setup mode). Uses config companyId if not provided.'
-        ),
+      companyId: companyIdSchema,
       redirectUrl: z.string().optional().describe('URL to redirect after checkout'),
       metadata: z.record(z.string(), z.string()).optional().describe('Custom metadata'),
       currency: z.string().optional().describe('Override currency'),
@@ -56,10 +75,22 @@ Use **mode** \`payment\` with either an existing \`planId\` or an inline \`plan\
     let companyId = ctx.input.companyId || ctx.config.companyId;
 
     if (ctx.input.mode === 'setup' && !companyId) {
-      throw new Error('companyId is required for setup mode');
+      throw createApiServiceError('companyId is required for setup mode');
     }
     if (ctx.input.mode === 'payment' && !ctx.input.planId && !ctx.input.plan) {
-      throw new Error('Either planId or plan is required for payment mode');
+      throw createApiServiceError('Either planId or plan is required for payment mode');
+    }
+
+    if (ctx.input.mode === 'payment' && ctx.input.planId && ctx.input.plan) {
+      throw createApiServiceError('Provide either planId or plan, not both.');
+    }
+    if (
+      ctx.input.mode === 'payment' &&
+      ctx.input.plan &&
+      !ctx.input.plan.productId &&
+      !ctx.input.plan.product
+    ) {
+      throw createApiServiceError('Inline plans require productId or a product definition.');
     }
 
     let result = await client.createCheckoutConfiguration({
@@ -69,6 +100,7 @@ Use **mode** \`payment\` with either an existing \`planId\` or an inline \`plan\
         ? {
             companyId: ctx.input.plan.companyId,
             productId: ctx.input.plan.productId,
+            product: ctx.input.plan.product,
             currency: ctx.input.plan.currency,
             initialPrice: ctx.input.plan.initialPrice,
             renewalPrice: ctx.input.plan.renewalPrice,

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let smartScrape = SlateTool.create(spec, {
   name: 'Smart Scrape',
   key: 'smart_scrape',
-  description: `Extracts structured data from a single webpage using AI and a natural language prompt. Provide a URL (or raw HTML/Markdown content) and describe what data you want extracted; returns structured JSON.
+  description: `Uses the legacy v1 API and requires a compatible legacy API key. Extracts structured data from a single webpage using AI and a natural language prompt. Provide a URL (or raw HTML/Markdown content) and describe what data you want extracted; returns structured JSON.
 Supports custom output schemas for consistent data structure, infinite scroll handling, stealth mode for anti-detection, and proxy routing by country.`,
   instructions: [
     'Provide exactly one of: websiteUrl, websiteHtml, or websiteMarkdown as the content source.',

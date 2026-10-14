@@ -48,7 +48,8 @@ export let getChannelTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new PlatformClient(ctx.auth.token);
-    let channel = await client.getChannel(ctx.input.channelId);
+    let result = await client.getChannel(ctx.input.channelId);
+    let channel = result.channel ?? result;
 
     return {
       output: { channel },

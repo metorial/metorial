@@ -1,6 +1,10 @@
 # <img src="logo.svg" height="20"> Mural
 
-Create, manage, and collaborate on visual murals with shared canvases. Add and update canvas widgets including sticky notes, shapes, text boxes, images, arrows, areas, tables, and comments. Organize content with tags, run voting sessions, control timers, and manage private mode for facilitated workshops. Create and manage rooms, workspaces, and templates. Invite users and manage permissions at workspace, room, and mural levels. Search across murals, rooms, and templates. Export murals and duplicate content. Enterprise features include audit logs, eDiscovery, content ownership transfer, SCIM user provisioning, and reporting.
+Manage Mural canvases, rooms, templates, widgets, tags, and workshop facilitation with OAuth. Discover workspaces and rooms, create and duplicate murals, search content, invite or remove collaborators, and run timers, voting sessions, and private mode.
+
+Use `list_workspaces` and `list_rooms` to discover destination IDs before creating a mural. `get_workspace` and `get_room` retrieve container details; `delete_widget` removes canvas content. List and search tools expose pagination cursors.
+
+Creating images requires a previously uploaded Mural asset name. Creating arrow connectors requires geometry and path points. Enterprise API keys belong to Mural's separate administrative API and cannot authorize these canvas tools. Workspace invitations require the `workspaces:write` scope and workspace-admin permissions.
 
 ## License
 

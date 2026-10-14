@@ -7,6 +7,8 @@ export * from './get-appointment-payments';
 export * from './list-appointment-types';
 export * from './list-appointments';
 export * from './list-calendars';
+export * from './list-certificates';
+export * from './list-class-availability';
 export * from './list-forms';
 export * from './list-labels';
 export * from './list-products-orders';

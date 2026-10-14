@@ -30,7 +30,9 @@ export let createEmbeddings = SlateTool.create(spec, {
       dimensions: z
         .number()
         .optional()
-        .describe('Number of output vector dimensions (up to 1536)')
+        .describe(
+          'Number of output vector dimensions; supported limits depend on the selected model'
+        )
     })
   )
   .output(

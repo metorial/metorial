@@ -8,8 +8,12 @@ export interface ClientConfig {
 
 export class Client {
   private ax: ReturnType<typeof createAuthenticatedAxios>;
+  readonly subdomain: string;
+  readonly tokenType: 'api_key' | 'user_token';
 
   constructor(config: ClientConfig) {
+    this.subdomain = config.subdomain;
+    this.tokenType = config.tokenType ?? 'api_key';
     this.ax = createAuthenticatedAxios({
       baseURL: `https://${config.subdomain}.nocrm.io/api/v2`,
       authHeader: {
@@ -19,6 +23,11 @@ export class Client {
       errorAdapter: error =>
         buildApiServiceError(error, { providerLabel: 'noCRM.io', reason: 'nocrm_api_error' })
     });
+  }
+
+  async ping() {
+    let response = await this.ax.get('/ping');
+    return response.data;
   }
 
   static fromContext(ctx: {
@@ -197,6 +206,9 @@ export class Client {
       endDate?: string;
       actionType?: string;
       userId?: number;
+      limit?: number;
+      offset?: number;
+      direction?: 'asc' | 'desc';
     }
   ) {
     let response = await this.ax.get(`/leads/${leadId}/action_histories`, {
@@ -204,7 +216,10 @@ export class Client {
         from: params?.startDate,
         to: params?.endDate,
         action_type: params?.actionType,
-        user_ids: params?.userId
+        user_ids: params?.userId === undefined ? undefined : String(params.userId),
+        limit: params?.limit,
+        offset: params?.offset,
+        direction: params?.direction
       }
     });
     return response.data as any[];
@@ -424,6 +439,21 @@ export class Client {
 
   async listActivities() {
     let response = await this.ax.get('/activities');
+    return response.data as any[];
+  }
+
+  async listPostSalesProcesses(params: {
+    leadId?: number;
+    userId?: string | number;
+    statuses?: ('todo' | 'standby' | 'done')[];
+  }) {
+    let response = await this.ax.get('/follow_ups', {
+      params: {
+        lead_id: params.leadId,
+        user_id: params.userId,
+        status: params.statuses?.join(',')
+      }
+    });
     return response.data as any[];
   }
 

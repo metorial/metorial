@@ -37,7 +37,10 @@ export let analyzeMorphologyTool = SlateTool.create(spec, {
         .array(z.array(z.string()))
         .optional()
         .describe('Compound word components for each token'),
-      hanReadings: z.array(z.string()).optional().describe('Han readings for each token')
+      hanReadings: z
+        .array(z.string())
+        .optional()
+        .describe('Han readings for each token; alternative readings are comma-separated')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,13 +57,16 @@ export let analyzeMorphologyTool = SlateTool.create(spec, {
 
     return {
       output: {
-        tokens: result.tokens,
-        posTags: result.posTags,
-        lemmas: result.lemmas,
-        compoundComponents: result.compoundComponents,
-        hanReadings: result.hanReadings
+        tokens: result.tokens ?? undefined,
+        posTags: result.posTags ?? undefined,
+        lemmas: result.lemmas ?? undefined,
+        compoundComponents: result.compounds ?? result.compoundComponents ?? undefined,
+        hanReadings:
+          result.hanReadings?.map((readings: string | string[]) =>
+            Array.isArray(readings) ? readings.join(', ') : readings
+          ) ?? undefined
       },
-      message: `Morphological analysis (${ctx.input.analysisType}) completed for ${(result.tokens ?? []).length} tokens.`
+      message: `Morphological analysis (${ctx.input.analysisType}) completed.`
     };
   })
   .build();

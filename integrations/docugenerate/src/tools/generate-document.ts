@@ -1,12 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DocuGenerateClient } from '../lib/client';
+import { DocuGenerateClient, fileMimeType } from '../lib/client';
 import { spec } from '../spec';
 
 export let generateDocument = SlateTool.create(spec, {
   name: 'Generate Document',
   key: 'generate_document',
-  description: `Generates one or more documents by merging a template with dynamic data. Each object in the data array produces a separate document with merge tags replaced by the provided values. Supports multiple output formats and options like PDF attachments, PDF merging, and combining into a single file.`,
+  description: `Generates a downloadable document by merging a template with dynamic data. Multiple data objects are combined into one file by default; set singleFile to false to receive a ZIP archive. Supports multiple output formats, PDF attachments, and PDF merging.`,
   instructions: [
     "The data array must contain at least one object. Each object's keys should match the merge tags defined in the template.",
     'Use attach and mergeWith only when outputFormat is a PDF variant (.pdf, .pdf/a-1b, .pdf/a-2b, .pdf/a-3b).'
@@ -26,6 +26,12 @@ export let generateDocument = SlateTool.create(spec, {
           'Array of data objects. Each object generates one document by replacing merge tags with its values.'
         ),
       name: z.string().optional().describe('Name for the generated document(s)'),
+      outputName: z
+        .string()
+        .optional()
+        .describe(
+          'Generated filename without its extension. May contain template merge tags for per-item filenames in a ZIP archive.'
+        ),
       outputFormat: z
         .enum([
           '.pdf',
@@ -75,7 +81,9 @@ export let generateDocument = SlateTool.create(spec, {
         z.object({
           documentId: z.string().describe('Unique ID of the generated document'),
           templateId: z.string().describe('ID of the template used'),
-          created: z.number().describe('Creation timestamp (Unix epoch)'),
+          created: z
+            .number()
+            .describe('Creation timestamp in milliseconds since the Unix epoch'),
           name: z.string().describe('Name of the document'),
           filename: z.string().describe('Filename of the generated document'),
           format: z.string().describe('Output format of the document'),
@@ -96,6 +104,7 @@ export let generateDocument = SlateTool.create(spec, {
       templateId: ctx.input.templateId,
       data: ctx.input.data,
       name: ctx.input.name,
+      outputName: ctx.input.outputName,
       outputFormat: ctx.input.outputFormat,
       outputQuality: ctx.input.outputQuality,
       singleFile: ctx.input.singleFile,
@@ -103,6 +112,16 @@ export let generateDocument = SlateTool.create(spec, {
       attach: ctx.input.attach,
       mergeWith: ctx.input.mergeWith
     });
+
+    for (let doc of results) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: doc.document_uri,
+        mimeType: fileMimeType(
+          doc.filename.toLowerCase().endsWith('.zip') ? '.zip' : doc.format
+        )
+      });
+    }
 
     let documents = results.map(doc => ({
       documentId: doc.id,
@@ -116,7 +135,7 @@ export let generateDocument = SlateTool.create(spec, {
 
     return {
       output: { documents },
-      message: `Generated **${documents.length}** document(s). ${documents.map(d => `[${d.filename}](${d.documentUri})`).join(', ')}`
+      message: `Generated **${documents.length}** downloadable document(s): ${documents.map(d => `**${d.filename}**`).join(', ')}`
     };
   })
   .build();

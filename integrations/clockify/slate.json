@@ -1,6 +1,6 @@
 {
   "name": "@metorial/clockify",
-  "description": "Track work hours, manage projects, and generate reports. Create, update, and delete time entries with support for timers, manual entry, billable status, and tags. Manage projects, tasks, clients, and tags within workspaces. Handle invoicing including creating invoices, importing time entries and expenses, recording payments, and changing invoice status. Track expenses with file attachments and category management. Manage time off policies, submit and approve PTO requests, and update balances. Create and publish scheduled assignments with recurring intervals. Submit and manage approval workflows for time entries and expenses. Generate detailed, summary, weekly, attendance, and expense reports with export to PDF, CSV, and XLSX. Configure custom fields, manage user groups and roles, and access audit logs for workspace activity tracking.",
+  "description": "Track work hours and timers, manage projects, tasks, clients, tags, and user groups, and generate detailed or summary reports. Discover workspaces and inspect user profiles, projects, and time entries. Manage invoices, create expenses with receipts, and submit or review time off requests.",
   "categories": [
     "apis-and-http-requests",
     "financial-data-and-stock-market",
@@ -13,9 +13,9 @@
     "generate work reports",
     "manage time off requests",
     "track expenses",
-    "schedule assignments",
-    "manage workspace members",
-    "handle approval workflows",
+    "discover workspaces",
+    "inspect user profiles",
+    "manage user groups",
     "manage clients and tags"
   ]
 }

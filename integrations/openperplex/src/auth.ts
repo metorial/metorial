@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -13,10 +13,16 @@ export let auth = SlateAuth.create()
     key: 'api_key',
 
     inputSchema: z.object({
-      apiKey: z.string()
+      apiKey: z.string().describe('Your OpenPerplex API key')
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiKey.trim() || /[\r\n]/.test(ctx.input.apiKey)) {
+        throw createApiServiceError(
+          'Provide a non-empty OpenPerplex API key without line breaks.'
+        );
+      }
+
       return {
         output: {
           token: ctx.input.apiKey

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteContact = SlateTool.create(spec, {
   name: 'Delete Contact',
   key: 'delete_contact',
-  description: `Permanently delete a contact from JobNimbus. This action cannot be undone.`,
+  description: `Delete a contact from JobNimbus by marking it inactive.`,
   tags: {
     destructive: true
   }

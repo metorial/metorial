@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createDocument = SlateTool.create(spec, {
@@ -33,10 +33,7 @@ export let createDocument = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      siteUrl: ctx.config.siteUrl,
-      token: ctx.auth.token
-    });
+    let client = createClient(ctx);
 
     let document = await client.createDocument(ctx.input.doctype, ctx.input.documentData);
 

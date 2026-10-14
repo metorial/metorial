@@ -28,7 +28,11 @@ export let updateEmailMessage = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the update was successful')
+      success: z.boolean().describe('Whether the update was successful'),
+      messageId: z
+        .number()
+        .optional()
+        .describe('Current message version ID to use when launching a campaign')
     })
   )
   .handleInvocation(async ctx => {
@@ -37,7 +41,7 @@ export let updateEmailMessage = SlateTool.create(spec, {
       locale: ctx.config.locale
     });
 
-    await client.updateEmailMessage({
+    let result = await client.updateEmailMessage({
       id: ctx.input.messageId,
       sender_name: ctx.input.senderName,
       sender_email: ctx.input.senderEmail,
@@ -45,14 +49,15 @@ export let updateEmailMessage = SlateTool.create(spec, {
       body: ctx.input.body,
       list_id: ctx.input.listId,
       text_body: ctx.input.textBody,
-      generate_text: ctx.input.generateText ? 1 : undefined,
+      generate_text:
+        ctx.input.generateText === undefined ? undefined : Number(ctx.input.generateText),
       tag: ctx.input.tag,
       lang: ctx.input.messageLang,
       wrap_type: ctx.input.wrapType
     });
 
     return {
-      output: { success: true },
+      output: { success: true, messageId: result.message_id },
       message: `Updated email message \`${ctx.input.messageId}\``
     };
   })

@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -21,6 +21,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.apiToken.trim()) {
+        throw createApiServiceError('A Sender API access token is required.');
+      }
       return {
         output: {
           token: ctx.input.apiToken

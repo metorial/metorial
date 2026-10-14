@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AhaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,12 +51,13 @@ export let manageEpic = SlateTool.create(spec, {
   )
   .output(epicOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new AhaClient(ctx.config.subdomain, ctx.auth.token);
+    let client = AhaClient.fromContext(ctx);
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.productId) throw new Error('productId is required to create an epic');
-      if (!ctx.input.name) throw new Error('name is required to create an epic');
+      if (!ctx.input.productId)
+        throw createApiServiceError('productId is required to create an epic');
+      if (!ctx.input.name) throw createApiServiceError('name is required to create an epic');
 
       let epic = await client.createEpic(ctx.input.productId, {
         name: ctx.input.name,
@@ -84,7 +85,7 @@ export let manageEpic = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.epicId) throw new Error('epicId is required for this action');
+    if (!ctx.input.epicId) throw createApiServiceError('epicId is required for this action');
 
     if (action === 'delete') {
       await client.deleteEpic(ctx.input.epicId);

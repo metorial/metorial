@@ -4,8 +4,10 @@ import {
   enrichCompany,
   enrichPerson,
   findDecisionMakers,
+  getCreditBalance,
   getInvestorPortfolio,
   getSocialPosts,
+  listEndpointPermissions,
   screenCompanies,
   searchCompanies,
   searchJobListings,
@@ -24,7 +26,9 @@ export let provider = Slate.create({
     getSocialPosts,
     webSearch,
     getInvestorPortfolio,
-    findDecisionMakers
+    findDecisionMakers,
+    getCreditBalance,
+    listEndpointPermissions
   ],
   triggers: []
 });

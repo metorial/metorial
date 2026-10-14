@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { EagleDocClient } from '../lib/client';
+import { addSignatureImages } from '../lib/signatures';
 import { spec } from '../spec';
 
 let extractedFieldSchema = z
@@ -180,6 +181,8 @@ You can target a specific document type (invoice or receipt) or let the API auto
         signature: ctx.input.extractSignatures
       });
     }
+
+    await addSignatureImages(ctx, result.signatures);
 
     let docType = result.docType || 'Unknown';
     let itemCount = result.productItems?.length || 0;

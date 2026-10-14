@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { KaleidoClient } from '../lib/client';
+import { consortiumId, environmentId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageNode = SlateTool.create(spec, {
@@ -17,8 +18,8 @@ Nodes run the blockchain protocol and can be configured with different sizes and
       action: z
         .enum(['create', 'get', 'list', 'update', 'delete', 'start', 'stop', 'suspend'])
         .describe('Action to perform on the node'),
-      consortiumId: z.string().describe('Consortium ID'),
-      environmentId: z.string().describe('Environment ID'),
+      consortiumId,
+      environmentId,
       nodeId: z
         .string()
         .optional()
@@ -31,7 +32,9 @@ Nodes run the blockchain protocol and can be configured with different sizes and
       role: z
         .enum(['signer', 'non-signer'])
         .optional()
-        .describe('Node role in the consensus algorithm'),
+        .describe(
+          'Initial consensus role for create. Consensus role changes are not supported by the node update endpoint.'
+        ),
       size: z
         .enum(['small', 'medium', 'large'])
         .optional()
@@ -63,6 +66,10 @@ Nodes run the blockchain protocol and can be configured with different sizes and
       size: z.string().optional().describe('Node size'),
       urls: z.any().optional().describe('Node connection URLs'),
       deleted: z.boolean().optional().describe('Whether the node was deleted'),
+      deletionRequested: z
+        .boolean()
+        .optional()
+        .describe('Whether Kaleido accepted the deletion request'),
       actionPerformed: z
         .string()
         .optional()
@@ -78,14 +85,14 @@ Nodes run the blockchain protocol and can be configured with different sizes and
     if (ctx.input.action === 'list') {
       let nodes = await client.listNodes(ctx.input.consortiumId, ctx.input.environmentId);
       let mapped = nodes.map((n: any) => ({
-        nodeId: n._id,
-        name: n.name,
-        membershipId: n.membership_id || undefined,
-        role: n.role || undefined,
-        state: n.state || undefined,
-        size: n.size || undefined,
-        provider: n.provider || undefined,
-        urls: n.urls || undefined
+        nodeId: n._id ?? n.id,
+        name: n.name ?? n._id ?? n.id,
+        membershipId: n.membership_id ?? undefined,
+        role: n.role ?? undefined,
+        state: n.state ?? undefined,
+        size: n.size ?? undefined,
+        provider: n.provider ?? undefined,
+        urls: n.urls ?? undefined
       }));
 
       return {
@@ -95,31 +102,34 @@ Nodes run the blockchain protocol and can be configured with different sizes and
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required');
-      if (!ctx.input.membershipId) throw new Error('Membership ID is required');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required', { reason: 'invalid_input' });
+      if (!ctx.input.membershipId)
+        throw createApiServiceError('Membership ID is required', { reason: 'invalid_input' });
 
       let result = await client.createNode(ctx.input.consortiumId, ctx.input.environmentId, {
         name: ctx.input.name,
         membership_id: ctx.input.membershipId,
-        role: ctx.input.role,
+        init_consensus_role: ctx.input.role,
         size: ctx.input.size
       });
 
       return {
         output: {
-          nodeId: result._id,
-          name: result.name,
-          membershipId: result.membership_id,
-          role: result.role,
-          state: result.state,
-          size: result.size,
+          nodeId: result._id ?? result.id,
+          name: result.name ?? undefined,
+          membershipId: result.membership_id ?? undefined,
+          role: result.role ?? undefined,
+          state: result.state ?? undefined,
+          size: result.size ?? undefined,
           urls: result.urls
         },
         message: `Created node **${result.name}** (\`${result._id}\`).`
       };
     }
 
-    if (!ctx.input.nodeId) throw new Error('Node ID is required');
+    if (!ctx.input.nodeId)
+      throw createApiServiceError('Node ID is required', { reason: 'invalid_input' });
 
     if (ctx.input.action === 'get') {
       let result = await client.getNode(
@@ -129,12 +139,12 @@ Nodes run the blockchain protocol and can be configured with different sizes and
       );
       return {
         output: {
-          nodeId: result._id,
-          name: result.name,
-          membershipId: result.membership_id,
-          role: result.role,
-          state: result.state,
-          size: result.size,
+          nodeId: result._id ?? result.id,
+          name: result.name ?? undefined,
+          membershipId: result.membership_id ?? undefined,
+          role: result.role ?? undefined,
+          state: result.state ?? undefined,
+          size: result.size ?? undefined,
           urls: result.urls
         },
         message: `Node **${result.name}** — role: ${result.role || 'default'}, state: ${result.state || 'unknown'}.`
@@ -142,9 +152,14 @@ Nodes run the blockchain protocol and can be configured with different sizes and
     }
 
     if (ctx.input.action === 'update') {
-      let updateParams: { name?: string; role?: string; size?: string } = {};
+      if (ctx.input.role !== undefined) {
+        throw createApiServiceError(
+          'role selects the initial consensus role for create. Omit role when updating a node.',
+          { reason: 'unsupported_role_update' }
+        );
+      }
+      let updateParams: { name?: string; size?: string } = {};
       if (ctx.input.name) updateParams.name = ctx.input.name;
-      if (ctx.input.role) updateParams.role = ctx.input.role;
       if (ctx.input.size) updateParams.size = ctx.input.size;
 
       let result = await client.updateNode(
@@ -155,12 +170,12 @@ Nodes run the blockchain protocol and can be configured with different sizes and
       );
       return {
         output: {
-          nodeId: result._id,
-          name: result.name,
-          membershipId: result.membership_id,
-          role: result.role,
-          state: result.state,
-          size: result.size,
+          nodeId: result._id ?? result.id,
+          name: result.name ?? undefined,
+          membershipId: result.membership_id ?? undefined,
+          role: result.role ?? undefined,
+          state: result.state ?? undefined,
+          size: result.size ?? undefined,
           urls: result.urls
         },
         message: `Updated node **${result.name}**.`
@@ -168,7 +183,7 @@ Nodes run the blockchain protocol and can be configured with different sizes and
     }
 
     if (ctx.input.action === 'delete') {
-      await client.deleteNode(
+      let result = await client.deleteNode(
         ctx.input.consortiumId,
         ctx.input.environmentId,
         ctx.input.nodeId
@@ -176,9 +191,11 @@ Nodes run the blockchain protocol and can be configured with different sizes and
       return {
         output: {
           nodeId: ctx.input.nodeId,
-          deleted: true
+          deleted: result?.state === 'deleted',
+          deletionRequested: true,
+          state: result?.state ?? undefined
         },
-        message: `Deleted node \`${ctx.input.nodeId}\`.`
+        message: `Kaleido accepted the deletion request for node \`${ctx.input.nodeId}\`.`
       };
     }
 
@@ -194,7 +211,7 @@ Nodes run the blockchain protocol and can be configured with different sizes and
         nodeId: ctx.input.nodeId,
         actionPerformed: ctx.input.action
       },
-      message: `Performed **${ctx.input.action}** on node \`${ctx.input.nodeId}\`.`
+      message: `Kaleido accepted the **${ctx.input.action}** request for node \`${ctx.input.nodeId}\`.`
     };
   })
   .build();

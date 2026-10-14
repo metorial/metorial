@@ -70,24 +70,24 @@ Omit parentId to browse root-level contents.`,
     });
 
     let subfolders = (response.subfolders ?? []).map(f => ({
-      folderId: f.id,
-      name: f.name,
-      parentId: f.parentId,
-      monitorCount: f.count,
-      failedCount: f.failedCount,
-      pausedCount: f.pausedCount
+      folderId: f.id ?? undefined,
+      name: f.name ?? undefined,
+      parentId: f.parentId ?? undefined,
+      monitorCount: f.count ?? undefined,
+      failedCount: f.failedCount ?? undefined,
+      pausedCount: f.pausedCount ?? undefined
     }));
 
     let monitors = (response.tasks ?? []).map(t => ({
-      wachetId: t.id,
-      name: t.name,
-      url: t.url,
-      jobType: t.jobType
+      wachetId: t.id ?? undefined,
+      name: t.name ?? undefined,
+      url: t.url ?? undefined,
+      jobType: t.jobType == null ? undefined : String(t.jobType)
     }));
 
     let path = response.path?.map(p => ({
-      folderId: p.id,
-      name: p.name
+      folderId: p.id ?? undefined,
+      name: p.name ?? undefined
     }));
 
     return {
@@ -95,7 +95,7 @@ Omit parentId to browse root-level contents.`,
         subfolders,
         monitors,
         path,
-        continuationToken: response.continuationToken
+        continuationToken: response.continuationToken ?? undefined
       },
       message: `Found **${subfolders.length}** subfolder(s) and **${monitors.length}** monitor(s)${ctx.input.parentId ? ` in folder \`${ctx.input.parentId}\`` : ' at root level'}.`
     };

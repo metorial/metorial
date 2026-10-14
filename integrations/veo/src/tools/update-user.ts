@@ -26,7 +26,11 @@ export let updateUser = SlateTool.create(spec, {
       roles: z
         .array(
           z.object({
-            organisationId: z.string().describe('Organisation ID for the role assignment'),
+            organisationId: z
+              .string()
+              .describe(
+                'Organisation ID for the role assignment. Call list_organisations to discover your organisations.'
+              ),
             roles: z.array(z.number()).describe('Array of role IDs (4 = User, 2 = Org Admin)')
           })
         )

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RunscopeClient } from '../lib/runscope-client';
 import { spec } from '../spec';
@@ -46,8 +46,14 @@ export let manageMonitoringTest = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.auth.runscopeToken && !ctx.auth.token) {
-      throw new Error('Runscope OAuth token is required for API Monitoring operations');
+    if (
+      ctx.auth.apiKeyId ||
+      ctx.auth.apiKeySecret ||
+      (!ctx.auth.runscopeToken && !ctx.auth.token)
+    ) {
+      throw createApiServiceError(
+        'Runscope OAuth token is required for API Monitoring operations'
+      );
     }
     let client = new RunscopeClient({ token: ctx.auth.runscopeToken || ctx.auth.token });
 
@@ -56,7 +62,7 @@ export let manageMonitoringTest = SlateTool.create(spec, {
       let mapped = tests.map((t: any) => ({
         testId: t.id,
         name: t.name,
-        description: t.description,
+        description: t.description ?? undefined,
         createdAt: t.created_at ? String(t.created_at) : undefined
       }));
       return {
@@ -66,7 +72,7 @@ export let manageMonitoringTest = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating a test');
+      if (!ctx.input.name) throw createApiServiceError('name is required for creating a test');
       let test = await client.createTest(ctx.input.bucketKey, {
         name: ctx.input.name,
         description: ctx.input.description,
@@ -79,7 +85,8 @@ export let manageMonitoringTest = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.testId) throw new Error('testId is required for updating a test');
+      if (!ctx.input.testId)
+        throw createApiServiceError('testId is required for updating a test');
       let test = await client.updateTest(ctx.input.bucketKey, ctx.input.testId, {
         name: ctx.input.name,
         description: ctx.input.description,
@@ -92,7 +99,8 @@ export let manageMonitoringTest = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.testId) throw new Error('testId is required for deleting a test');
+      if (!ctx.input.testId)
+        throw createApiServiceError('testId is required for deleting a test');
       await client.deleteTest(ctx.input.bucketKey, ctx.input.testId);
       return {
         output: { testId: ctx.input.testId, deleted: true },
@@ -100,6 +108,6 @@ export let manageMonitoringTest = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

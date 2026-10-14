@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { chatbotIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let conversationMessageSchema = z.object({
@@ -29,7 +30,7 @@ export let getConversations = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      chatbotId: z.string().describe('The ID of the chatbot.'),
+      chatbotId: chatbotIdSchema,
       conversationId: z
         .string()
         .optional()

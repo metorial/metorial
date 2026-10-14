@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { environmentIdInput } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listContentItems = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let listContentItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      environmentId: environmentIdInput,
       continuationToken: z
         .string()
         .optional()
@@ -43,7 +45,7 @@ export let listContentItems = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ManagementClient({
       token: ctx.auth.token,
-      environmentId: ctx.config.environmentId
+      environmentId: ctx.input.environmentId ?? ctx.config.environmentId
     });
 
     let result = await client.listContentItems(ctx.input.continuationToken);

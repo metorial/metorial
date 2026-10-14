@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -51,7 +51,7 @@ export let scrapeAmazon = SlateTool.create(spec, {
 
     if (ctx.input.action === 'product') {
       if (!ctx.input.asin) {
-        throw new Error('asin is required for the "product" action');
+        throw createApiServiceError('asin is required for the "product" action');
       }
       results = await client.getAmazonProduct({
         asin: ctx.input.asin,
@@ -64,7 +64,7 @@ export let scrapeAmazon = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.query) {
-        throw new Error('query is required for the "search" action');
+        throw createApiServiceError('query is required for the "search" action');
       }
       results = await client.searchAmazon({
         query: ctx.input.query,

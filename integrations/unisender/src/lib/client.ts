@@ -1,4 +1,10 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  isApiErrorRecord,
+  requestAxiosData
+} from 'slates';
 
 export class UnisenderClient {
   private ax;
@@ -12,7 +18,12 @@ export class UnisenderClient {
     });
   }
 
-  private async call<T = any>(method: string, params: Record<string, any> = {}): Promise<T> {
+  private async call<T = any>(
+    method: string,
+    params: Record<string, unknown> = {},
+    allowDirectResult = false,
+    preserveEnvelope = false
+  ): Promise<T> {
     let formParams = new URLSearchParams();
     formParams.append('api_key', this.apiKey);
     formParams.append('format', 'json');
@@ -33,20 +44,91 @@ export class UnisenderClient {
       }
     };
 
+    if (params.limit !== undefined) {
+      let maximum = method === 'getCampaigns' ? 10000 : 100;
+      if (
+        typeof params.limit !== 'number' ||
+        !Number.isInteger(params.limit) ||
+        params.limit < 1 ||
+        params.limit > maximum
+      ) {
+        throw createApiServiceError(`limit must be a whole number between 1 and ${maximum}.`);
+      }
+    }
+    if (
+      params.offset !== undefined &&
+      (typeof params.offset !== 'number' ||
+        !Number.isInteger(params.offset) ||
+        params.offset < 0)
+    ) {
+      throw createApiServiceError('offset must be a non-negative whole number.');
+    }
+    for (let key of ['date_from', 'date_to', 'from', 'to']) {
+      let value = params[key];
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        let end = key === 'date_to' || key === 'to';
+        params[key] =
+          `${value} ${end ? '23:59' : '00:00'}${key === 'from' || key === 'to' ? (end ? ':59' : ':00') : ''}`;
+      }
+    }
     flattenParams(params);
 
-    let response = await this.ax.post(`/${method}`, formParams.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
+    let data = await requestAxiosData<unknown>(
+      method,
+      () =>
+        this.ax.post(`/${method}`, formParams.toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'Unisender',
+          reason: 'unisender_api_error',
+          operation,
+          extractUpstreamCode: error => {
+            if (!isApiErrorRecord(error) || !isApiErrorRecord(error.data)) return;
+            let upstream = error.data.upstream;
+            return isApiErrorRecord(upstream) && typeof upstream.code === 'string'
+              ? upstream.code
+              : undefined;
+          }
+        })
+    );
 
-    let data = response.data;
-    if (data?.error) {
-      throw new Error(`Unisender API error (${data.code || 'unknown'}): ${data.error}`);
+    if (!isApiErrorRecord(data)) {
+      throw createApiServiceError(`Unisender API ${method} returned an invalid response.`);
     }
-
-    return data?.result as T;
+    if (data.error) {
+      throw buildApiServiceError(
+        { response: { status: 200, data } },
+        {
+          providerLabel: 'Unisender',
+          reason: 'unisender_api_error',
+          operation: method,
+          extractUpstreamCode: () => (typeof data.code === 'string' ? data.code : undefined)
+        }
+      );
+    }
+    if ('result' in data) {
+      if (data.result === null || data.result === undefined) {
+        throw createApiServiceError(`Unisender API ${method} returned an empty result.`);
+      }
+      if (
+        [
+          'getLists',
+          'getFields',
+          'getTags',
+          'getCampaigns',
+          'listMessages',
+          'listTemplates'
+        ].includes(method) &&
+        !Array.isArray(data.result)
+      ) {
+        throw createApiServiceError(`Unisender API ${method} returned an invalid list.`);
+      }
+      return (preserveEnvelope ? data : data.result) as T;
+    }
+    if (allowDirectResult) return data as T;
+    throw createApiServiceError(`Unisender API ${method} returned no result.`);
   }
 
   // === List Management ===
@@ -126,7 +208,12 @@ export class UnisenderClient {
   }
 
   async getContact(email: string): Promise<any> {
-    return this.call('getContact', { email });
+    return this.call('getContact', {
+      email,
+      include_lists: 1,
+      include_fields: 1,
+      include_details: 1
+    });
   }
 
   async getContactCount(
@@ -141,7 +228,7 @@ export class UnisenderClient {
     list_ids: string;
     condition?: string;
   }): Promise<any> {
-    return this.call('isContactInList', params);
+    return this.call('isContactInLists', params);
   }
 
   async getTotalContactsCount(login: string): Promise<{ total: number }> {
@@ -230,7 +317,7 @@ export class UnisenderClient {
     name?: string;
     public_name?: string;
   }): Promise<void> {
-    return this.call('updateField', params);
+    return this.call('updateField', params, true);
   }
 
   async deleteField(fieldId: number): Promise<void> {
@@ -282,7 +369,7 @@ export class UnisenderClient {
     series_time?: string;
     wrap_type?: string;
     categories?: string;
-  }): Promise<void> {
+  }): Promise<{ message_id: number }> {
     return this.call('updateEmailMessage', params);
   }
 
@@ -311,7 +398,11 @@ export class UnisenderClient {
     limit?: number;
     offset?: number;
   }): Promise<any> {
-    return this.call('listMessages', params || {});
+    return this.call('listMessages', {
+      ...params,
+      date_from: params?.date_from || '1970-01-01 00:00',
+      date_to: params?.date_to || new Date().toISOString().slice(0, 16).replace('T', ' ')
+    });
   }
 
   // === Campaigns ===
@@ -366,7 +457,12 @@ export class UnisenderClient {
     offset?: number;
     status?: string;
   }): Promise<any> {
-    return this.call('getCampaigns', params || {});
+    let { status, ...request } = params || {};
+    let campaigns = await this.call<any[]>('getCampaigns', {
+      ...request,
+      from: request.from || '1970-01-01 00:00:00'
+    });
+    return status ? campaigns.filter(campaign => campaign.status === status) : campaigns;
   }
 
   // === Send Individual Messages ===
@@ -390,16 +486,15 @@ export class UnisenderClient {
     return this.call('sendEmail', params);
   }
 
-  async sendTestEmail(params: { id: number; email?: string }): Promise<any> {
-    return this.call('sendTestEmail', params);
+  async sendTestEmail(params: { id: number; email: string }): Promise<any> {
+    return this.call('sendTestEmail', params, true);
   }
 
-  async checkEmail(params: { email_id: number[] }): Promise<any> {
-    let formattedParams: Record<string, any> = {};
-    for (let i = 0; i < params.email_id.length; i++) {
-      formattedParams[`email_id[${i}]`] = params.email_id[i];
-    }
-    return this.call('checkEmail', formattedParams);
+  async checkEmail(params: { email_id: (string | number)[] }): Promise<{
+    result: unknown;
+    failed_email_id?: unknown;
+  }> {
+    return this.call('checkEmail', { email_id: params.email_id.join(',') }, false, true);
   }
 
   // === SMS ===
@@ -417,7 +512,7 @@ export class UnisenderClient {
     return this.call('sendSms', params);
   }
 
-  async checkSms(smsId: number): Promise<any> {
+  async checkSms(smsId: string | number): Promise<any> {
     return this.call('checkSms', { sms_id: smsId });
   }
 

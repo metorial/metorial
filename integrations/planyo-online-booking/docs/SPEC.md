@@ -1,6 +1,6 @@
-Now let me get the webhook event details from the Planyo FAQ:Now I have comprehensive information. Let me compile the specification.
+# API Capability Reference for Planyo Online Booking
 
-# Slates Specification for Planyo Online Booking
+This reference describes provider API capabilities; the registered tools are documented in the integration README.
 
 ## Overview
 

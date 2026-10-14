@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -76,6 +76,20 @@ export let optimizeRoutes = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (
+      ctx.input.balancingFactor !== undefined &&
+      (ctx.input.balancingFactor < 0 || ctx.input.balancingFactor > 100)
+    ) {
+      throw createApiServiceError('balancingFactor must be between 0 and 100.');
+    }
+    if (
+      ctx.input.useDrivers?.some(
+        driver => !driver.serial?.trim() && !driver.externalId?.trim()
+      )
+    ) {
+      throw createApiServiceError('Provide serial or externalId for every selected driver.');
+    }
+
     let body: Record<string, unknown> = {
       date: ctx.input.date
     };
@@ -84,7 +98,7 @@ export let optimizeRoutes = SlateTool.create(spec, {
     if (ctx.input.balancing) body.balancing = ctx.input.balancing;
     if (ctx.input.balanceBy) body.balanceBy = ctx.input.balanceBy;
     if (ctx.input.balancingFactor !== undefined)
-      body.balancingFactor = ctx.input.balancingFactor;
+      body.balancingFactor = ctx.input.balancingFactor / 100;
     if (ctx.input.startWith) body.startWith = ctx.input.startWith;
     if (ctx.input.lockType) body.lockType = ctx.input.lockType;
     if (ctx.input.depotTrips !== undefined) body.depotTrips = ctx.input.depotTrips;
@@ -97,7 +111,7 @@ export let optimizeRoutes = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
-        planningId: result.planningId,
+        planningId: result.planningId === undefined ? undefined : String(result.planningId),
         missingOrders: result.missingOrders,
         missingDrivers: result.missingDrivers,
         ordersWithInvalidLocation: result.ordersWithInvalidLocation,

@@ -1,4 +1,4 @@
-# Slates Specification for Aha!
+# Aha! API Specification
 
 ## Overview
 
@@ -35,7 +35,7 @@ To authorize an external application to authenticate as a user, the application 
 
 If you don't know the user's subdomain, you can send them to `https://secure.aha.io/oauth/authorize` instead. The redirect will include an `account_subdomain` parameter. If the user was sent to secure.aha.io at the start of the flow, this parameter contains the subdomain of that user's account. You can use this subdomain for the request access token flow or for making API requests.
 
-**Important:** The `subdomain` is a required custom input. All API requests must be scoped to `https://<subdomain>.aha.io`.
+**Account domain:** API-key authentication requires the account subdomain. OAuth can discover it from the `account_subdomain` callback parameter. The account domain is saved with authentication and used for all API requests. Older connections may use their previously stored subdomain setting.
 
 ## Features
 
@@ -71,7 +71,7 @@ Comments can be added to and listed as a sub-resource on any resource that suppo
 
 ### To-dos, Tasks & Approvals
 
-Create and manage to-dos, tasks, and approvals. To-dos can be associated with features, releases, requirements, epics, and ideas. They support multiple assignees, due dates, and status updates.
+Create and manage to-dos, tasks, and approvals. To-dos can be associated with features, releases, requirements, epics, and ideas. They support multiple assignees, due dates, and status updates. To-dos use the `/tasks` resource and a `task` request envelope. Creating a to-do links its parent using `taskable_type` and `taskable_id`. User IDs are resolved to email addresses for assignments.
 
 ### Users & Teams
 

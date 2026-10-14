@@ -1,4 +1,4 @@
-# Slates Specification for Prerender
+# Prerender Integration Specification
 
 ## Overview
 
@@ -23,7 +23,7 @@ The token is passed in one of two ways depending on the API being used:
 
 There is no OAuth2 flow. Authentication is solely token-based.
 
-**Note:** API access is a premium feature, available only on Advanced or Custom/Enterprise plans.
+**Note:** The documented REST API is available on every plan. Cache clearing requires a current plan; legacy plans require provider support for that operation. Existing V3 management operations are retained for compatible connections.
 
 ## Features
 
@@ -31,7 +31,7 @@ There is no OAuth2 flow. Authentication is solely token-based.
 
 Trigger caching or recaching of URLs programmatically to ensure search engines see up-to-date content. The API allows programmatic control over when and how content is refreshed in the cache. Instead of waiting for cache expiration, you can trigger recaching immediately for high-priority pages, ensuring search engines always see current content.
 
-- Supports single or multiple URLs per request (up to 1,000 URLs per request).
+- Supports single or multiple URLs per request (up to 1,000 URLs per request). Empty or oversized requests are rejected before submission.
 - Can target desktop or mobile rendering via the `adaptiveType` parameter (`"desktop"` or `"mobile"`).
 
 ### Cache Search
@@ -45,14 +45,15 @@ The search API lets you search for cached URLs within your account and see their
 
 Clear cached URLs totally or partially using wildcard patterns. The query is inserted into an SQL-like condition where `%` and `?` act as wildcards. Adding `%` after a URL will delete everything that begins with the string before `%`.
 
-- The call schedules a clear job. The job usually runs quickly but depends on cache size. You can check the job's status. There can only be one scheduled job per user.
+- The call schedules a clear job. The job usually runs quickly but depends on cache size. `get_clear_cache_status` polls it without scheduling another job. HTTP 403 from the status endpoint means `in_progress`; HTTP 200 means `not_queued`. There can only be one scheduled job per user.
 
 ### Sitemap Management
 
 Submit XML sitemaps so Prerender can crawl and cache all listed URLs. URLs from the sitemap are added to the rendering queue and cached. Sitemaps are checked and updated every 7 days, daily, or hourly depending on the configured interval. New URLs are added automatically. Multiple sitemaps are supported. Supports XML sitemaps per sitemaps.org standard.
 
 - Recrawl interval is configurable per sitemap.
-- Can be triggered via the `/sitemap` API endpoint.
+- `submit_sitemap` uses the documented `/sitemap` endpoint to import new URLs. Existing cached URLs are not recached; use `recache_urls` for refreshes.
+- `manage_sitemaps` retains the existing V3 registration, listing, update, deletion, and crawl operations.
 
 ### Recache Speed Control
 
@@ -66,8 +67,14 @@ The Domain Manager provides a central view of all connected domains. It shows ho
 
 ### Page Rendering Service
 
-Render any URL through Prerender's headless browser to get the fully rendered HTML. This is accessed via the service endpoint (`https://service.prerender.io/{url}`) using the `X-Prerender-Token` header. This is the core rendering functionality used by middleware integrations.
+Render an HTTP or HTTPS URL through Prerender's headless browser to get the fully rendered HTML and a downloadable HTML snapshot. The existing `renderedHtml` output is preserved for compatibility. This is accessed via the service endpoint (`https://service.prerender.io/{url}`) using the `X-Prerender-Token` header. This is the core rendering functionality used by middleware integrations.
 
 ## Events
 
 The provider does not support events. Prerender.io does not offer webhooks or purpose-built event subscription mechanisms through its API.
+
+## Official API references
+
+- [REST API](https://docs.prerender.io/docs/6-api)
+- [Rendering request flow](https://docs.prerender.io/docs/how-does-prerender-work)
+- [V3 API documentation entry point](https://api.prerender.io/v3/api)

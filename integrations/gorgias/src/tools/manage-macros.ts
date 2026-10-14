@@ -14,7 +14,13 @@ export let listMacros = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Number of macros to return')
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('Number of macros to return')
     })
   )
   .output(
@@ -49,8 +55,8 @@ export let listMacros = SlateTool.create(spec, {
     return {
       output: {
         macros,
-        nextCursor: result.meta.next_cursor,
-        prevCursor: result.meta.prev_cursor
+        nextCursor: result.meta?.next_cursor ?? null,
+        prevCursor: result.meta?.prev_cursor ?? null
       },
       message: `Found **${macros.length}** macro(s).`
     };
@@ -68,10 +74,14 @@ export let createMacro = SlateTool.create(spec, {
       actions: z
         .array(
           z.object({
-            type: z
+            type: z.string().describe('Action type, for example user'),
+            name: z
               .string()
-              .describe('Action type (e.g., "set-status", "add-tag", "send-message")'),
-            args: z.any().optional().describe('Action arguments')
+              .optional()
+              .describe('Provider action name, for example addTags or setResponseText'),
+            title: z.string().optional().describe('Action display title'),
+            arguments: z.any().optional().describe('Provider action arguments'),
+            args: z.any().optional().describe('Legacy alias for arguments')
           })
         )
         .optional()
@@ -90,7 +100,10 @@ export let createMacro = SlateTool.create(spec, {
 
     let macro = await client.createMacro({
       name: ctx.input.name,
-      actions: ctx.input.actions
+      actions: ctx.input.actions?.map(({ args, ...action }) => ({
+        ...action,
+        arguments: action.arguments ?? args
+      }))
     });
 
     return {
@@ -117,7 +130,13 @@ export let updateMacro = SlateTool.create(spec, {
         .array(
           z.object({
             type: z.string().describe('Action type'),
-            args: z.any().optional().describe('Action arguments')
+            name: z
+              .string()
+              .optional()
+              .describe('Provider action name, for example addTags or setResponseText'),
+            title: z.string().optional().describe('Action display title'),
+            arguments: z.any().optional().describe('Provider action arguments'),
+            args: z.any().optional().describe('Legacy alias for arguments')
           })
         )
         .optional()
@@ -136,7 +155,11 @@ export let updateMacro = SlateTool.create(spec, {
 
     let data: any = {};
     if (ctx.input.name) data.name = ctx.input.name;
-    if (ctx.input.actions) data.actions = ctx.input.actions;
+    if (ctx.input.actions)
+      data.actions = ctx.input.actions.map(({ args, ...action }) => ({
+        ...action,
+        arguments: action.arguments ?? args
+      }));
 
     let macro = await client.updateMacro(ctx.input.macroId, data);
 

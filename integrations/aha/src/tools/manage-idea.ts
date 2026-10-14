@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AhaClient } from '../lib/client';
 import { spec } from '../spec';
@@ -54,12 +54,13 @@ export let manageIdea = SlateTool.create(spec, {
   )
   .output(ideaOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new AhaClient(ctx.config.subdomain, ctx.auth.token);
+    let client = AhaClient.fromContext(ctx);
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.productId) throw new Error('productId is required to create an idea');
-      if (!ctx.input.name) throw new Error('name is required to create an idea');
+      if (!ctx.input.productId)
+        throw createApiServiceError('productId is required to create an idea');
+      if (!ctx.input.name) throw createApiServiceError('name is required to create an idea');
 
       let idea = await client.createIdea(ctx.input.productId, {
         name: ctx.input.name,
@@ -86,7 +87,7 @@ export let manageIdea = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.ideaId) throw new Error('ideaId is required for this action');
+    if (!ctx.input.ideaId) throw createApiServiceError('ideaId is required for this action');
 
     if (action === 'delete') {
       await client.deleteIdea(ctx.input.ideaId);

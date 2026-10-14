@@ -6,8 +6,11 @@ import { spec } from '../spec';
 export let transliterateTextTool = SlateTool.create(spec, {
   name: 'Transliterate Text',
   key: 'transliterate_text',
-  description: `Converts text from one script to another without translation, preserving the phonetic representation. For example, converts Arabic or Cyrillic script text to Latin script, or romanized Arabic text to standard Arabic characters.`,
-  constraints: ['Maximum payload size is 600KB with a maximum of 50,000 characters.'],
+  description: `Transliterates Arabizi or Romanized Arabic chat text into native Arabic script. Use translate_name for translating names between other supported languages and scripts.`,
+  constraints: [
+    'Maximum payload size is 600KB with a maximum of 50,000 characters.',
+    'Only Arabizi-to-native-Arabic transliteration is exposed. The provider ignores the language field.'
+  ],
   tags: {
     readOnly: true
   }

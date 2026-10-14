@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, downloadGeneratedFile } from '../lib/client';
 import { spec } from '../spec';
 
 export let mergePdfs = SlateTool.create(spec, {
@@ -64,6 +64,9 @@ Use "pdfUrls" for URL-based merging, or "templates" for template-based merging.`
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.pdfUrls !== undefined && ctx.input.templates !== undefined) {
+      throw createApiServiceError('Provide either pdfUrls or templates, but not both.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       region: ctx.config.region
@@ -92,11 +95,18 @@ Use "pdfUrls" for URL-based merging, or "templates" for template-based merging.`
         outputFile: ctx.input.outputFile
       });
     } else {
-      throw new Error('Either "pdfUrls" or "templates" must be provided.');
+      throw createApiServiceError('Provide a non-empty pdfUrls or templates list.');
     }
 
     let mode = ctx.input.pdfUrls ? 'URL' : 'template';
     let count = ctx.input.pdfUrls?.length || ctx.input.templates?.length || 0;
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: await downloadGeneratedFile(result.file),
+      mimeType: 'application/pdf',
+      filename: ctx.input.outputFile || 'output.pdf'
+    });
 
     return {
       output: {

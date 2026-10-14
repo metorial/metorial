@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let tagOutputSchema = z.object({
@@ -12,21 +13,18 @@ let tagOutputSchema = z.object({
 export let createTag = SlateTool.create(spec, {
   name: 'Create Tag',
   key: 'create_tag',
-  description: `Create a new tag in the Clockify workspace. Tags are used to categorize and filter time entries.`,
+  description: `Create a new tag in the Clockify workspace. Tags are used to categorize and filter time entries. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Tag name')
     })
   )
   .output(tagOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let tag = await client.createTag({ name: ctx.input.name });
 
@@ -44,11 +42,12 @@ export let createTag = SlateTool.create(spec, {
 export let updateTag = SlateTool.create(spec, {
   name: 'Update Tag',
   key: 'update_tag',
-  description: `Update an existing tag in Clockify. Modify its name or archive status.`,
+  description: `Update an existing tag in Clockify. Modify its name or archive status. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       tagId: z.string().describe('ID of the tag to update'),
       name: z.string().optional().describe('Updated tag name'),
       archived: z.boolean().optional().describe('Archive/unarchive the tag')
@@ -56,11 +55,7 @@ export let updateTag = SlateTool.create(spec, {
   )
   .output(tagOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let tag = await client.updateTag(ctx.input.tagId, {
       name: ctx.input.name,
@@ -81,11 +76,12 @@ export let updateTag = SlateTool.create(spec, {
 export let deleteTag = SlateTool.create(spec, {
   name: 'Delete Tag',
   key: 'delete_tag',
-  description: `Delete a tag from the Clockify workspace.`,
+  description: `Delete a tag from the Clockify workspace. Call get_workspaces to discover the workspace ID.`,
   tags: { destructive: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       tagId: z.string().describe('ID of the tag to delete')
     })
   )
@@ -95,11 +91,7 @@ export let deleteTag = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     await client.deleteTag(ctx.input.tagId);
 
@@ -113,15 +105,26 @@ export let deleteTag = SlateTool.create(spec, {
 export let getTags = SlateTool.create(spec, {
   name: 'Get Tags',
   key: 'get_tags',
-  description: `List tags in the Clockify workspace. Filter by name or archived status.`,
+  description: `List tags in the Clockify workspace. Filter by name or archived status. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().optional().describe('Filter by tag name (partial match)'),
       archived: z.boolean().optional().describe('Filter by archived status'),
-      page: z.number().optional().describe('Page number'),
-      pageSize: z.number().optional().describe('Entries per page')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Page number'),
+      pageSize: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Entries per page')
     })
   )
   .output(
@@ -131,11 +134,7 @@ export let getTags = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let results = await client.getTags({
       name: ctx.input.name,

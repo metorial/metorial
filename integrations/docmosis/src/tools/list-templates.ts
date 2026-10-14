@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { asNumber, Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let listTemplates = SlateTool.create(spec, {
@@ -31,7 +31,10 @@ export let listTemplates = SlateTool.create(spec, {
           z.object({
             templateName: z.string().describe('Full path and name of the template'),
             sizeBytes: z.number().optional().describe('File size in bytes'),
-            uploadedTime: z.number().optional().describe('Upload timestamp in milliseconds')
+            uploadedTime: z
+              .number()
+              .optional()
+              .describe('Last modification timestamp in milliseconds')
           })
         )
         .describe('List of templates in the environment')
@@ -47,8 +50,8 @@ export let listTemplates = SlateTool.create(spec, {
 
     let templates = (result.templateList || []).map(t => ({
       templateName: t.name,
-      sizeBytes: t.sizeBytes,
-      uploadedTime: t.uploadedTime
+      sizeBytes: asNumber(t.sizeBytes),
+      uploadedTime: asNumber(t.lastModifiedMillisSinceEpoch) ?? asNumber(t.uploadedTime)
     }));
 
     let folderInfo = ctx.input.folder ? ` in folder \`${ctx.input.folder}\`` : '';

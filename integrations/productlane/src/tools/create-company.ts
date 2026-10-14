@@ -11,6 +11,16 @@ export let createCompany = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Company name'),
+      domain: z
+        .string()
+        .min(1)
+        .max(63)
+        .optional()
+        .describe('Company domain for the legacy v1 company API (e.g. example.com)'),
+      segments: z
+        .array(z.string())
+        .optional()
+        .describe('Company segments supported by the legacy v1 company API'),
       domains: z
         .array(z.string())
         .optional()

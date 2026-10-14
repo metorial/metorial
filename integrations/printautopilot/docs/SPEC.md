@@ -1,46 +1,28 @@
-Let me fetch the Postman API documentation and the PrintAutopilot website for more details.Now let me look at the Pipedream source code for the PrintAutopilot component to understand the authentication and API details better.Now I have a comprehensive understanding of PrintAutopilot. Let me also look at the Zapier page for any additional details on available actions.Now I have a thorough understanding of PrintAutopilot. Let me compile the specification.
+# PrintAutopilot Integration
 
-# Slates Specification for Printautopilot
-
-## Overview
-
-PrintAutopilot is a cloud-based service that connects applications to physical printers, enabling automated PDF document printing via remote print queues. It provides a Windows client that connects to local printers and a REST API to submit documents to those print queues programmatically. It is commonly used to automate printing of packing slips, shipping labels, and other documents in e-commerce and fulfillment workflows.
+PrintAutopilot connects applications to physical printers through remote PDF queues and a desktop print client. The base URL is `https://printautopilot.com/api`.
 
 ## Authentication
 
-PrintAutopilot uses two levels of authentication:
+The connection uses a bearer **connection token** from the dashboard. The provider documents this token for print-app endpoints: `/printers`, `/print-jobs`, and `/finish-print-jobs`.
 
-1. **Connection Token (Bearer Token):** API requests are authenticated using a Bearer token passed in the `Authorization` header (e.g., `Authorization: Bearer {connection_token}`). This token is associated with your PrintAutopilot account and is used for general API access such as retrieving print jobs. You obtain this token from your PrintAutopilot account dashboard.
+Document submission uses a separate **queue API token**, supplied as `printQueueToken` to `submit_document`. The queue token replaces the connection token in the Authorization header for that request.
 
-2. **Print Queue Token:** Each print queue has its own API Token ("Print Queue Token") that must be provided when submitting documents to a specific queue. This token identifies which print queue to send the document to.
+## Tools
 
-**Base URL:** `https://printautopilot.com/api/`
+| Key | Provider request | Contract |
+| --- | --- | --- |
+| `submit_document` | `POST /document/create` | One JSON object containing `fileName` and `base64`. The tool validates base64 and a PDF header before submission. The documented accepted response is HTTP 202 with `status: "ok"`. |
+| `list_print_jobs` | `GET /print-jobs` | Returns an array of groups with `Printer`, `PaperSize`, `scaling`, and `documents`. Document IDs and filenames remain in output; valid PDF contents are available as downloadable files. Invalid documents retain their metadata with `pdfError` so failed printing can be acknowledged. |
+| `create_printers` | `POST /printers` | A JSON array of printer names and `paperSizes`; each paper size contains `name`, `height`, `width`, and `rawKind`. Dimensions keep the printer driver's original units, which the API reference does not define. |
+| `finish_documents` | `POST /finish-print-jobs` | A JSON array of document `id`, `state` (`success` or `failed`), and optional `err_msg`. Record results after actual printing. |
 
-**API Documentation:** https://documenter.getpostman.com/view/1334461/TW6wJonb
+The existing tool keys and input field types remain available. The document submission API does not support batching PDFs. The published reference does not document pagination, queue discovery, identity, or full print-history retrieval. The `check-version` route is explicitly restricted to the provider's own client and is not exposed.
 
-## Features
+## Sources and verification limits
 
-### PDF Document Queue Submission
+- [Provider website](https://printautopilot.com/) links to the API reference and describes connection tokens, queue API tokens, and Windows/macOS clients.
+- [Provider-linked Postman API reference](https://documenter.getpostman.com/view/1334461/TW6wJonb).
+- [Public collection backing the reference](https://documenter.gw.postman.com/api/collections/1334461/TW6wJonb?segregateAuth=true&versionTag=latest).
 
-Allows automated printing by adding PDF files to a print queue, enabling seamless integration between applications and physical printers. When submitting a PDF, you must specify:
-
-- **File:** The PDF document to print (uploaded as a file).
-- **Filename:** The name for the document in the queue.
-- **Print Queue Token:** The token identifying which print queue to target.
-
-This is the primary API action. The action uploads the PDF document to the PrintAutopilot queue, after which the Windows client installed on the machine with the connected printer picks it up and prints it.
-
-### Print Job Management
-
-You can retrieve print jobs via the `/print-jobs` endpoint to monitor and track the status of submitted documents. This supports real-time print status monitoring.
-
-### Multiple Print Queues
-
-You can designate multiple print queues for a single printer or across multiple printers. Each queue has its own API token, allowing you to route different types of documents (e.g., packing slips, invoices, labels) to different printers or queues.
-
-- Only PDF documents are supported for printing.
-- The service uses a credit-based pay-per-use pricing model with no monthly fees.
-
-## Events
-
-The provider does not support events. There are no webhooks or purpose-built event subscription mechanisms available through the PrintAutopilot API.
+The public collection was published in 2021 and remains linked from the current website. Documentation review and local build verification do not establish live API or physical-printing behavior.

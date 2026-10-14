@@ -30,9 +30,16 @@ export interface LanguageVariant {
   item: KontentReference;
   language: KontentReference;
   elements: ElementValue[];
-  workflow: WorkflowReference;
-  workflow_step: KontentReference;
+  workflow?: WorkflowReference;
+  workflow_step?: KontentReference;
   last_modified: string;
+}
+
+export interface Environment {
+  id: string;
+  name: string;
+  environment: string;
+  is_production: boolean;
 }
 
 export interface ContentTypeElement {

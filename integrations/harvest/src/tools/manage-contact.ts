@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageContact = SlateTool.create(spec, {
   name: 'Manage Contact',
   key: 'manage_contact',
-  description: `Create, update, or delete a client contact in Harvest. Contacts belong to clients and include name, email, phone, and title information.`,
+  description: `Create, update, or delete a client contact in Harvest. Contacts belong to clients and include name, email, phone, and title information. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -14,6 +15,7 @@ export let manageContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       contactId: z.number().optional().describe('Contact ID (required for update/delete)'),
       clientId: z.number().optional().describe('Client ID (required for create)'),
@@ -42,11 +44,12 @@ export let manageContact = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.contactId) throw new Error('contactId is required for delete');
+      if (!ctx.input.contactId)
+        throw createApiServiceError('contactId is required for delete');
       await client.deleteContact(ctx.input.contactId);
       return {
         output: { contactId: ctx.input.contactId, deleted: true },
@@ -56,7 +59,7 @@ export let manageContact = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.clientId || !ctx.input.firstName) {
-        throw new Error('clientId and firstName are required for create');
+        throw createApiServiceError('clientId and firstName are required for create');
       }
       let contact = await client.createContact({
         clientId: ctx.input.clientId,
@@ -84,7 +87,7 @@ export let manageContact = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.contactId) throw new Error('contactId is required for update');
+    if (!ctx.input.contactId) throw createApiServiceError('contactId is required for update');
     let contact = await client.updateContact(ctx.input.contactId, {
       clientId: ctx.input.clientId,
       firstName: ctx.input.firstName,

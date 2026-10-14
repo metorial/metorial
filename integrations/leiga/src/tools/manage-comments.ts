@@ -6,29 +6,48 @@ import { spec } from '../spec';
 export let listCommentsTool = SlateTool.create(spec, {
   name: 'List Comments',
   key: 'list_comments',
-  description: `List all comments on an issue. Returns comment content, authors, and timestamps.`,
+  description: `List one page of comments on an issue. Returns comment content, authors, timestamps, and total count.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      issueId: z.number().describe('The issue ID to get comments for')
+      issueId: z.number().describe('The issue ID to get comments for'),
+      pageNumber: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .default(1)
+        .describe('Page number starting at 1'),
+      pageSize: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .default(50)
+        .describe('Comments per page')
     })
   )
   .output(
     z.object({
-      comments: z.array(z.any()).describe('List of comments')
+      comments: z.array(z.any()).describe('List of comments'),
+      total: z.number().optional().describe('Total matching comments')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let response = await client.listComments(ctx.input.issueId);
+    let response = await client.listComments(
+      ctx.input.issueId,
+      ctx.input.pageNumber,
+      ctx.input.pageSize
+    );
 
-    let comments = response.data || [];
+    let comments = response.data?.list || [];
 
     return {
-      output: { comments },
+      output: { comments, total: response.data?.total },
       message: `Found **${comments.length}** comment(s) on issue #${ctx.input.issueId}.`
     };
   })
@@ -42,7 +61,7 @@ export let addCommentTool = SlateTool.create(spec, {
   .input(
     z.object({
       issueId: z.number().describe('The issue ID to comment on'),
-      content: z.string().describe('Comment content (supports markdown)'),
+      content: z.string().describe('Comment content'),
       parentCommentId: z.number().optional().describe('Parent comment ID for replies')
     })
   )
@@ -60,10 +79,6 @@ export let addCommentTool = SlateTool.create(spec, {
       content: ctx.input.content,
       parentId: ctx.input.parentCommentId
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to add comment');
-    }
 
     return {
       output: { success: true, raw: response.data },
@@ -91,14 +106,10 @@ export let updateCommentTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.updateComment({
+    await client.updateComment({
       commentId: ctx.input.commentId,
       content: ctx.input.content
     });
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to update comment');
-    }
 
     return {
       output: { success: true },
@@ -128,11 +139,7 @@ export let deleteCommentTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let response = await client.deleteComment(ctx.input.commentId);
-
-    if (response.code !== '0') {
-      throw new Error(response.msg || 'Failed to delete comment');
-    }
+    await client.deleteComment(ctx.input.commentId);
 
     return {
       output: { success: true },

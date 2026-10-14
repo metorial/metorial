@@ -29,16 +29,25 @@ export let detectObjects = SlateTool.create(spec, {
       annotatedImage: z
         .boolean()
         .optional()
-        .describe('Whether to return an annotated image with bounding boxes (default: false)')
+        .describe('Whether to return an annotated image with bounding boxes (default: false)'),
+      returnMasks: z
+        .boolean()
+        .optional()
+        .describe('Return segmentation masks for detected objects')
     })
   )
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       objects: z
         .array(
           z.object({
             label: z.string().optional(),
+            mask: z.string().optional().describe('URL of the object segmentation mask'),
             bounds: z.unknown().optional()
           })
         )
@@ -68,16 +77,36 @@ export let detectObjects = SlateTool.create(spec, {
       fileStoreKey: ctx.input.fileStoreKey,
       prompts: ctx.input.prompts,
       features: ctx.input.features,
-      annotatedImage: ctx.input.annotatedImage
+      annotatedImage: ctx.input.annotatedImage,
+      returnMasks: ctx.input.returnMasks
     });
 
     let objectCount = result.objects?.length ?? 0;
+    if (result.annotated_image) {
+      await ctx.addAttachment(
+        await client.prepareGeneratedDownload(result.annotated_image, {
+          filename: 'annotated-image.png'
+        })
+      );
+    }
+    for (let [index, object] of (result.objects ?? []).entries()) {
+      if (object.mask)
+        await ctx.addAttachment(
+          await client.prepareGeneratedDownload(object.mask, {
+            filename: `object-mask-${index + 1}.png`
+          })
+        );
+    }
 
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         objects: result.objects,
-        guiElements: result.gui_elements,
+        guiElements: result.gui_elements?.map(element => ({
+          ...element,
+          content: element.content ?? undefined
+        })),
         tags: result.tags,
         annotatedImageUrl: result.annotated_image
       },

@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HyperbrowserClient } from '../lib/client';
-import { sessionOptionsSchema } from '../lib/schemas';
+import { browserAgentTypeSchema, sessionOptionsSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let runBrowserAgent = SlateTool.create(spec, {
@@ -22,8 +22,7 @@ Starts the agent task, waits for completion, and returns the final result and st
   .input(
     z.object({
       task: z.string().describe('Natural language description of the browser task to perform'),
-      agentType: z
-        .enum(['browser_use', 'claude_computer_use', 'openai_cua'])
+      agentType: browserAgentTypeSchema
         .default('browser_use')
         .describe('Type of AI agent to use'),
       llm: z
@@ -82,14 +81,31 @@ Starts the agent task, waits for completion, and returns the final result and st
     if (ctx.input.llm) params.llm = ctx.input.llm;
     if (ctx.input.maxSteps !== undefined) params.maxSteps = ctx.input.maxSteps;
     if (ctx.input.maxFailures !== undefined) params.maxFailures = ctx.input.maxFailures;
-    if (ctx.input.useVision !== undefined) params.useVision = ctx.input.useVision;
+    if (ctx.input.agentType === 'browser_use' && ctx.input.useVision !== undefined)
+      params.useVision = ctx.input.useVision;
     if (ctx.input.keepBrowserOpen !== undefined)
       params.keepBrowserOpen = ctx.input.keepBrowserOpen;
     if (ctx.input.sessionId) params.sessionId = ctx.input.sessionId;
     if (ctx.input.sessionOptions) params.sessionOptions = ctx.input.sessionOptions;
     if (ctx.input.useCustomApiKeys !== undefined)
       params.useCustomApiKeys = ctx.input.useCustomApiKeys;
-    if (ctx.input.apiKeys) params.apiKeys = ctx.input.apiKeys;
+    if (ctx.input.apiKeys) {
+      params.apiKeys =
+        ctx.input.agentType === 'claude_computer_use'
+          ? pickDefined({ anthropic: ctx.input.apiKeys.anthropic })
+          : ctx.input.agentType === 'openai_cua'
+            ? pickDefined({ openai: ctx.input.apiKeys.openai })
+            : ctx.input.apiKeys;
+    }
+    if (
+      ctx.input.useCustomApiKeys &&
+      (!params.apiKeys ||
+        Object.values(params.apiKeys as Record<string, unknown>).every(value => !value))
+    ) {
+      throw createApiServiceError(
+        'Provide a custom API key for the selected agent: Anthropic for Claude, OpenAI for CUA, or a supported provider for Browser Use.'
+      );
+    }
 
     let agentType = ctx.input.agentType;
     ctx.info(`Starting ${agentType} agent task`);
@@ -120,7 +136,7 @@ Starts the agent task, waits for completion, and returns the final result and st
     let result = await client.pollForCompletion(
       () => getStatus(jobId),
       () => getResult(jobId),
-      { maxAttempts: 300, intervalMs: 2000 }
+      { maxAttempts: 300, intervalMs: 2000, jobId }
     );
 
     let data = result.data as Record<string, unknown> | undefined;
@@ -130,11 +146,11 @@ Starts the agent task, waits for completion, and returns the final result and st
     return {
       output: {
         jobId,
-        liveUrl,
+        liveUrl: liveUrl ?? undefined,
         status: result.status as string,
         finalResult,
         steps,
-        error: result.error as string | undefined
+        error: typeof result.error === 'string' ? result.error : undefined
       },
       message: finalResult
         ? `Agent completed. Result: ${finalResult.substring(0, 500)}`

@@ -12,6 +12,7 @@ export let deleteContact = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_brand'])
   .input(
     z.object({
       contactId: z.string().describe('ID of the contact to delete')

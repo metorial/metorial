@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -48,7 +48,12 @@ export let updateCompany = SlateTool.create(spec, {
       payload.background_info = ctx.input.backgroundInfo;
 
     if (Object.keys(payload).length === 0) {
-      throw new Error('At least one field must be provided to update the company.');
+      throw createApiServiceError(
+        'At least one field must be provided to update the company.',
+        {
+          reason: 'company_update_required'
+        }
+      );
     }
 
     let result = await client.updateCompany(ctx.input.companyUid, payload);

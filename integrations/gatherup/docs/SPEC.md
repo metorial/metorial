@@ -1,96 +1,51 @@
-Now let me check for webhook support:Now I have enough information to write the specification.
+# GatherUp integration
 
-# Slates Specification for Gatherup
+GatherUp manages business locations, customer feedback, and reviews. The integration
+uses the provider's supported v1 REST API at `https://app.gatherup.com/api`.
+[API v2 documentation](https://apidocs.gatherup.com/) confirms that v1 remains supported.
 
-## Overview
+## Authentication and client targeting
 
-GatherUp (formerly GetFiveStars) is a customer feedback and online review management platform. It allows businesses and agencies to request and track customer feedback, manage online reviews across multiple platforms, and encourage customers to leave reviews. The platform consolidates reviews from multiple external sources such as Google and Facebook into a single dashboard.
+Connect with a bearer token and Client ID from Account Owner Details. The token
+is sent as an Authorization bearer header; the Client ID is included in request
+parameters. The connection is checked with the provider's test endpoint. This
+is static token authentication; the provider does not document token refresh.
+See [bearer authentication](https://app.gatherup.com/api/doc/bearer).
 
-## Authentication
+Global agency credentials can target a client through the optional `agent`
+connection setting. Call `list_agency_clients` to discover client IDs first.
+Omit `agent` when using credentials for an individual client. Agency discovery
+uses the global credentials without the configured target.
+See [agency authentication](https://app.gatherup.com/api/doc/global-api).
 
-GatherUp supports two authentication methods for its REST API (base URL: `https://app.gatherup.com/api`):
+## Available workflows
 
-### 1. Bearer Token Authentication (Recommended)
+- Discover, create, read, update, search, delete, deactivate, and reactivate
+  business locations. `list_business_types` finds valid category names.
+- List, create, update, delete, and bulk-import customers. Bulk imports contain
+  1–1000 customers; each customer needs email or phone, subject to plan rules.
+- Send feedback requests and configure automatic request volumes. Delayed
+  creation-time requests only apply in Manual Mode.
+- Read first-party feedback and its owner/customer conversation history through
+  `get_feedback_responses`. Read third-party reviews and Facebook recommendations.
+- Reply to first-party feedback or eligible Google reviews connected through
+  Google Business Profile authorization.
+- Read survey averages and Google Q&A. Generate review widget or badge HTML,
+  returned as embeddable code and a downloadable HTML file.
+- Create dashboard users with documented roles and discover agency clients.
 
-To authorize API calls, you need two credentials: a Bearer Token and a clientId.
+The API paginates business and customer/review lists. Returned `totalCount`
+fields preserve the number of items in the provider's current page; use `pages`
+and `page` to retrieve remaining results. Numbered responses are requested
+explicitly for v1 list and survey operations.
 
-- The Bearer Token should be added in the `Authorization` header of the request as `Bearer BEARER_TOKEN`.
-- The clientId should be added to the parameter (for GET) or body (for POST, PUT, DELETE) calls.
-- To find your credentials, click on your profile in the top right of the GatherUp dashboard and select "Account Owner Details" — there you can find your Client ID and Bearer Token.
+## Provider constraints
 
-### 2. Hash-based Authentication (Legacy)
+Basic-plan customer imports require an email address; higher plans accept email
+or phone. Update-customer docs label custom/job IDs as integers, while creation
+and lookup support string identifiers. Existing string inputs are retained.
+Update-business docs mark the business type required, although other fields are
+partial updates; the existing optional business type input is retained.
 
-This method requires a `clientId` and a `privateKey`. Each request is signed by computing a SHA-256 hash of the private key concatenated with sorted request parameters. The resulting hash is sent as a `hash` parameter with every request. No change is needed for existing API users — hash-based authentication is still supported.
-
-### Agency / Multi-Client Accounts
-
-Agency accounts contain multiple sets of API credentials — one for the entire account (Global API) and a set of credentials for each client. When using Global API credentials, an optional `agent` parameter can be added to any API call to specify which client the operation targets. The `agent` value is a numeric identifier for the client within the agency dashboard.
-
-## Features
-
-### Business Management
-
-Create, update, delete, search, deactivate, and reactivate business locations. Retrieve lists of businesses and business types. Each business represents a location being managed in GatherUp.
-
-- Businesses have associated online review links that can be configured (add, update, retrieve).
-- Notification email addresses can be managed per business.
-
-### Customer Management
-
-Create, update, delete, and retrieve customers associated with a business. Supports both single and bulk customer creation.
-
-- The most common integration use case is to sync a CRM, POS, or other customer contact software with GatherUp to automatically request feedback.
-- Customers are identified by email and/or phone number and are associated with a specific business location via `businessId`.
-
-### Feedback Requests & Collection
-
-Send feedback requests to customers via email or SMS and configure automatic feedback request sequences.
-
-- Requests can capture Net Promoter Score (NPS), 5-star ratings, survey questions, 1st-party reviews, and/or 3rd-party reviews.
-- Auto-feedback request settings can be configured per business to automatically send requests when customers are added.
-
-### Feedback & Review Retrieval
-
-Retrieve first-party feedback received through GatherUp, feedback responses, and show/hide history. Retrieve third-party online reviews monitored from external platforms (Google, Facebook, etc.).
-
-- Results can be filtered by business and date range.
-- Facebook recommendations can be retrieved separately.
-
-### Survey Results
-
-Retrieve aggregated survey results for a business and individual customer survey answers.
-
-### Review Responses
-
-Reply to customers who have left first-party feedback and reply to third-party online reviews (e.g., Google, Facebook) directly through the API.
-
-### Reviews Widget
-
-Retrieve embeddable HTML for a reviews widget that displays customer reviews on a website using Schema.org markup.
-
-### Google Q&A
-
-Retrieve Google Questions & Answers associated with a business listing.
-
-### User Management
-
-Create and manage users (managers) who can access the GatherUp dashboard. Set passwords, update user information, manage which businesses a user can access, and activate/deactivate users.
-
-### Agency Client Management
-
-For agency accounts, create new clients, retrieve a list of all clients with their agent IDs, and find the agent ID for a specific business location.
-
-## Events
-
-GatherUp supports webhooks in a limited, manually-configured fashion. GatherUp sends notifications as HTTP POST requests with a JSON body to specified endpoints.
-
-### Outbound Webhooks — Feedback Received
-
-- GatherUp sends feedback data as JSON when new feedback is received.
-- To set up outbound webhooks, you must contact support@GatherUp.com with your business name and the receiving URL. There is no self-service webhook configuration through the API or dashboard.
-
-### Inbound Webhooks — Customer Creation
-
-- GatherUp can ingest inbound webhooks containing customer information. A common use case is to create a new customer via webhook. Setup requires contacting support@GatherUp.com with an example payload URL.
-
-Note: Webhook setup is not self-service and requires coordination with GatherUp support for both inbound and outbound configurations.
+No suitable current-user/profile endpoint is documented. API v2 includes
+additional reporting and administration endpoints beyond this integration.

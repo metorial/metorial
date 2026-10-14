@@ -14,7 +14,11 @@ export let getProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.string().describe('The ID of the project to retrieve'),
+      projectId: z
+        .string()
+        .describe(
+          'The ID of the project to retrieve. Call list_projects to discover available projects.'
+        ),
       includeUserAssignments: z
         .boolean()
         .optional()

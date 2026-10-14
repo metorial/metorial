@@ -17,6 +17,7 @@ import {
   deleteObjectiveTool,
   deleteReleaseTool,
   deleteUserTool,
+  getCurrentUserTool,
   getCustomFieldValuesTool,
   getFeatureTool,
   getInitiativeTool,
@@ -24,6 +25,8 @@ import {
   getObjectiveTool,
   listCompaniesTool,
   listCustomFieldsTool,
+  listEntitiesTool,
+  listEntityConfigurationsTool,
   listFeatureStatusesTool,
   listFeaturesTool,
   listInitiativesTool,
@@ -45,6 +48,9 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUserTool,
+    listEntityConfigurationsTool,
+    listEntitiesTool,
     listFeaturesTool,
     getFeatureTool,
     createFeatureTool,

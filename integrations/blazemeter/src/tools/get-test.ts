@@ -32,7 +32,8 @@ export let getTest = SlateTool.create(spec, {
     let client = new BlazeMeterClient({
       token: ctx.auth.token,
       apiKeyId: ctx.auth.apiKeyId,
-      apiKeySecret: ctx.auth.apiKeySecret
+      apiKeySecret: ctx.auth.apiKeySecret,
+      runscopeToken: ctx.auth.runscopeToken
     });
 
     let test = await client.getTest(ctx.input.testId);

@@ -24,13 +24,15 @@ export let deleteTimeEntry = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    await client.deleteTimeEntry(ctx.input.entryId);
+    let deleted = await client.deleteTimeEntry(ctx.input.entryId);
 
     return {
       output: {
-        deleted: true
+        deleted
       },
-      message: `Deleted time entry **${ctx.input.entryId}**.`
+      message: deleted
+        ? `Deleted time entry **${ctx.input.entryId}**.`
+        : `Time entry **${ctx.input.entryId}** does not exist or was already deleted.`
     };
   })
   .build();

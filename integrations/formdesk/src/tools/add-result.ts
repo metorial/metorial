@@ -6,10 +6,10 @@ import { spec } from '../spec';
 export let addResult = SlateTool.create(spec, {
   name: 'Add Form Result',
   key: 'add_result',
-  description: `Adds a new result entry (submission) to a form programmatically. Field keys must match the exact field identifiers defined in the Formdesk form builder. Supports file uploads via base64-encoded values.`,
+  description: `Adds a new result entry (submission) to a form programmatically. Field keys must match the exact field identifiers defined in the Formdesk form builder. Call list_form_items to discover field identifiers.`,
   instructions: [
     'Field keys must match the form field identifiers exactly as defined in the Formdesk form builder.',
-    'For file uploads, provide the base64-encoded file content as the field value.'
+    'This tool accepts string field values. Structured file-upload objects are not supported by this input.'
   ]
 })
   .input(
@@ -49,7 +49,7 @@ export let addResult = SlateTool.create(spec, {
       processMessages: ctx.input.processMessages
     });
 
-    let resultId = String(result?.id || result?.resultId || '');
+    let resultId = String(result?._fd_id ?? result?.id ?? result?.resultId ?? '');
     let createdFields: Record<string, any> = {};
 
     if (result && typeof result === 'object') {

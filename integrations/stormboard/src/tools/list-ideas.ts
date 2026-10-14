@@ -40,19 +40,19 @@ export let listIdeas = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new StormboardClient({ token: ctx.auth.token });
     let ideas = await client.listIdeas(ctx.input.stormId);
-    let result = Array.isArray(ideas) ? ideas : [];
+    let result = ideas;
 
     return {
       output: {
         ideas: result.map((idea: any) => ({
           ideaId: idea.id,
-          type: idea.type,
-          color: idea.color,
-          text: idea.data?.text || idea.text,
-          x: idea.x,
-          y: idea.y,
-          z: idea.z,
-          lock: idea.lock
+          type: idea.type ?? undefined,
+          color: idea.color ?? undefined,
+          text: idea.data?.text ?? idea.text ?? undefined,
+          x: idea.x ?? undefined,
+          y: idea.y ?? undefined,
+          z: idea.z ?? undefined,
+          lock: idea.lock ?? undefined
         }))
       },
       message: `Found **${result.length}** idea(s) in Storm ${ctx.input.stormId}.`

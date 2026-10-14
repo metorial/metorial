@@ -6,7 +6,7 @@ import { spec } from '../spec';
 let presenceStatusSchema = z
   .number()
   .optional()
-  .describe('1 = active, 0 = inactive, -1 = unable to determine');
+  .describe('1 = active, 0 = inactive, -1 = unable to determine, -2 = platform error');
 
 export let checkOnlinePresence = SlateTool.create(spec, {
   name: 'Check Online Presence',
@@ -15,7 +15,7 @@ export let checkOnlinePresence = SlateTool.create(spec, {
   instructions: [
     'Phone numbers must be in E.164 format (e.g., +16502530000)',
     'Platform availability may vary by country; some platforms are only available in specific regions',
-    'Status values: 1 = active, 0 = inactive, -1 = unable to determine'
+    'Status values: 1 = active, 0 = inactive, -1 = unable to determine, -2 = platform error'
   ],
   tags: {
     readOnly: true
@@ -38,6 +38,9 @@ export let checkOnlinePresence = SlateTool.create(spec, {
       twitter: presenceStatusSchema.describe('Twitter presence status'),
       skype: presenceStatusSchema.describe('Skype presence status'),
       viber: presenceStatusSchema.describe('Viber presence status'),
+      facebook: presenceStatusSchema.describe('Facebook presence status'),
+      bukalapak: presenceStatusSchema.describe('Bukalapak presence status'),
+      flipkart: presenceStatusSchema.describe('Flipkart presence status'),
       status: z.number().optional().describe('Status code (0 = success)'),
       statusMessage: z.string().optional().describe('Status message')
     })
@@ -64,13 +67,16 @@ export let checkOnlinePresence = SlateTool.create(spec, {
         twitter: presence.twitter,
         skype: presence.skype,
         viber: presence.viber,
+        facebook: presence.facebook,
+        bukalapak: presence.bukalapak,
+        flipkart: presence.flipkart,
         status: result.status,
         statusMessage: result.status_message
       },
       message:
         activePlatforms.length > 0
           ? `Phone number **${ctx.input.phoneNumber}** is active on: **${activePlatforms.join(', ')}**.`
-          : `No active online presence detected for **${ctx.input.phoneNumber}**.`
+          : `No platforms returned an active status for **${ctx.input.phoneNumber}**. Unknown and error statuses do not confirm absence.`
     };
   })
   .build();

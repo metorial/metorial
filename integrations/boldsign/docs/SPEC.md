@@ -4,7 +4,7 @@ Now let me get the available webhook events list:Now I have enough information t
 
 ## Overview
 
-BoldSign is an electronic signature platform by Syncfusion that provides APIs for sending, signing, tracking, and managing documents. It supports embedded signing experiences, reusable templates, identity verification, branding, and team/user management. The API base URL is `https://api.boldsign.com` for the US region, with region-specific URLs available (e.g., `https://eu-api.boldsign.com` for EU).
+BoldSign is an electronic signature platform by Syncfusion that provides APIs for sending, signing, tracking, and managing documents. It supports embedded signing experiences, reusable templates, identity verification, branding, and team/user management. The API base URL is `https://api.boldsign.com` for the US region, with region-specific URLs available (e.g., `https://api-eu.boldsign.com` for EU).
 
 ## Authentication
 

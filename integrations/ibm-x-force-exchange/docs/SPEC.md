@@ -1,4 +1,4 @@
-Let me fetch the Swagger spec for more detail on the API features.# Slates Specification for IBM X-Force Exchange
+# IBM X-Force Exchange API Reference
 
 ## Overview
 

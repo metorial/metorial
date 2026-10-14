@@ -19,8 +19,27 @@ export let searchActivity = SlateTool.create(spec, {
       searchSubject: z.string().optional().describe('Filter by email subject'),
       searchSender: z.string().optional().describe('Filter by sender address'),
       searchRecipient: z.string().optional().describe('Filter by recipient address'),
-      searchUsernames: z.string().optional().describe('Filter by SMTP username or API key'),
-      limit: z.number().optional().describe('Maximum number of events to return'),
+      searchUsernames: z
+        .string()
+        .optional()
+        .describe('Filter by one SMTP username or API key'),
+      usernames: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Filter by several SMTP usernames or API keys; takes precedence over searchUsernames'
+        ),
+      searchEmailId: z
+        .string()
+        .optional()
+        .describe('Return events for a specific sent email ID'),
+      limit: z
+        .number()
+        .min(1)
+        .max(1000)
+        .refine(Number.isSafeInteger, 'Limit must be a whole number')
+        .optional()
+        .describe('Maximum number of events to return'),
       continueToken: z.string().optional().describe('Continuation token for pagination'),
       onlyLatest: z.boolean().optional().describe('Only return the latest event per email'),
       eventTypes: z
@@ -77,7 +96,7 @@ export let searchActivity = SlateTool.create(spec, {
       date: e.date ?? '',
       from: e.from ?? '',
       subject: e.subject ?? '',
-      recipients: e.recipients,
+      recipients: e.recipients ?? (e.recipient ? [e.recipient] : undefined),
       smtpResponse: e.smtp_response,
       reason: e.reason
     }));
@@ -85,7 +104,7 @@ export let searchActivity = SlateTool.create(spec, {
     return {
       output: {
         totalEvents: data.total_events ?? events.length,
-        continueToken: data.continue_token,
+        continueToken: data.continue_token ?? undefined,
         events
       },
       message: `Found **${data.total_events ?? events.length}** activity event(s).`

@@ -1,28 +1,30 @@
-import { createAxios } from 'slates';
-
-let http = createAxios({
-  baseURL: 'https://api.securitytrails.com/v1'
-});
+import { buildApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private headers: Record<string, string>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.headers = {
-      APIKEY: config.token,
-      'Content-Type': 'application/json'
-    };
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.securitytrails.com/v1',
+      authHeader: { name: 'APIKEY', value: config.token },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'SecurityTrails',
+          reason: 'securitytrails_api_error'
+        })
+    });
   }
 
   // General
   async ping(): Promise<{ success: boolean }> {
-    let response = await http.get('/ping', { headers: this.headers });
+    let response = await this.http.get('/ping');
     return response.data;
   }
 
   // Domain endpoints
   async getDomain(hostname: string): Promise<any> {
-    let response = await http.get(`/domain/${hostname}`, { headers: this.headers });
+    let response = await this.http.get(`/domain/${encodeURIComponent(hostname)}`);
     return response.data;
   }
 
@@ -33,8 +35,7 @@ export class Client {
       includeInactive?: boolean;
     }
   ): Promise<any> {
-    let response = await http.get(`/domain/${hostname}/subdomains`, {
-      headers: this.headers,
+    let response = await this.http.get(`/domain/${encodeURIComponent(hostname)}/subdomains`, {
       params: {
         children_only: params?.childrenOnly,
         include_inactive: params?.includeInactive
@@ -44,12 +45,12 @@ export class Client {
   }
 
   async getDomainTags(hostname: string): Promise<any> {
-    let response = await http.get(`/domain/${hostname}/tags`, { headers: this.headers });
+    let response = await this.http.get(`/domain/${encodeURIComponent(hostname)}/tags`);
     return response.data;
   }
 
   async getDomainWhois(hostname: string): Promise<any> {
-    let response = await http.get(`/domain/${hostname}/whois`, { headers: this.headers });
+    let response = await this.http.get(`/domain/${encodeURIComponent(hostname)}/whois`);
     return response.data;
   }
 
@@ -59,8 +60,7 @@ export class Client {
       page?: number;
     }
   ): Promise<any> {
-    let response = await http.get(`/domain/${hostname}/associated`, {
-      headers: this.headers,
+    let response = await this.http.get(`/domain/${encodeURIComponent(hostname)}/associated`, {
       params: {
         page: params?.page
       }
@@ -69,7 +69,7 @@ export class Client {
   }
 
   async getDomainSsl(hostname: string): Promise<any> {
-    let response = await http.get(`/domain/${hostname}/ssl`, { headers: this.headers });
+    let response = await this.http.get(`/domain/${encodeURIComponent(hostname)}/ssl`);
     return response.data;
   }
 
@@ -81,12 +81,14 @@ export class Client {
       page?: number;
     }
   ): Promise<any> {
-    let response = await http.get(`/history/${hostname}/dns/${type}`, {
-      headers: this.headers,
-      params: {
-        page: params?.page
+    let response = await this.http.get(
+      `/history/${encodeURIComponent(hostname)}/dns/${encodeURIComponent(type)}`,
+      {
+        params: {
+          page: params?.page
+        }
       }
-    });
+    );
     return response.data;
   }
 
@@ -96,8 +98,7 @@ export class Client {
       page?: number;
     }
   ): Promise<any> {
-    let response = await http.get(`/history/${hostname}/whois`, {
-      headers: this.headers,
+    let response = await this.http.get(`/history/${encodeURIComponent(hostname)}/whois`, {
       params: {
         page: params?.page
       }
@@ -114,13 +115,12 @@ export class Client {
       scroll?: boolean;
     }
   ): Promise<any> {
-    let response = await http.post(
+    let response = await this.http.post(
       '/domains/list',
       {
         query
       },
       {
-        headers: this.headers,
         params: {
           include_ips: params?.includeIps,
           page: params?.page,
@@ -138,13 +138,12 @@ export class Client {
       page?: number;
     }
   ): Promise<any> {
-    let response = await http.post(
+    let response = await this.http.post(
       '/domains/list',
       {
         filter
       },
       {
-        headers: this.headers,
         params: {
           include_ips: params?.includeIps,
           page: params?.page
@@ -159,14 +158,12 @@ export class Client {
     if (query) body.query = query;
     if (filter) body.filter = filter;
 
-    let response = await http.post('/domains/stats', body, {
-      headers: this.headers
-    });
+    let response = await this.http.post('/domains/stats', body);
     return response.data;
   }
 
   async scroll(scrollId: string): Promise<any> {
-    let response = await http.get(`/scroll/${scrollId}`, { headers: this.headers });
+    let response = await this.http.get(`/scroll/${encodeURIComponent(scrollId)}`);
     return response.data;
   }
 
@@ -177,13 +174,12 @@ export class Client {
       page?: number;
     }
   ): Promise<any> {
-    let response = await http.post(
+    let response = await this.http.post(
       '/ips/list',
       {
         query
       },
       {
-        headers: this.headers,
         params: {
           page: params?.page
         }
@@ -193,25 +189,17 @@ export class Client {
   }
 
   async getIpStats(query: string): Promise<any> {
-    let response = await http.post(
-      '/ips/stats',
-      {
-        query
-      },
-      {
-        headers: this.headers
-      }
-    );
+    let response = await this.http.post('/ips/stats', { query });
     return response.data;
   }
 
   async getIpNeighbors(ipAddress: string): Promise<any> {
-    let response = await http.get(`/ips/nearby/${ipAddress}`, { headers: this.headers });
+    let response = await this.http.get(`/ips/nearby/${encodeURIComponent(ipAddress)}`);
     return response.data;
   }
 
   async getIpWhois(ipAddress: string): Promise<any> {
-    let response = await http.get(`/ips/${ipAddress}/whois`, { headers: this.headers });
+    let response = await this.http.get(`/ips/${encodeURIComponent(ipAddress)}/whois`);
     return response.data;
   }
 
@@ -221,8 +209,7 @@ export class Client {
       page?: number;
     }
   ): Promise<any> {
-    let response = await http.get(`/ips/${ipAddress}/useragents`, {
-      headers: this.headers,
+    let response = await this.http.get(`/ips/${encodeURIComponent(ipAddress)}/useragents`, {
       params: {
         page: params?.page
       }
@@ -232,7 +219,7 @@ export class Client {
 
   // Account
   async getUsage(): Promise<any> {
-    let response = await http.get('/account/usage', { headers: this.headers });
+    let response = await this.http.get('/account/usage');
     return response.data;
   }
 }

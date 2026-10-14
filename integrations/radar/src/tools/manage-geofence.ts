@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RadarClient } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,7 @@ export let upsertGeofenceTool = SlateTool.create(spec, {
   instructions: [
     'For circle geofences, provide coordinates as [longitude, latitude] and a radius in meters (10-10,000).',
     'For polygon geofences, provide coordinates as [[lng0,lat0],[lng1,lat1],...,[lng0,lat0]] — the first and last points must match.',
-    'For isochrone geofences, provide coordinates as [longitude, latitude] and radius in minutes.'
+    'For isochrone geofences, provide coordinates as [longitude, latitude], radius in minutes, and a travel mode.'
   ],
   tags: {
     destructive: false,
@@ -55,6 +55,10 @@ export let upsertGeofenceTool = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Radius in meters (circle, 10-10000) or minutes (isochrone)'),
+      mode: z
+        .enum(['car', 'truck', 'foot', 'bike'])
+        .optional()
+        .describe('Travel mode, required for an isochrone geofence'),
       metadata: z
         .record(z.string(), z.string())
         .optional()
@@ -69,12 +73,52 @@ export let upsertGeofenceTool = SlateTool.create(spec, {
   )
   .output(geofenceSchema)
   .handleInvocation(async ctx => {
+    let { type, coordinates, radius, mode } = ctx.input;
+    let isPoint = (point: unknown): point is number[] =>
+      Array.isArray(point) &&
+      point.length === 2 &&
+      typeof point[0] === 'number' &&
+      typeof point[1] === 'number' &&
+      point[0] >= -180 &&
+      point[0] <= 180 &&
+      point[1] >= -90 &&
+      point[1] <= 90;
+    if (type === 'polygon') {
+      if (coordinates.length < 4 || coordinates.length > 2000 || !coordinates.every(isPoint)) {
+        throw createApiServiceError(
+          'Polygon coordinates must contain 4-2000 [longitude, latitude] pairs.'
+        );
+      }
+      let first = coordinates[0] as number[];
+      let last = coordinates[coordinates.length - 1] as number[];
+      if (first[0] !== last[0] || first[1] !== last[1]) {
+        throw createApiServiceError('The first and last polygon coordinates must match.');
+      }
+    } else {
+      if (!isPoint(coordinates)) {
+        throw createApiServiceError(
+          'Provide coordinates as [longitude, latitude] within valid ranges.'
+        );
+      }
+      if (radius === undefined || radius <= 0) {
+        throw createApiServiceError(
+          'A positive radius is required for circle and isochrone geofences.'
+        );
+      }
+      if (type === 'circle' && (radius < 10 || radius > 10000)) {
+        throw createApiServiceError('Circle radius must be between 10 and 10000 meters.');
+      }
+      if (type === 'isochrone' && !mode) {
+        throw createApiServiceError('A travel mode is required for an isochrone geofence.');
+      }
+    }
     let client = new RadarClient({ token: ctx.auth.token });
     let result = await client.upsertGeofence(ctx.input.tag, ctx.input.externalId, {
       description: ctx.input.description,
       type: ctx.input.type,
       coordinates: ctx.input.coordinates,
       radius: ctx.input.radius,
+      mode: ctx.input.mode,
       metadata: ctx.input.metadata,
       enabled: ctx.input.enabled,
       userId: ctx.input.userId,
@@ -216,7 +260,7 @@ export let getGeofenceTool = SlateTool.create(spec, {
       );
       identifier = `${ctx.input.tag}/${ctx.input.externalId}`;
     } else {
-      throw new Error('Provide either geofenceId, or both tag and externalId.');
+      throw createApiServiceError('Provide either geofenceId, or both tag and externalId.');
     }
 
     let g = geofenceResult.geofence;
@@ -236,9 +280,12 @@ export let getGeofenceTool = SlateTool.create(spec, {
 
     let users: any[] | undefined;
     if (ctx.input.includeUsers) {
-      let usersResult = ctx.input.geofenceId
-        ? await client.listGeofenceUsers(ctx.input.geofenceId)
-        : await client.listGeofenceUsers(`${ctx.input.tag}/${ctx.input.externalId}`);
+      if (!g.tag || !g.externalId) {
+        throw createApiServiceError(
+          'Radar did not return the geofence tag and external ID needed to list its users.'
+        );
+      }
+      let usersResult = await client.listGeofenceUsers(g.tag, g.externalId);
       users = usersResult.users || [];
     }
 
@@ -286,7 +333,7 @@ export let deleteGeofenceTool = SlateTool.create(spec, {
     } else if (ctx.input.tag && ctx.input.externalId) {
       await client.deleteGeofenceByTagAndExternalId(ctx.input.tag, ctx.input.externalId);
     } else {
-      throw new Error('Provide either geofenceId, or both tag and externalId.');
+      throw createApiServiceError('Provide either geofenceId, or both tag and externalId.');
     }
 
     return {

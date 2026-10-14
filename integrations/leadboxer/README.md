@@ -1,6 +1,12 @@
-# Lead Boxer
+# LeadBoxer
 
-Identify website visitors and enrich lead data with firmographic and behavioral intelligence. Retrieve and filter lists of identified leads, look up company information by IP address or domain, track server-side behavioral events, and enrich lead profiles with custom properties. Supports company identification from IP addresses (returning company name, industry, employee count, revenue, and location), domain-based data enrichment (returning technology stack, company size, and more), detailed session and event history retrieval for leads, and lead assignment to sales team members.
+Identify website visitors and enrich company and contact data. Discover accessible datasets, retrieve and paginate leads and sessions, inspect session events, look up IP addresses and company domains, enrich work emails, track server-side events, and manage lead tags.
+
+Connect with a LeadBoxer API key. You can also save the email address of the account that owns the key; dataset discovery and lead details require this account email. Call `list_datasets` to choose a dataset for subsequent calls. Existing connections retain their saved dataset as a fallback.
+
+Lead retrieval uses a 30-day period and a limit of 50 by default. Pagination tokens for leads and sessions expire after 10 minutes. Enrichment calls consume provider credits; email enrichment costs 50 credits when a match is found.
+
+See the [official API reference](https://developers.leadboxer.com/reference/authentication) for credentials, endpoint requirements, and credit limits.
 
 ## License
 

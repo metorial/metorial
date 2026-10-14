@@ -1,6 +1,10 @@
 # <img src="logo.png" height="20"> Astica Ai
 
-Analyze images using computer vision for object detection, face detection, OCR, content moderation, tagging, and GPT-powered descriptions. Generate AI images from text prompts. Convert text to speech with 500+ voices, voice cloning, and multilingual support. Transcribe speech to text from audio files or streams. Generate natural language text using GPT-S for question answering, content creation, and diverse text generation. Upscale images using AI enhancement. Train and run custom AI models for vision and NLP tasks.
+Analyze images, generate images and text, transcribe audio, browse voices and existing private voice clones, and synthesize downloadable speech audio. Low-priority speech tasks can be checked with `get_speech_task` until their WAV audio is ready.
+
+Generated image URLs and speech Base64 values remain available in their existing output fields. Image generation in low-priority mode returns the provider's result URL; its polling format is not documented in the public API reference.
+
+API reference: [Vision](https://astica.ai/vision/documentation/), [Image generation](https://astica.ai/design/documentation/), [Voice](https://astica.ai/voice/documentation/), [Hearing](https://astica.ai/hearing/documentation/), and [Text generation](https://astica.ai/nlp/documentation/).
 
 ## License
 

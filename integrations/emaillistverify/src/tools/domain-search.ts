@@ -6,11 +6,11 @@ import { spec } from '../spec';
 export let domainSearch = SlateTool.create(spec, {
   name: 'Domain Search',
   key: 'domain_search',
-  description: `Find verified email addresses linked to any domain. Returns functional email addresses like "contact@", "support@", "info@" with confidence scores.
+  description: `Find candidate role-based email addresses linked to a domain, such as "contact@", "support@", and "info@", with confidence scores.
 
-All discovered emails are verified to filter out bad or outdated addresses.`,
+Check each candidate's confidence and verification result; some candidates may have uncertain deliverability.`,
   instructions: ['Provide the domain name to search for associated email addresses.'],
-  constraints: ['Only charges for email addresses returned with medium confidence or higher.'],
+  constraints: ['A domain-only search costs ten credits.'],
   tags: {
     readOnly: true,
     destructive: false
@@ -29,10 +29,16 @@ All discovered emails are verified to filter out bad or outdated addresses.`,
         .array(
           z.object({
             email: z.string().describe('The discovered email address'),
-            confidence: z.string().describe('Confidence score of the result')
+            confidence: z.string().describe('Confidence score of the result'),
+            result: z
+              .string()
+              .optional()
+              .describe(
+                'Deliverability status of this candidate, when returned by the provider'
+              )
           })
         )
-        .describe('List of verified email addresses found for the domain'),
+        .describe('List of candidate email addresses found for the domain'),
       totalFound: z.number().describe('Total number of email addresses found')
     })
   )

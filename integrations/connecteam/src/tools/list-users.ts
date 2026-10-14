@@ -49,7 +49,7 @@ export let listUsers = SlateTool.create(spec, {
       fullNames: z
         .array(z.string())
         .optional()
-        .describe('Filter by exact full names (case-sensitive)'),
+        .describe('Filter by exact full names (case-insensitive)'),
       phoneNumbers: z
         .array(z.string())
         .optional()
@@ -80,8 +80,8 @@ export let listUsers = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ConnecteamClient({
-      baseUrl: ctx.config.baseUrl,
-      token: ctx.auth.token
+      ...ctx.auth,
+      baseUrl: ctx.auth.baseUrl ?? (ctx.config as { baseUrl?: string }).baseUrl
     });
 
     let response = await client.getUsers({

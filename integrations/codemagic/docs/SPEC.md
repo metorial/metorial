@@ -1,4 +1,4 @@
-# Slates Specification for Codemagic
+# Codemagic Specification
 
 ## Overview
 
@@ -10,7 +10,7 @@ Authentication with Codemagic APIs is performed using a Codemagic API token. The
 
 The actions permitted by the token are determined by the user's role within the team.
 
-**Obtaining the token:** You can find your API token by navigating to Teams > Personal Account > Integrations > Codemagic API > Show.
+**Obtaining the token:** You can find your API token under Account settings > API token.
 
 **Using the token:** When making API calls, include the API token in the `x-auth-token` request header.
 
@@ -22,9 +22,11 @@ curl -H "Content-Type: application/json" \
      https://api.codemagic.io/apps
 ```
 
-**Token regeneration:** Clicking Show will disable the existing API token. Clicking Show afterward will automatically generate a new token.
+**Token regeneration:** Click Revoke to disable the current token. Clicking Show afterward generates a new token.
 
 There is only one authentication method (API token). There are no OAuth flows, scopes, or additional credentials required.
+
+Use `get_current_user` to retrieve the connected user ID, optional avatar URL, and permissions keyed by resource ID.
 
 ## Features
 
@@ -43,7 +45,7 @@ Start new builds, cancel running builds, and retrieve build status. When startin
 
 ### Artifact Management
 
-Artifact download URLs can be obtained using the Builds API or copied directly from the Codemagic UI. You can generate public download URLs for build artifacts with configurable expiration times.
+Artifact download URLs can be obtained using the Builds API or copied directly from the Codemagic UI. Use `download_artifact` with the authenticated URL from `get_build` to prepare a downloadable file. You can also generate public download URLs with configurable expiration times using `create_artifact_url`.
 
 - Please take extra care when sharing public download URLs so as to not expose them. Anyone with access to a public download URL will be able to download your build artifact.
 
@@ -51,11 +53,24 @@ Artifact download URLs can be obtained using the Builds API or copied directly f
 
 List, delete all, or delete specific build caches for an application. Each cache is associated with a specific workflow and includes metadata like size and last usage time.
 
+Deletion is accepted asynchronously. The tool returns `deletionStarted` and the cache IDs queued for removal; `deleted` remains false until completion is confirmed. List caches again to check whether removal has completed.
+
 ### Environment Variables and Secrets
 
 For apps configured using codemagic.yaml, the API provides Secrets and Environment Vars endpoints for managing environment variables. Variables are organized into groups and can be defined at the application level or the team (global) level. Variables can be marked as secret for encrypted storage.
 
 - Variables can be added to groups via the API, for example using the `/api/v3/variable-groups/{variable_group_id}/variables` endpoint.
+- Use `list_variable_groups` to discover application group IDs before calling `add_variables`. The list supports page number and page size and returns the current and total page counts. Team-level group discovery is not exposed by this tool.
+
+## API References
+
+- [API overview and authentication](https://docs.codemagic.io/rest-api/codemagic-rest-api/)
+- [Applications API](https://docs.codemagic.io/rest-api/applications/)
+- [Builds API](https://docs.codemagic.io/rest-api/builds/)
+- [Artifacts API](https://docs.codemagic.io/rest-api/artifacts/)
+- [Caches API](https://docs.codemagic.io/rest-api/caches/)
+- [Current API reference](https://codemagic.io/api/v3/schema)
+- [Current OpenAPI schema](https://codemagic.io/api/v3/schema/openapi.json)
 
 ## Events
 

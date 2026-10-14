@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,14 +10,14 @@ export let assignTicket = SlateTool.create(spec, {
   instructions: [
     'To assign to a user, provide userId. To assign to a team, provide teamId.',
     'To unassign, set unassignUser or unassignTeam to true.',
-    'User and team assignments are independent — a ticket can be assigned to both a user and a team simultaneously.'
+    'An assigned user must belong to the assigned team. Changing the team can clear the existing user assignment; when both IDs are supplied, the team is assigned first.'
   ]
 })
   .input(
     z.object({
       ticketId: z.number().describe('The ID of the ticket to assign'),
-      userId: z.number().optional().describe('Assign ticket to this user ID'),
-      teamId: z.number().optional().describe('Assign ticket to this team ID'),
+      userId: z.number().optional().describe('Assign ticket to this user ID from list_agents'),
+      teamId: z.number().optional().describe('Assign ticket to this team ID from list_agents'),
       unassignUser: z.boolean().optional().describe('Remove user assignment from the ticket'),
       unassignTeam: z.boolean().optional().describe('Remove team assignment from the ticket')
     })
@@ -29,6 +29,24 @@ export let assignTicket = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      (ctx.input.userId !== undefined && ctx.input.unassignUser) ||
+      (ctx.input.teamId !== undefined && ctx.input.unassignTeam)
+    ) {
+      throw createApiServiceError(
+        'Choose either assignment or unassignment for each user/team.'
+      );
+    }
+    if (
+      ctx.input.userId === undefined &&
+      ctx.input.teamId === undefined &&
+      !ctx.input.unassignUser &&
+      !ctx.input.unassignTeam
+    ) {
+      throw createApiServiceError(
+        'Provide a userId, teamId, unassignUser, or unassignTeam action.'
+      );
+    }
     let client = new Client({
       token: ctx.auth.token,
       companySubdomain: ctx.config.companySubdomain
@@ -46,14 +64,14 @@ export let assignTicket = SlateTool.create(spec, {
       actions.push('Unassigned team');
     }
 
-    if (ctx.input.userId) {
-      await client.assignToUser(ctx.input.ticketId, ctx.input.userId);
-      actions.push(`Assigned to user ${ctx.input.userId}`);
-    }
-
-    if (ctx.input.teamId) {
+    if (ctx.input.teamId !== undefined) {
       await client.assignToTeam(ctx.input.ticketId, ctx.input.teamId);
       actions.push(`Assigned to team ${ctx.input.teamId}`);
+    }
+
+    if (ctx.input.userId !== undefined) {
+      await client.assignToUser(ctx.input.ticketId, ctx.input.userId);
+      actions.push(`Assigned to user ${ctx.input.userId}`);
     }
 
     return {

@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { checklistItemSchema, mapTask, taskOutputSchema } from '../lib/schemas';
+import {
+  checklistItemSchema,
+  mapTask,
+  projectIdSchema,
+  taskOutputSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateTask = SlateTool.create(spec, {
@@ -16,7 +21,7 @@ export let updateTask = SlateTool.create(spec, {
   .input(
     z.object({
       taskId: z.string().describe('ID of the task to update'),
-      projectId: z.string().describe('ID of the project the task belongs to'),
+      projectId: projectIdSchema,
       title: z.string().optional().describe('New task title'),
       content: z.string().optional().describe('New task description/content'),
       desc: z.string().optional().describe('New checklist description'),
@@ -52,7 +57,7 @@ export let updateTask = SlateTool.create(spec, {
     let task = await client.updateTask(ctx.input.taskId, {
       taskId: ctx.input.taskId,
       projectId: ctx.input.projectId,
-      title: ctx.input.title ?? '',
+      title: ctx.input.title,
       content: ctx.input.content,
       desc: ctx.input.desc,
       isAllDay: ctx.input.isAllDay,

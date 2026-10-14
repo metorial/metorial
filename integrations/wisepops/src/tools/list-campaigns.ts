@@ -22,7 +22,9 @@ Returns each campaign's name, activation status, creation date, display count, c
             label: z.string().describe('Name/label of the campaign.'),
             createdAt: z
               .string()
-              .describe('ISO 8601 timestamp when the campaign was created.'),
+              .describe(
+                'Creation timestamp returned by Wisepops, e.g. "2017-02-25 19:10:00".'
+              ),
             activated: z.boolean().describe('Whether the campaign is currently active.'),
             displayCount: z
               .number()

@@ -1,5 +1,6 @@
 export * from './get-message-analytics';
 export * from './list-channels';
+export * from './list-contact-attributes';
 export * from './list-inboxes';
 export * from './list-labels';
 export * from './list-users';
@@ -9,4 +10,5 @@ export * from './manage-conversations';
 export * from './manage-files';
 export * from './manage-notes';
 export * from './manage-templates';
+export * from './read-messages';
 export * from './send-message';

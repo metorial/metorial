@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SendbirdChatClient } from '../lib/client';
 import { spec } from '../spec';
@@ -67,6 +67,20 @@ export let listMessages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    for (let limit of [ctx.input.prevLimit, ctx.input.nextLimit]) {
+      if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 0 || limit > 200)) {
+        throw createApiServiceError(
+          'prevLimit and nextLimit must be whole numbers from 0 to 200.'
+        );
+      }
+    }
+    for (let reference of [ctx.input.messageTs, ctx.input.messageId]) {
+      if (reference !== undefined && (!Number.isSafeInteger(reference) || reference < 0)) {
+        throw createApiServiceError(
+          'messageTs and messageId must be non-negative whole numbers.'
+        );
+      }
+    }
     let client = new SendbirdChatClient({
       applicationId: ctx.config.applicationId,
       token: ctx.auth.token
@@ -87,17 +101,17 @@ export let listMessages = SlateTool.create(spec, {
     let messages = (result.messages ?? []).map((m: any) => ({
       messageId: m.message_id,
       messageType: m.type ?? '',
-      message: m.message,
-      senderId: m.user?.user_id,
-      senderNickname: m.user?.nickname,
+      message: m.message ?? undefined,
+      senderId: m.user?.user_id ?? undefined,
+      senderNickname: m.user?.nickname ?? undefined,
       channelUrl: m.channel_url ?? ctx.input.channelUrl,
-      customType: m.custom_type,
-      data: m.data,
+      customType: m.custom_type ?? undefined,
+      data: m.data ?? undefined,
       createdAt: m.created_at ?? 0,
-      updatedAt: m.updated_at,
-      mentionType: m.mention_type,
-      fileUrl: m.file?.url,
-      fileName: m.file?.name
+      updatedAt: m.updated_at ?? undefined,
+      mentionType: m.mention_type ?? undefined,
+      fileUrl: m.file?.url ?? undefined,
+      fileName: m.file?.name ?? undefined
     }));
 
     return {

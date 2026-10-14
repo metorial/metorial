@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { asBoolean, asNumber, Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let getEnvironmentStatus = SlateTool.create(spec, {
@@ -62,24 +62,25 @@ export let getEnvironmentStatus = SlateTool.create(spec, {
 
     let envDetails = summaryResult.accountEnvironmentSummary;
     let quota = envDetails?.pageQuota;
-    let queueInfo = queueResult.queueInfo;
+    let queueInfo = queueResult.queue;
+    let environmentReady = asBoolean(envDetails?.ready) ?? false;
 
-    let message = `Service: **${pingOk ? 'Online' : 'Offline'}** | Environment: **${envDetails?.ready ? 'Ready' : 'Not Ready'}** | Plan: **${envDetails?.plan?.name || 'N/A'}** | Pages used: **${quota?.used ?? 'N/A'}/${quota?.quota ?? 'N/A'}** (${quota?.pctUsedStr || 'N/A'})`;
+    let message = `Service: **${pingOk ? 'Online' : 'Offline'}** | Environment: **${environmentReady ? 'Ready' : 'Not Ready'}** | Plan: **${envDetails?.plan?.name || 'N/A'}** | Pages used: **${quota?.used ?? 'N/A'}/${quota?.quota ?? 'N/A'}** (${quota?.pctUsedStr || 'N/A'})`;
 
     return {
       output: {
         serviceOnline: pingOk,
-        environmentReady: envDetails?.ready ?? false,
+        environmentReady,
         environmentName: envDetails?.accountEnvDetails?.name,
         planName: envDetails?.plan?.name,
-        isActivated: envDetails?.accountEnvDetails?.isActivated,
-        pageQuotaUsed: quota?.used,
-        pageQuotaLimit: quota?.quota,
-        pageQuotaPercentUsed: quota?.pctUsed,
-        isHardLimited: quota?.isHardLimited,
-        queueAvailablePercent: queueInfo?.availablePct,
-        queueDelaySeconds: queueInfo?.delaySeconds,
-        queueRejected: queueInfo?.rejected
+        isActivated: asBoolean(envDetails?.accountEnvDetails?.isActivated),
+        pageQuotaUsed: asNumber(quota?.used),
+        pageQuotaLimit: asNumber(quota?.quota),
+        pageQuotaPercentUsed: asNumber(quota?.pctUsed),
+        isHardLimited: asBoolean(quota?.isHardLimited),
+        queueAvailablePercent: asNumber(queueInfo?.availablePct),
+        queueDelaySeconds: asNumber(queueInfo?.delaySeconds),
+        queueRejected: asBoolean(queueInfo?.rejected)
       },
       message
     };

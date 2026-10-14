@@ -22,8 +22,16 @@ Coordinates must use WGS 84 (EPSG:4326) in decimal format.`,
 })
   .input(
     z.object({
-      latitude: z.number().describe('Latitude in decimal degrees (WGS 84), e.g., 52.5200'),
-      longitude: z.number().describe('Longitude in decimal degrees (WGS 84), e.g., 13.4050'),
+      latitude: z
+        .number()
+        .min(-90)
+        .max(90)
+        .describe('Latitude in decimal degrees (WGS 84), e.g., 52.5200'),
+      longitude: z
+        .number()
+        .min(-180)
+        .max(180)
+        .describe('Longitude in decimal degrees (WGS 84), e.g., 13.4050'),
       language: z
         .string()
         .optional()
@@ -33,7 +41,9 @@ Coordinates must use WGS 84 (EPSG:4326) in decimal format.`,
       limit: z
         .number()
         .optional()
-        .describe('Maximum number of results to return (default: 10, max: 100)'),
+        .describe(
+          'Legacy compatibility field; reverse geocoding always returns at most one result'
+        ),
       minConfidence: z
         .number()
         .optional()
@@ -49,7 +59,9 @@ Coordinates must use WGS 84 (EPSG:4326) in decimal format.`,
       roadinfo: z
         .boolean()
         .optional()
-        .describe('Include road and driving information in results')
+        .describe(
+          'Match the nearest road rather than an address and include driving information'
+        )
     })
   )
   .output(
@@ -73,12 +85,6 @@ Coordinates must use WGS 84 (EPSG:4326) in decimal format.`,
       noRecord: ctx.input.noRecord,
       roadinfo: ctx.input.roadinfo
     });
-
-    if (response.status.code !== 200) {
-      throw new Error(
-        `OpenCage API error: ${response.status.message} (code: ${response.status.code})`
-      );
-    }
 
     let results = response.results.map(mapGeocodeResult);
 

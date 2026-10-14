@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -36,7 +36,12 @@ export let manageDatasetFeaturesTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Feature ID (required for get, upsert, delete)'),
-      geometry: z.any().optional().describe('GeoJSON geometry object (for upsert)'),
+      geometry: z
+        .any()
+        .optional()
+        .describe(
+          'Non-null GeoJSON geometry object, excluding GeometryCollection (for upsert)'
+        ),
       properties: z
         .record(z.string(), z.any())
         .optional()
@@ -80,7 +85,7 @@ export let manageDatasetFeaturesTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.featureId) throw new Error('featureId is required for get');
+      if (!ctx.input.featureId) throw createApiServiceError('featureId is required for get');
       let f = await client.getFeature(datasetId, ctx.input.featureId);
       return {
         output: { feature: mapFeature(f) },
@@ -89,7 +94,16 @@ export let manageDatasetFeaturesTool = SlateTool.create(spec, {
     }
 
     if (action === 'upsert') {
-      if (!ctx.input.featureId) throw new Error('featureId is required for upsert');
+      if (!ctx.input.featureId)
+        throw createApiServiceError('featureId is required for upsert');
+      if (!isApiErrorRecord(ctx.input.geometry))
+        throw createApiServiceError(
+          'geometry is required for upsert; provide a non-null GeoJSON geometry object.'
+        );
+      if (ctx.input.geometry.type === 'GeometryCollection')
+        throw createApiServiceError(
+          'Mapbox datasets do not support GeometryCollection geometries.'
+        );
       let featureBody: Record<string, any> = {
         id: ctx.input.featureId,
         type: 'Feature',
@@ -104,7 +118,8 @@ export let manageDatasetFeaturesTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.featureId) throw new Error('featureId is required for delete');
+      if (!ctx.input.featureId)
+        throw createApiServiceError('featureId is required for delete');
       await client.deleteFeature(datasetId, ctx.input.featureId);
       return {
         output: { deleted: true },
@@ -112,5 +127,5 @@ export let manageDatasetFeaturesTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

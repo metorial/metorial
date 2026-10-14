@@ -23,7 +23,10 @@ export let createPerson = SlateTool.create(spec, {
       companyId: z.number().optional().describe('Associated company ID'),
       companyName: z.string().optional().describe('Company name to associate'),
       userId: z.number().optional().describe('Owner user ID'),
-      sourceId: z.number().optional().describe('Lead source ID'),
+      sourceId: z
+        .number()
+        .optional()
+        .describe('Lead source ID. Call list_lead_sources to discover IDs.'),
       summary: z.string().optional().describe('Notes and talking points'),
       address: z.string().optional().describe('Address'),
       customFields: z

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 let taskOutputSchema = z.object({
@@ -16,11 +17,12 @@ let taskOutputSchema = z.object({
 export let createTask = SlateTool.create(spec, {
   name: 'Create Task',
   key: 'create_task',
-  description: `Create a new task within a Clockify project. Tasks can have assignees, estimates, billable status, and custom rates.`,
+  description: `Create a new task within a Clockify project. Tasks can have assignees, estimates, billable status, and custom rates. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       projectId: z.string().describe('ID of the project to create the task in'),
       name: z.string().describe('Name of the task'),
       assigneeIds: z
@@ -37,11 +39,7 @@ export let createTask = SlateTool.create(spec, {
   )
   .output(taskOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let task = await client.createTask(ctx.input.projectId, {
       name: ctx.input.name,
@@ -69,11 +67,12 @@ export let createTask = SlateTool.create(spec, {
 export let updateTask = SlateTool.create(spec, {
   name: 'Update Task',
   key: 'update_task',
-  description: `Update an existing task in a Clockify project. Modify name, assignees, billable status, estimate, or status.`,
+  description: `Update an existing task in a Clockify project. Modify name, assignees, billable status, estimate, or status. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: false }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       projectId: z.string().describe('ID of the project containing the task'),
       taskId: z.string().describe('ID of the task to update'),
       name: z.string().optional().describe('Updated task name'),
@@ -85,11 +84,7 @@ export let updateTask = SlateTool.create(spec, {
   )
   .output(taskOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let task = await client.updateTask(ctx.input.projectId, ctx.input.taskId, {
       name: ctx.input.name,
@@ -117,11 +112,12 @@ export let updateTask = SlateTool.create(spec, {
 export let deleteTask = SlateTool.create(spec, {
   name: 'Delete Task',
   key: 'delete_task',
-  description: `Delete a task from a Clockify project.`,
+  description: `Delete a task from a Clockify project. Call get_workspaces to discover the workspace ID.`,
   tags: { destructive: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       projectId: z.string().describe('ID of the project containing the task'),
       taskId: z.string().describe('ID of the task to delete')
     })
@@ -132,11 +128,7 @@ export let deleteTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     await client.deleteTask(ctx.input.projectId, ctx.input.taskId);
 
@@ -150,16 +142,27 @@ export let deleteTask = SlateTool.create(spec, {
 export let getTasks = SlateTool.create(spec, {
   name: 'Get Tasks',
   key: 'get_tasks',
-  description: `List tasks for a project in Clockify. Filter by name or active status. Supports pagination.`,
+  description: `List tasks for a project in Clockify. Filter by name or active status. Supports pagination. Call get_workspaces to discover the workspace ID.`,
   tags: { readOnly: true }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       projectId: z.string().describe('ID of the project to list tasks for'),
       name: z.string().optional().describe('Filter by task name'),
       isActive: z.boolean().optional().describe('Filter by active status'),
-      page: z.number().optional().describe('Page number'),
-      pageSize: z.number().optional().describe('Entries per page')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Page number'),
+      pageSize: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Entries per page')
     })
   )
   .output(
@@ -169,11 +172,7 @@ export let getTasks = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let tasks = await client.getTasks(ctx.input.projectId, {
       name: ctx.input.name,

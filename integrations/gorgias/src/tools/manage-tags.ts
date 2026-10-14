@@ -14,7 +14,13 @@ export let listTags = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Number of tags to return')
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('Number of tags to return')
     })
   )
   .output(
@@ -47,8 +53,8 @@ export let listTags = SlateTool.create(spec, {
     return {
       output: {
         tags: tagList,
-        nextCursor: result.meta.next_cursor,
-        prevCursor: result.meta.prev_cursor
+        nextCursor: result.meta?.next_cursor ?? null,
+        prevCursor: result.meta?.prev_cursor ?? null
       },
       message: `Found **${tagList.length}** tag(s).`
     };

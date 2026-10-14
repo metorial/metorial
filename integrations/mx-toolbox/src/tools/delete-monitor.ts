@@ -1,19 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { monitorUidSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteMonitor = SlateTool.create(spec, {
   name: 'Delete Monitor',
   key: 'delete_monitor',
-  description: `Delete an existing monitor by its unique identifier. This permanently removes the monitor and stops all associated health checks and alerts.`,
+  description: `Delete an existing monitor by its unique identifier. Call list_monitors to discover monitor UIDs. This permanently removes the monitor and stops all associated health checks and alerts.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      monitorUid: z.string().describe('The unique identifier (UID) of the monitor to delete')
+      monitorUid: monitorUidSchema
     })
   )
   .output(

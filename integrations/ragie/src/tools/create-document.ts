@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,13 +9,13 @@ export let createDocument = SlateTool.create(spec, {
   description: `Ingest a new document into Ragie for indexing and retrieval. Supports creating documents from a **publicly accessible URL** or from **raw text/JSON data**.
 Use this to add content to your Ragie knowledge base. Documents go through processing states and become retrievable once indexed.`,
   instructions: [
-    'Provide either a URL or raw data, not both. If both are provided, URL takes precedence.',
+    'Set source to "url" to ingest url, or "raw" to ingest rawData. The selected source determines which field is used.',
     'Use mode "hi_res" to extract images and tables from PDFs. Use "fast" for text-only extraction (up to 20x faster).'
   ],
   constraints: [
     'URL must be publicly accessible and between 1-2083 characters.',
     'PDF limit: 2000 pages in hi_res mode.',
-    'Metadata may have up to 1000 total values. Keys starting with underscore are reserved.'
+    'Metadata may have up to 1000 total values. Document identity, source, upload time, media timestamps, and chunk content type metadata keys are reserved.'
   ],
   tags: {
     destructive: false,
@@ -82,7 +82,7 @@ Use this to add content to your Ragie knowledge base. Documents go through proce
     let doc: any;
     if (ctx.input.source === 'url') {
       if (!ctx.input.url) {
-        throw new Error('URL is required when source is "url"');
+        throw createApiServiceError('URL is required when source is "url"');
       }
       doc = await client.createDocumentFromUrl({
         url: ctx.input.url,
@@ -93,8 +93,8 @@ Use this to add content to your Ragie knowledge base. Documents go through proce
         partition: ctx.input.partition
       });
     } else {
-      if (!ctx.input.rawData) {
-        throw new Error('rawData is required when source is "raw"');
+      if (ctx.input.rawData === undefined) {
+        throw createApiServiceError('rawData is required when source is "raw"');
       }
       doc = await client.createDocumentRaw({
         data: ctx.input.rawData,

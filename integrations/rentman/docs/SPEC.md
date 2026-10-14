@@ -1,6 +1,27 @@
-Now let me fetch the actual API documentation to understand the available resources/features:Let me get the OpenAPI spec or the actual API docs page to see the full resource list:Now I have enough information to write the specification.
+# Rentman API Specification
 
-# Slates Specification for Rentman
+## Integration coverage
+
+The tools cover project and subproject creation, project request management,
+contact and contact person management, equipment reads and stock movements,
+crew availability, appointment management, project costs, and financial record
+reads. `get_contact` reads a contact and optionally its linked contact persons.
+`list_appointments` discovers appointment IDs and accepts start-time filters.
+`list_serial_numbers` reads all serial numbers or those for a specific equipment
+item. Collection tools accept an opaque `cursor` from a returned `nextPageUrl`;
+pass the token unchanged and repeat the original filters, resource IDs, sort,
+and fields with each continuation call. For `list_appointments`, repeat any
+`startAfter` and `startBefore` values. The cursor retains the original page
+limit. The existing offset fields remain available. Rentman documents a maximum of
+1500 records and a 5 MB response limit per collection request.
+
+This coverage was checked against [Rentman's official API documentation](https://api.rentman.net/)
+and its published OpenAPI 1.18.0 document. The sections below describe the
+provider's broader capabilities; they do not imply every API operation is
+exposed by a tool. Project and subproject creation remains limited by the
+provider's beta endpoints. The integration preserves its existing optional
+creation fields, including fields whose write support is not confirmed in the
+published specification.
 
 ## Overview
 

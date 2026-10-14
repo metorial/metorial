@@ -7,7 +7,19 @@ let extractionFieldSchema = z.object({
   key: z.string().describe('Unique identifier for the field'),
   description: z.string().describe('Context about what data this field should capture'),
   example: z.string().optional().describe('Sample value demonstrating expected output'),
-  type: z.enum(['string', 'object', 'array']).optional().describe('Field type')
+  type: z.enum(['string', 'object', 'array']).optional().describe('Field type'),
+  properties: z
+    .array(z.record(z.string(), z.unknown()))
+    .optional()
+    .describe(
+      'Nested field definitions for object fields, using key, description, type, properties, and items as needed'
+    ),
+  items: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe(
+      'Array item definition, such as {type: "string", example: "English"} or {type: "object", properties: [...]}'
+    )
 });
 
 export let updateExtractionTool = SlateTool.create(spec, {

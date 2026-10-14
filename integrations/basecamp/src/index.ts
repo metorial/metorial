@@ -2,7 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createProjectTool,
+  getCurrentUserTool,
   getProjectTool,
+  listAccountsTool,
   listMessagesTool,
   listPeopleTool,
   listProjectsTool,
@@ -19,6 +21,8 @@ import {
 export let provider = Slate.create({
   spec,
   tools: [
+    listAccountsTool,
+    getCurrentUserTool,
     listProjectsTool,
     getProjectTool,
     createProjectTool,

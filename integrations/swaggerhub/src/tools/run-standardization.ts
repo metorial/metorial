@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ let standardizationErrorSchema = z
   .object({
     line: z.number().optional().describe('Line number where the issue was found'),
     description: z.string().optional().describe('Description of the issue'),
-    severity: z.string().optional().describe('Severity level (ERROR, WARNING, INFO)'),
+    severity: z.string().optional().describe('Severity level (Warning or Critical)'),
     ruleName: z
       .string()
       .optional()
@@ -17,9 +17,9 @@ let standardizationErrorSchema = z
   .passthrough();
 
 export let runStandardization = SlateTool.create(spec, {
-  name: 'Run Standardization Scan',
+  name: 'Get Standardization Results',
   key: 'run_standardization',
-  description: `Run a standardization scan against an API definition in SwaggerHub. Returns validation results including severity, rule name, and location for each error or warning. Use this to check compliance with organization style guides before publishing.`,
+  description: `Retrieve standardization results for an API definition in SwaggerHub. Returns validation issues and their locations to help review compliance before publishing. Standardization requires an eligible organization plan.`,
   tags: {
     readOnly: true
   }
@@ -48,7 +48,7 @@ export let runStandardization = SlateTool.create(spec, {
 
     let owner = ctx.input.owner || ctx.config.owner;
     if (!owner)
-      throw new Error(
+      throw createApiServiceError(
         'Owner is required. Provide it in the input or configure a default owner.'
       );
 
@@ -57,7 +57,17 @@ export let runStandardization = SlateTool.create(spec, {
       ctx.input.apiName,
       ctx.input.version
     );
-    let errors = Array.isArray(result) ? result : (result?.errors ?? result?.items ?? []);
+    let parsed = standardizationErrorSchema
+      .array()
+      .safeParse(
+        Array.isArray(result)
+          ? result
+          : (result?.validation ?? result?.errors ?? result?.items)
+      );
+    if (!parsed.success) {
+      throw createApiServiceError('SwaggerHub returned invalid standardization results.');
+    }
+    let errors = parsed.data;
 
     return {
       output: {

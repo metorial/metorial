@@ -1,6 +1,8 @@
-import { SlateTool } from 'slates';
+import { isApiErrorRecord, SlateTool } from 'slates';
 import { z } from 'zod';
 import { LeadBoxerClient } from '../lib/client';
+import { leadString } from '../lib/responses';
+import { datasetIdSchema, getLegacyDatasetId } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let trackEvent = SlateTool.create(spec, {
@@ -10,7 +12,9 @@ export let trackEvent = SlateTool.create(spec, {
   instructions: [
     'Set `proxy` to true if you want to prevent automatic geo/user-agent enrichment from the server IP.',
     'Any custom properties will become attributes on the lead profile, enabling progressive enrichment over time.',
-    'Use `leadboxerUserId` and `sessionId` to update existing lead records. Without them, a new user/session may be created.'
+    'Use `leadboxerUserId` and `sessionId` to update existing lead records. Without them, a new user/session may be created.',
+    'Call list_datasets to discover the dataset ID. Existing connections can use their saved dataset.',
+    'Custom property names must use ASCII and must not override the dedicated event parameters or response-format parameters.'
   ],
   tags: {
     destructive: false
@@ -23,6 +27,11 @@ export let trackEvent = SlateTool.create(spec, {
         .describe(
           'Event title/name, e.g. "user_registered", "subscription_upgraded", "invoice_paid"'
         ),
+      datasetId: datasetIdSchema,
+      eventId: z
+        .string()
+        .optional()
+        .describe('Optional event ID (eid); LeadBoxer generates one when omitted.'),
       email: z.string().optional().describe('Email address of the user'),
       userId: z.string().optional().describe('Your own user identifier'),
       leadboxerUserId: z
@@ -58,7 +67,7 @@ export let trackEvent = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new LeadBoxerClient({
       token: ctx.auth.token,
-      datasetId: ctx.config.datasetId
+      datasetId: ctx.input.datasetId ?? getLegacyDatasetId(ctx.config)
     });
 
     let result = await client.trackEvent({
@@ -71,13 +80,17 @@ export let trackEvent = SlateTool.create(spec, {
       referrer: ctx.input.referrer,
       ip: ctx.input.ip,
       proxy: ctx.input.proxy,
-      customProperties: ctx.input.customProperties
+      customProperties: ctx.input.customProperties,
+      eventId: ctx.input.eventId
     });
 
+    let response = isApiErrorRecord(result) ? result : {};
     let output = {
-      eventId: typeof result === 'object' ? result.eventId || result.event_id : undefined,
-      sessionId: typeof result === 'object' ? result.sessionId || result.sid : undefined,
-      leadboxerUserId: typeof result === 'object' ? result.userId || result.uid : undefined,
+      eventId:
+        leadString(response.eventId ?? response.event_id ?? response.eid) ??
+        leadString(result),
+      sessionId: leadString(response.sessionId ?? response.sid),
+      leadboxerUserId: leadString(response.userId ?? response.uid),
       rawResponse: result
     };
 

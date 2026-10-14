@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let queryIssuesTool = SlateTool.create(spec, {
@@ -13,18 +14,14 @@ export let queryIssuesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID to query issues from'),
+      projectId: projectIdSchema,
       pageNumber: z.number().optional().default(1).describe('Page number (starts at 1)'),
-      pageSize: z
-        .number()
-        .optional()
-        .default(20)
-        .describe('Number of issues per page (max 100)'),
+      pageSize: z.number().optional().default(20).describe('Number of issues per page'),
       filters: z
         .record(z.string(), z.any())
         .optional()
         .describe(
-          'Filter criteria object. Keys can include status, type, priority, assignee, sprint, epic, label, and other field names.'
+          'Documented query fields: summary, selectFields (field codes mapped to option ID arrays), dateFields (field codes mapped to timestamp ranges), statusTypes (2 not started, 3 in progress, 4 done), orderBy (createTime or updateTime), sort (ASC or DESC), and showedCustomFieldCodes. These fields are sent in the query body.'
         )
     })
   )

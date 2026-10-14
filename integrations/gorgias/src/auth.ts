@@ -1,5 +1,53 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { createClient, getSubdomain } from './lib/helpers';
+
+type GorgiasProfileContext = {
+  input: { subdomain: string };
+  output: {
+    token: string;
+    subdomain?: string;
+    refreshToken?: string;
+    expiresAt?: string;
+    authType?: 'basic' | 'bearer';
+  };
+};
+
+type GorgiasRefreshContext = GorgiasProfileContext & {
+  clientId: string;
+  clientSecret: string;
+};
+
+let GORGIAS_ACCESS_TOKEN_LIFETIME_SECONDS = 24 * 60 * 60;
+
+let normalizeGorgiasTokenResponse = (data: unknown, previousRefreshToken?: string) => {
+  if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+    let payload = data as Record<string, unknown>;
+    let expiresIn = payload.expires_in;
+    // Gorgias documents zero lifetimes alongside its 24-hour access-token lifetime.
+    let useDefaultLifetime =
+      expiresIn === 0 ||
+      expiresIn === '0' ||
+      expiresIn === undefined ||
+      expiresIn === null ||
+      expiresIn === '';
+    data = {
+      ...payload,
+      expires_in: useDefaultLifetime ? GORGIAS_ACCESS_TOKEN_LIFETIME_SECONDS : expiresIn
+    };
+  }
+  return normalizeOAuthTokenResponse(data, {
+    providerLabel: 'Gorgias',
+    previousRefreshToken,
+    refreshTokenFallbackMode: 'falsy'
+  });
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -7,7 +55,8 @@ export let auth = SlateAuth.create()
       token: z.string(),
       subdomain: z.string().optional(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      authType: z.enum(['bearer', 'basic']).optional()
     })
   )
   .addOauth({
@@ -132,6 +181,7 @@ export let auth = SlateAuth.create()
     }),
 
     getAuthorizationUrl: async ctx => {
+      let subdomain = getSubdomain(undefined, ctx.input.subdomain);
       let params = new URLSearchParams({
         response_type: 'code',
         client_id: ctx.clientId,
@@ -141,124 +191,86 @@ export let auth = SlateAuth.create()
       });
 
       return {
-        url: `https://${ctx.input.subdomain}.gorgias.com/oauth/authorize?${params.toString()}`,
+        url: `https://${subdomain}.gorgias.com/oauth/authorize?${params.toString()}`,
         input: ctx.input
       };
     },
 
     handleCallback: async ctx => {
-      let http = createAxios({
-        baseURL: `https://${ctx.input.subdomain}.gorgias.com`
+      let subdomain = getSubdomain(undefined, ctx.input.subdomain);
+      let http = createAuthenticatedAxios({
+        baseURL: `https://${subdomain}.gorgias.com`,
+        auth: { username: ctx.clientId, password: ctx.clientSecret },
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Gorgias',
+            reason: 'gorgias_api_error',
+            operation: 'exchange token'
+          })
       });
-
       let response = await http.post(
         '/oauth/token',
-        {
+        new URLSearchParams({
           grant_type: 'authorization_code',
           code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
+          redirect_uri: ctx.redirectUri
+        }).toString()
       );
-
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-        token_type: string;
-      };
-
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let token = normalizeGorgiasTokenResponse(response.data);
 
       return {
-        output: {
-          token: data.access_token,
-          subdomain: ctx.input.subdomain,
-          refreshToken: data.refresh_token,
-          expiresAt
-        },
+        output: { ...token, subdomain, authType: 'bearer' as const },
         input: ctx.input
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: GorgiasRefreshContext) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError('Reconnect Gorgias to obtain a refresh token.');
       }
-
-      let subdomain = ctx.output.subdomain || ctx.input.subdomain;
-      let http = createAxios({
-        baseURL: `https://${subdomain}.gorgias.com`
+      let subdomain = getSubdomain(undefined, ctx.output.subdomain || ctx.input.subdomain);
+      let http = createAuthenticatedAxios({
+        baseURL: `https://${subdomain}.gorgias.com`,
+        auth: { username: ctx.clientId, password: ctx.clientSecret },
+        contentType: 'application/x-www-form-urlencoded',
+        errorAdapter: error =>
+          buildApiServiceError(error, {
+            providerLabel: 'Gorgias',
+            reason: 'gorgias_api_error',
+            operation: 'refresh token'
+          })
       });
-
       let response = await http.post(
         '/oauth/token',
-        {
+        new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
+          refresh_token: ctx.output.refreshToken
+        }).toString()
       );
-
-      let data = response.data as {
-        access_token: string;
-        refresh_token?: string;
-        expires_in?: number;
-      };
-
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let token = normalizeGorgiasTokenResponse(response.data, ctx.output.refreshToken);
 
       return {
-        output: {
-          token: data.access_token,
-          subdomain: ctx.output.subdomain,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt
-        },
+        output: { ...token, subdomain, authType: 'bearer' as const },
         input: ctx.input
       };
     },
 
-    getProfile: async (ctx: any) => {
-      let subdomain = ctx.output.subdomain || ctx.input.subdomain;
-      let http = createAxios({
-        baseURL: `https://${subdomain}.gorgias.com/api`
-      });
-
-      let response = await http.get('/users/0', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
+    getProfile: async (ctx: GorgiasProfileContext) => {
+      let user = await createClient(
+        {},
+        {
+          ...ctx.output,
+          subdomain: ctx.output.subdomain || ctx.input.subdomain,
+          authType: 'bearer'
         }
-      });
-
-      let user = response.data as {
-        id: number;
-        email: string;
-        firstname: string;
-        lastname: string;
-      };
-
+      ).getUser(0);
       return {
         profile: {
           id: String(user.id),
           email: user.email,
-          name: [user.firstname, user.lastname].filter(Boolean).join(' ') || undefined
+          name:
+            user.name || [user.firstname, user.lastname].filter(Boolean).join(' ') || undefined
         }
       };
     }
@@ -283,34 +295,27 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: credentials,
-          subdomain: ctx.input.subdomain
+          subdomain: getSubdomain(undefined, ctx.input.subdomain),
+          authType: 'basic' as const
         }
       };
     },
 
-    getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: `https://${ctx.input.subdomain}.gorgias.com/api`
-      });
-
-      let response = await http.get('/users/0', {
-        headers: {
-          Authorization: `Basic ${ctx.output.token}`
+    getProfile: async (ctx: GorgiasProfileContext) => {
+      let user = await createClient(
+        {},
+        {
+          ...ctx.output,
+          subdomain: ctx.output.subdomain || ctx.input.subdomain,
+          authType: 'basic'
         }
-      });
-
-      let user = response.data as {
-        id: number;
-        email: string;
-        firstname: string;
-        lastname: string;
-      };
-
+      ).getUser(0);
       return {
         profile: {
           id: String(user.id),
           email: user.email,
-          name: [user.firstname, user.lastname].filter(Boolean).join(' ') || undefined
+          name:
+            user.name || [user.firstname, user.lastname].filter(Boolean).join(' ') || undefined
         }
       };
     }

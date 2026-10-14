@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> Hyperbrowser
 
-Manage cloud-based headless browser sessions for AI agents and web automation. Create, configure, and stop browser sessions with built-in stealth mode, proxy rotation, CAPTCHA solving, and anti-bot detection. Scrape web pages in markdown or HTML, crawl entire websites, and extract structured data using AI-powered schema-based extraction. Run autonomous AI browser agents (Browser Use, Claude Computer Use, OpenAI CUA, Gemini) that accept natural language tasks and operate a browser to complete them. Manage persistent browser profiles to maintain login state and cookies across sessions. Upload and attach Chrome extensions, retrieve downloaded files, perform web searches via Bing, capture session recordings, and observe live browser sessions in real-time.
+Manage cloud browser sessions for AI agents and web automation. Create and stop sessions with stealth mode, proxies, and CAPTCHA solving. Scrape webpages, crawl websites, extract structured data, and search the web. Run Browser Use, Claude Computer Use, or OpenAI CUA tasks, retrieve their results, and stop existing tasks. Create, inspect, list, and delete persistent browser profiles. Retrieve downloadable screenshots, session recordings, videos, and downloaded files, and observe sessions through their live view URLs.
 
 ## License
 

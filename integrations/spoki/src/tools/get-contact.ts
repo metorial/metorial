@@ -40,14 +40,27 @@ export let getContact = SlateTool.create(spec, {
     return {
       output: {
         contactId: result?.id ? String(result.id) : ctx.input.contactId,
-        phone: result?.phone,
-        firstName: result?.first_name,
-        lastName: result?.last_name,
-        email: result?.email,
-        language: result?.language,
-        tags: result?.tags,
-        lists: result?.lists,
-        customFields: result?.custom_fields,
+        phone: result?.phone ?? undefined,
+        firstName: result?.first_name ?? undefined,
+        lastName: result?.last_name ?? undefined,
+        email: result?.email ?? undefined,
+        language: result?.language ?? undefined,
+        tags:
+          result?.tags ??
+          result?.tag_set
+            ?.map((tag: any) => tag.name)
+            .filter((name: unknown) => typeof name === 'string'),
+        lists: result?.lists ?? result?.list_set,
+        customFields:
+          result?.custom_fields ??
+          (Array.isArray(result?.contactfield_set)
+            ? Object.fromEntries(
+                result.contactfield_set.map((field: any) => [
+                  field.visual_code,
+                  field.value_datetime ?? field.value
+                ])
+              )
+            : undefined),
         raw: result
       },
       message: `Retrieved contact **${result?.first_name || ''} ${result?.last_name || ''}** (${result?.phone || ctx.input.contactId})`

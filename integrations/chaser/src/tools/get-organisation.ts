@@ -29,7 +29,8 @@ export let getOrganisation = SlateTool.create(spec, {
         baseCurrency: result.baseCurrency || '',
         countryCode: result.countryCode || '',
         timezone: result.timezone || '',
-        lastSyncDate: result.lastSyncDate ?? null
+        lastSyncDate: result.lastSyncDate ?? null,
+        chasing: result.chasing
       },
       message: `Organisation: **${result.name}** (${result.baseCurrency}, ${result.countryCode}). Last synced: ${result.lastSyncDate || 'never'}.`
     };

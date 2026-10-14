@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ReferralRockClient } from '../lib/client';
+import { getFirstResult, ReferralRockClient } from '../lib/client';
+import { referralQuery } from '../lib/queries';
 import { spec } from '../spec';
 
 export let removeReferral = SlateTool.create(spec, {
@@ -38,28 +39,11 @@ export let removeReferral = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
-    let query: Record<string, unknown> = {};
-
-    if (ctx.input.referralId) {
-      query = { primaryInfo: { referralId: ctx.input.referralId } };
-    } else {
-      query = {
-        secondaryInfo: {
-          ...(ctx.input.email && { email: ctx.input.email }),
-          ...(ctx.input.externalIdentifier && {
-            externalIdentifier: ctx.input.externalIdentifier
-          })
-        },
-        tertiaryInfo: {
-          ...(ctx.input.programId && { ProgramId: ctx.input.programId })
-        }
-      };
-    }
+    let query = referralQuery(ctx.input);
 
     let result = await client.removeReferrals([{ query }]);
 
-    let results = result as unknown as Record<string, unknown>[];
-    let first = Array.isArray(results) ? results[0] : result;
+    let first = getFirstResult(result);
     let resultInfo = (first?.resultInfo || {}) as Record<string, unknown>;
 
     return {
@@ -67,7 +51,7 @@ export let removeReferral = SlateTool.create(spec, {
         status: resultInfo.Status as string | undefined,
         statusMessage: resultInfo.Message as string | undefined
       },
-      message: `Referral removal: ${resultInfo.Message || 'Completed'}.`
+      message: `Referral removal: ${resultInfo.Message || resultInfo.Status || 'Request processed'}.`
     };
   })
   .build();

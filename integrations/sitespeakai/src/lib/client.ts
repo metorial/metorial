@@ -1,43 +1,61 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  pickDefined
+} from 'slates';
+import { z } from 'zod';
+
+let recordSchema = z.record(z.string(), z.any());
+let recordsSchema = z.array(recordSchema);
 
 export class Client {
-  private token: string;
+  private axios;
 
   constructor(config: { token: string }) {
-    this.token = config.token;
-  }
+    if (!config.token.trim()) {
+      throw createApiServiceError('Connect a SiteSpeakAI API token before making a request.');
+    }
 
-  private get axios() {
-    return createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.sitespeak.ai/v1',
+      authHeader: { value: `Bearer ${config.token}` },
       headers: {
-        Authorization: `Bearer ${this.token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json'
-      }
+        Accept: 'application/json'
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'SiteSpeakAI',
+          reason: 'sitespeakai_api_error'
+        })
     });
   }
 
-  // ── User & Account ──
+  private parseResponse<T extends z.ZodType>(schema: T, data: unknown, operation: string) {
+    let result = schema.safeParse(data);
+    if (!result.success) {
+      throw createApiServiceError(`SiteSpeakAI returned an invalid ${operation} response.`, {
+        reason: 'sitespeakai_invalid_response'
+      });
+    }
+    return result.data;
+  }
 
   async getMe() {
     let response = await this.axios.get('/me');
-    return response.data.user ?? response.data;
+    let data = this.parseResponse(recordSchema, response.data, 'account');
+    return this.parseResponse(recordSchema, data.user ?? data, 'account');
   }
 
   async listChatbots() {
     let response = await this.axios.get('/me/chatbots');
-    return response.data;
+    return this.parseResponse(recordsSchema, response.data, 'chatbot list');
   }
-
-  // ── Chatbot Settings ──
 
   async getChatbotSettings(chatbotId: string) {
-    let response = await this.axios.get(`/${chatbotId}`);
-    return response.data;
+    let response = await this.axios.get(`/${encodeURIComponent(chatbotId)}`);
+    return this.parseResponse(recordSchema, response.data, 'chatbot settings');
   }
-
-  // ── Query ──
 
   async queryChatbot(
     chatbotId: string,
@@ -47,15 +65,16 @@ export class Client {
       format?: 'html' | 'markdown';
     }
   ) {
-    let response = await this.axios.post(`/${chatbotId}/query`, {
-      prompt: params.prompt,
-      conversation_id: params.conversationId,
-      format: params.format
-    });
-    return response.data;
+    let response = await this.axios.post(
+      `/${encodeURIComponent(chatbotId)}/query`,
+      pickDefined({
+        prompt: params.prompt,
+        conversation_id: params.conversationId,
+        format: params.format
+      })
+    );
+    return this.parseResponse(recordSchema, response.data, 'chatbot query');
   }
-
-  // ── Conversations ──
 
   async getConversations(
     chatbotId: string,
@@ -67,34 +86,30 @@ export class Client {
       order?: 'asc' | 'desc';
     }
   ) {
-    let queryParams: Record<string, string> = {};
+    if (params?.limit !== undefined && !Number.isInteger(params.limit)) {
+      throw createApiServiceError('The conversation limit must be a whole number.');
+    }
 
-    if (params?.conversationId) queryParams.conversation_id = params.conversationId;
-    if (params?.includeDeleted !== undefined)
-      queryParams.include_deleted = String(params.includeDeleted);
-    if (params?.includeSources !== undefined)
-      queryParams.include_sources = String(params.includeSources);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.order) queryParams.order = params.order;
-
-    let response = await this.axios.get(`/${chatbotId}/conversations`, {
-      params: queryParams
+    let response = await this.axios.get(`/${encodeURIComponent(chatbotId)}/conversations`, {
+      params: pickDefined({
+        conversation_id: params?.conversationId,
+        include_deleted: params?.includeDeleted,
+        include_sources: params?.includeSources,
+        limit: params?.limit,
+        order: params?.order
+      })
     });
-    return response.data;
+    return this.parseResponse(recordsSchema, response.data, 'conversation history');
   }
-
-  // ── Leads ──
 
   async getLeads(chatbotId: string) {
-    let response = await this.axios.get(`/${chatbotId}/leads`);
-    return response.data;
+    let response = await this.axios.get(`/${encodeURIComponent(chatbotId)}/leads`);
+    return this.parseResponse(recordsSchema, response.data, 'lead list');
   }
 
-  // ── Updated Answers (Finetunes) ──
-
   async getUpdatedAnswers(chatbotId: string) {
-    let response = await this.axios.get(`/${chatbotId}/finetunes`);
-    return response.data;
+    let response = await this.axios.get(`/${encodeURIComponent(chatbotId)}/finetunes`);
+    return this.parseResponse(recordsSchema, response.data, 'updated answer list');
   }
 
   async createUpdatedAnswer(
@@ -104,29 +119,38 @@ export class Client {
       suggestedAnswer: string;
     }
   ) {
-    let response = await this.axios.post(`/${chatbotId}/finetunes`, {
+    let response = await this.axios.post(`/${encodeURIComponent(chatbotId)}/finetunes`, {
       question: params.question,
       suggested_answer: params.suggestedAnswer
     });
-    return response.data;
+    let data = this.parseResponse(recordSchema, response.data, 'updated answer');
+    if (data.finetune !== undefined) {
+      this.parseResponse(recordSchema, data.finetune, 'updated answer');
+    }
+    return data;
   }
 
   async deleteUpdatedAnswer(chatbotId: string, finetuneId: string) {
-    let response = await this.axios.delete(`/${chatbotId}/finetunes/${finetuneId}`);
-    return response.data;
+    let response = await this.axios.delete(
+      `/${encodeURIComponent(chatbotId)}/finetunes/${encodeURIComponent(finetuneId)}`
+    );
+    return this.parseResponse(recordSchema, response.data, 'updated answer deletion');
   }
-
-  // ── Suggested Messages (Prompts) ──
 
   async getSuggestedMessages(chatbotId: string) {
-    let response = await this.axios.get(`/${chatbotId}/prompts`);
-    return response.data;
+    let response = await this.axios.get(`/${encodeURIComponent(chatbotId)}/prompts`);
+    return this.parseResponse(recordsSchema, response.data, 'suggested message list');
   }
 
-  // ── Sources ──
-
   async getSources(chatbotId: string) {
-    let response = await this.axios.get(`/${chatbotId}/sources`);
-    return response.data;
+    let response = await this.axios.get(`/${encodeURIComponent(chatbotId)}/sources`);
+    return this.parseResponse(recordsSchema, response.data, 'source list');
+  }
+
+  async getAnalytics(chatbotId: string, params: { from?: string; to?: string }) {
+    let response = await this.axios.get(`/${encodeURIComponent(chatbotId)}/analytics`, {
+      params: pickDefined(params)
+    });
+    return this.parseResponse(recordSchema, response.data, 'analytics');
   }
 }

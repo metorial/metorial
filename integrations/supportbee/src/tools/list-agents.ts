@@ -30,7 +30,11 @@ export let listAgents = SlateTool.create(spec, {
         .optional()
         .describe(
           'Filter users by role (comma-separated: admin, agent, collaborator, customer)'
-        )
+        ),
+      userType: z
+        .enum(['user', 'customer_group'])
+        .optional()
+        .describe('Retrieve individual users or customer groups')
     })
   )
   .output(
@@ -51,7 +55,8 @@ export let listAgents = SlateTool.create(spec, {
     if (ctx.input.includeUsers) {
       users = await client.listUsers({
         withInvited: ctx.input.withInvited,
-        withRoles: ctx.input.roles
+        withRoles: ctx.input.roles,
+        type: ctx.input.userType
       });
     }
 

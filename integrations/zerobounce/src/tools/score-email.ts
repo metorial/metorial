@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -24,7 +24,9 @@ A score of 10 is ideal, while 0 indicates a high-risk address (spam trap, inacti
   .output(
     z.object({
       address: z.string().describe('The email address that was scored'),
-      status: z.string().describe('Validation status of the email'),
+      status: z
+        .string()
+        .describe('Validation status when supplied; empty for a scoring-only response'),
       subStatus: z.string().optional().describe('Detailed sub-status code'),
       zerobounceScore: z
         .number()
@@ -51,14 +53,22 @@ A score of 10 is ideal, while 0 indicates a high-risk address (spam trap, inacti
     ctx.info(`Scoring email: ${ctx.input.email}`);
     let result = await client.scoreEmail(ctx.input.email);
 
+    let rawScore = result.score ?? result.zerobounce_score;
+    let score =
+      rawScore === undefined || rawScore === null || rawScore === '' ? null : Number(rawScore);
+    if (score !== null && (!Number.isFinite(score) || score < 0 || score > 10)) {
+      throw createApiServiceError('ZeroBounce returned an invalid email quality score.', {
+        reason: 'zerobounce_api_error'
+      });
+    }
+
     let output = {
-      address: String(result.address || ctx.input.email),
+      address: String(result.email || result.address || ctx.input.email),
       status: String(result.status || ''),
       subStatus: result.sub_status ? String(result.sub_status) : undefined,
-      zerobounceScore:
-        result.zerobounce_score !== undefined ? Number(result.zerobounce_score) : null,
-      account: result.account as string | null | undefined,
-      domain: result.domain as string | null | undefined,
+      zerobounceScore: score,
+      account: result.account,
+      domain: result.domain,
       processedAt: result.processed_at ? String(result.processed_at) : undefined
     };
 
@@ -67,7 +77,7 @@ A score of 10 is ideal, while 0 indicates a high-risk address (spam trap, inacti
 
     return {
       output,
-      message: `Email **${output.address}** scored ${scoreDisplay} (status: ${output.status}).`
+      message: `Email **${output.address}** scored ${scoreDisplay}.${output.status ? ` Status: ${output.status}.` : ''}`
     };
   })
   .build();

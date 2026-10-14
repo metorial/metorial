@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createPhase = SlateTool.create(spec, {
@@ -28,8 +29,8 @@ export let createPhase = SlateTool.create(spec, {
     z.object({
       phaseId: z.number().describe('Unique ID of the created phase'),
       phaseName: z.string().describe('Phase name'),
-      startDate: z.string().optional().describe('Start date'),
-      dueDate: z.string().optional().describe('Due date'),
+      startDate: z.string().nullable().optional().describe('Start date'),
+      dueDate: z.string().nullable().optional().describe('Due date'),
       status: z.any().optional().describe('Phase status')
     })
   )
@@ -73,8 +74,8 @@ export let updatePhase = SlateTool.create(spec, {
     z.object({
       phaseId: z.number().describe('ID of the updated phase'),
       phaseName: z.string().optional().describe('Updated phase name'),
-      startDate: z.string().optional().describe('Updated start date'),
-      dueDate: z.string().optional().describe('Updated due date'),
+      startDate: z.string().nullable().optional().describe('Updated start date'),
+      dueDate: z.string().nullable().optional().describe('Updated due date'),
       status: z.any().optional().describe('Phase status')
     })
   )
@@ -105,13 +106,18 @@ export let listPhases = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().optional().describe('Filter phases by project ID'),
+      projectId: z
+        .number()
+        .optional()
+        .describe('Required project ID. Call list_projects to discover projects.'),
+      pageToken: pageTokenSchema,
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Maximum number of phases to return')
     })
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       phases: z
         .array(
           z.object({
@@ -129,6 +135,7 @@ export let listPhases = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listPhases({
       projectId: ctx.input.projectId,
+      pageToken: ctx.input.pageToken,
       offset: ctx.input.offset,
       limit: ctx.input.limit
     });
@@ -136,7 +143,7 @@ export let listPhases = SlateTool.create(spec, {
     let phases = Array.isArray(result) ? result : (result.phases ?? result.data ?? []);
 
     return {
-      output: { phases },
+      output: { phases, pagination: result.pagination },
       message: `Found **${phases.length}** phase(s).`
     };
   })

@@ -1,5 +1,6 @@
 export * from './create-poll';
 export * from './delete-poll';
+export * from './get-current-user';
 export * from './get-poll';
 export * from './list-polls';
 export * from './manage-comments';

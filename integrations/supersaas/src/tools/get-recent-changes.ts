@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { scheduleIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getRecentChangesTool = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let getRecentChangesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      scheduleId: z.string().describe('Schedule ID to get changes for'),
+      scheduleId: scheduleIdSchema,
       from: z
         .string()
         .optional()
@@ -61,7 +62,7 @@ export let getRecentChangesTool = SlateTool.create(spec, {
           appointmentId: item.id != null ? String(item.id) : undefined,
           start: item.start ?? undefined,
           finish: item.finish ?? undefined,
-          resourceName: item.resource ?? undefined,
+          resourceName: item.res_name ?? item.resource ?? undefined,
           resourceId: item.resource_id != null ? String(item.resource_id) : undefined,
           fullName: item.full_name ?? undefined,
           email: item.email ?? undefined,

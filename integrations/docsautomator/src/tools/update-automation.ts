@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -52,12 +52,9 @@ export let updateAutomation = SlateTool.create(spec, {
 
     let { automationId, ...updateFields } = ctx.input;
 
-    // Filter out undefined values
-    let params: Record<string, unknown> = {};
-    for (let [key, value] of Object.entries(updateFields)) {
-      if (value !== undefined) {
-        params[key] = value;
-      }
+    let params = pickDefined(updateFields);
+    if (!Object.keys(params).length) {
+      throw createApiServiceError('Provide at least one automation setting to update.');
     }
 
     await client.updateAutomation(automationId, params);

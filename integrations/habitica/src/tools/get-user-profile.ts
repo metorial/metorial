@@ -43,10 +43,12 @@ export let getUserProfile = SlateTool.create(spec, {
     let client = new HabiticaClient({
       userId: ctx.auth.userId,
       token: ctx.auth.token,
-      xClient: ctx.config.xClient
+      xClient:
+        ctx.auth.xClient ??
+        (typeof ctx.config.xClient === 'string' ? ctx.config.xClient : undefined)
     });
 
-    let user = await client.getUser('stats,profile,auth,party,preferences');
+    let user = await client.getUser('stats,profile,auth,party,preferences,balance');
 
     let stats = user.stats || {};
     let profile = user.profile || {};
@@ -66,15 +68,15 @@ export let getUserProfile = SlateTool.create(spec, {
         exp: stats.exp,
         toNextLevel: stats.toNextLevel,
         gp: stats.gp,
-        gems: user.balance ? user.balance * 4 : 0,
+        gems: typeof user.balance === 'number' ? user.balance * 4 : undefined,
         strength: stats.str,
         intelligence: stats.int,
         constitution: stats.con,
         perception: stats.per,
         sleeping: user.preferences?.sleep,
-        partyId: user.party?._id
+        partyId: user.party?._id || undefined
       },
-      message: `**${profile.name || authData.local?.username}** - Level **${stats.lvl}** ${stats.class || 'adventurer'}. HP: **${stats.hp?.toFixed(0)}/${stats.maxHealth}**, XP: **${stats.exp?.toFixed(0)}/${stats.toNextLevel}**, Gold: **${stats.gp?.toFixed(2)}**`
+      message: `**${profile.name || authData.local?.username}** - Level **${stats.lvl}** ${stats.class || 'adventurer'}. HP: **${stats.hp?.toFixed(0)}**, XP: **${stats.exp?.toFixed(0)}**, Gold: **${stats.gp?.toFixed(2)}**`
     };
   })
   .build();

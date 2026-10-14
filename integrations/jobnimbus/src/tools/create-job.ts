@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,16 +9,26 @@ export let createJob = SlateTool.create(spec, {
   description: `Create a new job (project) in JobNimbus. Jobs must be associated with a contact. You can set the job name, address, workflow status, and more.`,
   instructions: [
     'A contactId (primary) is required to link the job to an existing contact.',
-    'Use the List Contacts or Search Contacts tool to find the contact ID first if needed.'
+    'Use list_contacts to find the contact ID and get_account_settings to discover job workflows and statuses.'
   ]
 })
   .input(
     z.object({
       contactId: z.string().describe('The contact ID (jnid) to associate this job with'),
-      name: z.string().optional().describe('Job name/title'),
+      name: z.string().optional().describe('Required job name/title'),
       description: z.string().optional().describe('Job description'),
-      recordTypeName: z.string().optional().describe('Workflow type name'),
-      statusName: z.string().optional().describe('Workflow status name'),
+      recordTypeName: z
+        .string()
+        .optional()
+        .describe(
+          'Required job workflow name. Call get_account_settings to discover workflows.'
+        ),
+      statusName: z
+        .string()
+        .optional()
+        .describe(
+          'Required workflow status name. Call get_account_settings to discover statuses.'
+        ),
       addressLine1: z.string().optional().describe('Job site address line 1'),
       addressLine2: z.string().optional().describe('Job site address line 2'),
       city: z.string().optional().describe('City'),
@@ -39,10 +49,19 @@ export let createJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.name?.trim() ||
+      !ctx.input.recordTypeName?.trim() ||
+      !ctx.input.statusName?.trim()
+    ) {
+      throw createApiServiceError(
+        'Provide name, recordTypeName, and statusName. Call get_account_settings to discover job workflows and their statuses.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let data: Record<string, any> = {
-      primary: ctx.input.contactId
+      primary: { id: ctx.input.contactId }
     };
 
     if (ctx.input.name) data.name = ctx.input.name;

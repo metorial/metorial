@@ -14,7 +14,13 @@ export let listUsers = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor'),
-      limit: z.number().optional().describe('Number of users to return')
+      limit: z
+        .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isInteger, 'Use a whole number')
+        .optional()
+        .describe('Number of users to return')
     })
   )
   .output(
@@ -46,15 +52,15 @@ export let listUsers = SlateTool.create(spec, {
       email: u.email || null,
       firstname: u.firstname || null,
       lastname: u.lastname || null,
-      role: u.role?.name || u.role || null,
+      role: typeof u.role === 'string' ? u.role : u.role?.name || null,
       active: u.active ?? true
     }));
 
     return {
       output: {
         users,
-        nextCursor: result.meta.next_cursor,
-        prevCursor: result.meta.prev_cursor
+        nextCursor: result.meta?.next_cursor ?? null,
+        prevCursor: result.meta?.prev_cursor ?? null
       },
       message: `Found **${users.length}** user(s).`
     };
@@ -96,7 +102,7 @@ export let getUser = SlateTool.create(spec, {
         email: u.email || null,
         firstname: u.firstname || null,
         lastname: u.lastname || null,
-        role: u.role?.name || u.role || null,
+        role: typeof u.role === 'string' ? u.role : u.role?.name || null,
         active: u.active ?? true,
         language: u.language || null,
         timezone: u.timezone || null

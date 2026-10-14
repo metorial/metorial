@@ -67,7 +67,7 @@ For bulk or template-based messaging, use **Start Automation** or **Send Templat
           : result?.message_id
             ? String(result.message_id)
             : undefined,
-        status: result?.status,
+        status: result?.status ?? undefined,
         raw: result
       },
       message: `Sent message to **${ctx.input.phone}**`

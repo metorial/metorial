@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { formatTidyId } from '../lib/format';
 import { spec } from '../spec';
 
 let addressOutputSchema = z.object({
@@ -22,7 +23,7 @@ let addressOutputSchema = z.object({
 });
 
 let mapAddress = (data: any) => ({
-  addressId: data.id,
+  addressId: formatTidyId(data.id),
   address: data.address,
   unit: data.unit ?? null,
   city: data.city,

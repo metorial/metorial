@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,8 +56,15 @@ export let analyzeSentimentTool = SlateTool.create(spec, {
 
     let result = await client.analyzeSentiment(ctx.input.content, ctx.input.language);
 
-    let docSentiment = result.document?.sentiment ??
-      result.sentiment ?? { label: 'neu', confidence: 0 };
+    let docSentiment = result.document?.sentiment ?? result.document ?? result.sentiment;
+    if (
+      typeof docSentiment?.label !== 'string' ||
+      typeof docSentiment?.confidence !== 'number'
+    ) {
+      throw createApiServiceError(
+        'The Analytics API did not return a document sentiment result.'
+      );
+    }
     let entitySentiments = result.entities ?? [];
 
     return {

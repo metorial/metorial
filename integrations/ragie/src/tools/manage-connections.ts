@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,7 @@ export let manageConnections = SlateTool.create(spec, {
   description: `List, inspect, update, enable/disable, sync, or delete data source connections. Connections synchronize documents from external services like Google Drive, Notion, Confluence, and Salesforce.
 Use this to manage the lifecycle of your data source integrations.`,
   instructions: [
-    'Use action "list" to see all connections.',
+    'Use action "list" to browse a page of connections, then pass nextCursor as cursor to continue.',
     'Use action "get" to inspect a specific connection.',
     'Use action "get_stats" to see document count statistics for a connection.',
     'Use action "update" to modify connection settings (applies on next sync).',
@@ -38,7 +38,22 @@ Use this to manage the lifecycle of your data source integrations.`,
       partitionStrategy: z
         .string()
         .optional()
-        .describe('Partition strategy to set (for "update" action)'),
+        .describe(
+          'Document processing strategy, such as "fast" or "hi_res" (required for "update")'
+        ),
+      cursor: z.string().optional().describe('Pagination cursor for the list action'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Connections per page, a whole number from 1 to 100'),
+      filter: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Metadata filter for the list action'),
+      partition: z
+        .string()
+        .optional()
+        .describe('Partition to scope the list action to; overrides the default partition'),
       keepFiles: z
         .boolean()
         .optional()
@@ -77,7 +92,13 @@ Use this to manage the lifecycle of your data source integrations.`,
         .describe('Connection details'),
       stats: z.record(z.string(), z.any()).optional().describe('Connection statistics'),
       synced: z.boolean().optional().describe('Whether a sync was triggered'),
-      deleted: z.boolean().optional().describe('Whether the connection was deleted')
+      deleted: z.boolean().optional().describe('Whether the connection was deleted'),
+      nextCursor: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Cursor for the next connection page'),
+      totalCount: z.number().optional().describe('Total connections matching the list query')
     })
   )
   .handleInvocation(async ctx => {
@@ -99,17 +120,24 @@ Use this to manage the lifecycle of your data source integrations.`,
 
     switch (ctx.input.action) {
       case 'list': {
-        let connections = await client.listConnections();
+        let result = await client.listConnections({
+          cursor: ctx.input.cursor,
+          pageSize: ctx.input.pageSize,
+          filter: ctx.input.filter,
+          partition: ctx.input.partition
+        });
         return {
           output: {
-            connections: connections.map(mapConnection)
+            connections: result.connections.map(mapConnection),
+            nextCursor: result.pagination.nextCursor,
+            totalCount: result.pagination.totalCount
           },
-          message: `Found **${connections.length}** connections.`
+          message: `Returned **${result.connections.length}** connections.${result.pagination.nextCursor ? ' More pages available.' : ''}`
         };
       }
 
       case 'get': {
-        if (!ctx.input.connectionId) throw new Error('connectionId is required.');
+        if (!ctx.input.connectionId) throw createApiServiceError('connectionId is required.');
         let conn = await client.getConnection(ctx.input.connectionId);
         return {
           output: {
@@ -120,7 +148,7 @@ Use this to manage the lifecycle of your data source integrations.`,
       }
 
       case 'get_stats': {
-        if (!ctx.input.connectionId) throw new Error('connectionId is required.');
+        if (!ctx.input.connectionId) throw createApiServiceError('connectionId is required.');
         let stats = await client.getConnectionStats(ctx.input.connectionId);
         return {
           output: {
@@ -131,7 +159,12 @@ Use this to manage the lifecycle of your data source integrations.`,
       }
 
       case 'update': {
-        if (!ctx.input.connectionId) throw new Error('connectionId is required.');
+        if (!ctx.input.connectionId) throw createApiServiceError('connectionId is required.');
+        if (!ctx.input.partitionStrategy) {
+          throw createApiServiceError(
+            'partitionStrategy is required when updating a connection. Use "fast" or "hi_res" for document processing.'
+          );
+        }
         let updated = await client.updateConnection(ctx.input.connectionId, {
           partitionStrategy: ctx.input.partitionStrategy,
           metadata: ctx.input.metadata
@@ -145,7 +178,7 @@ Use this to manage the lifecycle of your data source integrations.`,
       }
 
       case 'enable': {
-        if (!ctx.input.connectionId) throw new Error('connectionId is required.');
+        if (!ctx.input.connectionId) throw createApiServiceError('connectionId is required.');
         await client.setConnectionEnabled(ctx.input.connectionId, true);
         return {
           output: {},
@@ -154,7 +187,7 @@ Use this to manage the lifecycle of your data source integrations.`,
       }
 
       case 'disable': {
-        if (!ctx.input.connectionId) throw new Error('connectionId is required.');
+        if (!ctx.input.connectionId) throw createApiServiceError('connectionId is required.');
         await client.setConnectionEnabled(ctx.input.connectionId, false);
         return {
           output: {},
@@ -163,7 +196,7 @@ Use this to manage the lifecycle of your data source integrations.`,
       }
 
       case 'sync': {
-        if (!ctx.input.connectionId) throw new Error('connectionId is required.');
+        if (!ctx.input.connectionId) throw createApiServiceError('connectionId is required.');
         await client.syncConnection(ctx.input.connectionId);
         return {
           output: {
@@ -174,7 +207,7 @@ Use this to manage the lifecycle of your data source integrations.`,
       }
 
       case 'delete': {
-        if (!ctx.input.connectionId) throw new Error('connectionId is required.');
+        if (!ctx.input.connectionId) throw createApiServiceError('connectionId is required.');
         await client.deleteConnection(ctx.input.connectionId, ctx.input.keepFiles);
         return {
           output: {

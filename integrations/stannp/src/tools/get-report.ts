@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 // ---- Reporting Summary ----
@@ -33,20 +33,20 @@ export let getReportSummary = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getReportingSummary(ctx.input.startDate, ctx.input.endDate);
 
     return {
       output: {
-        total: result.total,
-        received: result.received,
-        printing: result.printing,
-        handedOver: result.handed_over,
-        localDelivery: result.local_delivery,
-        delivered: result.delivered,
-        returned: result.returned,
-        cancelled: result.cancelled
+        total: result.total ?? undefined,
+        received: result.received ?? undefined,
+        printing: result.printing ?? undefined,
+        handedOver: result.handed_over ?? undefined,
+        localDelivery: result.local_delivery ?? undefined,
+        delivered: result.delivered ?? undefined,
+        returned: result.returned ?? undefined,
+        cancelled: result.cancelled ?? undefined
       },
       message: `Report for **${ctx.input.startDate}** to **${ctx.input.endDate}**: ${result.total ?? 0} total, ${result.delivered ?? 0} delivered, ${result.returned ?? 0} returned.`
     };
@@ -97,7 +97,7 @@ export let listMailpieces = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let result = await client.getReportingList(
       ctx.input.startDate,
@@ -109,16 +109,16 @@ export let listMailpieces = SlateTool.create(spec, {
     let mailpieces = Array.isArray(result)
       ? result.map((m: any) => ({
           mailpieceId: String(m.id),
-          timestamp: m.timestamp,
-          status: m.status,
-          type: m.type,
-          format: m.format,
-          pdfUrl: m.pdf_file,
-          dispatched: m.dispatched,
-          country: m.country,
-          cost: m.cost,
-          tags: m.tags,
-          zipcode: m.zipcode
+          timestamp: m.timestamp ?? undefined,
+          status: m.status ?? undefined,
+          type: m.type ?? undefined,
+          format: m.format ?? undefined,
+          pdfUrl: m.pdf_file ?? undefined,
+          dispatched: m.dispatched ?? undefined,
+          country: m.country ?? undefined,
+          cost: m.cost != null ? String(m.cost) : undefined,
+          tags: m.tags ?? undefined,
+          zipcode: m.zipcode ?? undefined
         }))
       : [];
 

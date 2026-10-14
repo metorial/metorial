@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let updateTimeEntry = SlateTool.create(spec, {
   name: 'Update Time Entry',
   key: 'update_time_entry',
-  description: `Update an existing time entry in Clockify. Modify its start/end times, description, project, task, tags, or billable status. The start time is always required by the API.`,
+  description: `Update an existing time entry in Clockify. Modify its start/end times, description, project, task, tags, or billable status. The start time is always required by the API. Call get_workspaces to discover the workspace ID.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let updateTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       timeEntryId: z.string().describe('ID of the time entry to update'),
       start: z.string().describe('Start time in ISO 8601 format (required)'),
       end: z.string().optional().describe('End time in ISO 8601 format'),
@@ -36,11 +38,7 @@ export let updateTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let entry = await client.updateTimeEntry(ctx.input.timeEntryId, {
       start: ctx.input.start,

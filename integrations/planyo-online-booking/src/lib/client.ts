@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios, pickDefined } from 'slates';
 
 let api = createAxios({
   baseURL: 'https://www.planyo.com/rest/'
@@ -54,16 +54,34 @@ export class PlanyoClient {
   async call(method: string, params: Record<string, any> = {}): Promise<any> {
     let requestParams = this.buildParams(method, params);
 
-    let response = await api.get('', { params: requestParams });
-    let data = response.data;
+    try {
+      let response = await api.get('', { params: requestParams });
+      let data = response.data;
 
-    if (data.response_code !== 0) {
-      throw new Error(
-        `Planyo API error (code ${data.response_code}): ${data.response_message}`
-      );
+      if (!data || typeof data.response_code !== 'number') {
+        throw createApiServiceError('Planyo returned an invalid API response.', {
+          reason: 'planyo_invalid_response'
+        });
+      }
+
+      if (data.response_code !== 0) {
+        throw createApiServiceError(
+          `Planyo API error (code ${data.response_code}): ${data.response_message || 'Request failed'}`,
+          {
+            reason: 'planyo_api_error',
+            upstreamCode: String(data.response_code)
+          }
+        );
+      }
+
+      return data.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Planyo',
+        reason: 'planyo_request_failed',
+        operation: method
+      });
     }
-
-    return data.data;
   }
 
   // Site
@@ -94,10 +112,56 @@ export class PlanyoClient {
     if (params.sort) apiParams.sort = params.sort;
     if (params.customProperties) {
       for (let [key, value] of Object.entries(params.customProperties)) {
-        apiParams[`prop_res_${key}`] = value;
+        apiParams[`prop_res_${key.replaceAll(' ', '_')}`] = value;
       }
     }
     return this.call('list_resources', apiParams);
+  }
+
+  async searchResources(params: {
+    startTime: string;
+    endTime: string;
+    quantity: number;
+    resourceIds?: string;
+    sort?: string;
+    limit?: number;
+    customProperties?: Record<string, string>;
+    customFields?: Record<string, string>;
+  }): Promise<any> {
+    let apiParams: Record<string, any> = pickDefined({
+      start_time: params.startTime,
+      end_time: params.endTime,
+      quantity: params.quantity,
+      ppp_resfilter: params.resourceIds,
+      sort: params.sort,
+      search_results_limit: params.limit
+    });
+    if (params.customProperties) {
+      for (let [key, value] of Object.entries(params.customProperties)) {
+        apiParams[`prop_res_${key.replaceAll(' ', '_')}`] = value;
+      }
+    }
+    if (params.customFields) {
+      for (let [key, value] of Object.entries(params.customFields)) {
+        apiParams[`rental_prop_${key.replaceAll(' ', '_')}`] = value;
+      }
+    }
+    return this.call('resource_search', apiParams);
+  }
+
+  async searchReservations(params: {
+    query: string;
+    detailLevel?: number;
+    sort?: string;
+  }): Promise<any> {
+    return this.call(
+      'reservation_search',
+      pickDefined({
+        query: params.query,
+        detail_level: params.detailLevel,
+        sort: params.sort
+      })
+    );
   }
 
   async getResourceInfo(resourceId: string): Promise<any> {
@@ -133,6 +197,18 @@ export class PlanyoClient {
     mobilePrefix?: string;
     mobileNumber?: string;
   }): Promise<any> {
+    if (!params.userId && (!params.email || !params.firstName)) {
+      throw createApiServiceError(
+        'Provide userId, or both email and firstName, to create a reservation.'
+      );
+    }
+    if (
+      params.customPrice !== undefined &&
+      (params.voucherCode || params.customFields?.voucher)
+    ) {
+      throw createApiServiceError('A custom price cannot be combined with a voucher code.');
+    }
+
     let apiParams: Record<string, any> = {
       resource_id: params.resourceId,
       start_time: params.startTime,
@@ -163,7 +239,7 @@ export class PlanyoClient {
     if (params.mobileNumber) apiParams.mobile_number = params.mobileNumber;
     if (params.customFields) {
       for (let [key, value] of Object.entries(params.customFields)) {
-        apiParams[`rental_prop_${key}`] = value;
+        apiParams[`rental_prop_${key.replaceAll(' ', '_')}`] = value;
       }
     }
     return this.call('make_reservation', apiParams);
@@ -198,7 +274,7 @@ export class PlanyoClient {
     if (params.comments) apiParams.comments = params.comments;
     if (params.customFields) {
       for (let [key, value] of Object.entries(params.customFields)) {
-        apiParams[`rental_prop_${key}`] = value;
+        apiParams[`rental_prop_${key.replaceAll(' ', '_')}`] = value;
       }
     }
     return this.call('modify_reservation', apiParams);
@@ -210,12 +286,17 @@ export class PlanyoClient {
     params: {
       comment?: string;
       isQuiet?: boolean;
+      verificationCode?: string;
     } = {}
   ): Promise<any> {
+    if (action === 'Verify' && !params.verificationCode) {
+      throw createApiServiceError('Provide verificationCode when using the Verify action.');
+    }
     let apiParams: Record<string, any> = {
       reservation_id: reservationId,
       action
     };
+    if (params.verificationCode) apiParams.custom_data = params.verificationCode;
     if (params.comment) apiParams.comment = params.comment;
     if (params.isQuiet !== undefined) apiParams.is_quiet = params.isQuiet;
     return this.call('do_reservation_action', apiParams);
@@ -268,7 +349,7 @@ export class PlanyoClient {
     if (params.detailLevel !== undefined) apiParams.detail_level = params.detailLevel;
     if (params.customProperties) {
       for (let [key, value] of Object.entries(params.customProperties)) {
-        apiParams[`rental_prop_${key}`] = value;
+        apiParams[`rental_prop_${key.replaceAll(' ', '_')}`] = value;
       }
     }
     return this.call('list_reservations', apiParams);
@@ -345,7 +426,7 @@ export class PlanyoClient {
     if (params.voucherCode) apiParams.rental_prop_voucher = params.voucherCode;
     if (params.customFields) {
       for (let [key, value] of Object.entries(params.customFields)) {
-        apiParams[`rental_prop_${key}`] = value;
+        apiParams[`rental_prop_${key.replaceAll(' ', '_')}`] = value;
       }
     }
     return this.call('get_rental_price', apiParams);
@@ -405,6 +486,9 @@ export class PlanyoClient {
     email?: string;
     detailLevel?: number;
   }): Promise<any> {
+    if (!params.userId && !params.email) {
+      throw createApiServiceError('Provide userId or email to retrieve a user.');
+    }
     let apiParams: Record<string, any> = {};
     if (params.userId) apiParams.user_id = params.userId;
     if (params.email) apiParams.email = params.email;
@@ -447,7 +531,7 @@ export class PlanyoClient {
     if (params.language) apiParams.user_language = params.language;
     if (params.customProperties) {
       for (let [key, value] of Object.entries(params.customProperties)) {
-        apiParams[`prop_user_${key}`] = value;
+        apiParams[`prop_user_${key.replaceAll(' ', '_')}`] = value;
       }
     }
     return this.call('add_user', apiParams);
@@ -474,6 +558,9 @@ export class PlanyoClient {
     isBanned?: boolean;
     customProperties?: Record<string, string>;
   }): Promise<any> {
+    if (Boolean(params.userId) === Boolean(params.email)) {
+      throw createApiServiceError('Provide exactly one of userId or email to modify a user.');
+    }
     let apiParams: Record<string, any> = {};
     if (params.userId) apiParams.user_id = params.userId;
     if (params.email) apiParams.email = params.email;
@@ -495,7 +582,7 @@ export class PlanyoClient {
     if (params.isBanned !== undefined) apiParams.is_banned = params.isBanned;
     if (params.customProperties) {
       for (let [key, value] of Object.entries(params.customProperties)) {
-        apiParams[`prop_user_${key}`] = value;
+        apiParams[`prop_user_${key.replaceAll(' ', '_')}`] = value;
       }
     }
     return this.call('modify_user', apiParams);

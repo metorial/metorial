@@ -79,11 +79,12 @@ export let getTask = SlateTool.create(spec, {
         assigneeIds: t['responsible-party-ids']
           ? String(t['responsible-party-ids']).split(',')
           : undefined,
-        estimatedMinutes: t['estimated-minutes']
-          ? Number(t['estimated-minutes'])
-          : t.estimatedMinutes
-            ? Number(t.estimatedMinutes)
-            : undefined,
+        estimatedMinutes:
+          t['estimated-minutes'] != null
+            ? Number(t['estimated-minutes'])
+            : t.estimatedMinutes != null
+              ? Number(t.estimatedMinutes)
+              : undefined,
         createdOn: t['created-on'] || t.createdOn || undefined,
         lastChangedOn: t['last-changed-on'] || t.lastChangedOn || undefined,
         tags: tags.length > 0 ? tags : undefined,

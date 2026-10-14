@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -40,6 +40,9 @@ export let generatePdf = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((!ctx.input.url && !ctx.input.html) || (ctx.input.url && ctx.input.html)) {
+      throw createApiServiceError('Provide exactly one of url or html.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.generatePdf({
@@ -54,9 +57,16 @@ export let generatePdf = SlateTool.create(spec, {
       }
     });
 
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(new Uint8Array(result.content)),
+      mimeType: 'application/pdf',
+      filename: 'page.pdf'
+    });
+
     return {
       output: {
-        pdfData: result
+        pdfData: result.legacyData
       },
       message: `Generated PDF from ${ctx.input.url ? `**${ctx.input.url}**` : 'provided HTML content'}.`
     };

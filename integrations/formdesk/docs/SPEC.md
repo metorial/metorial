@@ -1,85 +1,33 @@
-Now let me get more details about the Formdesk REST API endpoints and SOAP API:Now I have comprehensive information about Formdesk's API. Let me compile the specification.
-
-# Slates Specification for Formdesk
-
-## Overview
-
-Formdesk is a Dutch online form builder that allows users to create forms such as registration forms, order forms, surveys, and applications. It provides a webservice API (both SOAP and REST) to programmatically manage forms, form submissions (results), visitors, and files. The platform is credit-based, requiring the purchase of API credits for API usage.
+# Formdesk integration
 
 ## Authentication
 
-Formdesk uses **API Key** authentication via a Bearer token.
+Supply an API key and account folder name. `GET https://www.formdesk.com/api/rest/v1/{domain}/connect` discovers the host used by subsequent calls. The domain belongs to auth output; no duplicate connection setting is required. The returned host must be a Formdesk hostname. Existing auth output already contains the domain and host.
 
-- The Bearer token in the Authorization header is the API Key which can be found or created within the User Management in your Formdesk account.
-- Within Formdesk, under user management, multiple API keys can be created with associated permissions.
-- The API key is passed as a Bearer token in the `Authorization` header: `Authorization: Bearer <api_key>`
+## Tools and provider mappings
 
-**Connection Flow:**
+- `list_forms`: GET `/forms`; `list_form_items`: GET `/forms/{formName}/items` returns identifiers, labels, types, and nullable choice options.
+- `get_form_filters`: GET `/forms/{formName}/filters`.
+- `get_form_results`: GET `/forms/{formName}/results`; date fields map to `created_from/to`, `changed_from/to`, `completed_from/to`, filterName to `view`, visitorId to `id_visitor`. Existing sync values map to `ALL`, `N,C,D,R`, or `P`. Limit and offset slice the returned list locally because server pagination parameters are not documented.
+- `get_result_details`, `update_result`, `remove_result`, `mark_result_processed`: use `/formresults/{resultId}` and its `/files` or `/processed` suffixes. Details unwrap the `result` object; metadata and optionally file metadata appear in systemFields. Creation/update responses unwrap `results[0]` and expose `_fd_id`.
+- `add_result`: POST `/forms/{formName}/results`; existing string field values are preserved. Structured file-upload objects are not supported by the input contract.
+- `export_results`: POST `/forms/{formName}/results/export` with JSON `{ format }`; decode every returned `files[].content` into downloadable files. `creditsUsed` retains its public key but represents the remaining credit balance in the Credits response header.
+- `get_result_pdf`: POST `/formresults/{resultId}/pdf`; JSON settings use `papersize`, numeric orientation, `scaletype`, `scaling`, camel-case margins, and `userpassword`. Numeric string settings are validated at runtime and the binary response becomes a downloadable PDF.
+- `list_files`: GET `/files` with optional `type`; `get_file`: GET file metadata then deliver authenticated GET `/files/{id}/content` as a downloadable file.
+- Visitor CRUD uses `/visitors`; `get_visitor` retrieves `/visitors/{id}` and excludes password fields. Optional list search filters the retrieved visitors locally.
+- `get_visitor_results`: GET `/visitors/{id}/formresults`, with optional local filtering by form names.
+- `sign_on`: POST `/signon` for account users or `/forms/{formName}/signon` for visitors. Optional email/userId/formName fields enable documented selectors; visitorId maps to `id` and requires formName. Provider returns the sign-on URL.
+- `park_data`: POST `/park` with `{ data, expires, reuse, preventchange }`. Expiration defaults to one day and must be a positive whole number. formName builds the returned ticket URL. `preventChange` can require tickets for subsequent form access; restore access by parking with false and opening that ticket URL.
 
-1. The resource URL must have the following format: `https://[host]/api/rest/v1/[folder of forms]/`
-2. For the initial Connect call, the host is always `www.formdesk.com`. With all other calls you need to use the host returned by the Connect method, e.g. `fd7.formdesk.com`.
-3. The "folder of forms" is also called "domain" — it is the unique account name you can find within your account settings.
+## Compatibility and limits
 
-The Connect method must be called first to determine the correct server for subsequent API calls. It returns the proper host, domain, and full API URL. An alternative authentication method is also available using **domain**, **username**, and **password** parameters via the Connect method.
+All existing tool keys, input field types, and enum values are preserved. The legacy `/visitors/authenticate` endpoint and legacy redirectUrl sign-on parameter remain, but neither is described in the current REST collection; provider failures surface as service errors. The legacy export formats dbase/foxpro, PDF Legal paper size, filename file lookup, and PDF margin units need provider confirmation. No suitable current-user identity endpoint is documented.
 
-**Required credentials:**
+No live provider, file delivery through the deployed service, trigger, or evaluation verification was performed in this refresh.
 
-- **API Key**: Generated in User Management within the Formdesk account
-- **Domain (folder of forms)**: The unique account name
-- **Host**: Determined dynamically via the Connect method
+## Official sources
 
-## Features
-
-### Form Management
-
-- Retrieve a list of all forms in the account, including form IDs and names.
-
-### Form Result (Submission) Management
-
-- Retrieve lists of form result entry IDs, with extensive filtering by date ranges (created, changed, completed), status, sync status, visitor, and pre-defined views/filters.
-- Get detailed individual result entries including all submitted field data and system metadata.
-- Add new result entries to a form programmatically, including file uploads (base64-encoded).
-- Update existing result entries with new data.
-- Remove result entries, optionally removing only associated uploaded files.
-- Mark result entries as "processed" to track synchronization state, enabling incremental sync workflows.
-- Export form results to various file formats: Excel, XML, CSV, dBase, FoxPro, and plain text.
-- Generate and retrieve PDF documents from result entries with configurable paper size, orientation, scaling, margins, and password protection.
-
-### Visitor Management
-
-- Visitors are registered users who can log in to forms that support entry maintenance.
-- List, add, update, and remove visitors, including their name, email, username, and password.
-- Authenticate visitors by username and password.
-- Retrieve all form results associated with a specific visitor across multiple forms.
-
-### Single Sign-On (SSO)
-
-- Sign on users or form visitors without requiring them to enter credentials, enabling SSO integration from external systems.
-- Returns a redirect URL with a session token that grants access to Formdesk.
-
-### Form Data Parking
-
-- Push data to Formdesk temporarily and receive a ticket. When the ticket is used to open a form, the form is pre-filled with the parked data.
-- Configurable expiration time and options for single/multi-use tickets and preventing field changes.
-
-### File Management
-
-- Retrieve uploaded files associated with form submissions by file name or ID.
-
-### Pre-defined Filters
-
-- Retrieve the list of pre-defined filters (views) configured on a form, which can then be used to filter result queries.
-
-## Events
-
-When a visitor completes and submits a form, the data is sent to the Formdesk database. Formdesk Webhooks allow you to send this data to one or more other systems at the same time.
-
-### Form Submission Webhooks
-
-- Directly submit entered data to one or more other systems using Webhooks.
-- Webhooks are configured per form in the form settings. Formdesk supports almost any standard method for exchanging data and offers a number of pre-defined Webhooks with commonly used systems such as Salesforce and Mailchimp.
-- Using the Webhook's sending criteria, you can execute them selectively. For example, consider an order form that inquires whether the user would like to receive your newsletter. The Webhooks should then only be executed when the visitor indicates they want to receive the newsletter. Or you can execute the Webhooks only once the completed form is approved in the workflow.
-- Sometimes the receiving system sends a reply upon receipt of the data. This could, for example, be a unique ID number that identifies the stored data. These replies can be stored in (hidden) fields within the form.
-- Webhooks can include PDF document attachments generated from the form submission.
-
-Note: Webhooks in Formdesk are outbound — they push form submission data to external URLs upon submission. They are configured within the Formdesk UI per form, not via the API.
+- https://formdesk.com/en/features/webservice-api/ (links the REST collection)
+- https://documenter.getpostman.com/view/9848031/SWEDyDrC (REST API v1)
+- https://documenter.gw.postman.com/api/collections/9848031/SWEDyDrC?segregateAuth=true&versionTag=latest (public collection data)
+- https://www.formdesk.com/manual/webservice2/?get=1 (API overview)

@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { HelloLeadsClient } from '../lib/client';
+import { HelloLeadsClient, readHelloLeadsString } from '../lib/client';
 import { spec } from '../spec';
 
 let leadSchema = z.object({
@@ -57,29 +57,36 @@ export let getLeads = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let rawLeads = Array.isArray(result) ? result : (result?.data ?? result?.leads ?? []);
+    let leads = result.map(lead => {
+      let leadId = readHelloLeadsString(lead.id ?? lead.lead_id);
+      if (!leadId?.trim()) {
+        throw createApiServiceError('HelloLeads returned a lead without an identifier.', {
+          reason: 'helloleads_invalid_response'
+        });
+      }
 
-    let leads = (rawLeads as any[]).map((lead: any) => ({
-      leadId: String(lead.id ?? lead.lead_id ?? ''),
-      firstName: String(lead.first_name ?? ''),
-      lastName: lead.last_name || undefined,
-      email: lead.email || undefined,
-      mobile: lead.mobile || undefined,
-      phone: lead.phone || undefined,
-      organization: lead.organization ?? lead.company ?? undefined,
-      designation: lead.designation || undefined,
-      address: lead.address || undefined,
-      city: lead.city || undefined,
-      state: lead.state || undefined,
-      country: lead.country || undefined,
-      zip: lead.zip ?? lead.postal_code ?? undefined,
-      website: lead.website || undefined,
-      potential: lead.potential || undefined,
-      dealSize: lead.deal_size ? String(lead.deal_size) : undefined,
-      tags: lead.tags || undefined,
-      notes: lead.notes || undefined,
-      createdAt: lead.created_at ?? lead.createdAt ?? undefined
-    }));
+      return {
+        leadId,
+        firstName: readHelloLeadsString(lead.first_name) ?? '',
+        lastName: readHelloLeadsString(lead.last_name),
+        email: readHelloLeadsString(lead.email),
+        mobile: readHelloLeadsString(lead.mobile),
+        phone: readHelloLeadsString(lead.phone),
+        organization: readHelloLeadsString(lead.organization ?? lead.company),
+        designation: readHelloLeadsString(lead.designation),
+        address: readHelloLeadsString(lead.address),
+        city: readHelloLeadsString(lead.city),
+        state: readHelloLeadsString(lead.state),
+        country: readHelloLeadsString(lead.country),
+        zip: readHelloLeadsString(lead.zip ?? lead.postal_code),
+        website: readHelloLeadsString(lead.website),
+        potential: readHelloLeadsString(lead.potential),
+        dealSize: readHelloLeadsString(lead.deal_size),
+        tags: readHelloLeadsString(lead.tags),
+        notes: readHelloLeadsString(lead.notes),
+        createdAt: readHelloLeadsString(lead.created_at ?? lead.createdAt)
+      };
+    });
 
     return {
       output: {

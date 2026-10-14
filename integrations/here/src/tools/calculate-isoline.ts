@@ -78,7 +78,18 @@ Useful for delivery zone planning, accessibility analysis, and coverage mapping.
             })
             .optional()
         })
+        .optional(),
+      arrival: z
+        .object({
+          time: z.string().optional(),
+          place: z
+            .object({
+              location: z.object({ lat: z.number(), lng: z.number() }).optional()
+            })
+            .optional()
+        })
         .optional()
+        .describe('Arrival details for a reverse isoline')
     })
   )
   .handleInvocation(async ctx => {
@@ -116,7 +127,8 @@ Useful for delivery zone planning, accessibility analysis, and coverage mapping.
     return {
       output: {
         isolines,
-        departure: response.departure
+        departure: response.departure,
+        arrival: response.arrival
       },
       message: `Computed **${isolines.length}** isoline(s) for **${ctx.input.transportMode}** (${ctx.input.rangeType}: ${rangeDesc}).`
     };

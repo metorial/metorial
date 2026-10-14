@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createProject = SlateTool.create(spec, {
   name: 'Create Project',
   key: 'create_project',
-  description: `Create a new project in Nozbe Teams. Configure the project with a name, description, color, visibility, and other settings. Requires a paid account.`,
+  description: `Create a new project in Nozbe Teams. Configure the project with a name, description, color, visibility, and other settings. Call list_teams to choose a space. Requires a paid account.`,
   constraints: ['Creating new projects is available for paid accounts only.'],
   tags: {
     destructive: false
@@ -15,7 +16,7 @@ export let createProject = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Project name (1-255 characters)'),
-      teamId: z.string().describe('Team ID to create the project in'),
+      teamId: teamIdSchema,
       description: z.string().optional().describe('Project purpose or description'),
       color: z.string().optional().describe('Project color'),
       isOpen: z

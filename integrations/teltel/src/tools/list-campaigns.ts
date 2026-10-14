@@ -35,7 +35,7 @@ Optionally fetch a specific campaign by providing a campaign ID for detailed inf
       let campaign = await client.getCampaign(ctx.input.campaignId);
       return {
         output: {
-          campaigns: [campaign]
+          campaigns: [campaign?.data ?? campaign]
         },
         message: `Retrieved campaign **${ctx.input.campaignId}**.`
       };

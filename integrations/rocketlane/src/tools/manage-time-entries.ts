@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pageTokenSchema, paginationSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createTimeEntry = SlateTool.create(spec, {
@@ -143,12 +144,14 @@ export let listTimeEntries = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Also return available time entry categories'),
+      pageToken: pageTokenSchema,
       offset: z.number().optional().describe('Pagination offset'),
       limit: z.number().optional().describe('Maximum number of entries to return')
     })
   )
   .output(
     z.object({
+      pagination: paginationSchema,
       timeEntries: z
         .array(
           z.object({
@@ -170,6 +173,7 @@ export let listTimeEntries = SlateTool.create(spec, {
     let result = await client.listTimeEntries({
       projectId: ctx.input.projectId,
       userId: ctx.input.userId,
+      pageToken: ctx.input.pageToken,
       offset: ctx.input.offset,
       limit: ctx.input.limit
     });
@@ -187,7 +191,7 @@ export let listTimeEntries = SlateTool.create(spec, {
     }
 
     return {
-      output: { timeEntries, categories },
+      output: { timeEntries, categories, pagination: result.pagination },
       message: `Found **${timeEntries.length}** time entry(ies).`
     };
   })

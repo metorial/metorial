@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { organizationIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createAsset = SlateTool.create(spec, {
   name: 'Create Asset',
   key: 'create_asset',
-  description: `Creates a new asset in MaintainX. Assets represent equipment, machines, or other trackable items. Supports setting metadata like serial number, manufacturer, model, location, and parent asset for hierarchical relationships.`,
+  description: `Creates a new asset in MaintainX. Assets represent equipment, machines, or other trackable items. Supports setting metadata like serial number, manufacturer, model, location, and parent asset for hierarchical relationships. For multi-organization keys, call list_organizations and pass organizationId.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let createAsset = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      organizationId: organizationIdSchema,
       name: z.string().describe('Name of the asset'),
       description: z.string().optional().describe('Description of the asset'),
       barcode: z.string().optional().describe('Barcode or QR code identifier'),
@@ -40,10 +42,7 @@ export let createAsset = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
-    });
+    let client = Client.fromContext(ctx);
 
     let result = await client.createAsset({
       name: ctx.input.name,

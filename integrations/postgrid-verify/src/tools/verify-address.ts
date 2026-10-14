@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -93,14 +93,14 @@ export let verifyAddress = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      line1: z.string().describe('Primary address line'),
+      line1: z.string().nullable().describe('Primary address line'),
       line2: z.string().optional().describe('Secondary address line'),
-      city: z.string().describe('City'),
-      provinceOrState: z.string().describe('Province or state'),
-      postalOrZip: z.string().describe('Postal or ZIP code'),
+      city: z.string().nullable().describe('City'),
+      provinceOrState: z.string().nullable().describe('Province or state'),
+      postalOrZip: z.string().nullable().describe('Postal or ZIP code'),
       zipPlus4: z.string().optional().describe('ZIP+4 code (US only)'),
       firmName: z.string().optional().describe('Business/firm name at the address'),
-      country: z.string().describe('Country code'),
+      country: z.string().nullable().describe('Country code'),
       countryName: z.string().optional().describe('Full country name'),
       status: z
         .enum(['verified', 'corrected', 'failed'])
@@ -125,12 +125,15 @@ export let verifyAddress = SlateTool.create(spec, {
           postalOrZip?: string;
           country?: string;
         };
-    if (ctx.input.freeformAddress) {
+    if (ctx.input.freeformAddress !== undefined && ctx.input.address !== undefined) {
+      throw createApiServiceError('Provide only one of freeformAddress or address.');
+    }
+    if (ctx.input.freeformAddress?.trim()) {
       addressInput = ctx.input.freeformAddress;
     } else if (ctx.input.address) {
       addressInput = ctx.input.address;
     } else {
-      throw new Error('Either freeformAddress or address must be provided');
+      throw createApiServiceError('Provide either a non-empty freeformAddress or address.');
     }
 
     let result = await client.verifyAddress(addressInput, {
@@ -158,7 +161,7 @@ export let verifyAddress = SlateTool.create(spec, {
 
     return {
       output: result,
-      message: `Address **${statusLabel}** (status: \`${result.status}\`). Result: ${result.line1}, ${result.city}, ${result.provinceOrState} ${result.postalOrZip}, ${result.country.toUpperCase()}.${errorSummary}`
+      message: `Address **${statusLabel}** (status: \`${result.status}\`). Result: ${result.line1}, ${result.city}, ${result.provinceOrState} ${result.postalOrZip}, ${result.country?.toUpperCase() ?? 'unknown country'}.${errorSummary}`
     };
   })
   .build();

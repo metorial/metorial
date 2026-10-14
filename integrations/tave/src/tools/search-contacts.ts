@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TavePublicClient } from '../lib/client';
+import { phoneValue, TavePublicClient, textField } from '../lib/client';
 import { spec } from '../spec';
 
 let contactSchema = z.object({
@@ -31,10 +31,20 @@ export let searchContacts = SlateTool.create(spec, {
       contactKind: z
         .string()
         .optional()
-        .describe('Filter by contact kind (e.g., "individual", "business")'),
-      brand: z.string().optional().describe('Filter by brand name'),
+        .describe(
+          'Filter by contact kind: person, company, location, or employee; individual and business are also accepted'
+        ),
+      brand: z
+        .string()
+        .optional()
+        .describe('Filter by exact brand name or ID from get_brands'),
       page: z.number().optional().describe('Page number for pagination (default: 1)'),
-      perPage: z.number().optional().describe('Number of results per page')
+      perPage: z
+        .number()
+        .optional()
+        .describe(
+          'Results per page: 10–100 for an unfiltered list, or 1–100 for searched/filtered results'
+        )
     })
   )
   .output(
@@ -44,40 +54,26 @@ export let searchContacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TavePublicClient(ctx.auth.token);
+    let client = new TavePublicClient(ctx.auth);
 
     ctx.info({ message: 'Searching contacts in Tave', query: ctx.input.query });
 
-    let result: any;
-    if (ctx.input.query) {
-      result = await client.searchContacts(ctx.input.query, {
-        contactKind: ctx.input.contactKind,
-        brand: ctx.input.brand,
-        page: ctx.input.page,
-        perPage: ctx.input.perPage
-      });
-    } else {
-      result = await client.listContacts({
-        contactKind: ctx.input.contactKind,
-        brand: ctx.input.brand,
-        page: ctx.input.page,
-        perPage: ctx.input.perPage
-      });
-    }
-
-    let items = Array.isArray(result) ? result : (result?.data ?? result?.contacts ?? []);
-
-    let contacts = items.map((c: any) => ({
-      contactId: String(c.id ?? c.contact_id ?? ''),
-      firstName: c.first_name ?? c.firstName ?? undefined,
-      lastName: c.last_name ?? c.lastName ?? undefined,
-      email: c.email ?? undefined,
-      phone: c.phone ?? undefined,
-      contactKind: c.contact_kind ?? c.contactKind ?? undefined,
+    let result = await client.listContacts(ctx.input);
+    let contacts = result.items.map(c => ({
+      contactId: String(c.id ?? ''),
+      firstName: textField(c, 'firstName', 'primaryContactFirstName', 'first_name'),
+      lastName: textField(c, 'lastName', 'primaryContactLastName', 'last_name'),
+      email: textField(c, 'email'),
+      phone:
+        phoneValue(c.cellPhone) ??
+        phoneValue(c.phone) ??
+        phoneValue(c.homePhone) ??
+        phoneValue(c.workPhone),
+      contactKind: textField(c, 'kind', 'contact_kind', 'contactKind'),
       raw: c
     }));
 
-    let totalCount = result?.total ?? result?.meta?.total ?? contacts.length;
+    let totalCount = result.meta.totalItems;
 
     return {
       output: {

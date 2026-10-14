@@ -26,7 +26,9 @@ export let getTemplate = SlateTool.create(spec, {
       signerDetails: z
         .array(z.record(z.string(), z.any()))
         .optional()
-        .describe('Role/signer configuration'),
+        .describe(
+          'Role/signer configuration; each role index is the roleIndex used by send_from_template'
+        ),
       ccDetails: z
         .array(z.record(z.string(), z.any()))
         .optional()
@@ -42,27 +44,29 @@ export let getTemplate = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       region: ctx.config.region
     });
 
     let result = await client.getTemplate(ctx.input.templateId);
 
+    let output = {
+      templateId: result.templateId ?? ctx.input.templateId,
+      templateName: result.title ?? result.templateName ?? undefined,
+      templateDescription: result.description ?? result.templateDescription ?? undefined,
+      status: result.status ?? undefined,
+      senderDetail: result.createdBy ?? result.senderDetail ?? undefined,
+      signerDetails: result.roles ?? result.signerDetails ?? undefined,
+      ccDetails: result.cCDetails ?? result.ccDetails ?? undefined,
+      brandId: result.brandId ?? undefined,
+      labels: result.labels ?? undefined,
+      createdDate: result.createdDate ?? undefined,
+      sharedTemplateDetail: result.sharedTemplateDetail ?? undefined
+    };
+
     return {
-      output: {
-        templateId: result.templateId,
-        templateName: result.templateName,
-        templateDescription: result.templateDescription,
-        status: result.status,
-        senderDetail: result.senderDetail,
-        signerDetails: result.signerDetails,
-        ccDetails: result.ccDetails,
-        brandId: result.brandId,
-        labels: result.labels,
-        createdDate: result.createdDate,
-        sharedTemplateDetail: result.sharedTemplateDetail
-      },
-      message: `Template **${result.templateName ?? result.templateId}** — Status: **${result.status}**`
+      output,
+      message: `Template **${output.templateName ?? output.templateId}**${output.status ? ` — Status: **${output.status}**` : ''}`
     };
   })
   .build();

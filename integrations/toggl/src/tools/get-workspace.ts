@@ -40,7 +40,7 @@ export let getWorkspace = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TogglClient(ctx.auth.token);
+    let client = new TogglClient(ctx.auth.token, ctx.auth.defaultWorkspaceId);
 
     let workspaces: any[];
     if (ctx.input.workspaceId) {
@@ -54,7 +54,7 @@ export let getWorkspace = SlateTool.create(spec, {
       workspaceId: w.id,
       name: w.name,
       organizationId: w.organization_id ?? null,
-      premium: w.premium ?? false,
+      premium: w.premium === true || w.business_ws === true,
       admin: w.admin ?? false,
       defaultCurrency: w.default_currency ?? null,
       defaultHourlyRate: w.default_hourly_rate ?? null,

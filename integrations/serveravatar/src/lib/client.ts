@@ -1,16 +1,18 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class ServerAvatarClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.axios = createAuthenticatedAxios({
       baseURL: 'https://api.serveravatar.com',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'content-type': 'application/json',
-        Accept: 'application/json'
-      }
+      authHeader: { value: `Bearer ${config.token}` },
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'ServerAvatar',
+          reason: 'serveravatar_api_error'
+        })
     });
   }
 
@@ -24,6 +26,11 @@ export class ServerAvatarClient {
   async getOrganization(organizationId: string): Promise<Record<string, unknown>> {
     let response = await this.axios.get(`/organizations/${organizationId}`);
     return response.data.organization || response.data;
+  }
+
+  async listTimezones(): Promise<Record<string, string>> {
+    let response = await this.axios.get('/timezone');
+    return response.data;
   }
 
   // ---- Server Providers ----
@@ -140,13 +147,31 @@ export class ServerAvatarClient {
       linodeRootPassword?: string;
     }
   ): Promise<Record<string, unknown>> {
+    if (
+      params.provider === 'hetzner' &&
+      (!/^\d+$/.test(params.sizeSlug) || !Number.isSafeInteger(Number(params.sizeSlug)))
+    ) {
+      throw createApiServiceError(
+        'For Hetzner, sizeSlug must contain a numeric server type ID.'
+      );
+    }
+    if (params.sshKey && !params.publicKey?.trim()) {
+      throw createApiServiceError('publicKey is required when sshKey is true.');
+    }
+    if (params.provider === 'lightsail' && !params.availabilityZone?.trim()) {
+      throw createApiServiceError('availabilityZone is required for Lightsail.');
+    }
+    if (params.provider === 'linode' && !params.linodeRootPassword?.trim()) {
+      throw createApiServiceError('linodeRootPassword is required for Linode.');
+    }
+
     let body: Record<string, unknown> = {
       name: params.name,
       provider: params.provider,
       cloud_server_provider_id: params.cloudServerProviderId,
       version: params.version,
       region: params.region,
-      sizeSlug: params.sizeSlug,
+      sizeSlug: params.provider === 'hetzner' ? Number(params.sizeSlug) : params.sizeSlug,
       web_server: params.webServer,
       database_type: params.databaseType,
       nodejs: params.nodejs,
@@ -663,8 +688,35 @@ export class ServerAvatarClient {
       command: params.command,
       system_user: params.systemUser
     };
-    if (params.schedule) body.schedule = params.schedule;
-    if (params.customScheduling) body.custom_scheduling = params.customScheduling;
+    if (params.customScheduling) {
+      if (params.schedule && params.schedule !== 'custom') {
+        throw createApiServiceError(
+          'Use schedule "custom" or omit schedule when providing customScheduling.'
+        );
+      }
+      let fields = params.customScheduling.trim().split(/\s+/);
+      if (fields.length !== 5) {
+        throw createApiServiceError(
+          'customScheduling must be a five-field cron expression: minute hour day-of-month month day-of-week.'
+        );
+      }
+      let [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+      Object.assign(body, {
+        schedule: 'custom',
+        minute,
+        hour,
+        day_of_month: dayOfMonth,
+        month,
+        day_of_week: dayOfWeek
+      });
+    } else {
+      if (!params.schedule || params.schedule === 'custom') {
+        throw createApiServiceError(
+          'Provide a predefined schedule or a customScheduling cron expression.'
+        );
+      }
+      body.schedule = params.schedule;
+    }
 
     let response = await this.axios.post(
       `/organizations/${organizationId}/servers/${serverId}/cronjobs`,
@@ -721,7 +773,13 @@ export class ServerAvatarClient {
     let response = await this.axios.get(
       `/organizations/${organizationId}/servers/${serverId}/system-users`
     );
-    return response.data.systemUsers || response.data.data || response.data || [];
+    return (
+      response.data.systemUsers?.data ||
+      response.data.systemUsers ||
+      response.data.data ||
+      response.data ||
+      []
+    );
   }
 
   async createSystemUser(

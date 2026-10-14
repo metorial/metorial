@@ -1,11 +1,14 @@
 export { createWorkflowRun } from './create-workflow-run';
 export { deleteWorkflowRun } from './delete-workflow-run';
+export { getCurrentApiKey } from './get-current-api-key';
 export { getWorkflowRun } from './get-workflow-run';
 export { listDataSets } from './list-data-sets';
+export { listFormFieldOptions } from './list-form-field-options';
 export { listTasks } from './list-tasks';
 export { listUsers } from './list-users';
 export { listWorkflowFormFields } from './list-workflow-form-fields';
 export { listWorkflowRuns } from './list-workflow-runs';
+export { listWorkflowRunsPage } from './list-workflow-runs-page';
 export { listWorkflows } from './list-workflows';
 export { manageApprovals } from './manage-approvals';
 export { manageDataSetRecords } from './manage-data-set-records';

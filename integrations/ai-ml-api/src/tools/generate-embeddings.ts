@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -43,7 +43,11 @@ Can embed single strings or batches of text in a single request.`,
         .array(
           z.object({
             index: z.number().describe('Index of the embedding in the input array'),
-            embedding: z.array(z.number()).describe('The embedding vector')
+            embedding: z.array(z.number()).describe('The embedding vector'),
+            encodedEmbedding: z
+              .string()
+              .optional()
+              .describe('Original base64 embedding when the provider returns base64 encoding')
           })
         )
         .describe('Array of generated embeddings'),
@@ -53,6 +57,16 @@ Can embed single strings or batches of text in a single request.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.dimensions !== undefined &&
+      (!Number.isInteger(ctx.input.dimensions) || ctx.input.dimensions < 1)
+    ) {
+      throw createApiServiceError('Embedding dimensions must be a positive whole number.');
+    }
+    let inputs = Array.isArray(ctx.input.input) ? ctx.input.input : [ctx.input.input];
+    if (inputs.length === 0 || inputs.some(input => input.length === 0)) {
+      throw createApiServiceError('Provide at least one non-empty text input to embed.');
+    }
     let client = new Client({
       token: ctx.auth.token,
       baseUrl: ctx.config.baseUrl
@@ -65,10 +79,22 @@ Can embed single strings or batches of text in a single request.`,
       encodingFormat: ctx.input.encodingFormat
     });
 
-    let embeddings = result.data.map(item => ({
-      index: item.index,
-      embedding: item.embedding
-    }));
+    let embeddings = result.data.map(item => {
+      if (Array.isArray(item.embedding)) {
+        return { index: item.index, embedding: item.embedding };
+      }
+      let bytes = Buffer.from(item.embedding, 'base64');
+      if (bytes.length === 0 || bytes.length % 4 !== 0) {
+        throw createApiServiceError('AI/ML API returned an invalid base64 embedding.');
+      }
+      let embedding = Array.from({ length: bytes.length / 4 }, (_, index) =>
+        bytes.readFloatLE(index * 4)
+      );
+      if (embedding.some(value => !Number.isFinite(value))) {
+        throw createApiServiceError('AI/ML API returned an invalid embedding vector.');
+      }
+      return { index: item.index, embedding, encodedEmbedding: item.embedding };
+    });
 
     let inputCount = Array.isArray(ctx.input.input) ? ctx.input.input.length : 1;
 

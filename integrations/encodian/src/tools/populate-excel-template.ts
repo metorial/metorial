@@ -42,11 +42,13 @@ export let populateExcelTemplate = SlateTool.create(spec, {
     z.object({
       fileName: z.string().describe('Output filename'),
       fileContent: z.string().describe('Base64-encoded populated Excel file'),
+      operationStatus: z.string().describe('Encodian operation status'),
+      statusUrl: z.string().optional().describe('Status URL for a queued operation'),
       operationId: z.string().describe('Encodian operation ID')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client(ctx.auth.token);
+    let client = new Client(ctx.auth.token, input => ctx.addAttachment(input));
     let result: any;
 
     if (ctx.input.operation === 'populate') {
@@ -74,9 +76,13 @@ export let populateExcelTemplate = SlateTool.create(spec, {
       output: {
         fileName: result.Filename,
         fileContent: result.FileContent,
+        operationStatus: client.operationStatus,
+        statusUrl: client.statusUrl,
         operationId: result.OperationId
       },
-      message: `Successfully ${ctx.input.operation === 'populate' ? 'populated Excel template' : 'added rows to Excel workbook'}. Output: **${result.Filename}**`
+      message: client.message(
+        `Successfully ${ctx.input.operation === 'populate' ? 'populated Excel template' : 'added rows to Excel workbook'}. Output: **${result.Filename}**`
+      )
     };
   })
   .build();

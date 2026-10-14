@@ -44,17 +44,17 @@ export let getCrawlStatus = SlateTool.create(spec, {
       output: {
         status: result.status,
         isFinished: result.is_finished ?? false,
-        isSuccess: result.is_success,
+        isSuccess: result.is_success ?? undefined,
         urlsVisited: state.urls_visited,
         urlsExtracted: state.urls_extracted,
         urlsFailed: state.urls_failed,
         urlsSkipped: state.urls_skipped,
         urlsToCrawl: state.urls_to_crawl,
         apiCreditUsed: state.api_credit_used,
-        duration: state.duration,
-        stopReason: result.stop_reason
+        duration: state.duration ?? undefined,
+        stopReason: state.stop_reason ?? result.stop_reason ?? undefined
       },
-      message: `Crawl \`${ctx.input.crawlUuid}\` - Status: **${result.status}**. Visited: ${state.urls_visited ?? 0} pages. ${result.is_finished ? `Finished. Stop reason: ${result.stop_reason ?? 'completed'}.` : `Remaining: ${state.urls_to_crawl ?? 'unknown'} pages.`}`
+      message: `Crawl \`${ctx.input.crawlUuid}\` - Status: **${result.status}**. Visited: ${state.urls_visited ?? 0} pages. ${result.is_finished ? `Finished. Stop reason: ${state.stop_reason ?? result.stop_reason ?? 'completed'}.` : `Remaining: ${state.urls_to_crawl ?? 'unknown'} pages.`}`
     };
   })
   .build();

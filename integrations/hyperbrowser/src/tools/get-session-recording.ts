@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HyperbrowserClient } from '../lib/client';
 import { spec } from '../spec';
@@ -34,7 +34,10 @@ Can get rrweb DOM-based replay recording URLs and MP4 video recording URLs. Vide
         .string()
         .optional()
         .nullable()
-        .describe('URL to retrieve downloaded files')
+        .describe('URL to retrieve downloaded files'),
+      recordingStatus: z.string().optional().describe('Recording processing status'),
+      videoRecordingStatus: z.string().optional().describe('Video processing status'),
+      downloadsStatus: z.string().optional().describe('Downloaded files processing status')
     })
   )
   .handleInvocation(async ctx => {
@@ -47,12 +50,18 @@ Can get rrweb DOM-based replay recording URLs and MP4 video recording URLs. Vide
       | undefined;
 
     let videoRecordingUrl: string | null | undefined;
+    let videoRecordingStatus: string | undefined;
     if (ctx.input.includeVideo) {
       let videoResult = await client.getSessionVideoRecordingUrl(ctx.input.sessionId);
-      videoRecordingUrl = (videoResult.url ?? videoResult.videoRecordingUrl) as
-        | string
-        | null
-        | undefined;
+      videoRecordingUrl = (videoResult.url ??
+        videoResult.recordingUrl ??
+        videoResult.videoRecordingUrl) as string | null | undefined;
+      videoRecordingStatus = videoResult.status as string | undefined;
+      if (videoResult.status === 'failed') {
+        throw createApiServiceError(
+          `Hyperbrowser video processing failed: ${videoResult.error ?? 'Unknown error'}`
+        );
+      }
     }
 
     let downloadsResult = await client.getSessionDownloadsUrl(ctx.input.sessionId);
@@ -61,12 +70,38 @@ Can get rrweb DOM-based replay recording URLs and MP4 video recording URLs. Vide
       | null
       | undefined;
 
+    for (let result of [recordingResult, downloadsResult]) {
+      if (result.status === 'failed') {
+        throw createApiServiceError(
+          `Hyperbrowser file processing failed: ${result.error ?? 'Unknown error'}`
+        );
+      }
+    }
+    for (let file of [
+      { kind: 'recording', url: recordingUrl, mimeType: 'application/json' },
+      { kind: 'video', url: videoRecordingUrl, mimeType: 'video/mp4' },
+      { kind: 'downloads', url: downloadsUrl, mimeType: 'application/zip' }
+    ]) {
+      if (file.url) {
+        await ctx.addAttachment({
+          type: 'url',
+          url: file.url,
+          mimeType: file.mimeType,
+          refreshReference: { sessionId: ctx.input.sessionId, kind: file.kind },
+          refreshAt: new Date().toISOString()
+        });
+      }
+    }
+
     return {
       output: {
         sessionId: ctx.input.sessionId,
         recordingUrl,
         videoRecordingUrl,
-        downloadsUrl
+        downloadsUrl,
+        recordingStatus: recordingResult.status as string | undefined,
+        videoRecordingStatus,
+        downloadsStatus: downloadsResult.status as string | undefined
       },
       message: `Retrieved recording data for session **${ctx.input.sessionId}**.${recordingUrl ? ` [Recording](${recordingUrl})` : ''}`
     };

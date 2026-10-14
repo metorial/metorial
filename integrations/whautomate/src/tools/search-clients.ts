@@ -45,7 +45,7 @@ export let searchClients = SlateTool.create(spec, {
           clients: [result],
           totalCount: 1
         },
-        message: `Found client **${result.firstName || ''} ${result.lastName || ''}** (${ctx.input.clientId}).`
+        message: `Found client **${result.fullName || [result.firstName, result.lastName].filter(Boolean).join(' ')}** (${ctx.input.clientId}).`
       };
     }
 
@@ -60,7 +60,7 @@ export let searchClients = SlateTool.create(spec, {
     });
 
     let clients = Array.isArray(result) ? result : result.clients || result.data || [];
-    let totalCount = result.totalCount || result.total || clients.length;
+    let totalCount = result.totalCount ?? result.total ?? clients.length;
 
     return {
       output: {

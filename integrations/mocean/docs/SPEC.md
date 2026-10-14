@@ -1,6 +1,4 @@
-Now I have comprehensive information about MoceanAPI. Let me compile the specification.
-
-# Slates Specification for Mocean
+# Mocean Integration Specification
 
 ## Overview
 
@@ -41,6 +39,7 @@ Send and receive text messages to users around the globe. Programmatically send 
 - Message scheduling using a datetime parameter (in GMT+8).
 - Receive inbound SMS on rented virtual numbers via a configured webhook URL.
 - Query message delivery status by message ID.
+- Report whether a recipient received an SMS using the Conversion API.
 - For US and Canada, a purchased number (Toll-Free or 10DLC) is required for sending and receiving SMS.
 
 ### Voice Calls

@@ -1,8 +1,20 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { getAuthorization } from './lib/client';
 
-let launchpadAxios = createAxios({
-  baseURL: 'https://launchpad.37signals.com'
+let launchpadAxios = createAuthenticatedAxios({
+  baseURL: 'https://launchpad.37signals.com',
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Basecamp OAuth',
+      reason: 'basecamp_oauth_error'
+    })
 });
 
 export let auth = SlateAuth.create()
@@ -47,14 +59,25 @@ export let auth = SlateAuth.create()
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_at
+          ...normalizeOAuthTokenResponse(data, {
+            providerLabel: 'Basecamp',
+            operation: 'token exchange',
+            required: true
+          })
         }
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
+    handleTokenRefresh: async (ctx: {
+      output: { token: string; refreshToken?: string };
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'A Basecamp refresh token is required. Reconnect your Basecamp account.'
+        );
+      }
       let response = await launchpadAxios.post('/authorization/token', {
         type: 'refresh',
         grant_type: 'refresh_token',
@@ -67,21 +90,18 @@ export let auth = SlateAuth.create()
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt: data.expires_at
+          ...normalizeOAuthTokenResponse(data, {
+            providerLabel: 'Basecamp',
+            operation: 'token refresh',
+            previousRefreshToken: ctx.output.refreshToken,
+            required: true
+          })
         }
       };
     },
 
-    getProfile: async (ctx: any) => {
-      let response = await launchpadAxios.get('/authorization.json', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let data = response.data;
+    getProfile: async (ctx: { output: { token: string } }) => {
+      let data = await getAuthorization(ctx.output.token);
       let identity = data.identity;
 
       return {

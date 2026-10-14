@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { SignPathClient } from '../lib/client';
+import { createSignPathClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let resubmitSigningRequest = SlateTool.create(spec, {
@@ -18,6 +18,17 @@ export let resubmitSigningRequest = SlateTool.create(spec, {
         .string()
         .describe('ID of the original signing request to resubmit'),
       signingPolicySlug: z.string().describe('Slug of the new signing policy to use'),
+      keepSnapshottedArtifactConfiguration: z
+        .boolean()
+        .optional()
+        .describe('Keep the artifact configuration captured by the original request'),
+      cancellationTimeoutInSeconds: z
+        .number()
+        .int()
+        .min(1)
+        .max(31536000)
+        .optional()
+        .describe('Cancel the request if it does not complete within this many seconds'),
       description: z
         .string()
         .optional()
@@ -31,16 +42,14 @@ export let resubmitSigningRequest = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new SignPathClient({
-      token: ctx.auth.token,
-      organizationId: ctx.config.organizationId,
-      baseUrl: ctx.config.baseUrl
-    });
+    let client = createSignPathClient(ctx);
 
     let result = await client.resubmitSigningRequest({
       originalSigningRequestId: ctx.input.originalSigningRequestId,
       signingPolicySlug: ctx.input.signingPolicySlug,
-      description: ctx.input.description
+      description: ctx.input.description,
+      keepSnapshottedArtifactConfiguration: ctx.input.keepSnapshottedArtifactConfiguration,
+      cancellationTimeoutInSeconds: ctx.input.cancellationTimeoutInSeconds
     });
 
     return {

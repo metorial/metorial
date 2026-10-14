@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { FormsiteClient } from '../lib/client';
+import { formDirSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageWebhooks = SlateTool.create(spec, {
@@ -19,7 +20,7 @@ export let manageWebhooks = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      formDir: z.string().describe('Form directory identifier'),
+      formDir: formDirSchema,
       action: z.enum(['list', 'create', 'delete']).describe('Action to perform on webhooks'),
       webhookUrl: z
         .string()
@@ -65,10 +66,17 @@ export let manageWebhooks = SlateTool.create(spec, {
       };
     }
 
+    if (!webhookUrl) {
+      throw createApiServiceError(`webhookUrl is required for the ${action} action.`);
+    }
+    if (
+      !URL.canParse(webhookUrl) ||
+      !['http:', 'https:'].includes(new URL(webhookUrl).protocol)
+    ) {
+      throw createApiServiceError('webhookUrl must be an HTTP or HTTPS URL.');
+    }
+
     if (action === 'create') {
-      if (!webhookUrl) {
-        throw new Error('webhookUrl is required for the create action.');
-      }
       let webhook = await client.createOrUpdateWebhook(formDir, {
         url: webhookUrl,
         handshakeKey
@@ -80,9 +88,6 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!webhookUrl) {
-        throw new Error('webhookUrl is required for the delete action.');
-      }
       await client.deleteWebhook(formDir, webhookUrl);
       return {
         output: { deleted: true },
@@ -90,6 +95,6 @@ export let manageWebhooks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

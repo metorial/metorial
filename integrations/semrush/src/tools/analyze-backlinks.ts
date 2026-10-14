@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SemrushAnalyticsClient } from '../lib/client';
 import { transformResults } from '../lib/csv-parser';
@@ -100,7 +100,7 @@ Use this for link building research, competitor backlink analysis, and assessing
         break;
 
       default:
-        throw new Error(`Unknown report type: ${ctx.input.reportType}`);
+        throw createApiServiceError(`Unknown report type: ${ctx.input.reportType}`);
     }
 
     let backlinks = transformResults(results);

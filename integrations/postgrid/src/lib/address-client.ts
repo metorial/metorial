@@ -1,24 +1,34 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
-let ADDRESS_VERIFICATION_BASE_URL = 'https://api.postgrid.com/addver';
+let ADDRESS_VERIFICATION_BASE_URL = 'https://api.postgrid.com/v1/addver';
 let INTL_ADDRESS_VERIFICATION_BASE_URL = 'https://api.postgrid.com/v1/intl_addver';
 
 export class AddressVerificationClient {
   private axios;
   private intlAxios;
 
-  constructor(private token: string) {
-    this.axios = createAxios({
+  constructor(token: string) {
+    if (!token.trim())
+      throw createApiServiceError('A PostGrid address verification API key is required.');
+    this.axios = createAuthenticatedAxios({
       baseURL: ADDRESS_VERIFICATION_BASE_URL,
-      headers: {
-        'x-api-key': this.token
-      }
+      authHeader: { name: 'x-api-key', value: token },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'PostGrid Address Verification',
+          reason: 'postgrid_address_api_error'
+        })
     });
-    this.intlAxios = createAxios({
+    this.intlAxios = createAuthenticatedAxios({
       baseURL: INTL_ADDRESS_VERIFICATION_BASE_URL,
-      headers: {
-        'x-api-key': this.token
-      }
+      authHeader: { name: 'x-api-key', value: token },
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'PostGrid Address Verification',
+          reason: 'postgrid_address_api_error'
+        })
     });
   }
 
@@ -47,6 +57,9 @@ export class AddressVerificationClient {
     if (options?.geocode) params.geocode = 'true';
 
     let res = await this.axios.post('/verifications', { address }, { params });
+    if (res.data?.status === 'error') {
+      throw createApiServiceError(res.data.message || 'PostGrid address verification failed.');
+    }
     return res.data;
   }
 
@@ -74,6 +87,9 @@ export class AddressVerificationClient {
     if (options?.geocode) params.geocode = 'true';
 
     let res = await this.axios.post('/verifications/batch', { addresses }, { params });
+    if (res.data?.status === 'error') {
+      throw createApiServiceError(res.data.message || 'PostGrid address verification failed.');
+    }
     return res.data;
   }
 
@@ -83,6 +99,9 @@ export class AddressVerificationClient {
     let res = await this.axios.get('/completions', {
       params: { partialStreet }
     });
+    if (res.data?.status === 'error') {
+      throw createApiServiceError(res.data.message || 'PostGrid address verification failed.');
+    }
     return res.data;
   }
 
@@ -111,6 +130,9 @@ export class AddressVerificationClient {
     if (options?.geoData) params.geoData = 'true';
 
     let res = await this.intlAxios.post('/verifications', { address }, { params });
+    if (res.data?.status === 'error') {
+      throw createApiServiceError(res.data.message || 'PostGrid address verification failed.');
+    }
     return res.data;
   }
 
@@ -119,6 +141,9 @@ export class AddressVerificationClient {
     if (countriesFilter) params.countriesFilter = countriesFilter;
 
     let res = await this.intlAxios.get('/completions', { params });
+    if (res.data?.status === 'error') {
+      throw createApiServiceError(res.data.message || 'PostGrid address verification failed.');
+    }
     return res.data;
   }
 }

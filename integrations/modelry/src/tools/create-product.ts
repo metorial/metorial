@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, formatProduct } from '../lib/client';
 import { spec } from '../spec';
 
 export let createProduct = SlateTool.create(spec, {
@@ -60,16 +60,7 @@ export let createProduct = SlateTool.create(spec, {
     let product = result.data;
 
     return {
-      output: {
-        productId: product.id,
-        sku: product.attributes.sku,
-        title: product.attributes.title,
-        batchId: product.attributes.batch_id,
-        description: product.attributes.description,
-        tags: product.attributes.tags,
-        dimensions: product.attributes.dimensions,
-        externalUrl: product.attributes.external_url
-      },
+      output: formatProduct(product),
       message: `Successfully created product **${product.attributes.title || product.id}** (ID: \`${product.id}\`).`
     };
   })

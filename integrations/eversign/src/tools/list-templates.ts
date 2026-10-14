@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { asOptionalNumber, asOptionalString, createClient } from '../lib/helpers';
+import { businessIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listTemplates = SlateTool.create(spec, {
   name: 'List Templates',
   key: 'list_templates',
-  description: `List available signature templates. Filter by active templates, archived templates, or template drafts. Returns template details including signer roles and merge fields.`,
+  description: `List available signature templates. Filter by active templates, archived templates, or template drafts. Returns template details including signer roles and merge fields. Call list_businesses to discover the businessId.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,12 +15,24 @@ export let listTemplates = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      businessId: businessIdSchema,
       type: z
         .enum(['templates', 'templates_archived', 'template_drafts'])
         .default('templates')
         .describe('Filter templates by status'),
-      page: z.number().optional().describe('Page number for pagination'),
-      limit: z.number().optional().describe('Maximum number of templates to return')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, { message: 'Must be a whole number' })
+        .min(1)
+        .optional()
+        .describe('Page number for pagination, starting at 1'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, { message: 'Must be a whole number' })
+        .min(1)
+        .max(500)
+        .optional()
+        .describe('Maximum number of templates to return')
     })
   )
   .output(
@@ -45,7 +58,7 @@ export let listTemplates = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.config, ctx.auth);
+    let client = createClient(ctx.config, ctx.auth, ctx.input.businessId);
     let templates = await client.listTemplates(
       ctx.input.type,
       ctx.input.page,
@@ -55,10 +68,10 @@ export let listTemplates = SlateTool.create(spec, {
     let result = (Array.isArray(templates) ? templates : []).map((t: any) => ({
       documentHash: t.document_hash,
       title: t.title || undefined,
-      createdAt: t.created ?? undefined,
+      createdAt: asOptionalString(t.created),
       signerRoles: (t.signers || []).map((s: any) => ({
         name: s.role || s.name || undefined,
-        order: s.order ?? undefined
+        order: asOptionalNumber(s.order)
       }))
     }));
 

@@ -20,6 +20,7 @@ import {
   listIssues,
   listJobs,
   listToDoLists,
+  messageTidy,
   rescheduleJob,
   resolveIssue,
   updateAddress,
@@ -50,7 +51,8 @@ export let provider = Slate.create({
     getIssue,
     createIssue,
     resolveIssue,
-    deleteIssue
+    deleteIssue,
+    messageTidy
   ],
   triggers: []
 });

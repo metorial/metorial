@@ -31,12 +31,20 @@ export let webSearch = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Automatically scrape result pages for content (default: true)'),
-      maxResults: z.number().optional().describe('Maximum number of results to return')
+      maxResults: z.number().optional().describe('Maximum number of results to return'),
+      byoUrls: z
+        .array(z.string())
+        .optional()
+        .describe('Specific URLs to include in the search results')
     })
   )
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       query: z.string().describe('The query that was searched'),
       aiOverview: z.string().optional().describe('AI-generated summary of the search results'),
       spellFixed: z
@@ -51,6 +59,13 @@ export let webSearch = SlateTool.create(spec, {
             url: z.string().optional(),
             description: z.string().optional(),
             content: z.string().optional(),
+            structuredContent: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Structured page content when returned by the provider'),
+            siteLongName: z.string().optional(),
+            snippets: z.array(z.string()).optional(),
+            relatedIndex: z.unknown().optional(),
             isSafe: z.boolean().optional(),
             siteName: z.string().optional(),
             age: z.string().optional(),
@@ -60,7 +75,11 @@ export let webSearch = SlateTool.create(spec, {
         )
         .describe('Search results'),
       imageUrls: z.array(z.string()).optional().describe('Image URLs found in results'),
-      links: z.array(z.string()).optional().describe('Related links')
+      links: z.array(z.string()).optional().describe('Related links'),
+      geoResults: z
+        .array(z.unknown())
+        .optional()
+        .describe('Geographic results with coordinates and place details')
     })
   )
   .handleInvocation(async ctx => {
@@ -73,7 +92,8 @@ export let webSearch = SlateTool.create(spec, {
       spellCheck: ctx.input.spellCheck,
       countryCode: ctx.input.countryCode,
       autoScrape: ctx.input.autoScrape,
-      maxResults: ctx.input.maxResults
+      maxResults: ctx.input.maxResults,
+      byoUrls: ctx.input.byoUrls
     });
 
     let resultCount = result.results?.length ?? 0;
@@ -81,15 +101,26 @@ export let webSearch = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         query: result.query,
         aiOverview: result.ai_overview,
         spellFixed: result.spell_fixed,
         isSafe: result.is_safe,
-        results: (result.results ?? []).map((r: Record<string, unknown>) => ({
+        results: result.results.map(r => ({
           title: r.title,
           url: r.url,
           description: r.description,
-          content: r.content,
+          content:
+            typeof r.content === 'string'
+              ? r.content
+              : typeof r.content?.text === 'string'
+                ? r.content.text
+                : undefined,
+          structuredContent:
+            r.content !== null && typeof r.content === 'object' ? r.content : undefined,
+          siteLongName: r.site_long_name,
+          snippets: r.snippets,
+          relatedIndex: r.related_index,
           isSafe: r.is_safe,
           siteName: r.site_name,
           age: r.age,
@@ -97,7 +128,8 @@ export let webSearch = SlateTool.create(spec, {
           favicon: r.favicon
         })),
         imageUrls: result.image_urls,
-        links: result.links
+        links: result.links,
+        geoResults: result.geo_results
       },
       message: `Searched for **"${ctx.input.query}"** and found **${resultCount} results**.${result.ai_overview ? ' AI overview generated.' : ''}`
     };

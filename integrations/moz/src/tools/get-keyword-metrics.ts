@@ -16,10 +16,13 @@ export let getKeywordMetricsTool = SlateTool.create(spec, {
       keyword: z.string().describe('Keyword to analyze'),
       locale: z.string().optional().describe('Locale code (default: en-US)'),
       device: z
-        .enum(['desktop', 'mobile'])
+        .enum(['desktop', 'mobile', 'mobile_android', 'mobile_ios'])
         .optional()
-        .describe('Device type (default: desktop)'),
-      engine: z.enum(['google', 'bing']).optional().describe('Search engine (default: google)')
+        .describe('Device type (default: desktop); mobile uses mobile_android'),
+      engine: z
+        .enum(['google', 'bing', 'yahoo'])
+        .optional()
+        .describe('Search engine (default: google)')
     })
   )
   .output(
@@ -53,10 +56,10 @@ export let getKeywordMetricsTool = SlateTool.create(spec, {
         locale: query.locale,
         device: query.device,
         engine: query.engine,
-        volume: metrics.volume,
-        difficulty: metrics.difficulty,
-        organicCtr: metrics.organic_ctr,
-        priority: metrics.priority
+        volume: metrics.volume ?? undefined,
+        difficulty: metrics.difficulty ?? undefined,
+        organicCtr: metrics.organic_ctr ?? undefined,
+        priority: metrics.priority ?? undefined
       },
       message: `**${ctx.input.keyword}**: Volume ${metrics.volume ?? 'N/A'}, Difficulty ${metrics.difficulty ?? 'N/A'}/100, Organic CTR ${metrics.organic_ctr ?? 'N/A'}%, Priority ${metrics.priority ?? 'N/A'}`
     };

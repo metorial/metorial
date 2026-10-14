@@ -1,4 +1,4 @@
-# Slates Specification for Anchor Browser
+# Anchor Browser API Specification
 
 ## Overview
 
@@ -91,4 +91,6 @@ List, create, and delete third-party integrations configured on the account.
 
 ## Events
 
-The provider does not support webhooks or event subscription mechanisms for external consumers. The "Event Coordination" feature is an internal signaling mechanism between external systems and active browser sessions (e.g., sending MFA codes into a running session), not an event subscription/webhook system.
+Anchor Browser supports [webhooks](https://docs.anchorbrowser.io/webhooks/overview) for task, session, and identity events, including completion, failure, and requests for human input. Webhook subscriptions can be configured through the Anchor Browser dashboard or API, and deliveries are signed with HMAC-SHA256.
+
+The Event Coordination feature exchanges named events and custom data between external systems and active browser sessions, such as sending MFA codes into a running session.

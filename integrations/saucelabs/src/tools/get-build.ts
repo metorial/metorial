@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { buildJobStatus, buildTimestampToIso } from '../lib/builds';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -57,14 +58,14 @@ export let getBuild = SlateTool.create(spec, {
 
     let output: any = {
       buildId: build.id,
-      name: build.name,
-      status: build.status,
-      startTime: build.start_time,
-      endTime: build.end_time,
+      name: build.name ?? undefined,
+      status: build.status ?? undefined,
+      startTime: buildTimestampToIso(build.start_time),
+      endTime: buildTimestampToIso(build.end_time),
       jobsPassed: build.jobs?.passed,
       jobsFailed: build.jobs?.failed,
       jobsErrored: build.jobs?.errored,
-      jobsComplete: build.jobs?.complete
+      jobsComplete: build.jobs?.finished ?? build.jobs?.complete
     };
 
     if (ctx.input.includeJobs) {
@@ -74,11 +75,11 @@ export let getBuild = SlateTool.create(spec, {
       let jobsRaw = jobsResult.jobs ?? [];
       output.jobs = jobsRaw.map((j: any) => ({
         jobId: j.id,
-        status: j.consolidated_status ?? j.status,
-        passed: j.passed,
-        name: j.name,
-        duration: j.duration,
-        browser: j.browser,
+        status: j.consolidated_status ?? j.status ?? buildJobStatus(j.state),
+        passed: j.passed ?? j.state?.passed,
+        name: j.name ?? undefined,
+        duration: j.duration ?? undefined,
+        browser: j.browser ?? undefined,
         os: j.os
       }));
     }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApaleoClient } from '../lib/client';
 import { spec } from '../spec';
@@ -37,6 +37,10 @@ export let manageReservation = SlateTool.create(spec, {
       travelPurpose: z.string().optional().describe('Updated travel purpose (for amend)'),
       companyId: z.string().optional().describe('Updated company ID (for amend)'),
       corporateCode: z.string().optional().describe('Updated corporate code (for amend)'),
+      requote: z
+        .boolean()
+        .optional()
+        .describe('Recalculate unchanged rate plan prices during amend; defaults to false.'),
       unitId: z.string().optional().describe('Room ID to assign (for assign_unit)'),
       timeSlices: z
         .array(
@@ -72,12 +76,16 @@ export let manageReservation = SlateTool.create(spec, {
         if (ctx.input.departure) amendBody.departure = ctx.input.departure;
         if (ctx.input.adults !== undefined) amendBody.adults = ctx.input.adults;
         if (ctx.input.childrenAges) amendBody.childrenAges = ctx.input.childrenAges;
-        if (ctx.input.comment) amendBody.comment = ctx.input.comment;
-        if (ctx.input.guestComment) amendBody.guestComment = ctx.input.guestComment;
-        if (ctx.input.travelPurpose) amendBody.travelPurpose = ctx.input.travelPurpose;
-        if (ctx.input.companyId) amendBody.companyId = ctx.input.companyId;
-        if (ctx.input.corporateCode) amendBody.corporateCode = ctx.input.corporateCode;
+        if (ctx.input.comment !== undefined) amendBody.comment = ctx.input.comment;
+        if (ctx.input.guestComment !== undefined)
+          amendBody.guestComment = ctx.input.guestComment;
+        if (ctx.input.travelPurpose !== undefined)
+          amendBody.travelPurpose = ctx.input.travelPurpose;
+        if (ctx.input.companyId !== undefined) amendBody.companyId = ctx.input.companyId;
+        if (ctx.input.corporateCode !== undefined)
+          amendBody.corporateCode = ctx.input.corporateCode;
         if (ctx.input.timeSlices) amendBody.timeSlices = ctx.input.timeSlices;
+        if (ctx.input.requote !== undefined) amendBody.requote = ctx.input.requote;
         await client.amendReservation(reservationId, amendBody);
         break;
       }
@@ -94,7 +102,8 @@ export let manageReservation = SlateTool.create(spec, {
         await client.noShowReservation(reservationId);
         break;
       case 'assign_unit':
-        if (!ctx.input.unitId) throw new Error('unitId is required for assign_unit action');
+        if (!ctx.input.unitId)
+          throw createApiServiceError('unitId is required for assign_unit action');
         await client.assignUnit(reservationId, ctx.input.unitId);
         break;
       case 'unassign_unit':

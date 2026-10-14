@@ -76,7 +76,7 @@ Can also discover the email format patterns used by an organization when called 
     });
 
     let otherFormats = Array.isArray(result.other_domain_formats)
-      ? result.other_domain_formats.map((f: Record<string, string>) => ({
+      ? result.other_domain_formats.map(f => ({
           format: String(f.format || ''),
           confidence: String(f.confidence || '')
         }))

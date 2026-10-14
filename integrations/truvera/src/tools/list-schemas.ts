@@ -13,8 +13,19 @@ export let listSchemas = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      offset: z.number().optional().describe('Number of items to skip for pagination'),
-      limit: z.number().optional().describe('Maximum number of items to return (max 64)')
+      offset: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(0)
+        .optional()
+        .describe('Number of items to skip for pagination'),
+      limit: z
+        .number()
+        .refine(Number.isSafeInteger, 'Pagination values must be whole numbers')
+        .min(1)
+        .max(64)
+        .optional()
+        .describe('Maximum number of items to return (max 64)')
     })
   )
   .output(
@@ -45,7 +56,7 @@ export let listSchemas = SlateTool.create(spec, {
       schemaId: s.id || '',
       schemaName: s.name || s.schema?.name,
       schemaDescription: s.description || s.schema?.description,
-      schema: s.schema || s
+      schema: s.schema !== undefined ? s.schema : s
     }));
 
     return {

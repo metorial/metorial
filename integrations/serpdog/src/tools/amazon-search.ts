@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let amazonSearch = SlateTool.create(spec, {
   key: 'amazon_data_extraction',
   description: `Extract data from Amazon in real time. Supports scraping search result pages, product details by ASIN, and product reviews. Use premium proxies for improved success on difficult pages.`,
   instructions: [
-    'For search results, provide a full encoded Amazon search URL.',
+    'For search results, provide a complete Amazon search URL; an already URL-encoded URL is also accepted.',
     'For product details, provide the product ASIN (Amazon Standard Identification Number).',
     'For reviews, provide the product ID and optionally a page number.'
   ],
@@ -24,7 +24,7 @@ export let amazonSearch = SlateTool.create(spec, {
       searchUrl: z
         .string()
         .optional()
-        .describe('Encoded Amazon search page URL (required for "search" type)'),
+        .describe('Complete Amazon search page URL (required for "search" type)'),
       asin: z
         .string()
         .optional()
@@ -59,12 +59,13 @@ export let amazonSearch = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let data: any;
+    let data: unknown;
     let message: string;
 
     switch (ctx.input.type) {
       case 'search':
-        if (!ctx.input.searchUrl) throw new Error('searchUrl is required for Amazon search');
+        if (!ctx.input.searchUrl)
+          throw createApiServiceError('searchUrl is required for Amazon search');
         data = await client.amazonSearch({
           url: ctx.input.searchUrl,
           premium: ctx.input.premium,
@@ -75,7 +76,8 @@ export let amazonSearch = SlateTool.create(spec, {
         break;
 
       case 'product':
-        if (!ctx.input.asin) throw new Error('asin is required for Amazon product lookup');
+        if (!ctx.input.asin)
+          throw createApiServiceError('asin is required for Amazon product lookup');
         data = await client.amazonProduct({
           asin: ctx.input.asin,
           domain: ctx.input.amazonDomain,
@@ -86,7 +88,8 @@ export let amazonSearch = SlateTool.create(spec, {
         break;
 
       case 'reviews':
-        if (!ctx.input.productId) throw new Error('productId is required for Amazon reviews');
+        if (!ctx.input.productId)
+          throw createApiServiceError('productId is required for Amazon reviews');
         data = await client.amazonReviews({
           productId: ctx.input.productId,
           page: ctx.input.reviewPage,
@@ -100,7 +103,7 @@ export let amazonSearch = SlateTool.create(spec, {
 
     return {
       output: { results: data },
-      message: message!
+      message
     };
   })
   .build();

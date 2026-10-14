@@ -1,18 +1,20 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageMessageTool = SlateTool.create(spec, {
   name: 'Manage Message',
   key: 'manage_message',
-  description: `Create or update a message on a Basecamp project's message board.
+  description: `Call list_accounts to discover the accountId for this operation. Create or update a message on a Basecamp project's message board.
 To **create**, provide the \`projectId\`, \`messageBoardId\`, and \`subject\`.
 To **update**, provide the \`projectId\`, \`messageId\`, and the fields to change.`,
   instructions: ['Use Get Project to find the message_board dock item and its ID.']
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project (bucket)'),
       action: z.enum(['create', 'update']).describe('Action to perform'),
       messageBoardId: z
@@ -38,15 +40,17 @@ To **update**, provide the \`projectId\`, \`messageId\`, and the fields to chang
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let { action, projectId } = ctx.input;
 
     if (action === 'create') {
       if (!ctx.input.messageBoardId)
-        throw new Error('messageBoardId is required for creating a message');
-      if (!ctx.input.subject) throw new Error('subject is required for creating a message');
+        throw createApiServiceError('messageBoardId is required for creating a message');
+      if (!ctx.input.subject)
+        throw createApiServiceError('subject is required for creating a message');
 
       let message = await client.createMessage(projectId, ctx.input.messageBoardId, {
         subject: ctx.input.subject,
@@ -68,7 +72,8 @@ To **update**, provide the \`projectId\`, \`messageId\`, and the fields to chang
     }
 
     // update
-    if (!ctx.input.messageId) throw new Error('messageId is required for updating a message');
+    if (!ctx.input.messageId)
+      throw createApiServiceError('messageId is required for updating a message');
 
     let message = await client.updateMessage(projectId, ctx.input.messageId, {
       subject: ctx.input.subject,

@@ -43,6 +43,10 @@ export let extractFromImage = SlateTool.create(spec, {
   .output(
     z.object({
       success: z.boolean(),
+      rawResponse: z
+        .unknown()
+        .optional()
+        .describe('Complete provider response, including additional result details'),
       context: z
         .unknown()
         .describe(
@@ -61,7 +65,11 @@ export let extractFromImage = SlateTool.create(spec, {
         )
         .optional()
         .describe('Text sections with positioning data'),
-      totalPages: z.number().optional().describe('Total pages in document (PDFs only)')
+      totalPages: z.number().optional().describe('Total pages in document (PDFs only)'),
+      pageRange: z
+        .array(z.number())
+        .optional()
+        .describe('Inclusive page range processed by the provider')
     })
   )
   .handleInvocation(async ctx => {
@@ -78,13 +86,15 @@ export let extractFromImage = SlateTool.create(spec, {
     return {
       output: {
         success: result.success,
+        rawResponse: result,
         context: result.context,
         width: result.width,
         height: result.height,
         tags: result.tags,
         hasText: result.has_text,
         sections: result.sections,
-        totalPages: result.total_pages
+        totalPages: result.total_pages,
+        pageRange: result.page_range
       },
       message: `Extracted data from image.${result.has_text ? ' Text detected in image.' : ''} ${result.tags?.length ? `Tags: ${result.tags.join(', ')}` : ''}`
     };

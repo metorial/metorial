@@ -26,7 +26,7 @@ export let createActivity = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let data: Record<string, any> = {
-      primary: ctx.input.parentRecordId,
+      primary: { id: ctx.input.parentRecordId },
       note: ctx.input.note,
       record_type_name: ctx.input.recordTypeName || 'Note'
     };

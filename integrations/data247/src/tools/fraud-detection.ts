@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getRawData247Result } from '../lib/client';
 import { spec } from '../spec';
 
 export let fraudDetection = SlateTool.create(spec, {
@@ -43,6 +43,10 @@ export let fraudDetection = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      rawResult: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Complete provider result in its original JSON types'),
       weight: z
         .string()
         .optional()
@@ -83,6 +87,7 @@ export let fraudDetection = SlateTool.create(spec, {
 
       return {
         output: {
+          rawResult: getRawData247Result(raw),
           weight,
           isSpam: undefined,
           phone: raw.phone,
@@ -92,7 +97,7 @@ export let fraudDetection = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.phone) {
-        throw new Error('Phone number is required for phone spam check.');
+        throw createApiServiceError('Phone number is required for phone spam check.');
       }
 
       let raw = await client.trustPhone(ctx.input.phone);
@@ -100,12 +105,13 @@ export let fraudDetection = SlateTool.create(spec, {
 
       return {
         output: {
+          rawResult: getRawData247Result(raw),
           weight: undefined,
           isSpam: spam || is_spam,
           phone,
           additionalAttributes: Object.keys(rest).length > 0 ? rest : undefined
         },
-        message: `Phone spam check for **${ctx.input.phone}**: ${(spam || is_spam) === 'y' ? 'Known spam caller.' : 'Not flagged as spam.'}`
+        message: `Phone spam check for **${ctx.input.phone}**: ${(spam || is_spam) === 'y' ? 'Known spam caller.' : (spam || is_spam) === 'n' ? 'Not flagged as spam.' : 'Provider did not return a recognized spam verdict.'}`
       };
     }
   })

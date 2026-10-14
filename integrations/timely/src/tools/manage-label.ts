@@ -1,16 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { TimelyClient } from '../lib/client';
+import { createTimelyClient } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageLabel = SlateTool.create(spec, {
   name: 'Manage Label',
   key: 'manage_label',
-  description: `Create or update a label (tag) in Timely. Provide a **labelId** to update an existing label, or omit it to create a new one. Labels can have a parent for hierarchical organization.`,
+  description: `Call list_accounts to choose a workspace when needed. Create or update a label (tag) in Timely. Provide a **labelId** to update an existing label, or omit it to create a new one. Labels can have a parent for hierarchical organization.`,
   tags: { destructive: false }
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       labelId: z
         .string()
         .optional()
@@ -34,10 +36,7 @@ export let manageLabel = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new TimelyClient({
-      accountId: ctx.config.accountId,
-      token: ctx.auth.token
-    });
+    let client = await createTimelyClient(ctx);
 
     let result: any;
     let action: string;

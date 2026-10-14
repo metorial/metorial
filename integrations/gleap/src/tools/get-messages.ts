@@ -19,7 +19,7 @@ export let getMessages = SlateTool.create(spec, {
       sort: z
         .string()
         .optional()
-        .describe('Sort field, prefix with - for descending (e.g. -createdAt)')
+        .describe('Legacy sort parameter; the provider always returns messages oldest first')
     })
   )
   .output(
@@ -30,7 +30,8 @@ export let getMessages = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GleapClient({
       token: ctx.auth.token,
-      projectId: ctx.auth.projectId
+      projectId: ctx.auth.projectId,
+      region: ctx.auth.region
     });
 
     let result = await client.getMessages({

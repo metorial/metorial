@@ -1,6 +1,17 @@
 # Unisender
 
-Manage email and SMS marketing campaigns. Create, update, and delete contact lists, subscribe and unsubscribe contacts, and import/export contacts in bulk. Design email messages and reusable templates, launch email campaigns with scheduling and A/B testing, and send SMS messages to lists or individual numbers. Manage custom contact fields, tags, and subscriber notes. Retrieve campaign statistics including opens, clicks, bounces, and delivery status. Configure webhooks for real-time notifications on email delivery, subscribes, unsubscribes, and campaign status changes. Manage sender domain verification and account settings.
+Manage contact lists, subscriptions, bulk imports, custom fields, and tags in the Unisender marketing platform. Create and update email messages and reusable templates, send test emails, schedule or cancel campaigns, and review campaign statistics. Send individual email and SMS messages and check their delivery statuses. Inspect account information and request sender email verification.
+
+## Common workflows
+
+- Discover contact list IDs with `get_lists`, then subscribe contacts or import up to 500 rows per call. Use the `email_list_ids` import column for comma-separated list IDs.
+- Create an email message, preview it with `send_test_email`, and send it with `launch_campaign`. `update_email_message` returns the current message version ID for subsequent launches.
+- Pass `email_id` values from `send_email` to `check_email_delivery`. Delivery statuses are retained by the provider for one month.
+- Keep the `sms_id` returned by `send_sms` as text and pass it to `check_sms_delivery`; some SMS IDs contain a dot and a phone number.
+
+## Authentication
+
+Connect with an API key from your Unisender account settings. The optional locale setting controls the API language (`en` or `ru`). This integration uses the marketing API, which is separate from Unisender Go.
 
 ## License
 

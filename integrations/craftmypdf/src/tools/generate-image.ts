@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, downloadGeneratedFile } from '../lib/client';
 import { spec } from '../spec';
 
 export let generateImage = SlateTool.create(spec, {
@@ -18,7 +18,12 @@ export let generateImage = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .optional()
         .describe('JSON data to populate the template with.'),
-      loadDataFrom: z.string().optional().describe('External URL to load template data from.'),
+      loadDataFrom: z
+        .string()
+        .optional()
+        .describe(
+          'External URL to load template data from. Overrides templateData if both are provided.'
+        ),
       version: z.number().optional().describe('Specific template version to use.'),
       outputType: z
         .enum(['jpeg', 'png'])
@@ -55,6 +60,14 @@ export let generateImage = SlateTool.create(spec, {
       expiration: ctx.input.expiration,
       outputFile: ctx.input.outputFile,
       outputType: ctx.input.outputType
+    });
+
+    await ctx.addAttachment({
+      type: 'content',
+      content: await downloadGeneratedFile(result.file),
+      mimeType: ctx.input.outputType === 'png' ? 'image/png' : 'image/jpeg',
+      filename:
+        ctx.input.outputFile || (ctx.input.outputType === 'png' ? 'output.png' : 'output.jpg')
     });
 
     return {

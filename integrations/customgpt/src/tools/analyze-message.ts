@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CustomGPTClient } from '../lib/client';
 import { spec } from '../spec';
@@ -22,14 +22,26 @@ export let analyzeMessage = SlateTool.create(spec, {
       analysisType: z
         .enum(['trust_score', 'claims', 'verify', 'feedback'])
         .describe('Type of analysis to perform'),
-      projectId: z.number().describe('ID of the agent'),
+      projectId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('ID of the agent'),
       sessionId: z.string().describe('Session ID of the conversation'),
-      promptId: z.number().describe('Prompt ID of the message to analyze'),
+      promptId: z
+        .number()
+        .refine(
+          value => Number.isSafeInteger(value) && value > 0,
+          'Must be a positive whole number'
+        )
+        .describe('Prompt ID of the message to analyze'),
       feedback: z
         .string()
         .optional()
         .describe(
-          'Feedback value (e.g. "thumbs_up", "thumbs_down") — required when analysisType is "feedback"'
+          'Feedback value: liked, disliked, or neutral (thumbs_up/thumbs_down also accepted) — required when analysisType is "feedback"'
         )
     })
   )
@@ -99,7 +111,9 @@ export let analyzeMessage = SlateTool.create(spec, {
 
     // feedback
     if (!ctx.input.feedback) {
-      throw new Error('feedback value is required when analysisType is "feedback"');
+      throw createApiServiceError(
+        'feedback value is required when analysisType is "feedback"'
+      );
     }
     await client.submitMessageFeedback(projectId, sessionId, promptId, ctx.input.feedback);
     return {

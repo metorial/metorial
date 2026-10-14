@@ -1,4 +1,4 @@
-# Slates Specification for Sendfox
+# SendFox API Specification
 
 ## Overview
 
@@ -82,4 +82,4 @@ Retrieve the authenticated user's profile including current contact count and co
 
 ## Events
 
-The provider does not support events. There is no documented webhook system or event subscription mechanism in the official SendFox API. Third-party integration platforms (e.g., Zapier, Make) may offer polling-based triggers, but SendFox does not natively provide webhooks or push-based event notifications.
+The marketing tools in this integration do not register event subscriptions. The current API also documents transactional email delivery webhooks, which are outside this integration's present tool coverage.

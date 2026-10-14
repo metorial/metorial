@@ -67,16 +67,16 @@ export let getEquipment = SlateTool.create(spec, {
       equipmentId: e.id,
       name: e.name,
       code: e.code,
-      category: e.folder,
-      quantityTotal: e.quantity_total,
-      rentalPrice: e.rental_price,
-      subrentalPrice: e.subrental_price,
+      category: e.folder ?? undefined,
+      quantityTotal: e.current_quantity ?? e.quantity_total,
+      rentalPrice: e.rental_price ?? (e.rental_sales === 'Rental' ? e.price : undefined),
+      subrentalPrice: e.subrental_costs ?? e.subrental_price,
       weight: e.weight,
       volume: e.volume,
-      isContainer: e.is_container,
+      isContainer: e.is_container ?? (e.type !== undefined ? e.type === 'case' : undefined),
       trackSerialNumbers: e.track_serial_numbers,
-      createdAt: e.created,
-      updatedAt: e.modified
+      createdAt: e.created ?? undefined,
+      updatedAt: e.modified ?? undefined
     };
 
     if (ctx.input.includeSerialNumbers) {

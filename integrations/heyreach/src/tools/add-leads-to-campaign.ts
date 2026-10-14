@@ -39,7 +39,7 @@ export let addLeadsToCampaign = SlateTool.create(spec, {
   ],
   constraints: [
     'Maximum of 100 leads per request.',
-    'Adding leads to a paused or finished campaign will automatically reactivate it.'
+    'Paused and finished campaigns are reactivated by default. Set the resume flags to false to keep them inactive.'
   ]
 })
   .input(
@@ -51,7 +51,17 @@ export let addLeadsToCampaign = SlateTool.create(spec, {
         .optional()
         .describe(
           'LinkedIn sender account ID. If empty, leads are auto-assigned to any active sender.'
-        )
+        ),
+      resumeFinishedCampaign: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('Reactivate a finished campaign when adding leads (default: true)'),
+      resumePausedCampaign: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('Reactivate a paused campaign when adding leads (default: true)')
     })
   )
   .output(
@@ -65,12 +75,14 @@ export let addLeadsToCampaign = SlateTool.create(spec, {
     let result = await client.addLeadsToCampaign(
       ctx.input.campaignId,
       ctx.input.leads,
-      ctx.input.linkedInAccountId
+      ctx.input.linkedInAccountId,
+      ctx.input.resumeFinishedCampaign,
+      ctx.input.resumePausedCampaign
     );
 
     return {
       output: { result: result?.data ?? result },
-      message: `Added **${ctx.input.leads.length}** lead(s) to campaign **${ctx.input.campaignId}**.`
+      message: `Processed import of **${ctx.input.leads.length}** lead(s) into campaign **${ctx.input.campaignId}**. Check the result for the added count.`
     };
   })
   .build();

@@ -1,4 +1,4 @@
-# Slates Specification for Wiza
+# Wiza Integration Specification
 
 ## Overview
 
@@ -50,6 +50,20 @@ Enrich multiple contacts by submitting individual reveal requests in parallel. W
 ### Credit Balance
 
 Check the remaining credit balance on your account via the API, including email credits, phone credits, and API-specific credits.
+
+### Prospect Search
+
+Search by name, job title, seniority, company, industry, headcount, location, or technology. Retrieve a matching count or up to 30 profiles and use their LinkedIn profile URLs for contact enrichment. Search Locations and Search Technologies discover values accepted by the location and technology filters. Returning profiles can consume API credits.
+
+## API Documentation
+
+- [Authorization](https://docs.wiza.co/using-the-api/authorization)
+- [Individual enrichment](https://docs.wiza.co/api-reference/individual-reveals/start-individual-reveal)
+- [Enrichment results](https://docs.wiza.co/api-reference/individual-reveals/get-individual-reveal)
+- [Company enrichment](https://docs.wiza.co/api-reference/company-enrichment/company-enrichment)
+- [Prospect search](https://docs.wiza.co/api-reference/prospect/prospect-search)
+- [Location discovery](https://docs.wiza.co/api-reference/prospects/search-locations)
+- [Technology discovery](https://docs.wiza.co/api-reference/prospects/search-technologies)
 
 ## Events
 

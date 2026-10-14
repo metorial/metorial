@@ -20,11 +20,11 @@ export let listMessages = SlateTool.create(spec, {
       dateFrom: z
         .string()
         .optional()
-        .describe('Filter messages created after this date (YYYY-MM-DD)'),
+        .describe('Start of the creation date range in UTC (YYYY-MM-DD or YYYY-MM-DD HH:MM)'),
       dateTo: z
         .string()
         .optional()
-        .describe('Filter messages created before this date (YYYY-MM-DD)'),
+        .describe('End of the creation date range in UTC (YYYY-MM-DD or YYYY-MM-DD HH:MM)'),
       limit: z.number().optional().describe('Maximum number of messages to return'),
       offset: z.number().optional().describe('Offset for pagination')
     })
@@ -44,7 +44,7 @@ export let listMessages = SlateTool.create(spec, {
       locale: ctx.config.locale
     });
 
-    if (ctx.input.messageId) {
+    if (ctx.input.messageId !== undefined) {
       let msg = await client.getMessage(ctx.input.messageId);
       return {
         output: { message: msg },

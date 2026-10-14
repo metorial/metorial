@@ -133,6 +133,14 @@ export let listAddresses = SlateTool.create(spec, {
         .optional()
         .describe('Number of addresses to return (max 100, default 10)'),
       offset: z.number().optional().describe('Number of addresses to skip for pagination'),
+      before: z
+        .string()
+        .optional()
+        .describe('Previous-page cursor from previousUrl; cannot be combined with after'),
+      after: z
+        .string()
+        .optional()
+        .describe('Next-page cursor from nextUrl; cannot be combined with before'),
       metadata: z
         .record(z.string(), z.string())
         .optional()
@@ -142,13 +150,25 @@ export let listAddresses = SlateTool.create(spec, {
   .output(
     z.object({
       addresses: z.array(addressSchema).describe('List of addresses'),
-      totalCount: z.number().describe('Total number of addresses matching the query')
+      totalCount: z.number().describe('Total number of addresses matching the query'),
+      nextUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Next-page URL; pass its after query value to after'),
+      previousUrl: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Previous-page URL; pass its before query value to before')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.listAddresses({
       limit: ctx.input.limit,
+      before: ctx.input.before,
+      after: ctx.input.after,
       offset: ctx.input.offset,
       metadata: ctx.input.metadata
     });
@@ -156,7 +176,9 @@ export let listAddresses = SlateTool.create(spec, {
     return {
       output: {
         addresses,
-        totalCount: result.total_count ?? result.count ?? addresses.length
+        totalCount: result.total_count ?? result.count ?? addresses.length,
+        nextUrl: result.next_url ?? null,
+        previousUrl: result.previous_url ?? null
       },
       message: `Found **${addresses.length}** addresses`
     };
@@ -188,8 +210,11 @@ export let deleteAddress = SlateTool.create(spec, {
     return {
       output: {
         addressId: result.id,
-        deleted: result.deleted ?? true
+        deleted: result.deleted === true
       },
-      message: `Deleted address **${ctx.input.addressId}**`
+      message:
+        result.deleted === true
+          ? `Deleted address **${ctx.input.addressId}**`
+          : 'Lob did not confirm the deletion or cancellation. Retrieve the resource to check its state.'
     };
   });

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, timeCampCreatedId } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageClient = SlateTool.create(spec, {
@@ -53,7 +53,7 @@ export let manageClient = SlateTool.create(spec, {
         currencyId: ctx.input.currencyId
       });
 
-      let clientId = String(result?.client_id || '');
+      let clientId = timeCampCreatedId(result, ['client_id', 'id'], 'client');
 
       return {
         output: {

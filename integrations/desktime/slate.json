@@ -1,9 +1,12 @@
 {
   "name": "@metorial/desktime",
-  "description": "Retrieve employee time tracking and productivity data from DeskTime. Access company settings, employee work hours, attendance records, and productivity breakdowns (productive, neutral, unproductive time). Look up employees by ID or email and retrieve app/website usage data for specific dates or monthly periods. Create projects and tasks, and start or stop project time tracking for integration with external tools. Useful for compiling attendance reports, monitoring team productivity, and integrating with payroll or invoicing systems.",
+  "description": "Retrieve employee time tracking, productivity, and project activity from DeskTime. Identify the connected employee, access company settings, retrieve employee work hours, and discover active projects and tasks. Create projects with an optional task and start or stop project time tracking.",
   "categories": ["apis-and-http-requests", "hr-and-recruiting", "task-and-project-management"],
   "skills": [
     "retrieve company information",
+    "identify connected employee",
+    "discover active projects and tasks",
+    "retrieve employee project activity",
     "track employee productivity",
     "get employee work hours",
     "monitor app and website usage",

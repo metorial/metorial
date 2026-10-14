@@ -1,12 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { accountIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageTodoTool = SlateTool.create(spec, {
   name: 'Manage To-Do',
   key: 'manage_todo',
-  description: `Create, update, complete, or uncomplete a to-do item in a Basecamp project.
+  description: `Call list_accounts to discover the accountId for this operation. Create, update, complete, or uncomplete a to-do item in a Basecamp project.
 To **create** a to-do, provide the \`projectId\`, \`todoListId\`, and \`content\`.
 To **update**, **complete**, or **uncomplete** a to-do, provide the \`projectId\` and \`todoId\`.
 Supports assigning people, setting due dates, and adding descriptions.`,
@@ -17,6 +18,7 @@ Supports assigning people, setting due dates, and adding descriptions.`,
 })
   .input(
     z.object({
+      accountId: accountIdSchema,
       projectId: z.string().describe('ID of the project (bucket)'),
       action: z
         .enum(['create', 'update', 'complete', 'uncomplete'])
@@ -47,14 +49,17 @@ Supports assigning people, setting due dates, and adding descriptions.`,
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: ctx.input.accountId,
+      legacyConfig: ctx.config
     });
 
     let { action, projectId, todoListId, todoId } = ctx.input;
 
     if (action === 'create') {
-      if (!todoListId) throw new Error('todoListId is required for creating a to-do');
-      if (!ctx.input.content) throw new Error('content is required for creating a to-do');
+      if (!todoListId)
+        throw createApiServiceError('todoListId is required for creating a to-do');
+      if (!ctx.input.content)
+        throw createApiServiceError('content is required for creating a to-do');
 
       let todo = await client.createTodo(projectId, todoListId, {
         content: ctx.input.content,
@@ -79,7 +84,7 @@ Supports assigning people, setting due dates, and adding descriptions.`,
     }
 
     if (action === 'complete') {
-      if (!todoId) throw new Error('todoId is required for completing a to-do');
+      if (!todoId) throw createApiServiceError('todoId is required for completing a to-do');
       await client.completeTodo(projectId, todoId);
       return {
         output: {
@@ -95,7 +100,7 @@ Supports assigning people, setting due dates, and adding descriptions.`,
     }
 
     if (action === 'uncomplete') {
-      if (!todoId) throw new Error('todoId is required for uncompleting a to-do');
+      if (!todoId) throw createApiServiceError('todoId is required for uncompleting a to-do');
       await client.uncompleteTodo(projectId, todoId);
       return {
         output: {
@@ -111,7 +116,7 @@ Supports assigning people, setting due dates, and adding descriptions.`,
     }
 
     // update
-    if (!todoId) throw new Error('todoId is required for updating a to-do');
+    if (!todoId) throw createApiServiceError('todoId is required for updating a to-do');
 
     let todo = await client.updateTodo(projectId, todoId, {
       content: ctx.input.content,

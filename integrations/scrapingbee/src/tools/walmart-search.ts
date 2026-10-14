@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -26,7 +26,7 @@ export let walmartSearch = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Sort order for search results (e.g., "best_match", "price_low", "price_high", "best_seller", "rating_high")'
+          'Sort order for search results: best_match, price_low, price_high, or best_seller'
         ),
       minPrice: z.number().optional().describe('Minimum price filter'),
       maxPrice: z.number().optional().describe('Maximum price filter'),
@@ -72,7 +72,7 @@ export let walmartSearch = SlateTool.create(spec, {
     }
 
     if (!ctx.input.query) {
-      throw new Error('Either query or productId must be provided');
+      throw createApiServiceError('Either query or productId must be provided.');
     }
 
     let result = await client.walmartSearch({

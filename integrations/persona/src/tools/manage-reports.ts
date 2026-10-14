@@ -120,12 +120,12 @@ export let getReport = SlateTool.create(spec, {
         reportId: result.data?.id,
         reportType: result.data?.type,
         status: n.status,
-        hasMatch: n['has-match'] ?? n.has_match,
-        createdAt: n['created-at'] || n.created_at,
-        completedAt: n['completed-at'] || n.completed_at,
+        hasMatch: n['has-match'] ?? n.has_match ?? undefined,
+        createdAt: n['created-at'] ?? n.created_at ?? undefined,
+        completedAt: n['completed-at'] ?? n.completed_at ?? undefined,
         attributes: n
       },
-      message: `Report **${result.data?.id}** (${result.data?.type}) is **${n.status}**.${n['has-match'] || n.has_match ? ' **Match found.**' : ''}`
+      message: `Report **${result.data?.id}** (${result.data?.type}) is **${n.status}**.${(n['has-match'] ?? n.has_match ?? undefined) ? ' **Match found.**' : ''}`
     };
   })
   .build();
@@ -181,7 +181,7 @@ export let listReports = SlateTool.create(spec, {
         reportId: item.id,
         reportType: item.type,
         status: n.status,
-        createdAt: n['created-at'] || n.created_at
+        createdAt: n['created-at'] ?? n.created_at ?? undefined
       };
     });
 

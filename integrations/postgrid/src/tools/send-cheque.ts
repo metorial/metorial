@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PrintMailClient } from '../lib/client';
 import { spec } from '../spec';
+import { getPreviewRefreshAt } from './get-file-url';
 
 let inlineAddressSchema = z
   .object({
@@ -91,6 +92,16 @@ export let sendCheque = SlateTool.create(spec, {
     let cheque = await client.createCheque(requestData as any);
 
     let amountDollars = (cheque.amount / 100).toFixed(2);
+
+    if (typeof cheque.url === 'string' && cheque.url) {
+      await ctx.addAttachment({
+        type: 'url',
+        url: cheque.url,
+        mimeType: 'application/pdf',
+        refreshReference: { orderId: cheque.id, orderType: 'cheque' },
+        refreshAt: getPreviewRefreshAt(cheque.url)
+      });
+    }
 
     return {
       output: {

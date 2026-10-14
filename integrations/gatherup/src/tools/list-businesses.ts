@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, readOptionalNumber } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listBusinesses = SlateTool.create(spec, {
@@ -62,7 +62,7 @@ Returns business names, addresses, types, and metadata. Supports filtering delet
 
     for (let i = 1; i <= count; i++) {
       businesses.push({
-        businessId: data[`businessId${i}`],
+        businessId: readOptionalNumber(data[`businessId${i}`]),
         businessName: data[`businessName${i}`],
         businessPhone: data[`businessPhone${i}`],
         businessCity: data[`businessCity${i}`],
@@ -81,8 +81,8 @@ Returns business names, addresses, types, and metadata. Supports filtering delet
     return {
       output: {
         businesses,
-        page: data.page ?? 1,
-        pages: data.pages ?? 1,
+        page: readOptionalNumber(data.page) ?? 1,
+        pages: readOptionalNumber(data.pages) ?? 1,
         totalCount: count
       } as any,
       message: `Found **${count}** business(es) (page ${data.page ?? 1} of ${data.pages ?? 1}).`

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, type SplitUser } from '../lib/client';
+import { validatePagination } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageUsers = SlateTool.create(spec, {
@@ -60,20 +61,21 @@ export let manageUsers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
-    let mapUser = (u: any) => ({
+    let mapUser = (u: SplitUser) => ({
       userId: u.id,
       email: u.email,
       userName: u.name ?? '',
       status: u.status,
       twoFactorAuth: u['2fa'] ?? false,
-      groups: (u.groups ?? []).map((g: any) => ({ groupId: g.id }))
+      groups: (u.groups ?? []).map(g => ({ groupId: g.id }))
     });
 
     switch (ctx.input.action) {
       case 'invite': {
-        if (!ctx.input.email) throw new Error('email is required to invite a user.');
+        if (!ctx.input.email)
+          throw createApiServiceError('email is required to invite a user.');
         let groups = ctx.input.groupIds?.map(id => ({ id, type: 'group' }));
         let user = await client.inviteUser(ctx.input.email, groups);
         return {
@@ -83,6 +85,7 @@ export let manageUsers = SlateTool.create(spec, {
       }
 
       case 'list': {
+        validatePagination(undefined, ctx.input.limit, 200);
         let result = await client.listUsers({
           limit: ctx.input.limit,
           after: ctx.input.after,
@@ -91,14 +94,14 @@ export let manageUsers = SlateTool.create(spec, {
         return {
           output: {
             users: result.data.map(mapUser),
-            nextMarker: result.nextMarker
+            nextMarker: result.nextMarker ?? undefined
           },
           message: `Found **${result.data.length}** users.`
         };
       }
 
       case 'get': {
-        if (!ctx.input.userId) throw new Error('userId is required.');
+        if (!ctx.input.userId) throw createApiServiceError('userId is required.');
         let user = await client.getUser(ctx.input.userId);
         return {
           output: { user: mapUser(user) },
@@ -107,7 +110,7 @@ export let manageUsers = SlateTool.create(spec, {
       }
 
       case 'update': {
-        if (!ctx.input.userId) throw new Error('userId is required.');
+        if (!ctx.input.userId) throw createApiServiceError('userId is required.');
         let current = await client.getUser(ctx.input.userId);
         let user = await client.updateUser(ctx.input.userId, {
           email: ctx.input.email ?? current.email,
@@ -123,7 +126,7 @@ export let manageUsers = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!ctx.input.userId) throw new Error('userId is required.');
+        if (!ctx.input.userId) throw createApiServiceError('userId is required.');
         await client.deleteUser(ctx.input.userId);
         return {
           output: { deleted: true },

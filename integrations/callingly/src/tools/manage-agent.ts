@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,7 @@ export let manageAgent = SlateTool.create(spec, {
 - To **update** an agent, provide the agentId along with the fields to change.
 - To **delete** an agent, set the \`delete\` flag to true with the agentId.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -54,6 +54,9 @@ export let manageAgent = SlateTool.create(spec, {
       accountId: ctx.config.accountId
     });
 
+    if (ctx.input.delete && !ctx.input.agentId) {
+      throw createApiServiceError('Provide agentId when deleting an agent.');
+    }
     if (ctx.input.delete && ctx.input.agentId) {
       await client.deleteAgent(ctx.input.agentId);
       return {
@@ -73,7 +76,8 @@ export let manageAgent = SlateTool.create(spec, {
       if (ctx.input.ext !== undefined) data.ext = ctx.input.ext;
       if (ctx.input.timezone !== undefined) data.timezone = ctx.input.timezone;
       if (ctx.input.priority !== undefined) data.priority = ctx.input.priority;
-      if (ctx.input.doNotDisturb !== undefined) data.donotdisturb = ctx.input.doNotDisturb;
+      if (ctx.input.doNotDisturb !== undefined)
+        data.donotdisturb = ctx.input.doNotDisturb ? 1 : 0;
       if (ctx.input.doNotDisturbUntil !== undefined)
         data.donotdisturb_until = ctx.input.doNotDisturbUntil;
 
@@ -81,15 +85,24 @@ export let manageAgent = SlateTool.create(spec, {
       return {
         output: {
           agentId: String(result.id),
-          firstName: result.fname,
-          lastName: result.lname,
-          phoneNumber: result.phone_number,
-          isAvailable: result.is_available
+          firstName: result.fname ?? undefined,
+          lastName: result.lname ?? undefined,
+          phoneNumber: result.phone_number ?? undefined,
+          isAvailable: result.is_available ?? undefined
         },
         message: `Agent **${result.fname ?? ''} ${result.lname ?? ''}** updated successfully.`
       };
     }
 
+    if (
+      !ctx.input.firstName?.trim() ||
+      !ctx.input.lastName?.trim() ||
+      !ctx.input.phoneNumber?.trim()
+    ) {
+      throw createApiServiceError(
+        'Provide firstName, lastName, and phoneNumber when creating an agent.'
+      );
+    }
     let result = await client.createAgent({
       firstName: ctx.input.firstName!,
       lastName: ctx.input.lastName!,
@@ -101,10 +114,10 @@ export let manageAgent = SlateTool.create(spec, {
     return {
       output: {
         agentId: String(result.id),
-        firstName: result.fname,
-        lastName: result.lname,
-        phoneNumber: result.phone_number,
-        isAvailable: result.is_available
+        firstName: result.fname ?? undefined,
+        lastName: result.lname ?? undefined,
+        phoneNumber: result.phone_number ?? undefined,
+        isAvailable: result.is_available ?? undefined
       },
       message: `Agent **${result.fname ?? ''} ${result.lname ?? ''}** created successfully.`
     };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -53,6 +53,10 @@ export let updateProject = SlateTool.create(spec, {
     if (ctx.input.isOpen !== undefined) data.is_open = ctx.input.isOpen;
     if (ctx.input.isFavorite !== undefined) data.is_favorite = ctx.input.isFavorite;
     if (ctx.input.endedAt !== undefined) data.ended_at = ctx.input.endedAt;
+
+    if (Object.keys(data).length === 0) {
+      throw createApiServiceError('Provide at least one field to update.');
+    }
 
     let project = await client.updateProject(ctx.input.projectId, data);
 

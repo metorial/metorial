@@ -1,3 +1,4 @@
+export * from './list-payment-profiles';
 export * from './list-staff';
 export * from './manage-client';
 export * from './manage-contact';

@@ -1,16 +1,44 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
   private apiKey: string;
 
   constructor(config: { token: string }) {
+    if (!config.token?.trim()) {
+      throw createApiServiceError('A Route4Me API key is required. Reconnect your account.', {
+        reason: 'missing_api_key'
+      });
+    }
     this.apiKey = config.token;
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.route4me.com',
-      headers: {
-        'Content-Type': 'application/json'
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Route4Me',
+          reason: 'route4me_api_error'
+        })
+    });
+    this.http.interceptors.response.use(response => {
+      let data = response.data;
+      if (
+        isApiErrorRecord(data) &&
+        (data.status === false ||
+          data.success === false ||
+          (Array.isArray(data.errors) && data.errors.length > 0))
+      ) {
+        throw buildApiServiceError(
+          { response: { status: response.status, data } },
+          { providerLabel: 'Route4Me', reason: 'route4me_api_error' }
+        );
       }
+      return response;
     });
   }
 
@@ -77,9 +105,13 @@ export class Client {
   }
 
   async updateRoute(routeId: string, body: Record<string, any>) {
-    let response = await this.http.put('/api.v4/route.php', body, {
-      params: this.params({ route_id: routeId })
-    });
+    let response = await this.http.put(
+      '/api.v4/route.php',
+      { parameters: body },
+      {
+        params: this.params({ route_id: routeId })
+      }
+    );
     return response.data;
   }
 
@@ -91,9 +123,11 @@ export class Client {
   }
 
   async duplicateRoute(routeId: string) {
-    let response = await this.http.post('/api.v4/route.php', null, {
-      params: this.params({ route_id: routeId, to: 'none', redirect: 0 })
-    });
+    let response = await this.http.post(
+      '/api.v4/route.php',
+      { duplicate_routes_id: [routeId] },
+      { params: this.params() }
+    );
     return response.data;
   }
 
@@ -260,9 +294,12 @@ export class Client {
   }
 
   async getUser() {
-    let response = await this.http.get('/api.v4/user.php', {
-      params: this.params()
-    });
+    let response = await this.http.get(
+      'https://wh.route4me.com/modules/api/v5.0/team/users/me',
+      {
+        params: this.params()
+      }
+    );
     return response.data;
   }
 
@@ -282,7 +319,8 @@ export class Client {
 
   async deleteMember(memberId: number) {
     let response = await this.http.delete('/api.v4/user.php', {
-      params: this.params({ member_id: memberId })
+      params: this.params(),
+      data: { member_id: memberId }
     });
     return response.data;
   }

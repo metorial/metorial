@@ -1,12 +1,15 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  aiEditImage,
   editImage,
   generateBackground,
   generateFashionModel,
   generateImage,
   generateVideo,
+  getAiEditStatus,
   getJobStatus,
+  listStorageTypes,
   manageStorage
 } from './tools';
 export let provider = Slate.create({
@@ -18,7 +21,10 @@ export let provider = Slate.create({
     generateFashionModel,
     generateVideo,
     manageStorage,
-    getJobStatus
+    getJobStatus,
+    aiEditImage,
+    getAiEditStatus,
+    listStorageTypes
   ],
   triggers: []
 });

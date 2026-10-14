@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { projectIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let listIssueTypesTool = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let listIssueTypesTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      projectId: z.number().describe('The project ID to get issue types for')
+      projectId: projectIdSchema
     })
   )
   .output(

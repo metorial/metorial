@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   cancelWorkflow,
   createPipeline,
+  getCurrentUser,
   getPipeline,
   getWorkflow,
   launchWorkflow,
@@ -13,22 +14,27 @@ import {
   listParticipants,
   listPipelines,
   listWorkflows,
+  listWorkflowTasks,
   listWorkspaces,
   manageActions,
   manageComputeEnv,
   manageDataset,
   manageLabels,
+  managePipeline,
   manageSecrets
 } from './tools';
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     listPipelines,
     getPipeline,
     createPipeline,
+    managePipeline,
     launchWorkflow,
     listWorkflows,
     getWorkflow,
+    listWorkflowTasks,
     cancelWorkflow,
     listComputeEnvs,
     manageComputeEnv,

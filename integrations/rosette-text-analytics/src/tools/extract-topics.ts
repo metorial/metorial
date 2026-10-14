@@ -49,7 +49,7 @@ export let extractTopicsTool = SlateTool.create(spec, {
 
     let result = await client.extractTopics(ctx.input.content, ctx.input.language);
 
-    let keyphrases = result.keyphrases ?? [];
+    let keyphrases = result.keyphrase ?? result.keyphrases ?? [];
     let concepts = result.concepts ?? [];
 
     return {

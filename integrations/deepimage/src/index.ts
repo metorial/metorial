@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deleteJobResult,
+  editImage,
   enhanceImage,
   faceSwap,
   generateImage,
@@ -22,7 +23,8 @@ export let provider = Slate.create({
     resizeImage,
     getJobResult,
     deleteJobResult,
-    getAccountInfo
+    getAccountInfo,
+    editImage
   ],
   triggers: []
 });

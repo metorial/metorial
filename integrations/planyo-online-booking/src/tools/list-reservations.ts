@@ -88,7 +88,7 @@ export let listReservations = SlateTool.create(spec, {
       sort: ctx.input.sort,
       sortReverse: ctx.input.sortReverse,
       page: ctx.input.page,
-      detailLevel: 3, // name + settings
+      detailLevel: 7, // reservation info + custom properties + pricing
       customProperties: ctx.input.customProperties
     });
 
@@ -98,7 +98,7 @@ export let listReservations = SlateTool.create(spec, {
       resourceId: r.resource_id ? String(r.resource_id) : undefined,
       startTime: r.start_time ? String(r.start_time) : undefined,
       endTime: r.end_time ? String(r.end_time) : undefined,
-      status: r.status ? String(r.status) : undefined,
+      status: r.status != null ? String(r.status) : undefined,
       quantity: r.quantity != null ? Number(r.quantity) : undefined,
       email: r.email,
       firstName: r.first_name,

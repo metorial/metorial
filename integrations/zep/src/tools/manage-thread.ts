@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let manageThread = SlateTool.create(spec, {
   name: 'Manage Thread',
   key: 'manage_thread',
-  description: `Create, retrieve, list, or delete conversation threads. Threads represent conversations between a user and your agent, and serve as containers for chat messages that feed into the knowledge graph.`,
+  description: `Create, retrieve, list, or delete conversation threads. Retrieving a thread includes its message history and owner information. Threads contain chat messages that feed into the user's knowledge graph.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -26,7 +26,15 @@ export let manageThread = SlateTool.create(spec, {
         .enum(['created_at', 'updated_at', 'user_id', 'thread_id'])
         .optional()
         .describe('Field to order results by'),
-      ascending: z.boolean().optional().describe('Whether to sort in ascending order')
+      ascending: z.boolean().optional().describe('Whether to sort in ascending order'),
+      messageLimit: z.number().optional().describe('Message page size for get'),
+      messageCursor: z.number().optional().describe('Message pagination cursor for get'),
+      lastMessages: z
+        .number()
+        .optional()
+        .describe(
+          'Return the most recent messages for get; overrides messageLimit and messageCursor'
+        )
     })
   )
   .output(
@@ -52,6 +60,31 @@ export let manageThread = SlateTool.create(spec, {
         .optional()
         .describe('List of threads'),
       totalCount: z.number().optional().describe('Total number of threads available'),
+      messages: z
+        .array(
+          z.object({
+            role: z.string().describe('Message sender role'),
+            content: z.string().describe('Message content'),
+            name: z.string().optional().describe('Speaker name'),
+            uuid: z.string().optional().describe('Message UUID'),
+            createdAt: z.string().optional().describe('Message timestamp'),
+            metadata: z
+              .record(z.string(), z.unknown())
+              .optional()
+              .describe('Message metadata'),
+            processed: z
+              .boolean()
+              .optional()
+              .describe('Whether the message has been processed')
+          })
+        )
+        .optional()
+        .describe('Message history returned by get'),
+      totalMessageCount: z
+        .number()
+        .optional()
+        .describe('Total number of messages in the thread'),
+      returnedMessageCount: z.number().optional().describe('Number of messages in this page'),
       deleted: z.boolean().optional().describe('Whether the thread was deleted')
     })
   )
@@ -60,7 +93,7 @@ export let manageThread = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.threadId || !ctx.input.userId) {
-        throw new Error('threadId and userId are required for creating a thread');
+        throw createApiServiceError('threadId and userId are required for creating a thread');
       }
       let thread = await client.createThread({
         threadId: ctx.input.threadId,
@@ -81,9 +114,13 @@ export let manageThread = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.threadId) {
-        throw new Error('threadId is required for getting a thread');
+        throw createApiServiceError('threadId is required for getting a thread');
       }
-      let thread = await client.getThread(ctx.input.threadId);
+      let thread = await client.getThread(ctx.input.threadId, {
+        limit: ctx.input.messageLimit,
+        cursor: ctx.input.messageCursor,
+        lastn: ctx.input.lastMessages
+      });
       return {
         output: {
           thread: {
@@ -91,7 +128,18 @@ export let manageThread = SlateTool.create(spec, {
             userId: thread.user_id,
             uuid: thread.uuid,
             createdAt: thread.created_at
-          }
+          },
+          messages: thread.messages?.map(message => ({
+            role: message.role,
+            content: message.content,
+            name: message.name,
+            uuid: message.uuid,
+            createdAt: message.created_at,
+            metadata: message.metadata,
+            processed: message.processed
+          })),
+          totalMessageCount: thread.total_count,
+          returnedMessageCount: thread.row_count
         },
         message: `Retrieved thread **${thread.thread_id}**.`
       };
@@ -104,7 +152,7 @@ export let manageThread = SlateTool.create(spec, {
         orderBy: ctx.input.orderBy,
         asc: ctx.input.ascending
       });
-      let threads = (result.threads || []).map((t: any) => ({
+      let threads = (result.threads || []).map(t => ({
         threadId: t.thread_id,
         userId: t.user_id,
         uuid: t.uuid,
@@ -121,7 +169,7 @@ export let manageThread = SlateTool.create(spec, {
 
     // delete
     if (!ctx.input.threadId) {
-      throw new Error('threadId is required for deleting a thread');
+      throw createApiServiceError('threadId is required for deleting a thread');
     }
     await client.deleteThread(ctx.input.threadId);
     return {

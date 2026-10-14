@@ -93,7 +93,7 @@ Use this to inspect a document's processing state, read its content, or access i
         output.content =
           typeof contentData === 'string'
             ? contentData
-            : contentData.content || JSON.stringify(contentData);
+            : (contentData.content ?? JSON.stringify(contentData));
       } catch (_e) {
         ctx.warn('Failed to fetch document content');
         output.content = null;
@@ -106,7 +106,7 @@ Use this to inspect a document's processing state, read its content, or access i
         output.summary =
           typeof summaryData === 'string'
             ? summaryData
-            : summaryData.summary || JSON.stringify(summaryData);
+            : (summaryData.summary ?? JSON.stringify(summaryData));
       } catch (_e) {
         ctx.warn('Failed to fetch document summary');
         output.summary = null;
@@ -118,7 +118,7 @@ Use this to inspect a document's processing state, read its content, or access i
         let chunksResult = await client.getDocumentChunks(ctx.input.documentId, { partition });
         output.chunks = chunksResult.chunks.map((c: any) => ({
           chunkId: c.id,
-          chunkIndex: c.index,
+          chunkIndex: c.index ?? -1,
           text: c.text
         }));
       } catch (_e) {

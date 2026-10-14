@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,7 +56,13 @@ Only one default webhook URL is allowed per account.`,
 
     if (ctx.input.action === 'set') {
       if (!ctx.input.callbackUrl) {
-        throw new Error('callbackUrl is required when action is "set"');
+        throw createApiServiceError('callbackUrl is required when action is "set".');
+      }
+      if (
+        !URL.canParse(ctx.input.callbackUrl) ||
+        !['http:', 'https:'].includes(new URL(ctx.input.callbackUrl).protocol)
+      ) {
+        throw createApiServiceError('callbackUrl must be an HTTP or HTTPS URL.');
       }
       await client.setDefaultWebhookUrl(ctx.input.callbackUrl);
       return {

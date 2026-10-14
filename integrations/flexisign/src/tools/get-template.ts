@@ -25,7 +25,11 @@ export let getTemplate = SlateTool.create(spec, {
         .record(z.string(), z.unknown())
         .describe(
           'Structure defining the fields, recipient roles, and configuration required to create a document from this template'
-        )
+        ),
+      recipients: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Recipient roles and details returned by the template')
     })
   )
   .handleInvocation(async ctx => {
@@ -37,7 +41,8 @@ export let getTemplate = SlateTool.create(spec, {
       output: {
         templateId: template.templateId,
         templateName: template.templateName,
-        bodyStructure: template.bodyStructure
+        bodyStructure: template.bodyStructure,
+        recipients: template.recipients
       },
       message: `Retrieved template **${template.templateName}** (\`${template.templateId}\`).`
     };

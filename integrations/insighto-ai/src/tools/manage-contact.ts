@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getObjectResult } from '../lib/client';
 import { spec } from '../spec';
 
 export let manageContact = SlateTool.create(spec, {
@@ -24,6 +24,10 @@ export let manageContact = SlateTool.create(spec, {
       lastName: z.string().optional().describe('Last name'),
       email: z.string().optional().describe('Email address'),
       phone: z.string().optional().describe('Phone number in E.164 format'),
+      channels: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider channel configuration for the update action'),
       customFields: z
         .record(z.string(), z.unknown())
         .optional()
@@ -51,14 +55,14 @@ export let manageContact = SlateTool.create(spec, {
         phone: ctx.input.phone,
         custom_fields: ctx.input.customFields
       });
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
-          contactId: data.id,
-          firstName: data.first_name,
-          lastName: data.last_name,
-          email: data.email,
-          phone: data.phone
+          contactId: data.id ?? ctx.input.contactId,
+          firstName: data.first_name ?? undefined,
+          lastName: data.last_name ?? undefined,
+          email: data.email ?? undefined,
+          phone: data.phone ?? undefined
         },
         message: `Upserted contact **${data.first_name || ''} ${data.last_name || ''}** (${data.email || data.phone || data.id}).`
       };
@@ -70,16 +74,17 @@ export let manageContact = SlateTool.create(spec, {
         last_name: ctx.input.lastName,
         email: ctx.input.email,
         phone: ctx.input.phone,
+        channels: ctx.input.channels,
         custom_fields: ctx.input.customFields
       });
-      let data = result.data || result;
+      let data = getObjectResult(result);
       return {
         output: {
-          contactId: data.id,
-          firstName: data.first_name,
-          lastName: data.last_name,
-          email: data.email,
-          phone: data.phone
+          contactId: data.id ?? ctx.input.contactId,
+          firstName: data.first_name ?? undefined,
+          lastName: data.last_name ?? undefined,
+          email: data.email ?? undefined,
+          phone: data.phone ?? undefined
         },
         message: `Updated contact **${data.first_name || ''} ${data.last_name || ''}**.`
       };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let textToSpeech = SlateTool.create(spec, {
   key: 'text_to_speech',
   description: `Convert text into natural-sounding speech audio using models from OpenAI, ElevenLabs, Deepgram, and Microsoft.
 Supports 120+ languages, multiple voices, adjustable speed, and various audio formats (mp3, opus, aac, flac, wav, pcm).
-Returns a URL to the generated audio file.`,
+Returns generated audio as a downloadable file, with its provider URL when available.`,
   instructions: [
     'Use model IDs like "openai/tts-1", "openai/tts-1-hd", "elevenlabs/eleven_multilingual_v2".',
     'Available voices for OpenAI models: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse.'
@@ -60,7 +60,7 @@ Returns a URL to the generated audio file.`,
       baseUrl: ctx.config.baseUrl
     });
 
-    let result = await client.textToSpeech({
+    let response = await client.textToSpeech({
       model: ctx.input.model,
       text: ctx.input.text,
       voice: ctx.input.voice,
@@ -68,9 +68,26 @@ Returns a URL to the generated audio file.`,
       speed: ctx.input.speed
     });
 
+    let result = response.result;
+    let audioUrl = typeof result.audio === 'string' ? result.audio : result.audio?.url;
+    if (audioUrl) {
+      await ctx.addAttachment({ type: 'url', url: audioUrl });
+    } else if (response.content?.byteLength) {
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(response.content),
+        mimeType: response.mimeType,
+        filename: `speech.${ctx.input.audioFormat ?? 'mp3'}`
+      });
+    } else {
+      throw createApiServiceError(
+        'AI/ML API returned no generated audio. Try another TTS model.'
+      );
+    }
+
     return {
       output: {
-        audioUrl: result.audio?.url,
+        audioUrl,
         duration: result.metadata?.duration,
         model: result.metadata?.model_info?.name
       },

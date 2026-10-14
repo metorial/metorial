@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { teamIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let manageSecret = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ export let manageSecret = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      teamId: teamIdSchema,
       action: z
         .enum(['list', 'create', 'get', 'update', 'delete'])
         .describe('Operation to perform'),
@@ -67,7 +69,9 @@ export let manageSecret = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId:
+        ctx.input.teamId ??
+        (typeof ctx.config.teamId === 'string' ? ctx.config.teamId : undefined)
     });
 
     let { action, projectId, secretId } = ctx.input;
@@ -93,9 +97,10 @@ export let manageSecret = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating a secret');
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for creating a secret');
       if (!ctx.input.secretType)
-        throw new Error('secretType is required for creating a secret');
+        throw createApiServiceError('secretType is required for creating a secret');
       let result = await client.createProjectSecret(projectId, {
         name: ctx.input.name,
         description: ctx.input.description,
@@ -115,7 +120,7 @@ export let manageSecret = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!secretId) throw new Error('secretId is required');
+      if (!secretId) throw createApiServiceError('secretId is required');
       let result = await client.getProjectSecret(projectId, secretId);
       return {
         output: {
@@ -128,9 +133,12 @@ export let manageSecret = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!secretId) throw new Error('secretId is required for update');
+      if (!secretId) throw createApiServiceError('secretId is required for update');
+      if (ctx.input.name !== undefined)
+        throw createApiServiceError(
+          'Secret group names cannot be changed. Update description, priority, variables, or tags instead.'
+        );
       let updateData: any = {};
-      if (ctx.input.name) updateData.name = ctx.input.name;
       if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
       if (ctx.input.priority !== undefined) updateData.priority = ctx.input.priority;
       if (ctx.input.variables) updateData.variables = ctx.input.variables;
@@ -147,7 +155,7 @@ export let manageSecret = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!secretId) throw new Error('secretId is required for delete');
+      if (!secretId) throw createApiServiceError('secretId is required for delete');
       await client.deleteProjectSecret(projectId, secretId);
       return {
         output: {
@@ -158,6 +166,6 @@ export let manageSecret = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

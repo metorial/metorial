@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppVeyorClient } from '../lib/client';
 import { spec } from '../spec';
@@ -45,7 +45,7 @@ export let manageUsers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new AppVeyorClient({
       token: ctx.auth.token,
-      accountName: ctx.config.accountName
+      accountName: ctx.auth.accountName ?? (ctx.config as { accountName?: string }).accountName
     });
 
     switch (ctx.input.action) {
@@ -59,7 +59,7 @@ export let manageUsers = SlateTool.create(spec, {
 
       case 'get': {
         if (ctx.input.userId === undefined) {
-          throw new Error('userId is required for get');
+          throw createApiServiceError('userId is required for get');
         }
         let user = await client.getUser(ctx.input.userId);
         return {
@@ -70,7 +70,12 @@ export let manageUsers = SlateTool.create(spec, {
 
       case 'create': {
         if (!ctx.input.fullName || !ctx.input.email || ctx.input.roleId === undefined) {
-          throw new Error('fullName, email, and roleId are required for create');
+          throw createApiServiceError('fullName, email, and roleId are required for create');
+        }
+        if (ctx.input.generatePassword !== true && !ctx.input.password) {
+          throw createApiServiceError(
+            'Set generatePassword to true or provide password when creating a user.'
+          );
         }
         await client.createUser({
           fullName: ctx.input.fullName,
@@ -88,11 +93,11 @@ export let manageUsers = SlateTool.create(spec, {
 
       case 'update': {
         if (ctx.input.userId === undefined) {
-          throw new Error('userId is required for update');
+          throw createApiServiceError('userId is required for update');
         }
         let updateBody: Record<string, unknown> = {
-          userId: ctx.input.userId,
-          ...(ctx.input.userSettings || {})
+          ...(ctx.input.userSettings || {}),
+          userId: ctx.input.userId
         };
         if (ctx.input.fullName) updateBody.fullName = ctx.input.fullName;
         if (ctx.input.email) updateBody.email = ctx.input.email;
@@ -110,7 +115,7 @@ export let manageUsers = SlateTool.create(spec, {
 
       case 'delete': {
         if (ctx.input.userId === undefined) {
-          throw new Error('userId is required for delete');
+          throw createApiServiceError('userId is required for delete');
         }
         await client.deleteUser(ctx.input.userId);
         return {
@@ -120,7 +125,7 @@ export let manageUsers = SlateTool.create(spec, {
       }
 
       default:
-        throw new Error(`Unknown action: ${ctx.input.action}`);
+        throw createApiServiceError(`Unknown action: ${ctx.input.action}`);
     }
   })
   .build();

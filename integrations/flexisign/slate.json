@@ -1,14 +1,13 @@
 {
   "name": "@metorial/flexisign",
-  "description": "Send, sign, and manage digital documents and e-signature requests. List and retrieve reusable document templates, create documents from templates, and send signature requests to one or more recipients. Track document status across stages such as waiting, completed, declined, and voided. Supports over 25 document types including PDF, Word, Excel, and images. Configure signing order for sequential or simultaneous workflows.",
+  "description": "List reusable FlexiSign templates, inspect their signer roles and required fields, and send documents for signature from an existing template. Connect with a workspace API key, then use the template's body structure to supply recipient names, emails, a message, and expiration settings.",
   "categories": ["document-processing", "legal-and-compliance"],
   "skills": [
     "list document templates",
     "retrieve template details",
     "create signature requests",
     "send documents for signing",
-    "track document status",
-    "manage signing workflows",
+    "inspect template recipient roles",
     "generate documents from templates"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/flexisign.png"

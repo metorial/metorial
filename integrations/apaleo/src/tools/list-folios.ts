@@ -11,7 +11,10 @@ export let listFolios = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      propertyId: z.string().optional().describe('Property ID'),
+      propertyId: z
+        .string()
+        .optional()
+        .describe('Property ID. Call list_properties to discover available properties.'),
       reservationIds: z.array(z.string()).optional().describe('Filter by reservation IDs'),
       bookingId: z.string().optional().describe('Filter by booking ID'),
       onlyMain: z.boolean().optional().describe('Return only the main folio per reservation'),
@@ -66,23 +69,25 @@ export let listFolios = SlateTool.create(spec, {
     });
 
     let folios = (result.folios || []).map((f: any) => ({
-      folioId: f.id,
-      type: f.type,
+      folioId: f.id ?? undefined,
+      type: f.type ?? undefined,
       reservationId: f.reservation?.id,
-      bookingId: f.booking?.id,
-      property: f.property ? { propertyId: f.property.id, name: f.property.name } : undefined,
-      balance: f.balance,
-      status: f.status,
-      created: f.created,
-      modified: f.modified
+      bookingId: f.bookingId ?? f.reservation?.bookingId ?? f.booking?.id,
+      property: f.property
+        ? { propertyId: f.property.id ?? undefined, name: f.property.name ?? undefined }
+        : undefined,
+      balance: f.balance ?? undefined,
+      status: f.status ?? undefined,
+      created: f.created ?? undefined,
+      modified: f.updated ?? f.modified
     }));
 
     return {
       output: {
         folios,
-        count: result.count || folios.length
+        count: result.count ?? folios.length
       },
-      message: `Found **${result.count || folios.length}** folios.`
+      message: `Found **${result.count ?? folios.length}** folios.`
     };
   })
   .build();

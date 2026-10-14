@@ -2,6 +2,8 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   cancelCampaign,
+  checkEmailDelivery,
+  checkSmsDelivery,
   createEmailMessage,
   deleteTag,
   getAccountInfo,
@@ -19,6 +21,7 @@ import {
   manageTemplates,
   sendEmail,
   sendSms,
+  sendTestEmail,
   subscribeContact,
   unsubscribeContact,
   updateEmailMessage,
@@ -41,6 +44,9 @@ export let provider = Slate.create({
     listCampaigns,
     sendEmail,
     sendSms,
+    checkEmailDelivery,
+    checkSmsDelivery,
+    sendTestEmail,
     manageTemplates,
     getTemplates,
     manageFields,

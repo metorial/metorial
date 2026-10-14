@@ -1,3 +1,43 @@
+import { createApiServiceError, isApiErrorRecord } from 'slates';
+
+// Translate the existing tool schemas to the documented GraphQL input names and list shapes.
+export let normalizeFunnelFilters = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(normalizeFunnelFilters);
+  if (!isApiErrorRecord(value)) return value;
+  let result: Record<string, unknown> = {};
+  for (let [key, field] of Object.entries(value)) {
+    if (['must', 'should', 'must_not'].includes(key) && Array.isArray(field)) {
+      result[key] = field.flat().map(normalizeFunnelFilters);
+    } else if (key === 'event_properties' && Array.isArray(field)) {
+      result[key] = field.map(property => {
+        if (!isApiErrorRecord(property) || typeof property.name !== 'string') {
+          throw createApiServiceError('Each custom event property filter requires a name.');
+        }
+        let { string, int, bool, float, ...rest } = property;
+        return normalizeFunnelFilters({
+          ...rest,
+          value_str: rest.value_str ?? string,
+          value_int: rest.value_int ?? int,
+          value_bool: rest.value_bool ?? bool,
+          value_float: rest.value_float ?? float
+        });
+      });
+    } else {
+      result[key] = normalizeFunnelFilters(field);
+    }
+  }
+  return result;
+};
+
+export let normalizeFunnelCompute = (compute: unknown[]) => {
+  if (compute.length !== 1) {
+    throw createApiServiceError(
+      'LiveSession accepts one computation configuration per funnel. Supply exactly one compute item.'
+    );
+  }
+  return normalizeFunnelFilters(compute[0]);
+};
+
 export let FUNNEL_FIELDS = `
   funnel_id
   name
@@ -9,16 +49,6 @@ export let FUNNEL_FIELDS = `
   is_public
   created_by_agent_id
   created_by_login
-  compute {
-    date_range { from to }
-    type
-    steps {
-      name
-      filters { must should must_not }
-    }
-    conversion_value { property_name value_type label }
-    filters { must should must_not }
-  }
 `;
 
 export let FUNNEL_CREATE_MUTATION = `

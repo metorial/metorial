@@ -1,24 +1,28 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
 
-  constructor(private config: { token: string }) {
-    this.axios = createAxios({
-      baseURL: 'https://api.abuseipdb.com/api/v2'
+  constructor(config: { token: string }) {
+    if (!config.token) {
+      throw createApiServiceError('An AbuseIPDB API key is required. Reconnect your account.');
+    }
+
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.abuseipdb.com/api/v2',
+      authHeader: { name: 'Key', value: config.token },
+      contentType: false,
+      headers: { Accept: 'application/json' },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'AbuseIPDB',
+          reason: 'abuseipdb_api_error'
+        })
     });
-  }
-
-  private get headers() {
-    return {
-      Key: this.config.token,
-      Accept: 'application/json'
-    };
   }
 
   async checkIp(params: { ipAddress: string; maxAgeInDays?: number; verbose?: boolean }) {
     let response = await this.axios.get('/check', {
-      headers: this.headers,
       params: {
         ipAddress: params.ipAddress,
         maxAgeInDays: params.maxAgeInDays ?? 30,
@@ -35,7 +39,6 @@ export class Client {
     perPage?: number;
   }) {
     let response = await this.axios.get('/reports', {
-      headers: this.headers,
       params: {
         ipAddress: params.ipAddress,
         maxAgeInDays: params.maxAgeInDays ?? 30,
@@ -48,7 +51,6 @@ export class Client {
 
   async checkBlock(params: { network: string; maxAgeInDays?: number }) {
     let response = await this.axios.get('/check-block', {
-      headers: this.headers,
       params: {
         network: params.network,
         maxAgeInDays: params.maxAgeInDays ?? 30
@@ -63,38 +65,23 @@ export class Client {
     comment?: string;
     timestamp?: string;
   }) {
-    let response = await this.axios.post('/report', null, {
+    let body = new URLSearchParams({ ip: params.ip, categories: params.categories });
+    if (params.comment !== undefined) body.set('comment', params.comment);
+    if (params.timestamp !== undefined) body.set('timestamp', params.timestamp);
+
+    let response = await this.axios.post('/report', body.toString(), {
       headers: {
-        ...this.headers,
         'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      params: {
-        ip: params.ip,
-        categories: params.categories,
-        comment: params.comment,
-        timestamp: params.timestamp
       }
     });
     return response.data;
   }
 
   async bulkReport(params: { csvContent: string }) {
-    let boundary = `----SlatesBoundary${Date.now().toString(36)}`;
-    let body = [
-      `--${boundary}`,
-      'Content-Disposition: form-data; name="csv"; filename="report.csv"',
-      'Content-Type: text/csv',
-      '',
-      params.csvContent,
-      `--${boundary}--`
-    ].join('\r\n');
+    let body = new FormData();
+    body.append('csv', new Blob([params.csvContent], { type: 'text/csv' }), 'report.csv');
 
-    let response = await this.axios.post('/bulk-report', body, {
-      headers: {
-        ...this.headers,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`
-      }
-    });
+    let response = await this.axios.post('/bulk-report', body);
     return response.data;
   }
 
@@ -119,7 +106,6 @@ export class Client {
     }
 
     let response = await this.axios.get('/blacklist', {
-      headers: this.headers,
       params: queryParams
     });
     return response.data;
@@ -127,7 +113,6 @@ export class Client {
 
   async clearAddress(params: { ipAddress: string }) {
     let response = await this.axios.delete('/clear-address', {
-      headers: this.headers,
       params: {
         ipAddress: params.ipAddress
       }

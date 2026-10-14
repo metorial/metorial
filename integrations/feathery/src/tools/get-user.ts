@@ -39,12 +39,16 @@ export let getUser = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new FeatheryClient({
       token: ctx.auth.token,
-      region: ctx.config.region
+      region:
+        ctx.auth.region ??
+        ('region' in ctx.config && typeof ctx.config.region === 'string'
+          ? ctx.config.region
+          : undefined)
     });
 
     let [fields, sessions] = await Promise.all([
-      client.getUserFields(ctx.input.userId).catch(() => null),
-      client.getUserSession(ctx.input.userId).catch(() => null)
+      client.getUserFields(ctx.input.userId),
+      client.getUserSession(ctx.input.userId)
     ]);
 
     let fieldValues: Record<string, any> = {};
@@ -56,12 +60,15 @@ export let getUser = SlateTool.create(spec, {
       fieldValues = fields;
     }
 
-    let sessionList = Array.isArray(sessions) ? sessions : sessions?.results || [];
+    let sessionList = Array.isArray(sessions)
+      ? sessions
+      : sessions?.forms || sessions?.results || [];
     let mappedSessions = sessionList.map((s: any) => ({
-      formId: s.form_id || s.id,
-      formName: s.form_name || s.name,
-      currentStep: s.current_step || s.step,
-      completed: s.completed
+      formId: s.form_id ?? s.id ?? undefined,
+      formName: s.form_name ?? s.name ?? undefined,
+      currentStep: s.current_step_id ?? s.current_step ?? s.step ?? undefined,
+      completed:
+        s.completed ?? (s.completed_at !== undefined ? s.completed_at !== null : undefined)
     }));
 
     return {

@@ -1,6 +1,10 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ScrapeDoClient } from '../lib/client';
+import {
+  type AsyncJobRenderOptions,
+  ScrapeDoClient,
+  validateWholeNumber
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let createAsyncJob = SlateTool.create(spec, {
@@ -86,7 +90,16 @@ export let createAsyncJob = SlateTool.create(spec, {
     let client = new ScrapeDoClient(ctx.auth.token);
     let input = ctx.input;
 
-    let renderOptions: Record<string, unknown> | undefined;
+    if (input.targets.length === 0 || input.targets.some(url => !url.trim())) {
+      throw createApiServiceError('Provide at least one non-empty target URL.');
+    }
+    if (input.setCookies && input.headers && Object.keys(input.headers).length > 0) {
+      throw createApiServiceError('Choose either setCookies or headers for an async job.');
+    }
+    validateWholeNumber('timeout', input.timeout, 5000, 120000);
+    validateWholeNumber('retryTimeout', input.retryTimeout, 1);
+    validateWholeNumber('render.customWait', input.render?.customWait, 0, 35000);
+    let renderOptions: AsyncJobRenderOptions | undefined;
     if (input.render) {
       renderOptions = {};
       if (input.render.blockResources !== undefined)
@@ -124,7 +137,7 @@ export let createAsyncJob = SlateTool.create(spec, {
       output: input.output,
       webhookUrl: input.webhookUrl,
       webhookHeaders: input.webhookHeaders,
-      render: renderOptions as any
+      render: renderOptions
     });
 
     return {

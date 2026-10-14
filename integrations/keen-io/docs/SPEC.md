@@ -1,4 +1,4 @@
-# Slates Specification for Keen.io
+# Keen.io API Specification
 
 ## Overview
 
@@ -8,7 +8,7 @@ Keen.io is an event streaming and analytics platform that allows developers to c
 
 Keen.io uses API key-based authentication. Keen supports two mechanisms for authenticating HTTP API requests, all requiring API Keys for the project you want to use.
 
-All requests require a **Project ID** to identify which project you are working with. API keys are then passed either via:
+All requests require a **Project ID** to identify which project you are working with. Supply the Project ID alongside the API key when connecting. Existing connections with a saved Project ID continue to use it. Project discovery requires an Organization Key, which these project-level authentication methods do not provide. API keys are passed either via:
 
 1. **Authorization header**: Set the `Authorization` HTTP header to the API key value. This method works for every API call.
 2. **Query parameter**: You can also authenticate requests with a query string parameter called `api_key`.

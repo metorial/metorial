@@ -63,7 +63,7 @@ export let listStorageFiles = SlateTool.create(spec, {
       kind: f.kind,
       size: f.size,
       uploadTimestamp: f.upload_timestamp,
-      description: f.description,
+      description: f.description ?? undefined,
       tags: f.tags,
       groupId: f.group_id,
       sha256: f.sha256,

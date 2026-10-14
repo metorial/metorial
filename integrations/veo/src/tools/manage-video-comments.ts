@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -44,7 +44,9 @@ export let manageVideoComments = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       let comments = await client.getVideoComments(ctx.input.videoId);
-      let commentList = Array.isArray(comments) ? comments : [];
+      let commentList = Array.isArray(comments)
+        ? comments
+        : (comments.Items ?? comments.items ?? []);
 
       return {
         output: { comments: commentList, success: true },
@@ -54,7 +56,7 @@ export let manageVideoComments = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.message) {
-        throw new Error('message is required when creating a comment');
+        throw createApiServiceError('message is required when creating a comment');
       }
       await client.createVideoComment(
         ctx.input.videoId,
@@ -69,7 +71,7 @@ export let manageVideoComments = SlateTool.create(spec, {
     }
 
     if (!ctx.input.commentId) {
-      throw new Error('commentId is required when deleting a comment');
+      throw createApiServiceError('commentId is required when deleting a comment');
     }
     await client.deleteVideoComment(ctx.input.videoId, ctx.input.commentId);
 

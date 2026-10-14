@@ -1,3 +1,4 @@
+export * from './delete-newsletter-list';
 export * from './execute-api-function';
 export * from './execute-sql-query';
 export * from './get-failed-emails';

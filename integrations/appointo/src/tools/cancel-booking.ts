@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { getAppointoRecord, mapBooking } from '../lib/bookings';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
@@ -37,13 +38,13 @@ export let cancelBooking = SlateTool.create(spec, {
       customerIds: ctx.input.customerIds
     });
 
-    let booking = result?.booking ?? result?.data ?? result;
+    let booking = getAppointoRecord(result, 'booking');
 
     return {
       output: {
-        bookingId: booking?.id ?? booking?.booking_id ?? ctx.input.bookingId,
-        status: booking?.status,
-        ...booking
+        ...mapBooking(booking),
+        bookingId: booking.id ?? booking.booking_id ?? ctx.input.bookingId,
+        status: booking.status ?? result?.response?.status
       },
       message: `Booking **#${ctx.input.bookingId}** canceled${ctx.input.customerIds ? ` for ${ctx.input.customerIds.length} customer(s)` : ''}.`
     };

@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let searchSite = SlateTool.create(spec, {
   name: 'Search Site',
   key: 'search_site',
-  description: `Search the published website using DatoCMS built-in site search. Returns matching pages with titles, URLs, body excerpts, and relevance scores. Requires site search to be configured with a build trigger.`,
+  description: `Search the published website using DatoCMS built-in site search. Returns matching pages with titles, URLs, body excerpts, and relevance scores. Requires an enabled search index.`,
   tags: {
     readOnly: true
   }
@@ -14,10 +14,18 @@ export let searchSite = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().describe('Search query string'),
+      searchIndexId: z
+        .string()
+        .optional()
+        .describe(
+          'Search index ID. Omit to use the first enabled search index. Do not combine with buildTriggerId.'
+        ),
       buildTriggerId: z
         .string()
         .optional()
-        .describe('Build trigger ID to scope the search to a specific site'),
+        .describe(
+          'Legacy build trigger ID for sites with one associated search index; prefer searchIndexId'
+        ),
       locale: z.string().optional().describe('Locale to filter results (e.g. "en")'),
       fuzzy: z.boolean().optional().describe('Enable fuzzy matching for approximate results'),
       pageOffset: z.number().optional().describe('Zero-based offset for pagination'),
@@ -38,6 +46,7 @@ export let searchSite = SlateTool.create(spec, {
 
     let result = await client.searchSite(ctx.input.query, {
       buildTriggerId: ctx.input.buildTriggerId,
+      searchIndexId: ctx.input.searchIndexId,
       locale: ctx.input.locale,
       fuzzy: ctx.input.fuzzy,
       pageOffset: ctx.input.pageOffset,

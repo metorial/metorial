@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapEmailValidationResult } from '../lib/results';
 import { spec } from '../spec';
 
 export let validateEmail = SlateTool.create(spec, {
@@ -20,9 +21,15 @@ export let validateEmail = SlateTool.create(spec, {
     z.object({
       validationId: z.string().describe('Unique identifier for this validation request'),
       email: z.string().describe('The validated email address'),
-      username: z.string().describe('Local part of the email (before @)'),
-      domain: z.string().describe('Domain part of the email (after @)'),
-      mxRecord: z.string().describe('Mail exchanger record for the domain'),
+      username: z
+        .string()
+        .describe('Local part of the email (before @), or empty if unavailable'),
+      domain: z
+        .string()
+        .describe('Domain part of the email (after @), or empty if unavailable'),
+      mxRecord: z
+        .string()
+        .describe('Mail exchanger record for the domain, or empty if unavailable'),
       score: z.number().describe('Validity score from 0 to 100'),
       result: z
         .string()
@@ -36,7 +43,14 @@ export let validateEmail = SlateTool.create(spec, {
         ),
       isFormatValid: z.boolean().describe('Whether the email format is valid'),
       isDomainValid: z.boolean().describe('Whether the domain is valid'),
-      isMxValid: z.boolean().describe('Whether MX records exist and are valid'),
+      isMxValid: z
+        .boolean()
+        .describe(
+          'True if MX records were checked and are valid. Check isMxChecked before treating false as invalid.'
+        ),
+      isMxChecked: z
+        .boolean()
+        .describe('Whether the provider checked MX records; false when its MX result is null'),
       isNotBlocklisted: z.boolean().describe('Whether the email is not on any blocklist'),
       isNotCatchAll: z.boolean().describe('Whether the domain is not a catch-all'),
       isNotGeneric: z
@@ -49,26 +63,8 @@ export let validateEmail = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let response = await client.validateEmail(ctx.input.email);
-    let data = response.data;
-
-    let output = {
-      validationId: data.id,
-      email: data.email,
-      username: data.username,
-      domain: data.domain,
-      mxRecord: data.mx_record,
-      score: data.score,
-      result: data.result,
-      reason: data.reason,
-      isFormatValid: data.isv_format,
-      isDomainValid: data.isv_domain,
-      isMxValid: data.isv_mx,
-      isNotBlocklisted: data.isv_noblock,
-      isNotCatchAll: data.isv_nocatchall,
-      isNotGeneric: data.isv_nogeneric,
-      isFreeProvider: data.is_free
-    };
+    let data = await client.validateEmail(ctx.input.email);
+    let output = mapEmailValidationResult(data);
 
     return {
       output,

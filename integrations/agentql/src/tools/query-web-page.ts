@@ -79,10 +79,10 @@ Supports configurable page load wait times, scrolling, screenshot capture, extra
         .optional()
         .describe('Whether to capture a screenshot of the page. Defaults to false'),
       browserProfile: z
-        .enum(['light', 'stealth'])
+        .enum(['light', 'stealth', 'tf-browser'])
         .optional()
         .describe(
-          'Browser profile: "light" (default) or "stealth" for enhanced bot detection avoidance'
+          'Browser profile: "light" (default), "tf-browser" for full browser features, or its "stealth" alias'
         ),
       proxy: z
         .union([tetraProxySchema, customProxySchema])
@@ -95,7 +95,10 @@ Supports configurable page load wait times, scrolling, screenshot capture, extra
       extractedData: z
         .record(z.string(), z.unknown())
         .describe('Structured data extracted from the web page matching the query'),
-      requestId: z.string().describe('Unique identifier for the request'),
+      requestId: z
+        .string()
+        .optional()
+        .describe('Unique identifier for the request, when provided'),
       generatedQuery: z
         .string()
         .optional()
@@ -128,20 +131,32 @@ Supports configurable page load wait times, scrolling, screenshot capture, extra
 
     let output: {
       extractedData: Record<string, unknown>;
-      requestId: string;
+      requestId?: string;
       generatedQuery?: string;
       screenshot?: string;
     } = {
       extractedData: result.data,
-      requestId: result.metadata.request_id
+      requestId: result.metadata?.request_id
     };
 
-    if (result.metadata.generated_query) {
+    if (result.metadata?.generated_query) {
       output.generatedQuery = result.metadata.generated_query;
     }
 
-    if (result.metadata.screenshot) {
+    if (result.metadata?.screenshot) {
       output.screenshot = result.metadata.screenshot;
+      let screenshotBytes = Buffer.from(result.metadata.screenshot, 'base64');
+      let isPng = screenshotBytes
+        .subarray(0, 8)
+        .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      let isJpeg = screenshotBytes[0] === 255 && screenshotBytes[1] === 216;
+      let mimeType = isPng ? 'image/png' : isJpeg ? 'image/jpeg' : 'application/octet-stream';
+      let extension = isPng ? 'png' : isJpeg ? 'jpg' : 'bin';
+      await ctx.addAttachment({
+        type: 'content',
+        content: new Response(screenshotBytes, { headers: { 'Content-Type': mimeType } }),
+        filename: `screenshot.${extension}`
+      });
     }
 
     let source = ctx.input.url ? `**${ctx.input.url}**` : 'provided HTML content';

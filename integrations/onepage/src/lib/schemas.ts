@@ -55,7 +55,11 @@ export let contactSchema = z.object({
   urls: z.array(urlSchema).optional().describe('URLs'),
   address: addressSchema.optional().describe('Postal address'),
   tags: z.array(z.string()).optional().describe('Tags associated with the contact'),
-  starValue: z.number().optional().describe('Star rating (0-5)'),
+  starValue: z
+    .number()
+    .optional()
+    .describe('Legacy star rating when returned by the provider'),
+  starred: z.boolean().optional().describe('Whether the contact is starred'),
   customFields: z.array(customFieldValueSchema).optional().describe('Custom field values'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   modifiedAt: z.string().optional().describe('Last modification timestamp')
@@ -104,7 +108,10 @@ export let actionSchema = z.object({
   text: z.string().describe('Action description text'),
   date: z.string().optional().describe('Due date (YYYY-MM-DD)'),
   exactTime: z.number().optional().describe('Exact time as Unix timestamp'),
-  status: z.string().optional().describe('Action status: asap, date, waiting, queued, done'),
+  status: z
+    .string()
+    .optional()
+    .describe('Action status: asap, date, date_time, waiting, queued, queued_with_date, done'),
   done: z.boolean().optional().describe('Whether the action has been completed'),
   createdAt: z.string().optional().describe('Creation timestamp'),
   modifiedAt: z.string().optional().describe('Last modification timestamp')
@@ -115,7 +122,11 @@ export let actionSchema = z.object({
 export let noteSchema = z.object({
   noteId: z.string().describe('Unique identifier for the note'),
   contactId: z.string().describe('ID of the associated contact'),
-  authorId: z.string().optional().describe('ID of the user who authored the note'),
+  authorId: z
+    .string()
+    .optional()
+    .describe('ID of the user who authored the note, when returned'),
+  author: z.string().optional().describe('Display name of the note author'),
   text: z.string().describe('Note content text'),
   linkedDealId: z.string().optional().describe('ID of a linked deal'),
   date: z.string().optional().describe('Note date'),
@@ -128,7 +139,11 @@ export let noteSchema = z.object({
 export let callSchema = z.object({
   callId: z.string().describe('Unique identifier for the call'),
   contactId: z.string().describe('ID of the associated contact'),
-  authorId: z.string().optional().describe('ID of the user who logged the call'),
+  authorId: z
+    .string()
+    .optional()
+    .describe('ID of the user who logged the call, when returned'),
+  author: z.string().optional().describe('Display name of the call author'),
   phoneNumber: z.string().optional().describe('Phone number for the call'),
   text: z.string().optional().describe('Call notes or description'),
   callResult: z.string().optional().describe('Result of the call'),
@@ -144,7 +159,11 @@ export let callSchema = z.object({
 export let meetingSchema = z.object({
   meetingId: z.string().describe('Unique identifier for the meeting'),
   contactId: z.string().describe('ID of the associated contact'),
-  authorId: z.string().optional().describe('ID of the user who logged the meeting'),
+  authorId: z
+    .string()
+    .optional()
+    .describe('ID of the user who logged the meeting, when returned'),
+  author: z.string().optional().describe('Display name of the meeting author'),
   text: z.string().optional().describe('Meeting notes or description'),
   meetingTime: z.string().optional().describe('Time of the meeting'),
   place: z.string().optional().describe('Meeting location'),

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -41,7 +41,7 @@ export let manageStoryComments = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.text) throw new Error('Text is required to create a comment');
+      if (!ctx.input.text) throw createApiServiceError('Text is required to create a comment');
       let comment = await client.createStoryComment(ctx.input.storyId, ctx.input.text);
 
       return {
@@ -56,8 +56,9 @@ export let manageStoryComments = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.commentId) throw new Error('Comment ID is required for update');
-      if (!ctx.input.text) throw new Error('Text is required to update a comment');
+      if (!ctx.input.commentId)
+        throw createApiServiceError('Comment ID is required for update');
+      if (!ctx.input.text) throw createApiServiceError('Text is required to update a comment');
       let comment = await client.updateStoryComment(
         ctx.input.storyId,
         ctx.input.commentId,
@@ -76,7 +77,7 @@ export let manageStoryComments = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.commentId) throw new Error('Comment ID is required for delete');
+    if (!ctx.input.commentId) throw createApiServiceError('Comment ID is required for delete');
     await client.deleteStoryComment(ctx.input.storyId, ctx.input.commentId);
 
     return {

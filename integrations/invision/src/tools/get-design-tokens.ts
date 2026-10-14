@@ -6,11 +6,11 @@ import { spec } from '../spec';
 export let getDesignTokens = SlateTool.create(spec, {
   name: 'Get Design Tokens',
   key: 'get_design_tokens',
-  description: `Retrieves design tokens (colors, typography, spacing, etc.) from an InVision DSM design system.
+  description: `Retrieves design tokens (colors and typography) from an InVision DSM design system.
 Returns token data in JSON format, useful for integrating design system values into development workflows.
 Supports both **lookup** (key-value) and **list** export formats.
 
-**Note:** InVision was shut down on December 31, 2024. This tool will only work if the service is still accessible.`,
+**Note:** InVision discontinued its design products on December 31, 2024. Legacy API availability is not guaranteed.`,
   instructions: [
     'Provide the full DSM export base URL from the InVision DSM API setup page.',
     'The DSM API key must be configured via the DSM API Key authentication method.'
@@ -19,6 +19,7 @@ Supports both **lookup** (key-value) and **list** export formats.
     readOnly: true
   }
 })
+  .authMethods(['dsm_api_key'])
   .input(
     z.object({
       dsmExportBaseUrl: z

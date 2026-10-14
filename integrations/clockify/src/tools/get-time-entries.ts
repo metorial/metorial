@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getTimeEntries = SlateTool.create(spec, {
   name: 'Get Time Entries',
   key: 'get_time_entries',
-  description: `Retrieve time entries for a user in the workspace. Filter by date range, project, task, tags, or description. Returns entries sorted by start time. If no userId is provided, retrieves entries for the authenticated user.`,
+  description: `Retrieve time entries for a user in the workspace. Filter by date range, project, task, tags, or description. Returns entries sorted by start time. If no userId is provided, retrieves entries for the authenticated user. Call get_workspaces to discover the workspace ID.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       userId: z
         .string()
         .optional()
@@ -24,10 +26,21 @@ export let getTimeEntries = SlateTool.create(spec, {
       end: z.string().optional().describe('Filter entries ending before this ISO 8601 date'),
       projectId: z.string().optional().describe('Filter by project ID'),
       taskId: z.string().optional().describe('Filter by task ID'),
+      tagIds: z.array(z.string()).optional().describe('Filter by tag IDs'),
       description: z.string().optional().describe('Filter by description (partial match)'),
       inProgress: z.boolean().optional().describe('Filter to only running timers'),
-      page: z.number().optional().describe('Page number (1-based)'),
-      pageSize: z.number().optional().describe('Number of entries per page (max 5000)')
+      page: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Page number (1-based)'),
+      pageSize: z
+        .number()
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
+        .min(1)
+        .optional()
+        .describe('Number of entries per page')
     })
   )
   .output(
@@ -50,11 +63,7 @@ export let getTimeEntries = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let userId = ctx.input.userId;
     if (!userId) {
@@ -67,6 +76,7 @@ export let getTimeEntries = SlateTool.create(spec, {
       end: ctx.input.end,
       project: ctx.input.projectId,
       task: ctx.input.taskId,
+      tags: ctx.input.tagIds,
       description: ctx.input.description,
       'in-progress': ctx.input.inProgress,
       page: ctx.input.page,

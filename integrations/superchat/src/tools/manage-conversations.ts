@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SuperchatClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,8 +47,8 @@ let mapConversation = (conv: any) => ({
     labelId: l.id,
     name: l.name
   })),
-  inboxId: conv.inbox_id,
-  contact: conv.contact
+  inboxId: conv.inbox?.id ?? conv.inbox_id,
+  contact: conv.contact ?? conv.contacts?.[0]
 });
 
 export let listConversations = SlateTool.create(spec, {
@@ -102,7 +102,7 @@ export let listConversations = SlateTool.create(spec, {
 export let getConversation = SlateTool.create(spec, {
   name: 'Get Conversation',
   key: 'get_conversation',
-  description: `Retrieve full details of a conversation including status, assigned users, labels, contact, messages, and notes.`,
+  description: `Retrieve full details of a conversation including status, assigned users, labels, inbox, and linked contact. Call list_conversation_messages to read the messages.`,
   tags: {
     readOnly: true
   }
@@ -163,6 +163,12 @@ export let updateConversation = SlateTool.create(spec, {
   .output(conversationSchema)
   .handleInvocation(async ctx => {
     let client = new SuperchatClient({ token: ctx.auth.token });
+
+    if (ctx.input.status === 'snoozed' && !ctx.input.snoozedUntil) {
+      throw createApiServiceError(
+        'Provide snoozedUntil when setting the conversation status to snoozed.'
+      );
+    }
 
     let result = await client.updateConversation(ctx.input.conversationId, {
       status: ctx.input.status,

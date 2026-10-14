@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getApiUsage,
+  getCurrentUser,
   getThreatReport,
   lookupAppProfile,
   lookupDnsWhois,
@@ -21,6 +22,7 @@ export let provider = Slate.create({
     lookupDnsWhois,
     manageCollections,
     getApiUsage,
+    getCurrentUser,
     getThreatReport,
     lookupAppProfile
   ],

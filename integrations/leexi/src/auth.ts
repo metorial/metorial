@@ -1,4 +1,4 @@
-import { SlateAuth } from 'slates';
+import { createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 
 export let auth = SlateAuth.create()
@@ -22,6 +22,9 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      if (!ctx.input.keyId.trim() || !ctx.input.keySecret.trim()) {
+        throw createApiServiceError('Enter both the Leexi API Key ID and API Key Secret.');
+      }
       let encoded = Buffer.from(`${ctx.input.keyId}:${ctx.input.keySecret}`).toString(
         'base64'
       );

@@ -3,6 +3,8 @@ export * from './assign-conversation';
 export * from './create-contact';
 export * from './delete-contact';
 export * from './get-contact';
+export * from './get-message';
+export * from './list-contact-channels';
 export * from './list-contacts';
 export * from './list-custom-fields';
 export * from './list-message-templates';

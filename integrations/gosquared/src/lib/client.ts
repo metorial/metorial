@@ -1,19 +1,63 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord,
+  pickDefined
+} from 'slates';
 
 export class GoSquaredClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private apiKey: string;
-  private siteToken: string;
+  private siteToken?: string;
 
-  constructor(config: { token: string; siteToken: string }) {
+  constructor(config: { token: string; siteToken?: string }) {
     this.apiKey = config.token;
     this.siteToken = config.siteToken;
-    this.axios = createAxios({
-      baseURL: 'https://api.gosquared.com'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.gosquared.com',
+      timeout: 30000,
+      errorMapping: {
+        extractResponseData: response => {
+          let data: unknown = response.data;
+          return isApiErrorRecord(data) && typeof data.code === 'number'
+            ? { ...data, code: String(data.code) }
+            : data;
+        }
+      },
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'GoSquared',
+          reason: 'gosquared_api_error',
+          extractResponse: (value, helpers) => {
+            let response = helpers.getResponse(value);
+            if (
+              !isApiErrorRecord(value) ||
+              value.name !== 'SlateError' ||
+              !isApiErrorRecord(value.data) ||
+              !isApiErrorRecord(value.data.baggage)
+            ) {
+              return response;
+            }
+            return { ...response, data: value.data.baggage.response };
+          },
+          extractUpstreamCode: (_value, response) => {
+            let data = response?.data;
+            return isApiErrorRecord(data) &&
+              (typeof data.code === 'string' || typeof data.code === 'number')
+              ? String(data.code)
+              : undefined;
+          }
+        })
     });
   }
 
   private get authParams() {
+    if (!this.siteToken?.trim()) {
+      throw createApiServiceError(
+        'A project token is required for this operation. Use List Sites to find a project, then set its token in the connection settings.'
+      );
+    }
     return {
       api_key: this.apiKey,
       site_token: this.siteToken
@@ -67,7 +111,12 @@ export class GoSquaredClient {
 
   // ── Trends API (Historical) ──
 
-  async getTrendsAggregate(params?: { from?: string; to?: string; interval?: string }) {
+  async getTrendsAggregate(params?: {
+    from?: string;
+    to?: string;
+    interval?: string;
+    limit?: string;
+  }) {
     let res = await this.axios.get('/trends/v2/aggregate', {
       params: { ...this.authParams, ...params }
     });
@@ -111,9 +160,9 @@ export class GoSquaredClient {
     let body: Record<string, any> = {
       event: {
         name: event.name,
-        ...(event.data ? { data: event.data } : {}),
-        ...(event.timestamp ? { timestamp: event.timestamp } : {})
-      }
+        ...(event.data ? { data: event.data } : {})
+      },
+      ...pickDefined({ timestamp: event.timestamp })
     };
     if (event.personId) body.person_id = event.personId;
     if (event.visitorId) body.visitor_id = event.visitorId;
@@ -131,6 +180,16 @@ export class GoSquaredClient {
     personId?: string;
     visitorId?: string;
   }) {
+    if (!pageview.visitorId?.trim()) {
+      throw createApiServiceError(
+        'GoSquared requires visitorId to track a pageview. Provide an anonymous visitor ID; personId alone is insufficient.'
+      );
+    }
+    if (!pageview.url?.trim()) {
+      throw createApiServiceError(
+        'GoSquared requires pageUrl to track a pageview. Provide the URL of the page visited.'
+      );
+    }
     let body: Record<string, any> = {};
     if (pageview.title || pageview.url) {
       body.page = {};
@@ -166,9 +225,9 @@ export class GoSquaredClient {
         ...(transaction.transactionId ? { id: transaction.transactionId } : {}),
         ...(transaction.revenue !== undefined ? { revenue: transaction.revenue } : {}),
         ...(transaction.quantity !== undefined ? { quantity: transaction.quantity } : {}),
-        ...(transaction.items ? { items: transaction.items } : {}),
-        ...(transaction.timestamp ? { timestamp: transaction.timestamp } : {})
-      }
+        ...(transaction.items ? { items: transaction.items } : {})
+      },
+      ...pickDefined({ timestamp: transaction.timestamp })
     };
     if (transaction.personId) body.person_id = transaction.personId;
     if (transaction.visitorId) body.visitor_id = transaction.visitorId;
@@ -190,7 +249,11 @@ export class GoSquaredClient {
     limit?: string;
   }) {
     let res = await this.axios.get('/people/v1/people', {
-      params: { ...this.authParams, ...params }
+      params: {
+        ...this.authParams,
+        ...params,
+        filters: params?.filters !== undefined ? JSON.stringify(params.filters) : undefined
+      }
     });
     return res.data;
   }
@@ -204,7 +267,14 @@ export class GoSquaredClient {
 
   async getPersonFeed(
     personId: string,
-    params?: { from?: string; to?: string; limit?: string }
+    params?: {
+      from?: string;
+      to?: string;
+      limit?: string;
+      query?: string;
+      sort?: string;
+      type?: string;
+    }
   ) {
     let res = await this.axios.get(`/people/v1/people/${encodeURIComponent(personId)}/feed`, {
       params: { ...this.authParams, ...params }
@@ -286,6 +356,20 @@ export class GoSquaredClient {
   async getPropertyTypes() {
     let res = await this.axios.get('/people/v1/propertyTypes', {
       params: this.authParams
+    });
+    return res.data;
+  }
+
+  async getTokenInfo() {
+    let res = await this.axios.get('/auth/v1/tokeninfo', {
+      params: { api_key: this.apiKey }
+    });
+    return res.data;
+  }
+
+  async getSites() {
+    let res = await this.axios.get('/account/v1/sites', {
+      params: { api_key: this.apiKey, presenter: 'flat' }
     });
     return res.data;
   }

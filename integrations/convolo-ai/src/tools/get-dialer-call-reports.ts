@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DialerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -34,6 +34,38 @@ let dialerCallSchema = z
   })
   .describe('Individual dialer call record');
 
+export let dialerCallFiltersSchema = z.object({
+  dayFrom: z.string().describe('Start date in YYYY-MM-DD format'),
+  dayTo: z.string().describe('End date in YYYY-MM-DD format'),
+  searchString: z.string().optional().describe('Text search filter'),
+  timezone: z.string().optional().describe('Timezone for the query (e.g., America/New_York)'),
+  types: z
+    .array(z.number())
+    .optional()
+    .describe('Call types to include: 0=inbound, 1=outbound, 2=internal'),
+  states: z
+    .array(z.number())
+    .optional()
+    .describe('Call states to include: 0=unanswered, 1=answered, 2=failed'),
+  agentIds: z.array(z.string()).optional().describe('Filter by specific agent IDs'),
+  teamIds: z.array(z.string()).optional().describe('Filter by specific team IDs'),
+  projectIds: z.array(z.string()).optional().describe('Filter by specific project IDs'),
+  tags: z.array(z.string()).optional().describe('Filter by call tags'),
+  outcomes: z.array(z.string()).optional().describe('Filter by call outcomes'),
+  outcomeTypes: z.array(z.string()).optional().describe('Filter by outcome types'),
+  talkTimeFrom: z.number().optional().describe('Minimum talk time in seconds'),
+  talkTimeTo: z.number().optional().describe('Maximum talk time in seconds'),
+  answerTimeFrom: z.number().optional().describe('Minimum answer time in seconds'),
+  answerTimeTo: z.number().optional().describe('Maximum answer time in seconds'),
+  page: z.number().optional().describe('Page number (default 1)'),
+  itemsPerPage: z.number().optional().describe('Items per page (default 100)'),
+  sortBy: z
+    .enum(['timestamp', 'talkTime', 'answerTime'])
+    .optional()
+    .describe('Field to sort by'),
+  sortDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction')
+});
+
 export let getDialerCallReports = SlateTool.create(spec, {
   name: 'Get Dialer Call Reports',
   key: 'get_dialer_call_reports',
@@ -48,42 +80,7 @@ export let getDialerCallReports = SlateTool.create(spec, {
     readOnly: true
   }
 })
-  .input(
-    z.object({
-      dayFrom: z.string().describe('Start date in YYYY-MM-DD format'),
-      dayTo: z.string().describe('End date in YYYY-MM-DD format'),
-      searchString: z.string().optional().describe('Text search filter'),
-      timezone: z
-        .string()
-        .optional()
-        .describe('Timezone for the query (e.g., America/New_York)'),
-      types: z
-        .array(z.number())
-        .optional()
-        .describe('Call types to include: 0=inbound, 1=outbound, 2=internal'),
-      states: z
-        .array(z.number())
-        .optional()
-        .describe('Call states to include: 0=unanswered, 1=answered, 2=failed'),
-      agentIds: z.array(z.string()).optional().describe('Filter by specific agent IDs'),
-      teamIds: z.array(z.string()).optional().describe('Filter by specific team IDs'),
-      projectIds: z.array(z.string()).optional().describe('Filter by specific project IDs'),
-      tags: z.array(z.string()).optional().describe('Filter by call tags'),
-      outcomes: z.array(z.string()).optional().describe('Filter by call outcomes'),
-      outcomeTypes: z.array(z.string()).optional().describe('Filter by outcome types'),
-      talkTimeFrom: z.number().optional().describe('Minimum talk time in seconds'),
-      talkTimeTo: z.number().optional().describe('Maximum talk time in seconds'),
-      answerTimeFrom: z.number().optional().describe('Minimum answer time in seconds'),
-      answerTimeTo: z.number().optional().describe('Maximum answer time in seconds'),
-      page: z.number().optional().describe('Page number (default 1)'),
-      itemsPerPage: z.number().optional().describe('Items per page (default 100)'),
-      sortBy: z
-        .enum(['timestamp', 'talkTime', 'answerTime'])
-        .optional()
-        .describe('Field to sort by'),
-      sortDirection: z.enum(['ASC', 'DESC']).optional().describe('Sort direction')
-    })
-  )
+  .input(dialerCallFiltersSchema)
   .output(
     z.object({
       calls: z.array(dialerCallSchema).describe('List of dialer call records'),
@@ -94,7 +91,7 @@ export let getDialerCallReports = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.dialerToken) {
-      throw new Error(
+      throw createApiServiceError(
         'Power Dialer API key (dialerToken) is required for this action. Please configure it in your authentication settings.'
       );
     }
@@ -107,31 +104,31 @@ export let getDialerCallReports = SlateTool.create(spec, {
 
     let calls = (result.calls || []).map((call: any) => ({
       callId: call.id?.toString(),
-      uniqueId: call.uniqueId,
-      timestamp: call.timestamp,
-      type: call.type,
-      state: call.state,
-      fromNumber: call.fromNumber,
-      toNumber: call.toNumber,
-      clientNumber: call.clientNumber,
-      answerTime: call.answerTime,
-      callTime: call.callTime,
-      talkTime: call.talkTime,
-      aiTalkTime: call.aiTalkTime,
-      totalTime: call.totalTime,
-      projectName: call.projectName,
+      uniqueId: call.uniqueId ?? undefined,
+      timestamp: call.timestamp ?? undefined,
+      type: call.type ?? undefined,
+      state: call.state ?? undefined,
+      fromNumber: call.fromNumber ?? undefined,
+      toNumber: call.toNumber ?? undefined,
+      clientNumber: call.clientNumber ?? undefined,
+      answerTime: call.answerTime ?? undefined,
+      callTime: call.callTime ?? undefined,
+      talkTime: call.talkTime ?? undefined,
+      aiTalkTime: call.aiTalkTime ?? undefined,
+      totalTime: call.totalTime ?? undefined,
+      projectName: call.projectName ?? undefined,
       projectId: call.projectId?.toString(),
       userId: call.userId?.toString(),
       agentShortNumber: call.agentShortNumber?.toString(),
-      tags: call.tags,
-      outcomeTag: call.outcomeTag,
-      outcomeType: call.outcomeType,
-      qualityRating: call.qualityRating,
-      recordName: call.recordName,
-      isRecordReady: call.isRecordReady,
-      aiSummary: call.convoloAiRecordingSummary,
-      aiTitle: call.convoloAiRecordingTitle,
-      label: call.label
+      tags: call.tags ?? undefined,
+      outcomeTag: call.outcomeTag ?? undefined,
+      outcomeType: call.outcomeType ?? undefined,
+      qualityRating: call.qualityRating ?? undefined,
+      recordName: call.recordName ?? undefined,
+      isRecordReady: call.isRecordReady ?? undefined,
+      aiSummary: call.convoloAiRecordingSummary ?? undefined,
+      aiTitle: call.convoloAiRecordingTitle ?? undefined,
+      label: call.label ?? undefined
     }));
 
     return {

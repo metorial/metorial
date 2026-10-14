@@ -44,15 +44,16 @@ export let updateCustomer = SlateTool.create(spec, {
 
     let body: Record<string, any> = {};
 
-    if (ctx.input.name) body.name = ctx.input.name;
-    if (ctx.input.label) body.label = ctx.input.label;
-    if (ctx.input.customerType) body.customerType = ctx.input.customerType;
-    if (ctx.input.nipNumber) body.nipNumber = ctx.input.nipNumber;
-    if (ctx.input.bankAccountNumber) body.bankAccountNumber = ctx.input.bankAccountNumber;
-    if (ctx.input.emails) body.emails = ctx.input.emails;
-    if (ctx.input.phones) body.phones = ctx.input.phones;
-    if (ctx.input.website) body.website = ctx.input.website;
-    if (ctx.input.description) body.description = ctx.input.description;
+    if (ctx.input.name !== undefined) body.name = ctx.input.name;
+    if (ctx.input.label !== undefined) body.label = ctx.input.label;
+    if (ctx.input.customerType !== undefined) body.customerType = ctx.input.customerType;
+    if (ctx.input.nipNumber !== undefined) body.nipNumber = ctx.input.nipNumber;
+    if (ctx.input.bankAccountNumber !== undefined)
+      body.bankAccountNumber = ctx.input.bankAccountNumber;
+    if (ctx.input.emails !== undefined) body.emails = ctx.input.emails;
+    if (ctx.input.phones !== undefined) body.phones = ctx.input.phones;
+    if (ctx.input.website !== undefined) body.website = ctx.input.website;
+    if (ctx.input.description !== undefined) body.description = ctx.input.description;
 
     if (ctx.input.officeStreet !== undefined)
       body['officeAddress.street'] = ctx.input.officeStreet;

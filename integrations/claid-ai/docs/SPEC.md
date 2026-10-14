@@ -1,4 +1,4 @@
-# Slates Specification for Claid.ai
+# Claid.ai API Specification
 
 ## Overview
 
@@ -59,12 +59,17 @@ Turn words into artwork and digital assets using a text-to-image AI generator.
 
 Turn static visuals into motion by generating dynamic product or model animations from a single image. Provide the image and describe the motion to get ready-to-use animated content.
 
+### Natural-Language Image Editing
+
+Use `ai_edit_image` to modify a source image with a text instruction, then call `get_ai_edit_status` with its task ID to retrieve results. The default v2 model focuses on quality and product preservation; v1 supports custom aspect ratio, inference steps, and guidance scale. Generate 1–4 PNG or JPEG results and optionally save them to connected storage.
+
 ### Storage Connectors
 
 Manage cloud storage connections for use as image input/output sources.
 
 - You can connect cloud storage and use it as a source for images. The API supports AWS S3 and Google Cloud Storage. Web Folders are also supported.
 - Storage connectors can be created, listed, updated, and deleted via the API.
+- Use `list_storage_types` to discover supported connector types before creating a connection.
 - By default, if no output destination is specified, results are stored in a temporary bucket with a 24-hour lifespan and a public URL is provided.
 
 ### Async and Batch Processing

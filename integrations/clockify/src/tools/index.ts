@@ -2,6 +2,7 @@ export * from './create-time-entry';
 export * from './delete-time-entry';
 export * from './generate-report';
 export * from './get-time-entries';
+export * from './get-time-entry';
 export * from './get-users';
 export * from './get-workspace';
 export * from './manage-client';

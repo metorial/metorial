@@ -14,7 +14,7 @@ export let listCompaniesTool = SlateTool.create(spec, {
   .input(
     z.object({
       search: z.string().optional().describe('Search term to filter companies by name'),
-      segment: z.string().optional().describe('Segment ID to filter by'),
+      segment: z.string().optional().describe('Segment URL name to filter by'),
       limit: z.number().optional().describe('Number of companies to return (max 100)'),
       cursor: z.string().optional().describe('Cursor for pagination')
     })

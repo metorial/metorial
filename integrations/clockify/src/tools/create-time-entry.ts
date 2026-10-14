@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createApiClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let createTimeEntry = SlateTool.create(spec, {
   name: 'Create Time Entry',
   key: 'create_time_entry',
-  description: `Create a new time entry or start a timer in Clockify. Supports manual time entries with start/end times, or starting a running timer by omitting the end time. Can assign entries to projects, tasks, and tags, and set billable status.`,
+  description: `Create a new time entry or start a timer in Clockify. Supports manual time entries with start/end times, or starting a running timer by omitting the end time. Can assign entries to projects, tasks, and tags, and set billable status. Call get_workspaces to discover the workspace ID.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,6 +15,7 @@ export let createTimeEntry = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       start: z
         .string()
         .describe('Start time in ISO 8601 format (e.g., "2024-01-15T09:00:00Z")'),
@@ -48,11 +50,7 @@ export let createTimeEntry = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({
-      token: ctx.auth.token,
-      workspaceId: ctx.config.workspaceId,
-      dataRegion: ctx.config.dataRegion
-    });
+    let client = createApiClient(ctx);
 
     let entry = await client.createTimeEntry({
       start: ctx.input.start,

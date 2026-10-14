@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GigasheetClient } from '../lib/client';
 import { spec } from '../spec';
@@ -9,7 +9,8 @@ export let createSheet = SlateTool.create(spec, {
   description: `Create a new sheet in Gigasheet. You can create a blank sheet with optional column headers, upload data from a URL, or upload raw data directly. Also supports creating folders for organization.`,
   instructions: [
     'When using uploadUrl, provide a publicly accessible URL (including pre-signed S3 URLs) to a CSV, JSON, or other supported file format.',
-    'When using rawData, provide the data as a string in CSV or JSON format.'
+    'When using rawData, provide the data as a string in CSV or JSON format.',
+    'Blank sheets with column headers are imported from a header-only CSV. Imports are asynchronous; check the returned handle with get_sheet.'
   ]
 })
   .input(
@@ -56,7 +57,13 @@ export let createSheet = SlateTool.create(spec, {
 
       case 'from_url':
         if (!ctx.input.uploadUrl) {
-          throw new Error('uploadUrl is required when method is "from_url"');
+          throw createApiServiceError('uploadUrl is required when method is "from_url"');
+        }
+        if (
+          !z.url().safeParse(ctx.input.uploadUrl).success ||
+          !/^https?:/i.test(ctx.input.uploadUrl)
+        ) {
+          throw createApiServiceError('uploadUrl must be an HTTP or HTTPS URL.');
         }
         result = await client.uploadFromUrl({
           url: ctx.input.uploadUrl,
@@ -67,7 +74,7 @@ export let createSheet = SlateTool.create(spec, {
 
       case 'raw_data':
         if (!ctx.input.rawData) {
-          throw new Error('rawData is required when method is "raw_data"');
+          throw createApiServiceError('rawData is required when method is "raw_data"');
         }
         result = await client.uploadDirect({
           data: ctx.input.rawData,

@@ -36,10 +36,10 @@ export let getGivingSummary = SlateTool.create(spec, {
     });
 
     let [lifetimeGiving, firstGift, latestGift, greatestGift] = await Promise.all([
-      client.getConstituentLifetimeGiving(ctx.input.constituentId).catch(() => null),
-      client.getConstituentFirstGift(ctx.input.constituentId).catch(() => null),
-      client.getConstituentLatestGift(ctx.input.constituentId).catch(() => null),
-      client.getConstituentGreatestGift(ctx.input.constituentId).catch(() => null)
+      client.getConstituentLifetimeGiving(ctx.input.constituentId),
+      client.getConstituentFirstGift(ctx.input.constituentId),
+      client.getConstituentLatestGift(ctx.input.constituentId),
+      client.getConstituentGreatestGift(ctx.input.constituentId)
     ]);
 
     let totalGiving = lifetimeGiving?.total_giving?.value;

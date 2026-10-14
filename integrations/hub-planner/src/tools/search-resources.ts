@@ -14,6 +14,14 @@ Use operators like **$in**, **$nin**, **$like** for flexible querying.`,
 })
   .input(
     z.object({
+      page: z.number().int().min(0).optional().describe('Page number (0-based)'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Results per page, up to 1000'),
       firstName: z
         .any()
         .optional()
@@ -60,19 +68,19 @@ Use operators like **$in**, **$nin**, **$like** for flexible querying.`,
     if (ctx.input.role !== undefined) filters.role = ctx.input.role;
     if (ctx.input.metadata !== undefined) filters.metadata = ctx.input.metadata;
 
-    let resources = await client.searchResources(filters);
+    let resources = await client.searchResources(filters, ctx.input.page, ctx.input.limit);
     return {
       output: {
         resources: resources.map((r: any) => ({
           resourceId: r._id,
-          firstName: r.firstName,
-          lastName: r.lastName,
-          email: r.email,
-          status: r.status,
-          role: r.role,
-          metadata: r.metadata,
-          createdDate: r.createdDate,
-          updatedDate: r.updatedDate
+          firstName: r.firstName ?? undefined,
+          lastName: r.lastName ?? undefined,
+          email: r.email ?? undefined,
+          status: r.status ?? undefined,
+          role: r.role ?? undefined,
+          metadata: r.metadata ?? undefined,
+          createdDate: r.createdDate ?? undefined,
+          updatedDate: r.updatedDate ?? undefined
         }))
       },
       message: `Found **${resources.length}** resources matching the search criteria.`

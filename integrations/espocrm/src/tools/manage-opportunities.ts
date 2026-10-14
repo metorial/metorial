@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -65,23 +65,23 @@ export let manageOpportunities = SlateTool.create(spec, {
       return {
         output: {
           opportunityId: result.id,
-          name: result.name,
-          stage: result.stage,
-          amount: result.amount,
-          amountCurrency: result.amountCurrency,
-          probability: result.probability,
-          closeDate: result.closeDate,
-          accountId: result.accountId,
-          accountName: result.accountName,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          stage: result.stage ?? undefined,
+          amount: result.amount ?? undefined,
+          amountCurrency: result.amountCurrency ?? undefined,
+          probability: result.probability ?? undefined,
+          closeDate: result.closeDate ?? undefined,
+          accountId: result.accountId ?? undefined,
+          accountName: result.accountName ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Opportunity **${result.name || ''}** created successfully.`
       };
     }
 
     if (action === 'update') {
-      if (!opportunityId) throw new Error('opportunityId is required for update');
+      if (!opportunityId) throw createApiServiceError('opportunityId is required for update');
       let data: Record<string, any> = { ...fields, ...customFields };
       Object.keys(data).forEach(key => {
         if (data[key] === undefined) delete data[key];
@@ -90,23 +90,23 @@ export let manageOpportunities = SlateTool.create(spec, {
       return {
         output: {
           opportunityId: result.id,
-          name: result.name,
-          stage: result.stage,
-          amount: result.amount,
-          amountCurrency: result.amountCurrency,
-          probability: result.probability,
-          closeDate: result.closeDate,
-          accountId: result.accountId,
-          accountName: result.accountName,
-          createdAt: result.createdAt,
-          modifiedAt: result.modifiedAt
+          name: result.name ?? undefined,
+          stage: result.stage ?? undefined,
+          amount: result.amount ?? undefined,
+          amountCurrency: result.amountCurrency ?? undefined,
+          probability: result.probability ?? undefined,
+          closeDate: result.closeDate ?? undefined,
+          accountId: result.accountId ?? undefined,
+          accountName: result.accountName ?? undefined,
+          createdAt: result.createdAt ?? undefined,
+          modifiedAt: result.modifiedAt ?? undefined
         },
         message: `Opportunity **${result.name || ''}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      if (!opportunityId) throw new Error('opportunityId is required for delete');
+      if (!opportunityId) throw createApiServiceError('opportunityId is required for delete');
       await client.deleteRecord('Opportunity', opportunityId);
       return {
         output: {
@@ -116,6 +116,6 @@ export let manageOpportunities = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

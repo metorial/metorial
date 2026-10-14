@@ -1,5 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
+import { harvestAccountIdSchema, resolveHarvestAccountId } from '../lib/account-id';
 import { HarvestClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -24,7 +25,7 @@ let lineItemSchema = z.object({
 export let manageInvoice = SlateTool.create(spec, {
   name: 'Manage Invoice',
   key: 'manage_invoice',
-  description: `Create, update, or delete an invoice in Harvest. Invoices can include line items for services and products, and can be associated with clients and projects. Supports tax, discount, and payment terms configuration.`,
+  description: `Create, update, or delete an invoice in Harvest. Invoices can include line items for services and products, and can be associated with clients and projects. Supports tax, discount, and payment terms configuration. Call list_accounts to discover account IDs when choosing between multiple accounts.`,
   instructions: [
     'When updating line items, include **lineItemId** for existing items. To add new items, omit lineItemId. To remove items, set **destroy** to true.',
     'Valid **paymentTerm** values: "upon receipt", "net 15", "net 30", "net 45", "net 60", "custom".'
@@ -36,6 +37,7 @@ export let manageInvoice = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      accountId: harvestAccountIdSchema,
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       invoiceId: z.number().optional().describe('Invoice ID (required for update/delete)'),
       clientId: z.number().optional().describe('Client ID (required for create)'),
@@ -69,11 +71,32 @@ export let manageInvoice = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new HarvestClient({
       token: ctx.auth.token,
-      accountId: ctx.config.accountId
+      accountId: resolveHarvestAccountId(ctx)
     });
 
+    for (let item of ctx.input.lineItems ?? []) {
+      let createsItem =
+        ctx.input.action === 'create' ||
+        (ctx.input.action === 'update' && item.lineItemId === undefined);
+      if (createsItem && (!item.kind || item.unitPrice === undefined)) {
+        throw createApiServiceError('New line items require kind and unitPrice.');
+      }
+      if (
+        ctx.input.action === 'create' &&
+        (item.lineItemId !== undefined || item.destroy !== undefined)
+      ) {
+        throw createApiServiceError(
+          'lineItemId and destroy are only supported when updating line items.'
+        );
+      }
+      if (ctx.input.action === 'update' && item.destroy && item.lineItemId === undefined) {
+        throw createApiServiceError('lineItemId is required to delete an existing line item.');
+      }
+    }
+
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.invoiceId) throw new Error('invoiceId is required for delete');
+      if (!ctx.input.invoiceId)
+        throw createApiServiceError('invoiceId is required for delete');
       await client.deleteInvoice(ctx.input.invoiceId);
       return {
         output: { invoiceId: ctx.input.invoiceId, deleted: true },
@@ -82,9 +105,9 @@ export let manageInvoice = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for create');
+      if (!ctx.input.clientId) throw createApiServiceError('clientId is required for create');
       let createLineItems = ctx.input.lineItems?.map(li => ({
-        kind: li.kind!,
+        kind: li.kind ?? '',
         description: li.description,
         quantity: li.quantity,
         unitPrice: li.unitPrice,
@@ -123,7 +146,7 @@ export let manageInvoice = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.invoiceId) throw new Error('invoiceId is required for update');
+    if (!ctx.input.invoiceId) throw createApiServiceError('invoiceId is required for update');
     let inv = await client.updateInvoice(ctx.input.invoiceId, {
       clientId: ctx.input.clientId,
       number: ctx.input.number,

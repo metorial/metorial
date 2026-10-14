@@ -16,10 +16,22 @@ export let createTicket = SlateTool.create(spec, {
     z.object({
       subject: z.string().describe('Subject line of the ticket'),
       requesterEmail: z.string().describe('Email address of the person submitting the ticket'),
+      requesterName: z
+        .string()
+        .optional()
+        .describe('Name of the person submitting the ticket'),
       contentText: z.string().optional().describe('Plain text body of the ticket'),
       contentHtml: z.string().optional().describe('HTML body of the ticket'),
       cc: z.array(z.string()).optional().describe('CC email addresses'),
       bcc: z.array(z.string()).optional().describe('BCC email addresses'),
+      notifyRequester: z
+        .boolean()
+        .optional()
+        .describe('Send a ticket notification to the requester'),
+      forwardingAddressId: z
+        .number()
+        .optional()
+        .describe('Forwarding address ID. Call list_emails to discover available addresses.'),
       attachmentIds: z
         .array(z.number())
         .optional()
@@ -36,10 +48,13 @@ export let createTicket = SlateTool.create(spec, {
     let ticket = await client.createTicket({
       subject: ctx.input.subject,
       requesterEmail: ctx.input.requesterEmail,
+      requesterName: ctx.input.requesterName,
       contentText: ctx.input.contentText,
       contentHtml: ctx.input.contentHtml,
       cc: ctx.input.cc,
       bcc: ctx.input.bcc,
+      notify: ctx.input.notifyRequester,
+      forwardingAddressId: ctx.input.forwardingAddressId,
       attachmentIds: ctx.input.attachmentIds
     });
 

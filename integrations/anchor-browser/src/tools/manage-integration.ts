@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -70,7 +70,9 @@ export let manageIntegration = SlateTool.create(spec, {
 
     if (input.action === 'create') {
       if (!input.name || !input.integrationType || !input.credentials) {
-        throw new Error('name, integrationType, and credentials are required for create.');
+        throw createApiServiceError(
+          'name, integrationType, and credentials are required for create.'
+        );
       }
       let result = await client.createIntegration({
         name: input.name,
@@ -93,7 +95,8 @@ export let manageIntegration = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.integrationId) throw new Error('integrationId is required for delete.');
+      if (!input.integrationId)
+        throw createApiServiceError('integrationId is required for delete.');
       await client.deleteIntegration(input.integrationId);
       return {
         output: { deleted: true },
@@ -101,6 +104,6 @@ export let manageIntegration = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

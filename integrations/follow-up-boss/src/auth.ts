@@ -1,11 +1,27 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
-let apiAxios = createAxios({
+let apiAxios = createAuthenticatedAxios({
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Follow Up Boss',
+      reason: 'follow_up_boss_auth_error'
+    }),
   baseURL: 'https://api.followupboss.com/v1'
 });
 
-let oauthAxios = createAxios({
+let oauthAxios = createAuthenticatedAxios({
+  errorAdapter: error =>
+    buildApiServiceError(error, {
+      providerLabel: 'Follow Up Boss',
+      reason: 'follow_up_boss_auth_error'
+    }),
   baseURL: 'https://app.followupboss.com'
 });
 
@@ -65,29 +81,32 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Follow Up Boss'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          ...tokens,
           authMethod: 'oauth' as const
         }
       };
     },
 
     handleTokenRefresh: async (ctx: any) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError(
+          'Follow Up Boss refresh token is missing. Reconnect using OAuth.'
+        );
+      }
+
       let credentials = Buffer.from(`${ctx.clientId}:${ctx.clientSecret}`).toString('base64');
 
       let response = await oauthAxios.post(
         '/oauth/token',
         new URLSearchParams({
           grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken || ''
+          refresh_token: ctx.output.refreshToken
         }).toString(),
         {
           headers: {
@@ -97,16 +116,15 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let tokens = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Follow Up Boss',
+        previousRefreshToken: ctx.output.refreshToken,
+        refreshTokenFallbackMode: 'falsy'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
+          ...tokens,
           authMethod: 'oauth' as const
         }
       };

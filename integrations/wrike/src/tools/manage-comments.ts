@@ -144,3 +144,49 @@ export let deleteComment = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let updateComment = SlateTool.create(spec, {
+  name: 'Update Comment',
+  key: 'update_comment',
+  description:
+    'Edit a comment during the first five minutes after its creation. Wrike rejects edits after this window.',
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      commentId: z
+        .string()
+        .min(1)
+        .describe('Comment ID returned by list_comments or create_comment'),
+      text: z.string().min(1).describe('Replacement comment text; supports HTML'),
+      plainText: z
+        .boolean()
+        .optional()
+        .describe('Return the updated comment text as plain text instead of HTML')
+    })
+  )
+  .output(
+    z.object({
+      commentId: z.string(),
+      authorId: z.string(),
+      text: z.string(),
+      createdDate: z.string()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new WrikeClient(ctx.auth);
+    let comment = await client.updateComment(ctx.input.commentId, {
+      text: ctx.input.text,
+      plainText: ctx.input.plainText
+    });
+    return {
+      output: {
+        commentId: comment.id,
+        authorId: comment.authorId,
+        text: comment.text,
+        createdDate: comment.createdDate
+      },
+      message: `Updated comment ${comment.id}.`
+    };
+  })
+  .build();

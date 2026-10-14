@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAccountTool = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account',
-  description: `Retrieve your ClickSend account details including balance, user information, and allowed email addresses. Useful for checking available funds, verifying account settings, or finding email address IDs needed for sending emails.`,
+  description: `Retrieve your ClickSend account details including balance and user information. Useful for identifying the authenticated account, checking available funds, or verifying account settings. Use list_email_addresses to find sender email address IDs.`,
   tags: {
     readOnly: true
   }

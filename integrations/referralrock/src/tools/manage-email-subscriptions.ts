@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ReferralRockClient } from '../lib/client';
 import { spec } from '../spec';
@@ -41,7 +41,8 @@ export let manageEmailSubscriptions = SlateTool.create(spec, {
     let client = new ReferralRockClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'unsubscribe') {
-      if (!ctx.input.email) throw new Error('Email is required for unsubscribe action');
+      if (!ctx.input.email)
+        throw createApiServiceError('Email is required for unsubscribe action');
       await client.unsubscribeEmail(ctx.input.email);
       return {
         output: { success: true, message: `Email ${ctx.input.email} has been unsubscribed.` },
@@ -50,7 +51,8 @@ export let manageEmailSubscriptions = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'resubscribe') {
-      if (!ctx.input.email) throw new Error('Email is required for resubscribe action');
+      if (!ctx.input.email)
+        throw createApiServiceError('Email is required for resubscribe action');
       await client.removeUnsubscribe(ctx.input.email);
       return {
         output: { success: true, message: `Email ${ctx.input.email} has been resubscribed.` },
@@ -60,7 +62,12 @@ export let manageEmailSubscriptions = SlateTool.create(spec, {
 
     // list
     let result = await client.getUnsubscribedEmails(ctx.input.email);
-    let emails = (result as unknown as string[]) || [];
+    if (!Array.isArray(result) || !result.every(value => typeof value === 'string')) {
+      throw createApiServiceError(
+        'Referral Rock did not return an email list. The unsubscribe response format could not be read.'
+      );
+    }
+    let emails = result as string[];
 
     return {
       output: {

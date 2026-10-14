@@ -40,6 +40,10 @@ Supports metadata filtering, reranking for relevance, and limiting chunks per do
         .number()
         .optional()
         .describe('Maximum chunks per document for result diversity'),
+      recencyBias: z
+        .boolean()
+        .optional()
+        .describe('Favor more recently updated documents when ranking results'),
       partition: z
         .string()
         .optional()
@@ -62,7 +66,13 @@ Supports metadata filtering, reranking for relevance, and limiting chunks per do
               .describe('Chunk-level metadata (e.g., page numbers, timestamps)'),
             documentMetadata: z
               .record(z.string(), z.any())
-              .describe('Parent document metadata')
+              .describe('Parent document metadata'),
+            documentId: z.string().optional().describe('ID of the parent document'),
+            documentName: z.string().optional().describe('Name of the parent document'),
+            links: z
+              .record(z.string(), z.any())
+              .optional()
+              .describe('Available content links for the chunk')
           })
         )
         .describe('Scored and ranked chunks matching the query'),
@@ -81,6 +91,7 @@ Supports metadata filtering, reranking for relevance, and limiting chunks per do
       rerank: ctx.input.rerank,
       filter: ctx.input.filter,
       maxChunksPerDocument: ctx.input.maxChunksPerDocument,
+      recencyBias: ctx.input.recencyBias,
       partition: ctx.input.partition
     });
 
@@ -90,7 +101,10 @@ Supports metadata filtering, reranking for relevance, and limiting chunks per do
       score: c.score,
       chunkIndex: c.index,
       metadata: c.metadata,
-      documentMetadata: c.documentMetadata
+      documentMetadata: c.documentMetadata,
+      documentId: c.documentId,
+      documentName: c.documentName,
+      links: c.links
     }));
 
     return {

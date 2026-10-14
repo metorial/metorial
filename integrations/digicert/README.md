@@ -1,6 +1,10 @@
 # <img src="logo.svg" height="20"> Digicert
 
-Order, issue, renew, reissue, and revoke TLS/SSL certificates, code signing certificates, document signing certificates, and client certificates. Manage domains and perform domain control validation (DCV) using email, DNS CNAME, DNS TXT, or HTTP methods. Manage organizations and submit them for OV, EV, and code signing validation. Automate certificate enrollment and installation across devices using agent-based or agentless automation. Discover internal and public-facing certificates across your network. Manage private CA hierarchies and issue X.509 certificates via private PKI. Sign code and software artifacts securely through Software Trust Manager. Provision IoT devices, manage device groups, enroll device certificates, and handle firmware updates. Generate custom reports on certificate orders, domains, and organizations using GraphQL.
+Manage certificate orders in DigiCert CertCentral: discover products, order and reissue certificates, check issuance and validation status, download certificate files, cancel pending orders, and request revocation. List and manage domains and organizations, submit validation requests, and process order approvals.
+
+Connect with a CertCentral API key and select the US or Europe instance used by your account. Use `get_current_user` to identify the user and access roles assigned to the key, and `get_order_validation` to inspect domain and organization checks blocking issuance.
+
+Public TLS certificate validity and multi-year coverage depend on the product and account settings. This integration targets the CertCentral Services API; DigiCert ONE, certificate deployment automation, network discovery, and report-generation APIs are outside its current tool surface.
 
 ## License
 

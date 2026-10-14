@@ -58,12 +58,15 @@ export let listSalesNotes = SlateTool.create(spec, {
 
     let salesNotes = result.data.map((n: any) => ({
       salesNoteId: n.id,
-      description: n.description,
-      type: n.type,
-      customerId: typeof n.customer === 'object' ? n.customer?.id : n.customer,
-      customerName: typeof n.customer === 'object' ? n.customer?.name : undefined,
-      date: n.date,
-      creationDate: n.creationDate
+      description: n.description ?? undefined,
+      type: n.type ?? undefined,
+      customerId: (typeof n.customer === 'object' ? n.customer?.id : n.customer) ?? undefined,
+      customerName:
+        (typeof n.customer === 'object'
+          ? (n.customer?.name ?? n.customer?.label)
+          : undefined) ?? undefined,
+      date: n.date ?? undefined,
+      creationDate: n.creationDate ?? undefined
     }));
 
     return {

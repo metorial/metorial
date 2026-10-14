@@ -3,6 +3,8 @@ import { spec } from './spec';
 import {
   discoverDatasets,
   geocodeAddress,
+  getBoundaryLayers,
+  getGeocoderOptions,
   getGeography,
   lookupVariables,
   queryData,
@@ -17,7 +19,9 @@ export let provider = Slate.create({
     lookupVariables,
     geocodeAddress,
     getGeography,
-    queryTigerweb
+    queryTigerweb,
+    getBoundaryLayers,
+    getGeocoderOptions
   ],
   triggers: []
 });

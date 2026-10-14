@@ -112,8 +112,22 @@ export let emailSchema = z.object({
   emailId: z.number().describe('Unique email address identifier'),
   email: z.string().describe('The email address'),
   name: z.string().optional().describe('Display name for the email'),
+  forwardingTo: z.string().optional().describe('SupportBee destination for forwarded mail'),
   isDefault: z.boolean().optional().describe('Whether this is the default email'),
   createdAt: z.string().optional().describe('Email creation timestamp')
+});
+
+export let auditEntrySchema = z.object({
+  action: z.string().describe('Action performed on the ticket'),
+  actor: z
+    .object({
+      name: z.string().optional().describe('Name of the person who performed the action'),
+      imageUrl: z.string().optional().describe('Profile picture URL')
+    })
+    .optional(),
+  url: z.string().optional().describe('Link or fragment to the related ticket activity'),
+  severity: z.string().optional().describe('Activity severity'),
+  happenedAt: z.string().optional().describe('Time the action occurred')
 });
 
 export type Ticket = z.infer<typeof ticketSchema>;
@@ -124,3 +138,4 @@ export type Team = z.infer<typeof teamSchema>;
 export type Label = z.infer<typeof labelSchema>;
 export type Snippet = z.infer<typeof snippetSchema>;
 export type Email = z.infer<typeof emailSchema>;
+export type AuditEntry = z.infer<typeof auditEntrySchema>;

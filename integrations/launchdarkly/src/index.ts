@@ -4,7 +4,9 @@ import {
   createFeatureFlag,
   deleteFeatureFlag,
   getCurrentIdentity,
+  getExperiment,
   getFeatureFlag,
+  getMetric,
   getSegment,
   inviteMembers,
   listEnvironments,
@@ -44,7 +46,9 @@ export let provider = Slate.create({
     inviteMembers,
     searchContexts,
     listMetrics,
-    listExperiments
+    getMetric,
+    listExperiments,
+    getExperiment
   ],
   triggers: []
 });

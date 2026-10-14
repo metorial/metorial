@@ -1,3 +1,4 @@
+export * from './get-api-permissions';
 export * from './get-statistics';
 export * from './manage-allowed-senders';
 export * from './manage-domains';

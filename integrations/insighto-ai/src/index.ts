@@ -4,6 +4,7 @@ import {
   deleteConversation,
   disconnectCall,
   listAssistants,
+  listCampaigns,
   listContacts,
   listConversations,
   listDataSources,
@@ -17,7 +18,8 @@ import {
   manageDataSource,
   manageForm,
   manageWebhook,
-  sendMessage
+  sendMessage,
+  whoAmI
 } from './tools';
 export let provider = Slate.create({
   spec,
@@ -38,7 +40,9 @@ export let provider = Slate.create({
     listForms,
     manageWebhook,
     listWebhooks,
-    manageCampaign
+    manageCampaign,
+    listCampaigns,
+    whoAmI
   ],
   triggers: []
 });

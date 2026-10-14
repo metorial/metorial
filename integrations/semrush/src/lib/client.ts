@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 import { parseCsvResponse } from './csv-parser';
 
 export interface SemrushClientConfig {
@@ -8,30 +8,79 @@ export interface SemrushClientConfig {
 }
 
 export class SemrushAnalyticsClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
   private token: string;
   private database: string;
 
   constructor(config: SemrushClientConfig) {
+    if (config.authType !== 'api_key') {
+      throw createApiServiceError('SEO Analytics reports require an API Key connection.');
+    }
     this.token = config.token;
     this.database = config.database || 'us';
-    this.axios = createAxios({
-      baseURL: 'https://api.semrush.com'
+    this.axios = createAuthenticatedAxios({
+      baseURL: 'https://api.semrush.com',
+      contentType: false,
+      responseType: 'text',
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Semrush',
+          reason: 'upstream_http_error'
+        })
     });
   }
 
   private buildParams(
     params: Record<string, string | number | undefined>
   ): Record<string, string | number> {
+    let limit = params.display_limit;
+    let offset = params.display_offset;
+    for (let [name, value] of [
+      ['display_limit', limit],
+      ['display_offset', offset]
+    ] as const) {
+      if (
+        value !== undefined &&
+        (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)
+      ) {
+        throw createApiServiceError(`${name} must be a non-negative whole number.`);
+      }
+    }
     let result: Record<string, string | number> = {
-      key: this.token
+      key: this.token,
+      export_escape: 1,
+      export_decode: 1
     };
     for (let [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== null && value !== '') {
         result[key] = value;
       }
     }
+    // Semrush display_limit is the ending row when display_offset is used.
+    if (typeof limit === 'number' && limit > 0 && typeof offset === 'number') {
+      result.display_limit = limit + offset;
+    }
+    if (Number(result.display_limit ?? 0) > 4_000_000) {
+      throw createApiServiceError(
+        'The requested limit plus offset must not exceed 4,000,000.'
+      );
+    }
     return result;
+  }
+
+  async getApiUnitBalance(): Promise<number> {
+    let response = await this.axios.get('https://www.semrush.com/users/countapiunits.html', {
+      params: { key: this.token }
+    });
+    let text = String(response.data).trim();
+    if (!/^\d+(?:,\d{3})*$/.test(text)) {
+      throw createApiServiceError('Semrush returned an invalid API-unit balance.');
+    }
+    let balance = Number(text.replaceAll(',', ''));
+    if (!Number.isSafeInteger(balance)) {
+      throw createApiServiceError('Semrush returned an invalid API-unit balance.');
+    }
+    return balance;
   }
 
   async getDomainRanks(domain: string, database?: string): Promise<Record<string, unknown>[]> {
@@ -101,7 +150,7 @@ export class SemrushAnalyticsClient {
     let response = await this.axios.get('/', {
       params: this.buildParams({
         type: 'domain_domains',
-        domains: params.domains.join('|'),
+        domains: params.domains.map(domain => `*|or|${domain}`).join('|'),
         database: params.database || this.database,
         display_limit: params.displayLimit,
         display_offset: params.displayOffset,
@@ -120,7 +169,7 @@ export class SemrushAnalyticsClient {
         type: 'domain_rank',
         domain: params.domain,
         database: params.database || this.database,
-        export_columns: 'Db,Dn,Rk,Or,Ot,Oc,Ad,At,Ac,Sh,Sv'
+        export_columns: 'Dn,Rk,Or,Ot,Oc,Ad,At,Ac'
       })
     });
     return parseCsvResponse(response.data);
@@ -191,7 +240,7 @@ export class SemrushAnalyticsClient {
   }): Promise<Record<string, unknown>[]> {
     let response = await this.axios.get('/', {
       params: this.buildParams({
-        type: 'phrase_all',
+        type: 'phrase_this',
         phrase: params.phrase,
         database: params.database || this.database,
         export_columns: 'Ph,Nq,Cp,Co,Nr,Td,In,Kd'
@@ -204,9 +253,9 @@ export class SemrushAnalyticsClient {
     phrases: string[];
     database?: string;
   }): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.post('/', null, {
+    let response = await this.axios.get('/', {
       params: this.buildParams({
-        type: 'phrase_all',
+        type: 'phrase_these',
         phrase: params.phrases.join(';'),
         database: params.database || this.database,
         export_columns: 'Ph,Nq,Cp,Co,Nr,Td,In,Kd'

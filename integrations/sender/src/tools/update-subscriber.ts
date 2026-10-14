@@ -29,7 +29,9 @@ export let updateSubscriber = SlateTool.create(spec, {
       customFields: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Updated custom field key-value pairs'),
+        .describe(
+          'Updated custom field key-value pairs. Call list_fields for fieldName keys, such as {$company}.'
+        ),
       subscriberStatus: z
         .enum(['ACTIVE', 'UNSUBSCRIBED', 'BOUNCED', 'SPAM_REPORTED'])
         .optional()

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MapboxClient } from '../lib/client';
 import { spec } from '../spec';
@@ -89,7 +89,7 @@ export let manageTokensTool = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.scopes || ctx.input.scopes.length === 0) {
-        throw new Error('At least one scope is required to create a token');
+        throw createApiServiceError('At least one scope is required to create a token');
       }
       let t = await client.createToken({
         note: ctx.input.note,
@@ -103,7 +103,7 @@ export let manageTokensTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.tokenId) throw new Error('tokenId is required for update');
+      if (!ctx.input.tokenId) throw createApiServiceError('tokenId is required for update');
       let updateData: Record<string, any> = {};
       if (ctx.input.note !== undefined) updateData.note = ctx.input.note;
       if (ctx.input.scopes !== undefined) updateData.scopes = ctx.input.scopes;
@@ -116,7 +116,7 @@ export let manageTokensTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.tokenId) throw new Error('tokenId is required for delete');
+      if (!ctx.input.tokenId) throw createApiServiceError('tokenId is required for delete');
       await client.deleteToken(ctx.input.tokenId);
       return {
         output: { deleted: true },
@@ -132,7 +132,7 @@ export let manageTokensTool = SlateTool.create(spec, {
           valid: isValid,
           tokenInfo: result.token
             ? {
-                tokenId: result.token.id,
+                tokenId: result.token.authorization ?? result.token.id,
                 usage: result.token.usage,
                 scopes: result.token.scopes,
                 note: result.token.note,
@@ -146,5 +146,5 @@ export let manageTokensTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   });

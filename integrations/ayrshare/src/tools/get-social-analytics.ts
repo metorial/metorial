@@ -34,7 +34,7 @@ export let getSocialAnalytics = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe(
-          'Return daily time-series data instead of aggregates (Facebook, Instagram, TikTok, YouTube)'
+          'Return daily time-series data instead of aggregates (Facebook, Google Business Profile, Instagram, Snapchat, TikTok, YouTube)'
         ),
       quarters: z
         .number()
@@ -47,6 +47,10 @@ export let getSocialAnalytics = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().optional().describe('Response status'),
+      warnings: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Non-fatal analytics warnings'),
       analytics: z
         .record(z.string(), z.record(z.string(), z.unknown()))
         .describe(
@@ -56,7 +60,7 @@ export let getSocialAnalytics = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -91,7 +95,8 @@ export let getSocialAnalytics = SlateTool.create(spec, {
     return {
       output: {
         status: result.status,
-        analytics
+        analytics,
+        warnings: result.warnings
       },
       message: `Retrieved social analytics for **${Object.keys(analytics).length}** platform(s): ${Object.keys(analytics).join(', ')}.`
     };

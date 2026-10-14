@@ -21,8 +21,14 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
     z.object({
       integratedNumber: z
         .string()
-        .describe('Your WhatsApp Business number registered with MSG91'),
-      templateName: z.string().describe('Approved WhatsApp template name'),
+        .describe(
+          'Your WhatsApp Business number. Call list_whatsapp_numbers to discover registered numbers.'
+        ),
+      templateName: z
+        .string()
+        .describe(
+          'Approved WhatsApp template name. Call list_whatsapp_templates to discover templates.'
+        ),
       languageCode: z.string().describe('Template language code (e.g., "en", "en_US")'),
       namespace: z
         .string()
@@ -38,7 +44,22 @@ export let sendWhatsAppMessage = SlateTool.create(spec, {
               .record(z.string(), z.string())
               .optional()
               .describe(
-                'Template component variables (e.g., {"body_1": "value", "button_1": "url"})'
+                'Text variables (e.g., {"body_1": "value", "button_1": "url"}). Button variables use URL subtype; use componentDetails for other types.'
+              ),
+            componentDetails: z
+              .record(
+                z.string(),
+                z.object({
+                  type: z
+                    .string()
+                    .describe('Component type, such as text, image, or document'),
+                  value: z.string().describe('Text value or public media URL'),
+                  subtype: z.string().optional().describe('Button subtype, such as url')
+                })
+              )
+              .optional()
+              .describe(
+                'Typed template components keyed by body_1, header_1, or button_1. Overrides matching entries in components.'
               )
           })
         )

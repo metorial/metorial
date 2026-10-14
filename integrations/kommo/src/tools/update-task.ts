@@ -38,7 +38,9 @@ export let updateTaskTool = SlateTool.create(spec, {
     if (ctx.input.responsibleUserId !== undefined)
       payload.responsible_user_id = ctx.input.responsibleUserId;
     if (ctx.input.isCompleted !== undefined) payload.is_completed = ctx.input.isCompleted;
-    if (ctx.input.resultText !== undefined) payload.result = { text: ctx.input.resultText };
+    if (ctx.input.resultText !== undefined || ctx.input.isCompleted === true) {
+      payload.result = { text: ctx.input.resultText ?? '' };
+    }
 
     let result = await client.updateTask(ctx.input.taskId, payload);
 

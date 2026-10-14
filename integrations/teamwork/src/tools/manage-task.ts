@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -94,8 +94,10 @@ export let manageTask = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.taskListId) throw new Error('taskListId is required to create a task');
-      if (!ctx.input.content) throw new Error('content is required to create a task');
+      if (!ctx.input.taskListId)
+        throw createApiServiceError('taskListId is required to create a task');
+      if (!ctx.input.content)
+        throw createApiServiceError('content is required to create a task');
       let result = await client.createTask(ctx.input.taskListId, {
         content: ctx.input.content,
         description: ctx.input.description,
@@ -123,7 +125,8 @@ export let manageTask = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.taskId) throw new Error('taskId is required to update a task');
+      if (!ctx.input.taskId)
+        throw createApiServiceError('taskId is required to update a task');
       await client.updateTask(ctx.input.taskId, {
         content: ctx.input.content,
         description: ctx.input.description,
@@ -144,7 +147,8 @@ export let manageTask = SlateTool.create(spec, {
     }
 
     if (action === 'complete') {
-      if (!ctx.input.taskId) throw new Error('taskId is required to complete a task');
+      if (!ctx.input.taskId)
+        throw createApiServiceError('taskId is required to complete a task');
       await client.completeTask(ctx.input.taskId);
       return {
         output: { completed: true },
@@ -153,7 +157,8 @@ export let manageTask = SlateTool.create(spec, {
     }
 
     if (action === 'reopen') {
-      if (!ctx.input.taskId) throw new Error('taskId is required to reopen a task');
+      if (!ctx.input.taskId)
+        throw createApiServiceError('taskId is required to reopen a task');
       await client.reopenTask(ctx.input.taskId);
       return {
         output: { reopened: true },
@@ -162,7 +167,8 @@ export let manageTask = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.taskId) throw new Error('taskId is required to delete a task');
+      if (!ctx.input.taskId)
+        throw createApiServiceError('taskId is required to delete a task');
       await client.deleteTask(ctx.input.taskId);
       return {
         output: { deleted: true },
@@ -170,6 +176,6 @@ export let manageTask = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

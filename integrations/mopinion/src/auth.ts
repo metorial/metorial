@@ -1,4 +1,10 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  requestAxiosData,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
 
 let apiAxios = createAxios({
@@ -29,13 +35,29 @@ export let auth = SlateAuth.create()
         'base64'
       );
 
-      let response = await apiAxios.get('/token', {
-        headers: {
-          Authorization: `Basic ${credentials}`
-        }
-      });
+      let response = await requestAxiosData<{ token?: string }>(
+        'retrieve signature token',
+        () =>
+          apiAxios.get('/token', {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              version: '2.5.0'
+            }
+          }),
+        (error, operation) =>
+          buildApiServiceError(error, {
+            providerLabel: 'Mopinion',
+            reason: 'mopinion_auth_error',
+            operation
+          })
+      );
 
-      let signatureToken = response.data.token;
+      let signatureToken = response.token;
+      if (typeof signatureToken !== 'string' || !signatureToken) {
+        throw createApiServiceError(
+          'Mopinion did not return a signature token. Check your API keys.'
+        );
+      }
 
       return {
         output: {
@@ -55,7 +77,8 @@ export let auth = SlateAuth.create()
         signatureToken: ctx.output.signatureToken
       });
 
-      let account = await client.getAccount();
+      let result = await client.getAccount();
+      let account = result.data ?? result;
 
       return {
         profile: {

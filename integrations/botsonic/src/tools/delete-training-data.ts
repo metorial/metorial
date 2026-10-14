@@ -1,18 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BusinessClient } from '../lib/client';
+import { botIdSchema, workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let deleteTrainingData = SlateTool.create(spec, {
   name: 'Delete Training Data',
   key: 'delete_training_data',
   description: `Delete a specific training data entry from a bot's knowledge base. Use the "List Training Data" tool to find the data ID.`,
+  instructions: [
+    'For account API key connections, call list_bots and provide botId. A Bot API Token connection targets the bot owning that token.'
+  ],
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      botId: botIdSchema,
+      workspaceId: workspaceIdSchema,
       dataId: z.string().describe('The unique identifier of the training data entry to delete')
     })
   )
@@ -25,7 +31,12 @@ export let deleteTrainingData = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new BusinessClient(ctx.auth.token);
+    let client = new BusinessClient(
+      ctx.auth.token,
+      ctx.auth.credentialType,
+      ctx.input.botId,
+      ctx.input.workspaceId
+    );
 
     let result = await client.deleteBotData(ctx.input.dataId);
 

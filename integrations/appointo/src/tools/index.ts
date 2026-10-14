@@ -3,6 +3,7 @@ export * from './create-booking';
 export * from './get-availability';
 export * from './list-appointments';
 export * from './list-bookings';
+export * from './list-cancelled-bookings';
 export * from './list-products';
 export * from './list-subscription-contracts';
 export * from './reschedule-booking';

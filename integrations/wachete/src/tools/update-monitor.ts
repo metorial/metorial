@@ -145,10 +145,10 @@ Can modify the URL, XPath, alerts, notification endpoints, check frequency, and 
     return {
       output: {
         wachetId: result.id ?? ctx.input.wachetId,
-        name: result.name,
-        url: result.url,
-        jobType: result.jobType,
-        recurrenceInSeconds: result.recurrenceInSeconds
+        name: result.name ?? undefined,
+        url: result.url ?? undefined,
+        jobType: result.jobType == null ? undefined : String(result.jobType),
+        recurrenceInSeconds: result.recurrenceInSeconds ?? undefined
       },
       message: `Updated monitor **${result.name}** (ID: \`${result.id}\`).`
     };

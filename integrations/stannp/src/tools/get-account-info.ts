@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let getAccountInfo = SlateTool.create(spec, {
@@ -23,7 +23,7 @@ export let getAccountInfo = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let client = createClient(ctx.auth, ctx.config);
 
     let [info, balanceResult] = await Promise.all([
       client.getAccountInfo(),
@@ -33,12 +33,12 @@ export let getAccountInfo = SlateTool.create(spec, {
     return {
       output: {
         accountId: info?.id != null ? String(info.id) : undefined,
-        email: info?.email,
-        firstname: info?.firstname,
-        lastname: info?.lastname,
-        balance: balanceResult?.balance
+        email: info?.email ?? undefined,
+        firstname: info?.firstname ?? undefined,
+        lastname: info?.lastname ?? undefined,
+        balance: balanceResult?.balance != null ? String(balanceResult.balance) : undefined
       },
-      message: `Account: **${info?.email}** — Balance: **$${balanceResult?.balance ?? 'unknown'}**`
+      message: `Account: **${info?.email}** — Balance: **${balanceResult?.balance ?? 'unknown'}**`
     };
   })
   .build();

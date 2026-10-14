@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -75,7 +75,8 @@ export let manageHistoricEvents = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.eventId) throw new Error('eventId is required when updating a milestone');
+      if (!ctx.input.eventId)
+        throw createApiServiceError('eventId is required when updating a milestone');
 
       let data: Record<string, unknown> = {};
       if (ctx.input.eventName !== undefined) data.name = ctx.input.eventName;
@@ -99,7 +100,8 @@ export let manageHistoricEvents = SlateTool.create(spec, {
     }
 
     // remove
-    if (!ctx.input.eventId) throw new Error('eventId is required when removing a milestone');
+    if (!ctx.input.eventId)
+      throw createApiServiceError('eventId is required when removing a milestone');
     await client.deletePersonHistoricEvent(ctx.input.personId, ctx.input.eventId);
 
     return {

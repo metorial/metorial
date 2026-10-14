@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let webScraper = SlateTool.create(spec, {
   key: 'web_page_scraper',
   description: `Scrape any website using a general-purpose web scraping API that handles blockages and CAPTCHAs internally. Supports JavaScript rendering via headless browser, premium residential proxies, and configurable wait times for heavy pages.`,
   instructions: [
-    'The URL should be fully encoded before passing it.',
+    'Provide the complete URL; an already URL-encoded URL is also accepted.',
     'Use `renderJs` for pages that rely on client-side JavaScript rendering.',
     'Use `waitMs` along with `renderJs` for pages that need time to fully load.',
     'Enable `premium` for difficult-to-scrape websites that block regular proxies.'
@@ -23,7 +23,7 @@ export let webScraper = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      url: z.string().describe('The URL of the page to scrape (should be URL-encoded)'),
+      url: z.string().describe('The complete HTTP or HTTPS URL of the page to scrape'),
       renderJs: z
         .boolean()
         .optional()
@@ -59,10 +59,20 @@ export let webScraper = SlateTool.create(spec, {
       wait: ctx.input.waitMs,
       country: ctx.input.country
     });
+    if (typeof data !== 'string') {
+      throw createApiServiceError(
+        'Serpdog returned an unexpected page response. Try scraping the page again.'
+      );
+    }
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(data, { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+      filename: 'page.html'
+    });
 
     return {
       output: { content: data },
-      message: `Scraped web page at **${ctx.input.url}**.`
+      message: `Scraped web page at **${ctx.input.url}** and prepared its HTML for download.`
     };
   })
   .build();

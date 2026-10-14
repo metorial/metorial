@@ -7,8 +7,11 @@ import {
   createUser,
   getItem,
   getOrganization,
+  getProject,
   searchItems,
   searchProjects,
+  searchTeams,
+  searchUsers,
   updateItem
 } from './tools';
 export let provider = Slate.create({
@@ -22,7 +25,10 @@ export let provider = Slate.create({
     searchProjects,
     createMessage,
     createUser,
-    getOrganization
+    getOrganization,
+    getProject,
+    searchUsers,
+    searchTeams
   ],
   triggers: []
 });

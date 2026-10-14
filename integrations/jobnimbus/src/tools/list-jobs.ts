@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { recordId, recordName } from '../lib/records';
 import { spec } from '../spec';
 
 export let listJobs = SlateTool.create(spec, {
@@ -67,7 +68,7 @@ export let listJobs = SlateTool.create(spec, {
       mustClauses.push({ term: { record_type_name: ctx.input.recordTypeName } });
     }
     if (ctx.input.contactId) {
-      mustClauses.push({ term: { primary: ctx.input.contactId } });
+      mustClauses.push({ term: { 'primary.id': ctx.input.contactId } });
     }
     if (ctx.input.tag) {
       mustClauses.push({ term: { tags: ctx.input.tag } });
@@ -83,22 +84,22 @@ export let listJobs = SlateTool.create(spec, {
 
     let jobs = (result.results || []).map((j: any) => ({
       jobId: j.jnid,
-      name: j.name,
-      description: j.description,
-      number: j.number,
-      statusName: j.status_name,
-      recordTypeName: j.record_type_name,
-      addressLine1: j.address_line1,
-      city: j.city,
-      state: j.state_text,
-      zip: j.zip,
-      primaryContactId: j.primary,
-      primaryContactName: j.primary_name,
-      sourceName: j.source_name,
-      tags: j.tags,
-      salesRepName: j.sales_rep_name,
-      dateCreated: j.date_created,
-      dateUpdated: j.date_updated
+      name: j.name ?? undefined,
+      description: j.description ?? undefined,
+      number: j.number ?? undefined,
+      statusName: j.status_name ?? undefined,
+      recordTypeName: j.record_type_name ?? undefined,
+      addressLine1: j.address_line1 ?? undefined,
+      city: j.city ?? undefined,
+      state: j.state_text ?? undefined,
+      zip: j.zip ?? undefined,
+      primaryContactId: recordId(j.primary),
+      primaryContactName: recordName(j.primary) ?? j.primary_name ?? undefined,
+      sourceName: j.source_name ?? undefined,
+      tags: j.tags ?? undefined,
+      salesRepName: j.sales_rep_name ?? undefined,
+      dateCreated: j.date_created ?? undefined,
+      dateUpdated: j.date_updated ?? undefined
     }));
 
     return {

@@ -44,9 +44,9 @@ export let listLists = SlateTool.create(spec, {
       return {
         listId: item.id,
         listType: item.type,
-        name: n.name,
+        name: n.name ?? undefined,
         status: n.status,
-        createdAt: n['created-at'] || n.created_at
+        createdAt: n['created-at'] ?? n.created_at ?? undefined
       };
     });
 

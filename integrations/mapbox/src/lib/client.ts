@@ -1,15 +1,45 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  isApiErrorRecord
+} from 'slates';
 
 export class MapboxClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
   private token: string;
   private username: string;
 
   constructor(config: { token: string; username: string }) {
     this.token = config.token;
     this.username = config.username;
-    this.http = createAxios({
-      baseURL: 'https://api.mapbox.com'
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.mapbox.com',
+      timeout: 30000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Mapbox',
+          reason: 'mapbox_api_error',
+          extractUpstreamCode: (_error, response) =>
+            isApiErrorRecord(response?.data) && typeof response.data.code === 'string'
+              ? response.data.code
+              : undefined
+        })
+    });
+    this.http.interceptors.response.use(response => {
+      if (
+        /^\/(directions|directions-matrix|matching|optimized-trips)\//.test(
+          response.config.url ?? ''
+        ) &&
+        typeof response.data?.code === 'string' &&
+        response.data.code !== 'Ok'
+      ) {
+        throw createApiServiceError(
+          `Mapbox could not complete the routing request: ${response.data.message || response.data.code}`,
+          { upstreamStatus: response.status, upstreamCode: response.data.code }
+        );
+      }
+      return response;
     });
   }
 
@@ -46,7 +76,9 @@ export class MapboxClient {
   }
 
   async updateStyle(styleId: string, style: Record<string, any>) {
-    let response = await this.http.patch(`/styles/v1/${this.username}/${styleId}`, style, {
+    let currentStyle = await this.getStyle(styleId);
+    let update = { ...currentStyle, ...style, created: undefined, modified: undefined };
+    let response = await this.http.patch(`/styles/v1/${this.username}/${styleId}`, update, {
       params: this.params()
     });
     return response.data;
@@ -190,6 +222,51 @@ export class MapboxClient {
     return response.data;
   }
 
+  // ── Geocoding v6 API ──
+
+  async geocodeV6(options: {
+    mode: 'forward' | 'reverse';
+    searchText?: string;
+    longitude?: number;
+    latitude?: number;
+    addressNumber?: string;
+    street?: string;
+    place?: string;
+    region?: string;
+    postcode?: string;
+    country?: string;
+    language?: string;
+    limit?: number;
+    types?: string;
+    proximity?: string;
+    bbox?: string;
+    autocomplete?: boolean;
+    worldview?: string;
+  }) {
+    let forward = options.mode === 'forward';
+    let response = await this.http.get(`/search/geocode/v6/${options.mode}`, {
+      params: this.params({
+        q: forward ? options.searchText : undefined,
+        longitude: forward ? undefined : options.longitude,
+        latitude: forward ? undefined : options.latitude,
+        address_number: forward ? options.addressNumber : undefined,
+        street: forward ? options.street : undefined,
+        place: forward ? options.place : undefined,
+        region: forward ? options.region : undefined,
+        postcode: forward ? options.postcode : undefined,
+        country: options.country,
+        language: options.language,
+        limit: options.limit,
+        types: options.types,
+        proximity: forward ? options.proximity : undefined,
+        bbox: forward ? options.bbox : undefined,
+        autocomplete: forward ? options.autocomplete : undefined,
+        worldview: options.worldview
+      })
+    });
+    return response.data;
+  }
+
   // ── Directions API ──
 
   async getDirections(
@@ -242,6 +319,7 @@ export class MapboxClient {
     padding?: string;
     attribution?: boolean;
     logo?: boolean;
+    format?: 'png' | 'jpeg' | 'webp';
   }): string {
     let owner = options.styleOwner || this.username;
     let bearing = options.bearing ?? 0;
@@ -254,7 +332,8 @@ export class MapboxClient {
     if (options.attribution === false) params.set('attribution', 'false');
     if (options.logo === false) params.set('logo', 'false');
     if (options.padding) params.set('padding', options.padding);
-    return `https://api.mapbox.com/styles/v1/${owner}/${options.styleId}/static/${overlaySegment}${options.longitude},${options.latitude},${options.zoom},${bearing},${pitch}/${options.width}x${options.height}${retinaStr}?${params.toString()}`;
+    let format = options.format ? `.${options.format}` : '';
+    return `https://api.mapbox.com/styles/v1/${owner}/${options.styleId}/static/${overlaySegment}${options.longitude},${options.latitude},${options.zoom},${bearing},${pitch}/${options.width}x${options.height}${retinaStr}${format}?${params.toString()}`;
   }
 
   // ── Isochrone API ──
@@ -362,6 +441,14 @@ export class MapboxClient {
       distributions?: string;
     }
   ) {
+    if (
+      options?.roundtrip === false &&
+      (options.source === 'any' || options.destination === 'any')
+    ) {
+      throw createApiServiceError(
+        'Non-roundtrip optimization requires source "first" and destination "last".'
+      );
+    }
     let response = await this.http.get(
       `/optimized-trips/v1/mapbox/${profile}/${coordinates}`,
       {
@@ -371,8 +458,9 @@ export class MapboxClient {
           steps: options?.steps,
           annotations: options?.annotations,
           language: options?.language,
-          source: options?.source,
-          destination: options?.destination,
+          source: options?.source ?? (options?.roundtrip === false ? 'first' : undefined),
+          destination:
+            options?.destination ?? (options?.roundtrip === false ? 'last' : undefined),
           roundtrip: options?.roundtrip,
           distributions: options?.distributions
         })

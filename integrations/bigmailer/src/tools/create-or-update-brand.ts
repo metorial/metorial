@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createOrUpdateBrand = SlateTool.create(spec, {
   name: 'Create or Update Brand',
   key: 'create_or_update_brand',
-  description: `Create a new brand or update an existing one. To update, provide the \`brandId\`. To create, omit \`brandId\` and provide at least a \`name\`. Brands are subaccounts with their own lists, contacts, campaigns, and senders.`,
+  description: `Create a new brand or update an existing one. To update, provide the \`brandId\`. To create, omit \`brandId\` and provide a \`name\`, \`fromName\`, and \`fromEmail\`. Brands are subaccounts with their own lists, contacts, campaigns, and senders.`,
   instructions: [
     'Omit brandId to create a new brand. Provide brandId to update an existing one.',
     'When updating, only provided fields are changed; others remain unchanged.'
@@ -59,6 +59,14 @@ export let createOrUpdateBrand = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.brandId &&
+      (!ctx.input.name || !ctx.input.fromName || !ctx.input.fromEmail)
+    ) {
+      throw createApiServiceError(
+        'name, fromName, and fromEmail are required to create a brand.'
+      );
+    }
     let client = new Client(ctx.auth.token);
 
     let payload: Record<string, unknown> = {};

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -32,9 +32,11 @@ Allows CC/BCC recipients, reply-to addresses, attachments (base64-encoded), pers
 })
   .input(
     z.object({
-      from: recipientSchema.describe(
-        'Sender email and optional name. Must match a verified domain.'
-      ),
+      from: recipientSchema
+        .optional()
+        .describe(
+          'Sender email and optional name. Must match a verified domain. May be omitted when templateId has a default sender.'
+        ),
       to: z.array(recipientSchema).min(1).describe('List of recipients (1-50).'),
       subject: z.string().optional().describe('Email subject line (max 998 characters).'),
       html: z.string().optional().describe('HTML content of the email.'),
@@ -107,10 +109,23 @@ Allows CC/BCC recipients, reply-to addresses, attachments (base64-encoded), pers
         .nullable()
         .describe('Unique message ID for tracking. Null if not returned.'),
       statusCode: z.number().describe('HTTP status code from the API.'),
-      accepted: z.boolean().describe('Whether the email was accepted for delivery.')
+      accepted: z.boolean().describe('Whether a message was created for delivery.'),
+      paused: z.boolean().optional().describe('Whether sending is paused for this message.'),
+      warnings: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Provider warnings, including suppressed recipients and their reasons.')
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.templateId && !ctx.input.html && !ctx.input.text) {
+      throw createApiServiceError('Provide html, text, or templateId for the email content.');
+    }
+    if (!ctx.input.templateId && (!ctx.input.from || !ctx.input.subject)) {
+      throw createApiServiceError(
+        'Provide from and subject, or use a template with defaults.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let settings =
@@ -147,21 +162,19 @@ Allows CC/BCC recipients, reply-to addresses, attachments (base64-encoded), pers
       settings
     });
 
-    let accepted = result.statusCode >= 200 && result.statusCode < 300;
-
-    if (!accepted) {
-      ctx.warn(['Email was not accepted', result]);
-    }
+    let accepted = Boolean(result.messageId);
 
     return {
       output: {
         messageId: result.messageId,
         statusCode: result.statusCode,
-        accepted
+        accepted,
+        paused: result.paused,
+        warnings: result.warnings
       },
       message: accepted
-        ? `Email ${ctx.input.sendAt ? 'scheduled' : 'sent'} to **${ctx.input.to.map(r => r.email).join(', ')}**${result.messageId ? ` (Message ID: \`${result.messageId}\`)` : ''}.`
-        : `Email sending failed with status ${result.statusCode}.`
+        ? `Email ${result.paused ? 'queued with sending paused' : ctx.input.sendAt ? 'scheduled' : 'queued'} for **${ctx.input.to.map(r => r.email).join(', ')}** (Message ID: \`${result.messageId}\`).`
+        : 'No email message was created. Review the provider warnings for suppressed recipients.'
     };
   })
   .build();

@@ -28,6 +28,10 @@ export let getPortingHistory = SlateTool.create(spec, {
     z.object({
       portingEvents: z.array(portingEventSchema).optional().describe('List of porting events'),
       status: z.number().optional().describe('Status code (0 = success)'),
+      responseStatus: z
+        .string()
+        .optional()
+        .describe('Provider request status when returned as text'),
       statusMessage: z.string().optional().describe('Status message'),
       rawResponse: z.any().optional().describe('Full raw API response')
     })
@@ -39,17 +43,23 @@ export let getPortingHistory = SlateTool.create(spec, {
     let events = result.porting_history || result.events || result.history || [];
     let portingEvents = Array.isArray(events)
       ? events.map((e: any) => ({
-          actionType: e.action_type || e.actionType,
-          networkId: e.network_id || e.networkId,
-          lineType: e.line_type || e.lineType,
-          timestamp: e.timestamp || e.date
+          actionType: e.action_type ?? e.actionType ?? e.action,
+          networkId:
+            e.network_id ??
+            e.networkId ??
+            (e.tmtnetwork === undefined || e.tmtnetwork === null
+              ? undefined
+              : String(e.tmtnetwork)),
+          lineType: e.line_type ?? e.lineType ?? e.i_type,
+          timestamp: e.timestamp ?? e.date ?? e.ts
         }))
       : [];
 
     return {
       output: {
         portingEvents,
-        status: result.status,
+        status: typeof result.status === 'number' ? result.status : undefined,
+        responseStatus: typeof result.status === 'string' ? result.status : undefined,
         statusMessage: result.status_message,
         rawResponse: result
       },

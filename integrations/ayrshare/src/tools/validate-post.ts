@@ -38,6 +38,10 @@ export let validatePost = SlateTool.create(spec, {
   .output(
     z.object({
       status: z.string().describe('Validation status (success or error)'),
+      warnings: z
+        .array(z.record(z.string(), z.unknown()))
+        .optional()
+        .describe('Non-fatal validation warnings'),
       errors: z
         .array(z.record(z.string(), z.unknown()))
         .optional()
@@ -46,7 +50,7 @@ export let validatePost = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -61,7 +65,8 @@ export let validatePost = SlateTool.create(spec, {
     return {
       output: {
         status: result.status || (errors.length > 0 ? 'error' : 'success'),
-        errors
+        errors,
+        warnings: result.warnings
       },
       message:
         errors.length > 0

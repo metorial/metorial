@@ -1,73 +1,34 @@
-Now let me get the full Heyy API documentation:Let me check the Postman API documentation referenced in the search results:Now let me try to access the Heyy API reference documentation directly:Now I have enough information to compile the specification. Let me synthesize what I've found.
-
-# Slates Specification for Heyy
-
-## Overview
-
-Heyy (heyy.io) is a customer messaging and communication platform that unifies interactions across WhatsApp, Instagram, Facebook Messenger, and website live chat into a single inbox. It connects with WhatsApp, Instagram, Messenger, and your website chat widget, and can be plugged into CRMs, e-commerce systems, ticketing tools, and more using integrations or APIs. It also offers AI Employees — customizable AI entities that handle tasks like customer support, sales, onboarding, or internal operations.
+# Heyy Integration
 
 ## Authentication
 
-Heyy uses API keys for authentication.
+Create a bearer API key in your Heyy workspace under [Settings → API Keys](https://app.heyy.io/settings/api-keys). The same documented bearer authentication is used by both API versions. Connection profile verification retrieves the v2 business account.
 
-To obtain an API key:
+- [API v2 authentication](https://docs.heyy.io/api-reference/v2/authentication)
+- [API v3 authentication](https://docs.heyy.io/api-reference/v3/authentication)
 
-1. Log in to the Heyy Hub (https://hub.heyy.io/).
-2. Navigate to **Settings**, then under the **Developers** section, click on **API Keys**, and click **Create API Key**.
+## Supported workflows
 
-The API key is passed as a Bearer token in the `Authorization` header of each request:
+The existing 16 tools preserve their API v2 inputs and outputs. They cover business information, channel discovery, contact listing and management, WhatsApp messaging, template discovery, broadcasts and recipient addition, chat listing and updates, and automation listing and invocation. Requests use the current documented API v2 server, `https://api.heyy.io/v2`.
 
-```
-Authorization: Bearer <your_api_token>
-```
+Three read-only tools use the current API v3 server, `https://api.heyy.io/v3`:
 
-The base URL for the API is `https://api.hey-y.io/api/v2.0/`.
+- `get_workspace`: identify the workspace associated with the API key and inspect its timezone and availability.
+- `get_contact`: retrieve contact names, messaging handles, subscription state, label IDs, attribute values, and associated chat IDs.
+- `get_chat`: inspect chat status, unread state, assignments, sensitivity, and the latest message.
 
-## Features
+File upload, message-template creation, campaign editing, webhook management, and AI employee configuration are not exposed by this package. Media messaging requires a file ID already obtained from Heyy.
 
-### Business Information
+## API v2 sunset
 
-- Retrieve details about your business account on Heyy.
-- Used to verify API connectivity and access business-level configuration.
+Heyy's [versioning notice](https://docs.heyy.io/api-reference/v3/versioning) explicitly schedules API v2 retirement for **November 1, 2026**. Existing v2 tools and connection profile verification require a separate migration before that date. V3 changes list operations to search endpoints and renames broadcasts to campaigns and workflows to automations. The current refresh preserves existing public contracts rather than changing those meanings during this update.
 
-### Contact Management
+## Provider references
 
-- Create new contacts for the business.
-- Update the details of existing contacts.
-- Contacts represent customers or leads that your business communicates with across channels.
-
-### Messaging
-
-- Send WhatsApp messages to contacts.
-- Messages are sent to contacts already registered in your business account.
-- Heyy supports communication across WhatsApp, Instagram, Messenger, and website chat.
-
-### File Uploads
-
-- Upload files to be used within conversations or associated with contacts.
-- Supported formats and file path configuration may be required.
-
-### Campaigns
-
-- Run campaigns for lead nurturing and client communication.
-- The platform supports marketing outreach and re-engagement campaigns across connected channels.
-
-### AI Employees
-
-- AI Employees are digital, customizable AI entities that handle tasks like customer support, sales, onboarding, or internal operations — virtual team members that can chat with customers, answer FAQs, qualify leads, or integrate with tools.
-- Automatically route complex queries to humans with full conversation context and sentiment awareness.
-
-### Automations & Workflows
-
-- Connect Heyy to CRM, ticketing, e-commerce, and internal tools — or build custom actions via API/webhooks.
-- Build automated response flows, escalation paths, and backend workflows.
-
-## Events
-
-Heyy supports webhooks for real-time event notifications.
-
-### Incoming Messages
-
-- Emit new event when a business gets a new incoming message.
-- Can be scoped to a specific channel ID.
-- Useful for triggering external workflows whenever a customer sends a message through any connected channel (WhatsApp, Instagram, Messenger, web chat).
+- [Current v2 OpenAPI contract](https://docs.heyy.io/api-reference/openapi-v2.json)
+- [Current v3 OpenAPI contract](https://docs.heyy.io/api-reference/openapi-v3.json)
+- [Get workspace](https://docs.heyy.io/api-reference/get-workspace)
+- [Get contact](https://docs.heyy.io/api-reference/get-contact)
+- [Get chat](https://docs.heyy.io/api-reference/get-chat)
+- [API v2 errors](https://docs.heyy.io/api-reference/v2/error-handling)
+- [API v3 errors](https://docs.heyy.io/api-reference/v3/error-handling)

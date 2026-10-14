@@ -57,7 +57,7 @@ export let getComments = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -80,7 +80,7 @@ export let getComments = SlateTool.create(spec, {
 export let postComment = SlateTool.create(spec, {
   name: 'Post Comment',
   key: 'post_comment',
-  description: `Post a comment or reply on a social media post. Supports posting to multiple platforms simultaneously and optionally includes an image attachment.`,
+  description: `Post a new comment on a social media post. Supports posting to multiple platforms simultaneously and optionally includes an image attachment.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -115,7 +115,7 @@ export let postComment = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
@@ -150,7 +150,18 @@ export let deleteComment = SlateTool.create(spec, {
   .input(
     z.object({
       commentId: z.string().describe('The comment ID to delete'),
-      platforms: z.array(platformEnum).min(1).describe('Platforms to delete the comment from')
+      platforms: z
+        .array(platformEnum)
+        .min(1)
+        .describe(
+          'Platforms to delete the comment from; exactly one when searchPlatformId is true'
+        ),
+      searchPlatformId: z
+        .boolean()
+        .optional()
+        .describe(
+          'Set to true when commentId is a Social Comment ID rather than an Ayrshare Comment ID'
+        )
     })
   )
   .output(
@@ -160,13 +171,14 @@ export let deleteComment = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({
-      token: ctx.auth.token,
+      ...ctx.auth,
       profileKey: ctx.config.profileKey
     });
 
     let result = await client.deleteComment({
       commentId: ctx.input.commentId,
-      platforms: ctx.input.platforms
+      platforms: ctx.input.platforms,
+      searchPlatformId: ctx.input.searchPlatformId
     });
 
     return {

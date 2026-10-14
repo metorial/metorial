@@ -6,8 +6,9 @@ import { spec } from '../spec';
 export let updateTokenConfig = SlateTool.create(spec, {
   name: 'Update Token Config',
   key: 'update_token_config',
-  description: `Update the callback URL, return URL, and/or webhook URL linked to the current organizational token (API key). These URLs control where OKSign sends signature callbacks, browser redirects, and notification delivery error reports.`,
+  description: `Replace the callback URL, return URL, and webhook URL linked to the current organizational token (API key). These URLs control where OKSign sends signature callbacks, browser redirects, and notification delivery error reports.`,
   instructions: [
+    'Provide all three URL fields. Use an empty string to clear a URL; omitted values cannot be preserved by this API.',
     'The callback URL receives HTTP GET requests when a document is signed.',
     "The return URL is used to redirect the signer's browser after signing.",
     'The webhook URL receives HTTP GET requests when email/SMS notifications fail.'

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { Client, getCreatedId } from '../lib/client';
 import { spec } from '../spec';
 
 export let createProject = SlateTool.create(spec, {
@@ -20,9 +20,7 @@ Optionally assign a parent portfolio and project type.`,
       type: z
         .string()
         .optional()
-        .describe(
-          'Project type identifier. Use "Get Organization Info" to list available container types.'
-        ),
+        .describe('Project type name. Call get_organization and use a containerTypes label.'),
       description: z.string().optional().describe('Description of the project.'),
       parentPortfolioExternalIds: z
         .array(z.string())
@@ -32,7 +30,9 @@ Optionally assign a parent portfolio and project type.`,
   )
   .output(
     z.object({
-      projectId: z.string().describe('ID of the newly created project.')
+      projectId: z
+        .string()
+        .describe('External ID of the newly created project. Use get_project to retrieve it.')
     })
   )
   .handleInvocation(async ctx => {
@@ -48,8 +48,7 @@ Optionally assign a parent portfolio and project type.`,
       parentPortfolioExternalIds: ctx.input.parentPortfolioExternalIds
     });
 
-    let projectId =
-      typeof result === 'string' ? result : result?.id || result?.externalId || String(result);
+    let projectId = getCreatedId(result);
 
     return {
       output: {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { KlazifyClient } from '../lib/client';
+import { refreshSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getTechStack = SlateTool.create(spec, {
@@ -14,7 +15,8 @@ export let getTechStack = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      url: z.string().describe('The URL or domain to detect the tech stack for')
+      url: z.string().describe('The URL or domain to detect the tech stack for'),
+      refresh: refreshSchema
     })
   )
   .output(
@@ -26,7 +28,7 @@ export let getTechStack = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new KlazifyClient({ token: ctx.auth.token });
-    let result = await client.techStack(ctx.input.url);
+    let result = await client.techStack(ctx.input.url, ctx.input.refresh);
 
     let tech = result.objects?.company?.tech ?? [];
 

@@ -1,73 +1,28 @@
-Now let me check the chatbot/webhook configuration details more closely.Now I have enough information to write the specification.
+# Loomio Integration
 
-# Slates Specification for Loomio
+Loomio helps groups discuss issues, vote on proposals, and reach decisions.
 
-## Overview
+## Authentication and instance
 
-Loomio is a collaborative decision-making platform that enables groups to hold discussions, create proposals, and run polls with various voting methods (proposals, score voting, ranked choice, dot voting, etc.). It is open-source software developed by Loomio Cooperative Limited.
+Use a per-user API key from the signed-in [API access page](https://www.loomio.com/profile/api_access). Requests use `Authorization: Bearer <key>` against `/api/b2` on the configured Loomio instance. Hosted connections default to `https://www.loomio.com`; self-hosted connections may supply their own base URL. Actions use the account's existing permissions. Instance-administrator status does not expand group access.
 
-## Authentication
+## Capabilities
 
-As of October 2023, Loomio uses a per-user API key system. Each user of Loomio has an API key, and the API uses normal user accounts rather than per-group API keys.
+- `list_groups` discovers active memberships, group IDs, names, subgroup parents, and whether the group subscription is enabled. The endpoint returns all matching groups without pagination.
+- `create_discussion`, `get_discussion`, and `update_discussion` create, retrieve, and edit discussion context. Markdown and HTML are supported. Creation may include recipient IDs, emails, audience, and an invitation message.
+- `list_discussions` reads a group's discussions with `open`, `closed`, or `all` status, plus `limit` and `offset` pagination. Loomio requires `groupId`; the tool keeps that input optional for schema compatibility and reports a validation error when omitted.
+- `create_comment` posts text to an existing discussion as the API-key user.
+- `create_poll` and `get_poll` support proposals, polls, counts, score voting, ranked choice, meetings, and dot voting. Creation sends the documented `options` array. An omitted closing time creates a work-in-progress poll with voting disabled. Optional invitation messages and closing-soon reminders are supported.
+- `list_polls` reads a group's `active`, `closed`, or `all` polls with `limit` and `offset`. The existing `discussionId` filter is preserved by resolving the discussion's group and filtering the returned group page. Pagination occurs before that filter; advance the offset to check later group pages. A total count is returned only for unfiltered group results when supplied by Loomio.
+- `manage_memberships` invites email addresses and optionally removes absent members. This requires group-administrator permission. The response contains added and removed email addresses.
 
-The API key is available on the Loomio API documentation page at `https://www.loomio.com/help/api2` when logged in. The key is passed as a parameter (`api_key`) in requests, either as a query string parameter for GET requests or within the JSON body for POST requests.
+Read outputs retain their existing field types. Missing or null optional provider fields are omitted, while unexpected response envelopes report a provider error rather than returning empty summaries.
 
-It is recommended to create a dedicated user account for API access. The API uses normal user accounts, and you can mark a user as a bot account via the profile page to prevent it from being invited to polls and discussions.
+## Scope and limitations
 
-**Base URL:** `https://www.loomio.com/api/b2/`
+The public User API has no documented self/profile endpoint, so no identity tool is added. Server-wide account administration uses the separate `/api/b3` API and is outside this integration. File exports, webhooks, triggers, and chat integrations are outside this refresh. Provider permissions apply to every request.
 
-For self-hosted Loomio instances, replace `www.loomio.com` with your instance domain.
+## Provider references
 
-**Note:** OAuth support was previously available but has been removed because it was not being used and considered a security risk.
-
-## Features
-
-### Discussion Management
-
-Create and retrieve discussion threads within groups. Threads can include a title, description (in Markdown or HTML), and can notify specific users, email addresses, or an entire group upon creation.
-
-- Supports specifying a group for the thread or creating standalone threads.
-- Recipients can be specified by user IDs, email addresses, or by targeting the whole group.
-
-### Polls and Proposals
-
-Create and retrieve polls and proposals with various voting methods. Supported poll types include: proposals (show of thumbs), multiple choice, score voting, ranked choice, dot voting, and meeting polls (time polls).
-
-- **Poll types:** `proposal`, `poll`, `count`, `score`, `ranked_choice`, `meeting`, `dot_vote`.
-- Options can be configured per poll type (e.g., `agree`/`disagree`/`abstain`/`block` for proposals, ISO 8601 datetimes for meeting polls, arbitrary strings for other types).
-- Configurable closing time, anonymous voting, result visibility (`off`, `until_vote`, `until_closed`), option shuffling, and closing-soon reminders.
-- Voters can be restricted to specified people only (`specified_voters_only`).
-- Polls can be associated with an existing discussion thread or a group.
-
-### Membership Management
-
-List and manage group memberships. You can send a list of emails to invite all new email addresses to the group.
-
-- Supports syncing membership with an external list: passing `remove_absent=1` will remove any existing group members whose emails are not in the provided list. Use with caution as this can remove all members.
-- Returns a summary of added and removed email addresses.
-
-### Data Retrieval
-
-Fetch details of individual discussions and polls by their ID (integer) or key (string).
-
-- The API is still evolving and described as "development is request driven." Not all internal platform features are exposed through the public integration API.
-
-## Events
-
-Loomio supports **outgoing webhooks** (called "Chatbots") that send notifications to external services when events occur within a group. The webhook-based system can be used to support any system that accepts incoming webhooks with HTML or Markdown formatting.
-
-Chatbots are configured per group and can be set to automatically fire on specific events. They can also be triggered manually (e.g., inviting a chatbot to notify about a specific poll).
-
-### Discussion Events
-
-Notifications when new discussion threads are started within a group.
-
-### Proposal and Poll Events
-
-Notifications when new proposals are created, comments are posted, votes are cast, and outcomes are published.
-
-### Configurable Event Types
-
-Automatic notifications can be enabled per event type in the chatbot settings. Events include new threads, new polls/proposals, new comments, new votes, and outcomes. Each event type can be individually toggled on or off per chatbot.
-
-- **Limitation:** These are outgoing webhooks only (Loomio pushes to an external URL). Loomio does not support inbound webhooks or event subscription callbacks to arbitrary endpoints via its API. The chatbot/webhook configuration is done through the Loomio UI, not programmatically via the API.
+- [User API documentation](https://www.loomio.com/docs/en/user_manual/integrations/api/user-api)
+- [API overview](https://www.loomio.com/docs/en/user_manual/integrations/api)

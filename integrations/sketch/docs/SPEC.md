@@ -1,61 +1,52 @@
-I can see that Sketch primarily has a local JavaScript plugin API for the Mac app. Let me check if they have a cloud/web API (Sketch Cloud or Sketch for Teams) that would be more suitable for an integration platform.I see that Sketch's GraphQL API in the web app is internal-only and not publicly accessible. Let me check the Sketch Cloud API and webhooks more specifically.Based on my research, I now have a comprehensive understanding of Sketch's developer ecosystem. Sketch does **not** offer a public REST/GraphQL web API for cloud operations. It provides: a JavaScript Plugin API (runs inside the Mac app), a CLI tool (sketchtool), an open file format, an Action API for in-app events, and a URL scheme. There is no public cloud API, no OAuth, no webhooks, and no personal access tokens for remote API access.
+# Sketch integration specification
 
-# Slates Specification for Sketch
+## Supported surface
 
-## Overview
+This integration processes unpacked Sketch JSON using the documented
+[open file format](https://developer.sketch.com/file-format/). Sketch's developer
+site also documents a Mac application JavaScript API and command-line tools;
+this integration does not invoke those application runtimes.
 
-Sketch is a macOS-native digital design application for UI/UX and product design, offering vector editing, prototyping, and collaboration via a cloud workspace. It provides developer extensibility through a JavaScript Plugin API that runs inside the Mac app, a command-line interface (sketchtool) for asset export and document inspection, and an open JSON-based file format for programmatic document manipulation. Sketch does not offer a public REST or GraphQL web API for remote cloud access.
+Authentication and configuration are empty because all operations use the JSON
+provided to the tool. There is no account identity to discover in this surface.
+No remote account API or undocumented cloud endpoint is assumed.
 
-## Authentication
+## Document inspection
 
-The Sketch JavaScript API comes bundled inside the Sketch Mac app and requires no separate authentication — it runs in the context of the local application.
+- `parse_document` summarizes pages, artboards, flattened child layers, local
+  symbol sources, shared styles, color assets, and supplied version/font data.
+- `inspect_layers` accepts at most one of `objectId`, `layerName`, or
+  `layerClass`. Omitting all selectors lists child layers. Explicit selectors
+  can match the page itself as well as its descendants.
+- `extract_colors` reads legacy color assets, shared swatches, shared layer/text
+  styles, enabled fills and borders, and attributed text colors. It deduplicates
+  by color, source, and source name; it does not flatten gradients or render
+  appearance/compositing.
+- `extract_text_content` preserves empty text-layer strings and includes layer
+  IDs, names, and containing page names.
+- `extract_symbols` inventories local `symbolMaster` layers, exposing their
+  symbol ID, object ID, name, page, and dimensions. It does not resolve remote
+  libraries or expand symbol-instance overrides.
 
-The CLI tool (sketchtool) is free to use but requires a valid Sketch license to run plugins.
+Nested JSON is checked for the fields used by these operations. Unknown fields
+are retained. This structural check is not complete native schema validation.
+Invalid consumed data and incompatible search selectors return clear validation
+errors.
 
-Sketch does not provide a public cloud-facing API with standard authentication mechanisms (such as API keys, OAuth2, or personal access tokens). The GraphQL API used in the Sketch Web App is internal-only and not available for external use. All developer integrations are either local (via the Plugin API or CLI running on macOS) or file-based (by reading/writing the `.sketch` file format directly).
+## Draft generation
 
-There is no remote HTTP API authentication to configure for third-party integrations.
+`generate_page` and `generate_document` create partial draft JSON structures
+and downloadable JSON files. Existing structured JSON output shapes are retained.
+They do not generate a ZIP archive or certify that Sketch will open the drafts.
+Layer-specific geometry, text attributes, images, complete style defaults, and
+other required native fields may need completion for the target document version.
 
-## Features
+Hex colors accept 3, 4, 6, or 8 hexadecimal digits with an optional `#`; alpha
+uses the final component. Invalid colors, negative dimensions or border
+thickness, and opacity outside 0–1 are rejected. Generated text layers always
+contain an attributed string, including empty strings.
 
-### Document Manipulation (JavaScript Plugin API)
-
-The official JavaScript API allows access to and modification of Sketch documents, provides data to Sketch users, and offers basic user interface integration. This includes:
-
-- Accessing, modifying, and creating documents — everything from colors to layers and symbols.
-- Saving custom data for a layer or document and storing user settings for a plugin.
-- Providing image or text data right within Sketch via Data Suppliers, which integrate directly with the Sketch user interface.
-- Working with libraries, importing symbols, layer styles, and text styles from shared libraries.
-- Importing files as layers and exporting objects to supported file formats.
-
-This API only runs within the Sketch Mac application and cannot be accessed remotely.
-
-### Asset Export (CLI — sketchtool)
-
-Sketch includes sketchtool, a command-line interface for integration into save-to-publish workflows. With sketchtool you can export artboards, layers, slices, pages and document previews, inspect documents, and run plugins.
-
-- Supports export in multiple formats (PNG, JPG, SVG, PDF, etc.) and at multiple scales.
-- Can inspect document metadata and dump the full document structure in JSON format.
-- Requires macOS and the Sketch app to be installed, as the binary is located within the Sketch application bundle.
-
-### Open File Format
-
-Sketch documents are stored as ZIP archives containing JSON-encoded data. The file format allows for third-party integration — you can generate Sketch documents dynamically, read, or modify them without opening them in Sketch.
-
-- The specification is published as JSON Schema, which can be used to generate types, GraphQL schemas, model code, or validate Sketch documents programmatically.
-- TypeScript types are available via the `sketch-file-format-ts` npm package for strongly typing Sketch document data.
-- This enables cross-platform, server-side processing of Sketch files without requiring macOS or the Sketch app.
-
-### URL Scheme
-
-Sketch supports integration via the `sketch://` URL scheme, which allows external applications to trigger actions within the Sketch Mac app, such as opening specific documents.
-
-## Events
-
-Sketch provides an Action API that lets plugins react to events in the app. Plugin authors can write code that is executed when certain actions are triggered.
-
-An action is an event that happens in the app, usually as a consequence of user interaction. Actions have names like `CloseDocument`, `DistributeHorizontally`, or `TogglePresentationMode`, and plugins can run code when those actions are triggered.
-
-These events are only available to plugins running inside the Sketch Mac application. They are not webhooks and cannot be subscribed to remotely. Sketch does not provide webhooks, server-side event subscriptions, or any remote event notification mechanism.
-
-The provider does not support events accessible from an external integration platform.
+Use the [official specification](https://developer.sketch.com/file-format/spec)
+for version-specific validation. Its linked [schema repository](https://github.com/sketch-hq/sketch-document)
+was archived in April 2025; documentation and historic schemas do not prove
+compatibility with newer Sketch formats.

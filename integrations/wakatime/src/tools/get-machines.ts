@@ -31,16 +31,16 @@ export let getMachines = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new WakaTimeClient({ token: ctx.auth.token });
+    let client = new WakaTimeClient(ctx.auth);
 
     let machines = await client.getMachines();
 
     let mapped = (machines || []).map((m: any) => ({
       machineId: m.id ?? '',
       name: m.value ?? m.name ?? '',
-      ip: m.ip,
-      lastSeenAt: m.last_seen_at,
-      createdAt: m.created_at
+      ip: m.ip ?? undefined,
+      lastSeenAt: m.last_seen_at ?? undefined,
+      createdAt: m.created_at ?? undefined
     }));
 
     return {

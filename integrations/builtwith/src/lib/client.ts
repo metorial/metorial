@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export interface DomainLookupOptions {
   domain: string;
@@ -16,6 +16,7 @@ export interface ListsOptions {
   technology: string;
   includeMetaData?: boolean;
   offset?: number;
+  offsetToken?: string;
   since?: string;
 }
 
@@ -37,14 +38,82 @@ export interface TrustOptions {
 }
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
   private token: string;
 
   constructor(config: { token: string }) {
+    if (!config.token.trim()) {
+      throw createApiServiceError('A BuiltWith API key is required.', {
+        reason: 'builtwith_missing_api_key'
+      });
+    }
     this.token = config.token;
-    this.http = createAxios({
-      baseURL: 'https://api.builtwith.com'
+    this.http = createAuthenticatedAxios({
+      baseURL: 'https://api.builtwith.com',
+      timeout: 60000,
+      contentType: false,
+      errorAdapter: error => this.apiError(error)
     });
+  }
+
+  private apiError(error: unknown) {
+    return buildApiServiceError(error, {
+      providerLabel: 'BuiltWith',
+      reason: 'builtwith_api_error',
+      detailKeys: ['Message', 'Code', 'message', 'code', 'error'],
+      nestedKeys: ['Errors', 'errors'],
+      extractResponse: (failure, helpers) => {
+        let response = helpers.getResponse(failure);
+        if (
+          helpers.isRecord(failure) &&
+          failure.name === 'SlateError' &&
+          helpers.isRecord(failure.data) &&
+          helpers.isRecord(failure.data.baggage) &&
+          failure.data.baggage.response !== undefined
+        ) {
+          return { ...response, data: failure.data.baggage.response };
+        }
+        return response;
+      },
+      extractUpstreamCode: (_failure, response, helpers) => {
+        let data = response?.data;
+        let error =
+          helpers.isRecord(data) && Array.isArray(data.Errors) ? data.Errors[0] : undefined;
+        if (
+          helpers.isRecord(error) &&
+          (typeof error.Code === 'number' || typeof error.Code === 'string')
+        ) {
+          return String(error.Code);
+        }
+        return undefined;
+      }
+    });
+  }
+
+  private async get(
+    path: string,
+    params: Record<string, string | number | boolean | undefined>
+  ) {
+    let response = await this.http.get(path, { params: this.buildParams(params) });
+    if (Array.isArray(response.data?.Errors) && response.data.Errors.length > 0) {
+      throw this.apiError({ response: { status: response.status, data: response.data } });
+    }
+    return response.data;
+  }
+
+  private detectedRange(value: string | undefined, field: string) {
+    if (value === undefined) return undefined;
+    if (/^\d{4}-\d{2}-\d{2}\|\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    let date = /^\d+$/.test(value) ? new Date(Number(value)) : new Date(value);
+    if (!Number.isFinite(date.getTime())) {
+      throw createApiServiceError(
+        `${field} must be a date, Unix timestamp in milliseconds, or YYYY-MM-DD|YYYY-MM-DD range.`,
+        {
+          reason: 'builtwith_invalid_detection_date'
+        }
+      );
+    }
+    return `${date.toISOString().slice(0, 10)}|${new Date().toISOString().slice(0, 10)}`;
   }
 
   private buildParams(
@@ -67,20 +136,14 @@ export class Client {
     if (options.noMetaData) params.NOMETA = 'yes';
     if (options.noAttributeData) params.NOATTR = 'yes';
     if (options.noPii) params.NOPII = 'yes';
-    if (options.firstDetectedSince) params.FDRANGE = options.firstDetectedSince;
-    if (options.lastDetectedSince) params.LDRANGE = options.lastDetectedSince;
+    params.FDRANGE = this.detectedRange(options.firstDetectedSince, 'firstDetectedSince');
+    params.LDRANGE = this.detectedRange(options.lastDetectedSince, 'lastDetectedSince');
 
-    let response = await this.http.get('/v22/api.json', {
-      params: this.buildParams(params)
-    });
-    return response.data;
+    return this.get('/v22/api.json', params);
   }
 
   async domainLive(domain: string) {
-    let response = await this.http.get('/ddlv2/api.json', {
-      params: this.buildParams({ LOOKUP: domain })
-    });
-    return response.data;
+    return this.get('/ddlv2/api.json', { LOOKUP: domain });
   }
 
   async lists(options: ListsOptions) {
@@ -88,20 +151,21 @@ export class Client {
       TECH: options.technology
     };
     if (options.includeMetaData) params.META = 'yes';
-    if (options.offset !== undefined) params.OFFSET = options.offset;
+    if (options.offset !== undefined && options.offsetToken !== undefined) {
+      throw createApiServiceError('Provide offsetToken or offset, not both.', {
+        reason: 'builtwith_conflicting_offset'
+      });
+    }
+    if (options.offsetToken !== undefined) params.OFFSET = options.offsetToken;
+    else if (options.offset !== undefined) params.OFFSET = options.offset;
+    params.TECH = options.technology.replace(/\s+/g, '-');
     if (options.since) params.SINCE = options.since;
 
-    let response = await this.http.get('/lists12/api.json', {
-      params: this.buildParams(params)
-    });
-    return response.data;
+    return this.get('/lists12/api.json', params);
   }
 
   async relationships(domain: string) {
-    let response = await this.http.get('/rv4/api.json', {
-      params: this.buildParams({ LOOKUP: domain })
-    });
-    return response.data;
+    return this.get('/rv4/api.json', { LOOKUP: domain });
   }
 
   async trends(options: TrendsOptions) {
@@ -110,10 +174,7 @@ export class Client {
     };
     if (options.date) params.DATE = options.date;
 
-    let response = await this.http.get('/trends/v6/api.json', {
-      params: this.buildParams(params)
-    });
-    return response.data;
+    return this.get('/trends/v6/api.json', params);
   }
 
   async companyToUrl(options: CompanyToUrlOptions) {
@@ -123,17 +184,11 @@ export class Client {
     if (options.amount !== undefined) params.AMOUNT = options.amount;
     if (options.tld) params.TLD = options.tld;
 
-    let response = await this.http.get('/ctu3/api.json', {
-      params: this.buildParams(params)
-    });
-    return response.data;
+    return this.get('/ctu3/api.json', params);
   }
 
   async keywords(domains: string[]) {
-    let response = await this.http.get('/kw2/api.json', {
-      params: this.buildParams({ LOOKUP: domains.join(',') })
-    });
-    return response.data;
+    return this.get('/kw2/api.json', { LOOKUP: domains.join(',') });
   }
 
   async trust(options: TrustOptions) {
@@ -143,51 +198,43 @@ export class Client {
     if (options.stopwords) params.WORDS = options.stopwords;
     if (options.live) params.LIVE = 'yes';
 
-    let response = await this.http.get('/trustv1/api.json', {
-      params: this.buildParams(params)
-    });
-    return response.data;
+    return this.get('/trustv1/api.json', params);
   }
 
   async redirects(domain: string) {
-    let response = await this.http.get('/redirect1/api.json', {
-      params: this.buildParams({ LOOKUP: domain })
-    });
-    return response.data;
+    return this.get('/redirect1/api.json', { LOOKUP: domain });
   }
 
   async recommendations(domain: string) {
-    let response = await this.http.get('/rec1/api.json', {
-      params: this.buildParams({ LOOKUP: domain })
-    });
-    return response.data;
+    return this.get('/rec1/api.json', { LOOKUP: domain });
   }
 
   async tags(domain: string) {
-    let response = await this.http.get('/tag1/api.json', {
-      params: this.buildParams({ LOOKUP: domain })
-    });
-    return response.data;
+    return this.get('/tag1/api.json', { LOOKUP: domain });
   }
 
   async productSearch(query: string) {
-    let response = await this.http.get('/productv1/api.json', {
-      params: this.buildParams({ QUERY: query })
-    });
-    return response.data;
+    return this.get('/productv1/api.json', { QUERY: query });
   }
 
   async freeLookup(domain: string) {
-    let response = await this.http.get('/free1/api.json', {
-      params: this.buildParams({ LOOKUP: domain })
-    });
-    return response.data;
+    return this.get('/free1/api.json', { LOOKUP: domain });
+  }
+
+  async changes(domain: string, since?: string) {
+    return this.get('/change1/api.json', { LOOKUP: domain, SINCE: since });
+  }
+
+  async keywordSearch(keyword: string, limit?: number, offset?: string) {
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 16 || limit > 1000)) {
+      throw createApiServiceError('limit must be a whole number from 16 to 1000.', {
+        reason: 'builtwith_invalid_keyword_limit'
+      });
+    }
+    return this.get('/kws1/api.json', { KEYWORD: keyword, LIMIT: limit, OFFSET: offset });
   }
 
   async financial(domain: string) {
-    let response = await this.http.get('/financialv1/api.json', {
-      params: this.buildParams({ LOOKUP: domain })
-    });
-    return response.data;
+    return this.get('/financial1/api.json', { LOOKUP: domain });
   }
 }

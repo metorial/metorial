@@ -1,6 +1,7 @@
 export * from './create-optimization';
 export * from './geocode';
 export * from './get-activities';
+export * from './get-current-user';
 export * from './get-optimization';
 export * from './manage-contacts';
 export * from './manage-notes';

@@ -1,6 +1,8 @@
-# Customgpt
+# CustomGPT
 
-Create and manage custom AI chatbot agents powered by your own content. Ingest data from websites, documents, PDFs, audio, video, and 1400+ file formats to build RAG-powered knowledge bases. Send messages to agents and manage conversations with session tracking. Retrieve citations, trust scores, and claim verification for responses. Configure agent personas, settings, and behavior rules. Organize documents with labels and control user access. View analytics including customer intelligence, traffic, query, and conversation metrics. Export leads and conversation data. Manage agent licenses, data source syncing, and document reindexing.
+Create and manage AI agents powered by your own content. Add URL or sitemap sources, sync existing sources, and browse, search, reindex, or update metadata for indexed documents. Send questions, manage conversations, inspect individual messages and citations, and submit feedback. Configure settings and restore persona versions. View account information and analytics, or download a conversation as CSV, JSON, Excel, or PDF.
+
+Connect with a CustomGPT API key. Use `list_agents`, `list_conversations`, and `get_messages` to discover the IDs needed by subsequent tools. Source labeling and persona restoration require the relevant CustomGPT plan or feature access. File uploads are not exposed by this integration.
 
 ## License
 

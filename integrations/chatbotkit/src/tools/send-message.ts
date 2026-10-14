@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let sendMessageTool = SlateTool.create(spec, {
   key: 'send_message',
   description: `Send a message in a conversation and optionally receive the bot's response. Can also use the stateless complete endpoint for one-shot interactions without managing conversation state.`,
   instructions: [
-    'For stateless one-shot completions, omit conversationId and provide text and/or messages directly.',
+    'For stateless one-shot completions, omit conversationId and provide text directly.',
     'For stateful conversations, provide conversationId and set receiveResponse to true to get the bot reply.'
   ],
   tags: {
@@ -76,6 +76,21 @@ export let sendMessageTool = SlateTool.create(spec, {
       receiveResponse,
       meta
     } = ctx.input;
+
+    if (
+      conversationId &&
+      [botId, backstory, model, datasetId, skillsetId].some(value => value !== undefined)
+    ) {
+      throw createApiServiceError(
+        'Bot and model overrides are only supported for stateless completions. Omit conversationId or update the conversation settings first.'
+      );
+    }
+
+    if (!conversationId && receiveResponse === false) {
+      throw createApiServiceError(
+        'Stateless completions always return a response. Supply conversationId when receiveResponse is false.'
+      );
+    }
 
     if (!conversationId) {
       let result = await client.completeConversation({

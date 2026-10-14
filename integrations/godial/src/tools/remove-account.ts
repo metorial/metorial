@@ -14,7 +14,9 @@ export let removeAccount = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      accountId: z.string().describe('ID of the account to remove')
+      accountId: z
+        .string()
+        .describe('Account ID. Call list_accounts to discover available accounts.')
     })
   )
   .output(

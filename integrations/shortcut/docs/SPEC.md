@@ -1,4 +1,4 @@
-Now let me get more details on the API features by looking at the REST API documentation:# Slates Specification for Shortcut
+# Shortcut API Specification
 
 ## Overview
 

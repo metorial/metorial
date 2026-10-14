@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'sendbird',
   name: 'Sendbird',
   description:
-    'Sendbird provides APIs for real-time chat messaging, voice/video calls, and business messaging.',
+    'Manage Sendbird Chat users, channels, messages, channel membership, and moderation.',
   metadata: {},
   config,
   auth

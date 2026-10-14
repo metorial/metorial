@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CoreClient } from '../lib/client';
 import { spec } from '../spec';
@@ -47,10 +47,20 @@ export let manageStorageZone = SlateTool.create(spec, {
       page: z.number().optional().describe('Page number (list action)'),
       perPage: z.number().optional().describe('Results per page (list action)'),
       originUrl: z.string().optional().describe('Custom origin URL (update action)'),
+      custom404FilePath: z
+        .string()
+        .optional()
+        .describe(
+          'Path to the custom 404 file (update action). Use an empty string to disable it.'
+        ),
+      rewrite404To200: z
+        .boolean()
+        .optional()
+        .describe('Return HTTP 200 for a custom 404 response (update action)'),
       customSsl404Enabled: z
         .boolean()
         .optional()
-        .describe('Enable custom 404 page (update action)')
+        .describe('Legacy setting. Use custom404FilePath or rewrite404To200 for update.')
     })
   )
   .output(
@@ -63,6 +73,19 @@ export let manageStorageZone = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ['get', 'update', 'delete'].includes(ctx.input.action) &&
+      (ctx.input.storageZoneId === undefined ||
+        ctx.input.storageZoneId <= 0 ||
+        !Number.isInteger(ctx.input.storageZoneId))
+    )
+      throw createApiServiceError('A positive storageZoneId is required for this action.');
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim())
+      throw createApiServiceError('A name is required to create a storage zone.');
+    if (ctx.input.action === 'update' && ctx.input.customSsl404Enabled !== undefined)
+      throw createApiServiceError(
+        'customSsl404Enabled is not a supported storage setting. Use custom404FilePath to select a custom error page, or rewrite404To200 to control its response status.'
+      );
     let client = new CoreClient({ token: ctx.auth.token });
 
     switch (ctx.input.action) {
@@ -88,8 +111,11 @@ export let manageStorageZone = SlateTool.create(spec, {
         };
       }
       case 'create': {
-        let data: any = { Name: ctx.input.name! };
-        if (ctx.input.region) data.Region = ctx.input.region;
+        let data = {
+          Name: ctx.input.name!,
+          Region: ctx.input.region ?? 'DE',
+          ReplicationRegions: ctx.input.replicationRegions
+        };
         if (ctx.input.replicationRegions)
           data.ReplicationRegions = ctx.input.replicationRegions;
 
@@ -101,11 +127,12 @@ export let manageStorageZone = SlateTool.create(spec, {
       }
       case 'update': {
         let data: Record<string, any> = {};
-        if (ctx.input.replicationRegions)
-          data.ReplicationRegions = ctx.input.replicationRegions;
+        if (ctx.input.replicationRegions) data.ReplicationZones = ctx.input.replicationRegions;
         if (ctx.input.originUrl !== undefined) data.OriginUrl = ctx.input.originUrl;
-        if (ctx.input.customSsl404Enabled !== undefined)
-          data.Custom404FilePath = ctx.input.customSsl404Enabled;
+        if (ctx.input.custom404FilePath !== undefined)
+          data.Custom404FilePath = ctx.input.custom404FilePath;
+        if (ctx.input.rewrite404To200 !== undefined)
+          data.Rewrite404To200 = ctx.input.rewrite404To200;
 
         let zone = await client.updateStorageZone(ctx.input.storageZoneId!, data);
         return {

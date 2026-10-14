@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DockClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,9 +7,9 @@ export let manageDid = SlateTool.create(spec, {
   name: 'Manage DID',
   key: 'manage_did',
   description: `Create, retrieve, list, delete, or export a Decentralized Identifier (DID). DIDs are globally unique identifiers that allow their owner to prove cryptographic control.
-Supports both native Dock DIDs and Polygon ID DIDs. Use \`keyType: "bjj"\` for Polygon ID DIDs.`,
+Current DID creation supports cheqd, key, and legacy Dock methods. Older Polygon ID input values remain accepted for compatibility.`,
   instructions: [
-    'To create a DID, set action to "create". Optionally specify type (dock or polygonid) and keyType (ed25519, sr25519, secp256k1, bjj).',
+    'To create a DID, set action to "create". Optionally specify didType (cheqd, key, or dock) and keyType. cheqd is the current default; sr25519 and secp256k1 are deprecated.',
     'To retrieve a DID, set action to "get" and provide the did.',
     'To list all DIDs, set action to "list".',
     'To delete a DID, set action to "delete" and provide the did. This is irreversible.',
@@ -29,11 +29,16 @@ Supports both native Dock DIDs and Polygon ID DIDs. Use \`keyType: "bjj"\` for P
         .string()
         .optional()
         .describe('Fully qualified DID string (required for get, delete, export)'),
-      didType: z.enum(['dock', 'polygonid']).optional().describe('Type of DID to create'),
-      keyType: z
-        .enum(['ed25519', 'sr25519', 'secp256k1', 'bjj'])
+      didType: z
+        .enum(['dock', 'polygonid', 'cheqd', 'key'])
         .optional()
-        .describe('Key type for the DID. Use bjj for Polygon ID DIDs'),
+        .describe('Type of DID to create'),
+      keyType: z
+        .enum(['ed25519', 'sr25519', 'secp256k1', 'bjj', 'secp256r1'])
+        .optional()
+        .describe(
+          'Signing key type. ed25519 is recommended; secp256r1 supports ES256/JWK flows'
+        ),
       controller: z
         .string()
         .optional()
@@ -79,7 +84,15 @@ Supports both native Dock DIDs and Polygon ID DIDs. Use \`keyType: "bjj"\` for P
         });
         return {
           output: {
-            did: result.did as string | undefined,
+            did:
+              typeof result.did === 'string'
+                ? result.did
+                : typeof result.data === 'object' &&
+                    result.data !== null &&
+                    'did' in result.data &&
+                    typeof result.data.did === 'string'
+                  ? result.data.did
+                  : undefined,
             didDocument: result,
             jobId: result.id as string | undefined
           },
@@ -87,7 +100,7 @@ Supports both native Dock DIDs and Polygon ID DIDs. Use \`keyType: "bjj"\` for P
         };
       }
       case 'get': {
-        if (!ctx.input.did) throw new Error('did is required for get action');
+        if (!ctx.input.did) throw createApiServiceError('did is required for get action');
         let result = await client.getDid(ctx.input.did);
         return {
           output: {
@@ -110,7 +123,7 @@ Supports both native Dock DIDs and Polygon ID DIDs. Use \`keyType: "bjj"\` for P
         };
       }
       case 'delete': {
-        if (!ctx.input.did) throw new Error('did is required for delete action');
+        if (!ctx.input.did) throw createApiServiceError('did is required for delete action');
         let result = await client.deleteDid(ctx.input.did);
         return {
           output: {
@@ -122,9 +135,17 @@ Supports both native Dock DIDs and Polygon ID DIDs. Use \`keyType: "bjj"\` for P
         };
       }
       case 'export': {
-        if (!ctx.input.did) throw new Error('did is required for export action');
-        if (!ctx.input.password) throw new Error('password is required for export action');
+        if (!ctx.input.did) throw createApiServiceError('did is required for export action');
+        if (!ctx.input.password)
+          throw createApiServiceError('password is required for export action');
         let result = await client.exportDid(ctx.input.did, ctx.input.password);
+        await ctx.addAttachment({
+          type: 'content',
+          content: new Response(JSON.stringify(result), {
+            headers: { 'Content-Type': 'application/json' }
+          }),
+          filename: 'encrypted-did-wallet.json'
+        });
         return {
           output: {
             did: ctx.input.did,

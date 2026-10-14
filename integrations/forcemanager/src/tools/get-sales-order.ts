@@ -43,10 +43,18 @@ Fetch by ID or list/search with filtering. When retrieving by ID, line items can
       let salesOrder = await client.getSalesOrder(ctx.input.salesOrderId);
       let lines: any[] | undefined;
       if (ctx.input.includeLines) {
-        let linesResult = await client.listSalesOrderLines({
-          q: `salesOrderId=${ctx.input.salesOrderId}`
-        });
-        lines = linesResult.records;
+        lines = [];
+        let page: number | null = 0;
+        while (page !== null) {
+          let linesResult = await client.listSalesOrderLines(
+            {
+              q: `salesorderId=${ctx.input.salesOrderId}`
+            },
+            page
+          );
+          lines.push(...linesResult.records);
+          page = linesResult.nextPage;
+        }
       }
       return {
         output: { salesOrders: [salesOrder], lines, totalCount: 1, nextPage: null },

@@ -4,6 +4,7 @@ import {
   addLeadsToCampaign,
   addLeadsToList,
   createList,
+  deleteLeadsFromList,
   getCampaign,
   getConversations,
   getLead,
@@ -13,6 +14,7 @@ import {
   listCampaigns,
   listLists,
   sendMessage,
+  stopLeadInCampaign,
   toggleCampaignStatus
 } from './tools';
 export let provider = Slate.create({
@@ -25,6 +27,8 @@ export let provider = Slate.create({
     getLead,
     getLeadsFromList,
     addLeadsToList,
+    deleteLeadsFromList,
+    stopLeadInCampaign,
     listLists,
     createList,
     getConversations,

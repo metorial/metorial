@@ -17,6 +17,9 @@ export let getBulkSearchResults = SlateTool.create(spec, {
       fileId: z.string().describe('File ID of the bulk search'),
       limit: z
         .number()
+        .min(1)
+        .max(100)
+        .refine(Number.isSafeInteger, 'Must be a safe integer')
         .optional()
         .describe('Number of results per page (default: 10, max: 100)'),
       next: z.boolean().optional().describe('Set true for next page, false for previous page'),
