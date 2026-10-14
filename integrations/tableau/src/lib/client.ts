@@ -309,6 +309,24 @@ export class TableauClient {
     return response.data.view;
   }
 
+  // Reads the view's underlying CSV as text for callers that need the data inline.
+  async getViewData(
+    viewId: string,
+    options?: Pick<ViewExportOptions, 'maxAgeMinutes' | 'filters'>,
+    maxBytes?: number
+  ): Promise<string> {
+    let response = await this.http.get(
+      `/sites/${this.siteId}/views/${encodeURIComponent(viewId)}/${EXPORT_ENDPOINTS.csv}`,
+      {
+        params: buildViewExportParams(options),
+        responseType: 'text',
+        headers: { Accept: '*/*' },
+        ...(maxBytes ? { maxContentLength: maxBytes } : {})
+      }
+    );
+    return typeof response.data === 'string' ? response.data : String(response.data ?? '');
+  }
+
   // Export endpoints are stable GET URLs authenticated by the X-Tableau-Auth header, so
   // the file is fetched on download instead of being read here.
   viewExportFile(

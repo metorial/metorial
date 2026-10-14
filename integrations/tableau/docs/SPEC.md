@@ -29,7 +29,7 @@ Tableau credentials tokens expire. Tableau Cloud tokens are documented as valid 
 - `list_datasources`: List and filter published data sources.
 - `manage_datasource`: Get, update, delete, and refresh data sources.
 - `list_views`: List and filter views.
-- `get_view_data`: Export view underlying data as a downloadable CSV file.
+- `get_view_data`: Return view underlying data as inline CSV text (optional `vf_` filters and `maxAge`), cut at a row boundary above about 4 MB with `truncated: true` and the full `byteSize`.
 - `export_view`: Export a view as a downloadable CSV, PNG, or PDF file.
 - `manage_custom_views`: List, get, update, delete, and export custom views.
 - `manage_users`: List, get, add, update, and remove site users.
@@ -44,7 +44,7 @@ Tableau credentials tokens expire. Tableau Cloud tokens are documented as valid 
 
 ## View Exports
 
-`get_view_data`, `export_view`, and the `manage_custom_views` `export` action first read the view or custom view (`GET .../views/{view-luid}` or `GET .../customviews/{custom-view-luid}`), so missing IDs and missing read access fail immediately. That pre-read only verifies read access: missing export permissions (Download Summary Data or Download Full Data for CSV, Download Image/PDF for PNG and PDF), invalid `vf_<field>` filters, and Tableau render timeouts surface only when the file is downloaded. The tools then return the Tableau export endpoint (`.../data`, `.../image`, or `.../pdf`, with `maxAge`, `vf_<field>` filters, and the image/PDF rendering options as query parameters) as a downloadable file authenticated with the `X-Tableau-Auth` credentials token. Tableau renders the file when it is downloaded, so there is no export size cap; structured output carries only the view ID, format, and MIME type. The stored credentials token is resolved when the file is downloaded, so PAT and username/password connections keep working after the sign-in session is renewed. Self-hosted Tableau Server must be reachable from the public internet for these downloads to work.
+`export_view` and the `manage_custom_views` `export` action first read the view or custom view (`GET .../views/{view-luid}` or `GET .../customviews/{custom-view-luid}`), so missing IDs and missing read access fail immediately. That pre-read only verifies read access: missing export permissions (Download Summary Data or Download Full Data for CSV, Download Image/PDF for PNG and PDF), invalid `vf_<field>` filters, and Tableau render timeouts surface only when the file is downloaded. The tools then return the Tableau export endpoint (`.../data`, `.../image`, or `.../pdf`, with `maxAge`, `vf_<field>` filters, and the image/PDF rendering options as query parameters) as a downloadable file authenticated with the `X-Tableau-Auth` credentials token. Tableau renders the file when it is downloaded, so there is no export size cap; structured output carries only the view ID, format, and MIME type. The stored credentials token is resolved when the file is downloaded, so PAT and username/password connections keep working after the sign-in session is renewed. Self-hosted Tableau Server must be reachable from the public internet for these downloads to work.
 
 ## Error Handling
 
